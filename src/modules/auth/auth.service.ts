@@ -1,0 +1,138 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import { User } from '@/entities/user.entity';
+import { RegisterDto, LoginDto } from './dto';
+import { AuthRepository } from './repositories';
+import {
+  ConflictException,
+  UnauthorizedException,
+  BusinessException,
+} from '@/common/exceptions';
+
+/**
+ * Auth Service - Business Logic Layer
+ * Gọi AuthRepository để access database thông qua stored procedures
+ * Áp dụng:
+ * - Single Responsibility Principle (SRP): Chỉ xử lý authentication logic
+ * - Dependency Inversion Principle (DIP): Phụ thuộc vào Repository abstraction
+ * - Repository Pattern + Database Procedure Pattern
+ */
+@Injectable()
+export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
+  constructor(
+    private readonly authRepository: AuthRepository,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  /**
+   * Register new user
+   */
+  async register(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
+    const { email, password } = registerDto;
+
+    // Check if user already exists via repository
+    const emailExists = await this.authRepository.emailExists(email);
+    if (emailExists) {
+      throw new ConflictException('Email already exists', 'EMAIL_EXISTS');
+    }
+
+    // Hash password
+    const passwordHash = await this.hashPassword(password);
+
+    // Create user via repository (stored procedure)
+    const user = await this.authRepository.createUser(email, passwordHash);
+
+    this.logger.log(`New user registered: ${email}`);
+
+    // Generate JWT token
+    const accessToken = this.generateAccessToken(user);
+
+    return {
+      accessToken,
+      user: this.sanitizeUser(user),
+    };
+  }
+
+  /**
+   * Login user
+   */
+  async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
+    const { email, password } = loginDto;
+
+    // Find user via repository (stored procedure)
+    const user = await this.authRepository.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check if user is banned
+    if (user.status === 'BANNED') {
+      throw new BusinessException('Account has been banned', 'ACCOUNT_BANNED');
+    }
+
+    // Verify password
+    const isPasswordValid = await this.verifyPassword(password, user.password_hash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    this.logger.log(`User logged in: ${email}`);
+
+    // Generate JWT token
+    const accessToken = this.generateAccessToken(user);
+
+    return {
+      accessToken,
+      user: this.sanitizeUser(user),
+    };
+  }
+
+  /**
+   * Get user profile by ID
+   */
+  async getProfile(userId: number): Promise<Partial<User>> {
+    // Note: This would also use a repository method if needed
+    // For now, service handles the error, repository would be called if we had this in repo
+    throw new UnauthorizedException('User profile endpoint should be called from users service');
+  }
+
+  /**
+   * Hash password using bcrypt
+   */
+  private async hashPassword(password: string): Promise<string> {
+    const saltRounds = 10;
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  /**
+   * Verify password
+   */
+  private async verifyPassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+
+  /**
+   * Generate JWT access token
+   */
+  private generateAccessToken(user: User): string {
+    const payload = {
+      sub: user.user_id,
+      email: user.email,
+    };
+
+    return this.jwtService.sign(payload);
+  }
+
+  /**
+   * Remove sensitive data from user object
+   */
+  private sanitizeUser(user: User): Partial<User> {
+    const { password_hash, two_fa_secret, ...sanitized } = user;
+    return sanitized;
+  }
+}
