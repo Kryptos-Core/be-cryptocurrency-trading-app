@@ -3,8 +3,8 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 /**
- * Logging Interceptor - Log incoming requests và responses
- * Áp dụng: Cross-Cutting Concern
+ * Logging Interceptor - Log incoming requests and responses 
+ * Applicable: Cross-Cutting Concern
  */
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
