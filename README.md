@@ -7,28 +7,36 @@ src/
 │   ├── filters/
 │   ├── guards/
 │   ├── interceptors/
-│   ├── pipes/
-│   └── exceptions/
+│   ├── repositories/
+│   │   ├── base.repository.ts
+│   │   ├── interfaces/
+│   │   └── index.ts
+│   ├── services/
+│   │   ├── redis.service.ts
+│   │   └── cache.service.ts
+│   ├── exceptions/
+│   └── validators/
 ├── config/
-│   ├── data-source.ts
-│   ├── typeorm.config.ts
+│   ├── app.config.ts
 │   ├── redis.config.ts
-│   └── app.config.ts
+│   ├── swagger.config.ts
+│   ├── typeorm.config.ts
+│   └── env.validation.ts
 ├── modules/
 │   ├── auth/
 │   ├── users/
-│   ├── wallets/
 │   ├── currencies/
 │   ├── markets/
+│   ├── wallets/
 │   ├── orders/
+│   ├── matching/
 │   ├── trades/
 │   ├── price-alerts/
-│   └── deposits-withdrawals/
+│   ├── deposits/
+│   ├── withdrawals/
+│   ├── websocket/
+│   └── jobs/
 ├── entities/
 ├── migrations/
-├── utils/
-│   ├── decorators/
-│   ├── helpers/
-│   └── validators/
-└── app.module.ts
+└── utils/
 ```
