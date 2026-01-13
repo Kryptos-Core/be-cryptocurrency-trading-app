@@ -21,6 +21,12 @@ export class User {
   @Column({ type: 'varchar', length: 255 })
   password_hash!: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  first_name!: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  last_name!: string;
+
   @Column({ type: 'varbinary', nullable: true })
   two_fa_secret!: Buffer;
 

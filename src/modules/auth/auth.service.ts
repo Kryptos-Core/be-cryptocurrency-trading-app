@@ -10,6 +10,7 @@ import {
   UnauthorizedException,
   BusinessException,
 } from '@/common/exceptions';
+import { formatName } from '@/utils/helpers';
 
 /**
  * Auth Service - Business Logic Layer
@@ -31,9 +32,10 @@ export class AuthService {
 
   /**
    * Register new user
+   * Applies Name Formatting Pattern for data consistency
    */
   async register(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
-    const { email, password } = registerDto;
+    const { email, password, firstName, lastName } = registerDto;
 
     // Check if user already exists via repository
     const emailExists = await this.authRepository.emailExists(email);
@@ -44,8 +46,17 @@ export class AuthService {
     // Hash password
     const passwordHash = await this.hashPassword(password);
 
+    // Format names for consistency (capitalize, sanitize)
+    const formattedFirstName = formatName(firstName);
+    const formattedLastName = formatName(lastName);
+
     // Create user via repository (stored procedure)
-    const user = await this.authRepository.createUser(email, passwordHash);
+    const user = await this.authRepository.createUser(
+      email, 
+      passwordHash, 
+      formattedFirstName, 
+      formattedLastName
+    );
 
     this.logger.log(`New user registered: ${email}`);
 
