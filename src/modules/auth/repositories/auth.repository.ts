@@ -33,11 +33,16 @@ export class AuthRepository {
    * Create new user (for registration)
    * Procedure returns the newly created user_id
    */
-  async createUser(email: string, passwordHash: string): Promise<User> {
+  async createUser(
+    email: string, 
+    passwordHash: string,
+    firstName?: string,
+    lastName?: string
+  ): Promise<User> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_create(?, ?)',
-        [email.toLowerCase(), passwordHash],
+        'CALL sp_user_create(?, ?, ?, ?)',
+        [email.toLowerCase(), passwordHash, firstName || null, lastName || null],
       );
 
       const userId = result[0]?.[0]?.user_id;
