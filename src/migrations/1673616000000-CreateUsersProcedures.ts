@@ -10,6 +10,25 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class CreateUsersProcedures1673616000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Check if users table exists before creating procedures
+    const tableExists = await queryRunner.hasTable('users');
+    if (!tableExists) {
+      // If table doesn't exist, skip this migration
+      // Procedures will be created after InitialSchema migration
+      return;
+    }
+
+    // Drop existing procedures if they exist (for re-running migrations)
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_id');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_email');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_all');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_count');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_create');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_update');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_delete');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_get_statistics');
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_email_exists');
+
     // 1. Find user by ID
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_id(

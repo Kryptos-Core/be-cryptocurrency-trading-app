@@ -11,12 +11,37 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Step 1: Add columns to users table
-    await queryRunner.query(`
-      ALTER TABLE users 
-      ADD COLUMN first_name VARCHAR(100) NULL AFTER password_hash,
-      ADD COLUMN last_name VARCHAR(100) NULL AFTER first_name
-    `);
+    // Check if users table exists before altering
+    const tableExists = await queryRunner.hasTable('users');
+    if (!tableExists) {
+      // If table doesn't exist, skip this migration
+      // It will be handled by InitialSchema migration
+      return;
+    }
+
+    // Check if columns already exist
+    const table = await queryRunner.getTable('users');
+    const hasFirstName = table?.findColumnByName('first_name');
+    const hasLastName = table?.findColumnByName('last_name');
+
+    // Step 1: Add columns to users table (only if they don't exist)
+    if (!hasFirstName && !hasLastName) {
+      await queryRunner.query(`
+        ALTER TABLE users 
+        ADD COLUMN first_name VARCHAR(100) NULL AFTER password_hash,
+        ADD COLUMN last_name VARCHAR(100) NULL AFTER first_name
+      `);
+    } else if (!hasFirstName) {
+      await queryRunner.query(`
+        ALTER TABLE users 
+        ADD COLUMN first_name VARCHAR(100) NULL AFTER password_hash
+      `);
+    } else if (!hasLastName) {
+      await queryRunner.query(`
+        ALTER TABLE users 
+        ADD COLUMN last_name VARCHAR(100) NULL AFTER first_name
+      `);
+    }
 
     // Step 2: Drop and recreate sp_user_create with new parameters
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_create`);
