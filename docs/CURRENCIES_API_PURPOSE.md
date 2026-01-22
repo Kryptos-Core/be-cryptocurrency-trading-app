@@ -500,14 +500,5 @@ async withdraw(userId: number, currencySymbol: string, amount: string) {
 
 ---
 
-## 7. Related Documentation
-
-- [Currencies Module Guide](./CURRENCIES_MODULE_GUIDE.md) - Technical implementation details
-- [Currencies Stored Procedures Guide](./CURRENCIES_STORED_PROCEDURES_GUIDE.md) - Database procedures
-- [Frontend UI Guide](./FRONTEND_UI_GUIDE.md) - Frontend integration
-- [API Documentation](../postman/Cryptocurrency-Trading-API.postman_collection.json) - Postman collection
-
----
-
 **Last Updated:** 2026-01-22  
 **Version:** 1.0.0
