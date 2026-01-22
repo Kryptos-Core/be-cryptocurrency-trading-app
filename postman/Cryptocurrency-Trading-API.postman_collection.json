@@ -1,0 +1,522 @@
+{
+	"info": {
+		"_postman_id": "cryptocurrency-trading-api",
+		"name": "Cryptocurrency Trading API - Currencies",
+		"description": "Postman collection để test API quản lý danh sách tiền ảo (Currencies Module)\n\n**Các tính năng:**\n- CRUD operations cho currencies\n- Pagination và filtering\n- Redis caching\n- JWT Authentication\n\n**Cách sử dụng:**\n1. Import collection này vào Postman\n2. Tạo environment với biến:\n   - `base_url`: http://localhost:3000\n   - `access_token`: (sẽ được set tự động sau khi login)\n3. Chạy request \"Auth - Login\" để lấy token\n4. Các request khác sẽ tự động sử dụng token",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.success && response.data && response.data.access_token) {",
+									"        pm.environment.set('access_token', response.data.access_token);",
+									"        console.log('Access token saved to environment');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Đăng nhập để lấy JWT access token. Token sẽ được tự động lưu vào environment variable `access_token`."
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints"
+		},
+		{
+			"name": "Currencies",
+			"item": [
+				{
+					"name": "Get All Currencies",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies?page=1&limit=10&includeInactive=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page (default: 10)"
+								},
+								{
+									"key": "includeInactive",
+									"value": "false",
+									"description": "Include inactive currencies (default: false)"
+								}
+							]
+						},
+						"description": "Lấy danh sách tất cả currencies với pagination. Có thể filter để bao gồm hoặc loại trừ inactive currencies."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Currencies - With Inactive",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies?page=1&limit=10&includeInactive=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "includeInactive",
+									"value": "true"
+								}
+							]
+						},
+						"description": "Lấy danh sách currencies bao gồm cả inactive currencies."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active Currencies",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies/active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								"active"
+							]
+						},
+						"description": "Lấy danh sách tất cả active currencies. Response được cache trong Redis để tăng performance."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tradable Currencies",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies/tradable",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								"tradable"
+							]
+						},
+						"description": "Lấy danh sách tất cả tradable và active currencies. Response được cache trong Redis."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Currency by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Currency ID"
+								}
+							]
+						},
+						"description": "Lấy thông tin chi tiết của một currency theo ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Currency by Symbol",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies/symbol/:symbol",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								"symbol",
+								":symbol"
+							],
+							"variable": [
+								{
+									"key": "symbol",
+									"value": "BTC",
+									"description": "Currency symbol (e.g., BTC, ETH, USDT)"
+								}
+							]
+						},
+						"description": "Lấy thông tin currency theo symbol (ví dụ: BTC, ETH, USDT)."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Currency",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"symbol\": \"BTC\",\n  \"name\": \"Bitcoin\",\n  \"precisionScale\": 8,\n  \"minWithdraw\": \"0.001\",\n  \"isTradable\": true,\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/currencies",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies"
+							]
+						},
+						"description": "Tạo currency mới. \n\n**Required fields:**\n- `symbol`: Currency symbol (uppercase, alphanumeric, 2-16 chars)\n- `name`: Currency full name (1-64 chars)\n\n**Optional fields:**\n- `precisionScale`: Decimal precision (0-18, default: 8)\n- `minWithdraw`: Minimum withdrawal amount (default: \"0\")\n- `isTradable`: Is tradable (default: true)\n- `isActive`: Is active (default: true)\n\n**Validation:**\n- Symbol must be unique\n- Symbol must match pattern: ^[A-Z0-9]+$"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Currency - Minimal",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"symbol\": \"ETH\",\n  \"name\": \"Ethereum\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/currencies",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies"
+							]
+						},
+						"description": "Tạo currency với chỉ các field bắt buộc. Các field optional sẽ dùng giá trị default."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Currency",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Bitcoin Updated\",\n  \"isActive\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/currencies/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Currency ID to update"
+								}
+							]
+						},
+						"description": "Cập nhật thông tin currency. Tất cả các fields đều optional.\n\n**Có thể update:**\n- `symbol`: Currency symbol (không nên thay đổi)\n- `name`: Currency name\n- `precisionScale`: Decimal precision (0-18)\n- `minWithdraw`: Minimum withdrawal amount\n- `isTradable`: Is tradable\n- `isActive`: Is active"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Currency - Full",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"symbol\": \"BTC\",\n  \"name\": \"Bitcoin\",\n  \"precisionScale\": 8,\n  \"minWithdraw\": \"0.0001\",\n  \"isTradable\": true,\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/currencies/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Cập nhật tất cả các fields của currency."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Currency",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/currencies/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"currencies",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Currency ID to delete"
+								}
+							]
+						},
+						"description": "Soft delete currency (set is_active = false). Response status code: 204 No Content."
+					},
+					"response": []
+				}
+			],
+			"description": "CRUD operations cho currencies module"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set base_url if not exists",
+					"if (!pm.environment.get('base_url')) {",
+					"    pm.environment.set('base_url', 'http://localhost:3000');",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"pm.test('Response time is less than 5000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
