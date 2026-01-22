@@ -33,13 +33,30 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
   }
 
   /**
+   * Get primary key property name from entity metadata
+   * Returns the first primary column property name
+   */
+  protected getPrimaryKeyName(): string {
+    const metadata = this.dataSource.getMetadata(this.entity);
+    const primaryColumns = metadata.primaryColumns;
+    if (primaryColumns.length === 0) {
+      throw new Error(`Entity ${metadata.name} has no primary key`);
+    }
+    // Return the first primary column property name
+    return primaryColumns[0].propertyName;
+  }
+
+  /**
    * Find entity by ID
    * Template Method: Base implementation
+   * Automatically uses the correct primary key field name
    */
   async findById(id: number | string): Promise<T | null> {
     try {
+      const primaryKeyName = this.getPrimaryKeyName();
+      const whereClause = { [primaryKeyName]: id } as unknown as FindOptionsWhere<T>;
       return await this.repository.findOne({
-        where: { id } as unknown as FindOptionsWhere<T>,
+        where: whereClause,
       } as FindOneOptions<T>);
     } catch (error) {
       this.logger.error(`Error finding ${this.entity.toString()} by ID: ${id}`, error);
@@ -157,10 +174,13 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
   /**
    * Update entity by ID
    * Template Method: Base update implementation
+   * Automatically uses the correct primary key field name
    */
   async update(id: number | string, entity: DeepPartial<T>): Promise<T> {
     try {
-      await this.repository.update(id, entity as any);
+      const primaryKeyName = this.getPrimaryKeyName();
+      const whereClause = { [primaryKeyName]: id } as any;
+      await this.repository.update(whereClause, entity as any);
       const updated = await this.findById(id);
       if (!updated) {
         throw new Error(`Entity with ID ${id} not found after update`);
@@ -188,10 +208,13 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
   /**
    * Delete entity by ID (soft delete if entity has deletedAt)
    * Template Method: Can be overridden for soft delete
+   * Automatically uses the correct primary key field name
    */
   async delete(id: number | string): Promise<void> {
     try {
-      const result = await this.repository.delete(id);
+      const primaryKeyName = this.getPrimaryKeyName();
+      const whereClause = { [primaryKeyName]: id } as any;
+      const result = await this.repository.delete(whereClause);
       if (result.affected === 0) {
         throw new Error(`Entity with ID ${id} not found`);
       }
@@ -216,10 +239,13 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
 
   /**
    * Hard delete entity by ID
+   * Automatically uses the correct primary key field name
    */
   async hardDelete(id: number | string): Promise<void> {
     try {
-      const result = await this.repository.delete(id);
+      const primaryKeyName = this.getPrimaryKeyName();
+      const whereClause = { [primaryKeyName]: id } as any;
+      const result = await this.repository.delete(whereClause);
       if (result.affected === 0) {
         throw new Error(`Entity with ID ${id} not found`);
       }
