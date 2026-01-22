@@ -41,11 +41,13 @@
 							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/auth/login",
+							"raw": "{{base_url}}/api/v1/auth/login",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"auth",
 								"login"
 							]
@@ -76,11 +78,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies?page=1&limit=10&includeInactive=false",
+							"raw": "{{base_url}}/api/v1/currencies?page=1&limit=10&includeInactive=false",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies"
 							],
 							"query": [
@@ -121,11 +125,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies?page=1&limit=10&includeInactive=true",
+							"raw": "{{base_url}}/api/v1/currencies?page=1&limit=10&includeInactive=true",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies"
 							],
 							"query": [
@@ -163,11 +169,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies/active",
+							"raw": "{{base_url}}/api/v1/currencies/active",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								"active"
 							]
@@ -192,11 +200,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies/tradable",
+							"raw": "{{base_url}}/api/v1/currencies/tradable",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								"tradable"
 							]
@@ -221,11 +231,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies/:id",
+							"raw": "{{base_url}}/api/v1/currencies/:id",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								":id"
 							],
@@ -257,11 +269,13 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies/symbol/:symbol",
+							"raw": "{{base_url}}/api/v1/currencies/symbol/:symbol",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								"symbol",
 								":symbol"
@@ -303,7 +317,7 @@
 							"raw": "{\n  \"symbol\": \"BTC\",\n  \"name\": \"Bitcoin\",\n  \"precisionScale\": 8,\n  \"minWithdraw\": \"0.001\",\n  \"isTradable\": true,\n  \"isActive\": true\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/currencies",
+							"raw": "{{base_url}}/api/v1/currencies",
 							"host": [
 								"{{base_url}}"
 							],
@@ -340,7 +354,7 @@
 							"raw": "{\n  \"symbol\": \"ETH\",\n  \"name\": \"Ethereum\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/currencies",
+							"raw": "{{base_url}}/api/v1/currencies",
 							"host": [
 								"{{base_url}}"
 							],
@@ -377,11 +391,13 @@
 							"raw": "{\n  \"name\": \"Bitcoin Updated\",\n  \"isActive\": false\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/currencies/:id",
+							"raw": "{{base_url}}/api/v1/currencies/:id",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								":id"
 							],
@@ -422,11 +438,13 @@
 							"raw": "{\n  \"symbol\": \"BTC\",\n  \"name\": \"Bitcoin\",\n  \"precisionScale\": 8,\n  \"minWithdraw\": \"0.0001\",\n  \"isTradable\": true,\n  \"isActive\": true\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/currencies/:id",
+							"raw": "{{base_url}}/api/v1/currencies/:id",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								":id"
 							],
@@ -457,11 +475,13 @@
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/currencies/:id",
+							"raw": "{{base_url}}/api/v1/currencies/:id",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
+								"v1",
 								"currencies",
 								":id"
 							],
