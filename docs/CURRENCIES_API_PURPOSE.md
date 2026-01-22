@@ -509,5 +509,5 @@ async withdraw(userId: number, currencySymbol: string, amount: string) {
 
 ---
 
-**Last Updated:** 2024-01-22  
+**Last Updated:** 2026-01-22  
 **Version:** 1.0.0
