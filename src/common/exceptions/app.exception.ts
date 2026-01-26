@@ -15,6 +15,17 @@ export class AppException extends Error {
 }
 
 /**
+ * Bad Request Exception (400)
+ * For invalid client requests
+ */
+export class BadRequestException extends AppException {
+  constructor(message: string, code: string = 'BAD_REQUEST', context?: Record<string, any>) {
+    super(code, message, 400, context);
+    Object.setPrototypeOf(this, BadRequestException.prototype);
+  }
+}
+
+/**
  * Business Logic Exception
  */
 export class BusinessException extends AppException {
