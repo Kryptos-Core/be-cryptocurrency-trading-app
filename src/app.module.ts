@@ -5,6 +5,7 @@ import { getTypeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
+import { MarketsModule } from './modules/markets/markets.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
@@ -30,6 +31,7 @@ import appConfig from './config/app.config';
     AuthModule,
     UsersModule,
     CurrenciesModule,
+    MarketsModule,
   ],
 })
 export class AppModule {}
