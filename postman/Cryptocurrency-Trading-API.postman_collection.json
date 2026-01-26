@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "cryptocurrency-trading-api",
-		"name": "Cryptocurrency Trading API - Currencies",
-		"description": "Postman collection để test API quản lý danh sách tiền ảo (Currencies Module)\n\n**Các tính năng:**\n- CRUD operations cho currencies\n- Pagination và filtering\n- Redis caching\n- JWT Authentication\n\n**Cách sử dụng:**\n1. Import collection này vào Postman\n2. Tạo environment với biến:\n   - `base_url`: http://localhost:3000\n   - `access_token`: (sẽ được set tự động sau khi login)\n3. Chạy request \"Auth - Login\" để lấy token\n4. Các request khác sẽ tự động sử dụng token",
+		"name": "Cryptocurrency Trading API",
+		"description": "Postman collection để test API Cryptocurrency Trading Platform\n\n**Modules:**\n- Auth: Authentication endpoints\n- Currencies: Quản lý danh sách tiền ảo\n- Markets: Quản lý market pairs (BTC/USDT, ETH/USDT, ...)\n\n**Các tính năng:**\n- CRUD operations cho currencies và markets\n- Market ticker information (24h statistics)\n- Order book (bids/asks)\n- Recent trades\n- Pagination và filtering\n- Redis caching\n- JWT Authentication\n\n**Cách sử dụng:**\n1. Import collection này vào Postman\n2. Tạo environment với biến:\n   - `base_url`: http://localhost:3000\n   - `access_token`: (sẽ được set tự động sau khi login)\n3. Chạy request \"Auth - Login\" để lấy token\n4. Các request khác sẽ tự động sử dụng token",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -499,6 +499,625 @@
 				}
 			],
 			"description": "CRUD operations cho currencies module"
+		},
+		{
+			"name": "Markets",
+			"item": [
+				{
+					"name": "Get All Market Pairs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets?page=1&limit=10&includeInactive=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page (default: 10)"
+								},
+								{
+									"key": "includeInactive",
+									"value": "false",
+									"description": "Include inactive pairs (default: false)"
+								}
+							]
+						},
+						"description": "Lấy danh sách tất cả market pairs với pagination. Có thể filter để bao gồm hoặc loại trừ inactive pairs."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active Market Pairs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"active"
+							]
+						},
+						"description": "Lấy danh sách tất cả active market pairs. Response được cache trong Redis."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Market Pair by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Market pair ID"
+								}
+							]
+						},
+						"description": "Lấy thông tin chi tiết của một market pair theo ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Market Pair by Symbol",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/symbol/:symbol",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"symbol",
+								":symbol"
+							],
+							"variable": [
+								{
+									"key": "symbol",
+									"value": "BTC/USDT",
+									"description": "Market pair symbol (e.g., BTC/USDT, ETH/USDT)"
+								}
+							]
+						},
+						"description": "Lấy thông tin market pair theo symbol (ví dụ: BTC/USDT, ETH/USDT)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Market Ticker by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/:id/ticker",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								":id",
+								"ticker"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Market pair ID"
+								}
+							]
+						},
+						"description": "Lấy 24h market statistics (ticker) cho một trading pair. Bao gồm: last price, high/low 24h, volume, change %, best bid/ask."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Market Ticker by Symbol",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/symbol/:symbol/ticker",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"symbol",
+								":symbol",
+								"ticker"
+							],
+							"variable": [
+								{
+									"key": "symbol",
+									"value": "BTC/USDT",
+									"description": "Market pair symbol"
+								}
+							]
+						},
+						"description": "Lấy 24h market statistics (ticker) cho một trading pair theo symbol."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Tickers",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/tickers/all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"tickers",
+								"all"
+							]
+						},
+						"description": "Lấy 24h statistics cho tất cả active market pairs. Response được cache trong Redis (TTL: 1 phút)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order Book by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/:id/orderbook?limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								":id",
+								"orderbook"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of price levels (default: 20)"
+								}
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Market pair ID"
+								}
+							]
+						},
+						"description": "Lấy order book (bids và asks) cho một market pair. Bids sorted DESC, asks sorted ASC. Response được cache (TTL: 10 giây)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order Book by Symbol",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/symbol/:symbol/orderbook?limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"symbol",
+								":symbol",
+								"orderbook"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							],
+							"variable": [
+								{
+									"key": "symbol",
+									"value": "BTC/USDT",
+									"description": "Market pair symbol"
+								}
+							]
+						},
+						"description": "Lấy order book (bids và asks) cho một market pair theo symbol."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Recent Trades by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/:id/trades?limit=50",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								":id",
+								"trades"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50",
+									"description": "Number of trades (default: 50)"
+								}
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Market pair ID"
+								}
+							]
+						},
+						"description": "Lấy recent trades cho một market pair. Sorted by created_at DESC. Response được cache (TTL: 5 giây)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Recent Trades by Symbol",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/symbol/:symbol/trades?limit=50",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								"symbol",
+								":symbol",
+								"trades"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50"
+								}
+							],
+							"variable": [
+								{
+									"key": "symbol",
+									"value": "BTC/USDT",
+									"description": "Market pair symbol"
+								}
+							]
+						},
+						"description": "Lấy recent trades cho một market pair theo symbol."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Market Pair",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"baseCurrencyId\": 1,\n  \"quoteCurrencyId\": 3,\n  \"symbol\": \"BTC/USDT\",\n  \"priceScale\": 2,\n  \"amountScale\": 6,\n  \"minOrderAmount\": \"0.0001\",\n  \"makerFeeRate\": 0.001,\n  \"takerFeeRate\": 0.001,\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets"
+							]
+						},
+						"description": "Tạo market pair mới (ví dụ: BTC/USDT).\n\n**Required fields:**\n- `baseCurrencyId`: Base currency ID (e.g., BTC = 1)\n- `quoteCurrencyId`: Quote currency ID (e.g., USDT = 3)\n\n**Optional fields:**\n- `symbol`: Market pair symbol (auto-generated if not provided)\n- `priceScale`: Price decimal precision (default: 2)\n- `amountScale`: Amount decimal precision (default: 6)\n- `minOrderAmount`: Minimum order amount (default: \"0.0001\")\n- `makerFeeRate`: Maker fee rate (default: 0.001 = 0.1%)\n- `takerFeeRate`: Taker fee rate (default: 0.001 = 0.1%)\n- `isActive`: Is active (default: true)\n\n**Validation:**\n- Base và quote currencies phải là tradable và active\n- Base và quote currencies không được giống nhau\n- Market pair với base/quote combination phải unique"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Market Pair - Minimal",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"baseCurrencyId\": 1,\n  \"quoteCurrencyId\": 3\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets"
+							]
+						},
+						"description": "Tạo market pair với chỉ các field bắt buộc. Symbol sẽ được auto-generate từ base/quote currency symbols."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Market Pair",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isActive\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Market pair ID to update"
+								}
+							]
+						},
+						"description": "Cập nhật thông tin market pair. Tất cả các fields đều optional.\n\n**Có thể update:**\n- `baseCurrencyId`: Base currency ID (không nên thay đổi)\n- `quoteCurrencyId`: Quote currency ID (không nên thay đổi)\n- `symbol`: Market pair symbol (không nên thay đổi)\n- `priceScale`: Price decimal precision\n- `amountScale`: Amount decimal precision\n- `minOrderAmount`: Minimum order amount\n- `makerFeeRate`: Maker fee rate\n- `takerFeeRate`: Taker fee rate\n- `isActive`: Is active"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Market Pair",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/markets/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"markets",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Market pair ID to delete"
+								}
+							]
+						},
+						"description": "Soft delete market pair (set is_active = false). Response status code: 204 No Content."
+					},
+					"response": []
+				}
+			],
+			"description": "CRUD operations và market data endpoints cho markets module"
 		}
 	],
 	"event": [
