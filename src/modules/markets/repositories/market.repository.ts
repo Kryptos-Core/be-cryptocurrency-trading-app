@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, FindManyOptions } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
 import { MarketPair } from '@/entities/market-pair.entity';
-import { Order } from '@/entities/order.entity';
 import { Trade } from '@/entities/trade.entity';
 
 /**
@@ -56,19 +55,21 @@ export class MarketRepository extends BaseRepository<MarketPair> {
 
   /**
    * Find market pair by base and quote currency IDs
+   * Database Procedure Pattern: sp_market_find_by_currencies
    */
   async findByCurrencies(
     baseCurrencyId: number,
     quoteCurrencyId: number,
   ): Promise<MarketPair | null> {
     try {
-      return await this.findOne({
-        where: {
-          base_currency_id: baseCurrencyId,
-          quote_currency_id: quoteCurrencyId,
-        } as any,
-        relations: ['base_currency', 'quote_currency'],
-      });
+      const result = await this.dataSource.query(
+        'CALL sp_market_find_by_currencies(?, ?)',
+        [baseCurrencyId, quoteCurrencyId],
+      );
+      if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
+        return null;
+      }
+      return this.mapProcedureResultToEntity(result[0][0]);
     } catch (error) {
       this.logger.error(
         `Error finding market pair by currencies: ${baseCurrencyId}/${quoteCurrencyId}`,
@@ -112,6 +113,17 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       this.logger.error('Error finding all market pairs', error);
       throw error;
     }
+  }
+
+  /**
+   * Override findWithPagination to use stored procedures
+   */
+  async findWithPagination(
+    page: number = 1,
+    limit: number = 10,
+    options?: any,
+  ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
+    return this.findAll(page, limit, options?.includeInactive ?? false);
   }
 
   /**
@@ -207,6 +219,21 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     return pair;
   }
 
+  private mapTradeRow(row: any): Trade {
+    const trade = new Trade();
+    trade.trade_id = row.trade_id;
+    trade.pair_id = row.pair_id;
+    trade.taker_order_id = row.taker_order_id;
+    trade.maker_order_id = row.maker_order_id;
+    trade.price = row.price?.toString() || '0';
+    trade.amount = row.amount?.toString() || '0';
+    trade.taker_fee = row.taker_fee?.toString() || '0';
+    trade.maker_fee = row.maker_fee?.toString() || '0';
+    trade.fee_currency_id = row.fee_currency_id;
+    trade.created_at = row.created_at;
+    return trade;
+  }
+
   /**
    * Get order book for a market pair
    * Complex Query: Aggregates orders by price level
@@ -216,49 +243,25 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     limit: number = 20,
   ): Promise<{ bids: any[]; asks: any[] }> {
     try {
-      const orderRepository = this.dataSource.getRepository(Order);
+      const bidsResult = await this.dataSource.query(
+        'CALL sp_market_order_book_bids(?, ?)',
+        [pairId, limit],
+      );
+      const asksResult = await this.dataSource.query(
+        'CALL sp_market_order_book_asks(?, ?)',
+        [pairId, limit],
+      );
 
-      // Get bids (BUY orders) - sorted by price DESC
-      const bids = await orderRepository
-        .createQueryBuilder('order')
-        .select('order.price', 'price')
-        .addSelect('SUM(order.amount - order.filled_amount)', 'amount')
-        .addSelect('COUNT(*)', 'orders')
-        .where('order.pair_id = :pairId', { pairId })
-        .andWhere('order.side = :side', { side: 'BUY' })
-        .andWhere('order.status IN (:...statuses)', {
-          statuses: ['OPEN', 'PARTIAL'],
-        })
-        .andWhere('order.price IS NOT NULL')
-        .groupBy('order.price')
-        .orderBy('order.price', 'DESC')
-        .limit(limit)
-        .getRawMany();
-
-      // Get asks (SELL orders) - sorted by price ASC
-      const asks = await orderRepository
-        .createQueryBuilder('order')
-        .select('order.price', 'price')
-        .addSelect('SUM(order.amount - order.filled_amount)', 'amount')
-        .addSelect('COUNT(*)', 'orders')
-        .where('order.pair_id = :pairId', { pairId })
-        .andWhere('order.side = :side', { side: 'SELL' })
-        .andWhere('order.status IN (:...statuses)', {
-          statuses: ['OPEN', 'PARTIAL'],
-        })
-        .andWhere('order.price IS NOT NULL')
-        .groupBy('order.price')
-        .orderBy('order.price', 'ASC')
-        .limit(limit)
-        .getRawMany();
+      const bids = bidsResult?.[0] || [];
+      const asks = asksResult?.[0] || [];
 
       return {
-        bids: bids.map((bid) => ({
+        bids: bids.map((bid: any) => ({
           price: bid.price?.toString() || '0',
           amount: bid.amount?.toString() || '0',
           orders: parseInt(bid.orders?.toString() || '0') || 0,
         })),
-        asks: asks.map((ask) => ({
+        asks: asks.map((ask: any) => ({
           price: ask.price?.toString() || '0',
           amount: ask.amount?.toString() || '0',
           orders: parseInt(ask.orders?.toString() || '0') || 0,
@@ -276,74 +279,18 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async getTicker(pairId: number): Promise<any> {
     try {
-      const tradeRepository = this.dataSource.getRepository(Trade);
-      const orderRepository = this.dataSource.getRepository(Order);
+      const result = await this.dataSource.query('CALL sp_market_ticker(?)', [pairId]);
+      const row = result?.[0]?.[0] || {};
 
-      // Get 24h ago timestamp
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+      const lastPrice = row.last_price?.toString() || '0';
+      const open24h = row.open_24h?.toString() || lastPrice;
+      const high24h = row.high_24h?.toString() || lastPrice;
+      const low24h = row.low_24h?.toString() || lastPrice;
+      const volume24h = row.volume_24h?.toString() || '0';
+      const quoteVolume24h = row.quote_volume_24h?.toString() || '0';
+      const bestBid = row.best_bid?.toString() || '0';
+      const bestAsk = row.best_ask?.toString() || '0';
 
-      // Get last trade
-      const lastTrade = await tradeRepository
-        .createQueryBuilder('trade')
-        .where('trade.pair_id = :pairId', { pairId })
-        .orderBy('trade.created_at', 'DESC')
-        .limit(1)
-        .getOne();
-
-      // Get 24h statistics from trades
-      const stats24h = await tradeRepository
-        .createQueryBuilder('trade')
-        .select('MAX(trade.price)', 'high')
-        .addSelect('MIN(trade.price)', 'low')
-        .addSelect('SUM(trade.amount)', 'volume')
-        .addSelect('SUM(trade.price * trade.amount)', 'quoteVolume')
-        .where('trade.pair_id = :pairId', { pairId })
-        .andWhere('trade.created_at >= :since', { since: twentyFourHoursAgo })
-        .getRawOne();
-
-      // Get opening price (first trade in 24h)
-      const openingTrade = await tradeRepository
-        .createQueryBuilder('trade')
-        .where('trade.pair_id = :pairId', { pairId })
-        .andWhere('trade.created_at >= :since', { since: twentyFourHoursAgo })
-        .orderBy('trade.created_at', 'ASC')
-        .limit(1)
-        .getOne();
-
-      // Get best bid and ask from order book
-      const bestBid = await orderRepository
-        .createQueryBuilder('order')
-        .where('order.pair_id = :pairId', { pairId })
-        .andWhere('order.side = :side', { side: 'BUY' })
-        .andWhere('order.status IN (:...statuses)', {
-          statuses: ['OPEN', 'PARTIAL'],
-        })
-        .andWhere('order.price IS NOT NULL')
-        .orderBy('order.price', 'DESC')
-        .limit(1)
-        .getOne();
-
-      const bestAsk = await orderRepository
-        .createQueryBuilder('order')
-        .where('order.pair_id = :pairId', { pairId })
-        .andWhere('order.side = :side', { side: 'SELL' })
-        .andWhere('order.status IN (:...statuses)', {
-          statuses: ['OPEN', 'PARTIAL'],
-        })
-        .andWhere('order.price IS NOT NULL')
-        .orderBy('order.price', 'ASC')
-        .limit(1)
-        .getOne();
-
-      const lastPrice = lastTrade ? lastTrade.price?.toString() || '0' : '0';
-      const open24h = openingTrade ? openingTrade.price?.toString() || lastPrice : lastPrice;
-      const high24h = stats24h?.high?.toString() || lastPrice;
-      const low24h = stats24h?.low?.toString() || lastPrice;
-      const volume24h = stats24h?.volume?.toString() || '0';
-      const quoteVolume24h = stats24h?.quoteVolume?.toString() || '0';
-
-      // Calculate change
       const changeAmount = parseFloat(lastPrice) - parseFloat(open24h);
       const changePercent =
         parseFloat(open24h) > 0
@@ -359,8 +306,8 @@ export class MarketRepository extends BaseRepository<MarketPair> {
         quoteVolume24h,
         change24h: changePercent,
         changeAmount24h: changeAmount.toFixed(18),
-        bestBid: bestBid?.price?.toString() || '0',
-        bestAsk: bestAsk?.price?.toString() || '0',
+        bestBid,
+        bestAsk,
       };
     } catch (error) {
       this.logger.error(`Error getting ticker for pair: ${pairId}`, error);
@@ -373,13 +320,12 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async getRecentTrades(pairId: number, limit: number = 50): Promise<Trade[]> {
     try {
-      const tradeRepository = this.dataSource.getRepository(Trade);
-      return await tradeRepository.find({
-        where: { pair_id: pairId } as any,
-        order: { created_at: 'DESC' },
-        take: limit,
-        relations: ['taker_order', 'maker_order'],
-      });
+      const result = await this.dataSource.query('CALL sp_market_recent_trades(?, ?)', [
+        pairId,
+        limit,
+      ]);
+      const rows = result?.[0] || [];
+      return rows.map((row: any) => this.mapTradeRow(row));
     } catch (error) {
       this.logger.error(`Error getting recent trades for pair: ${pairId}`, error);
       throw error;

@@ -482,6 +482,160 @@ export class CreateMarketsProcedures1768226500000 implements MigrationInterface 
         ORDER BY mp.symbol ASC;
       END;
     `);
+
+    // ============================================
+    // PROCEDURE 11: sp_market_find_by_currencies
+    // Purpose: Find market pair by base/quote currency IDs
+    // ============================================
+    await queryRunner.query(`
+      DROP PROCEDURE IF EXISTS sp_market_find_by_currencies;
+    `);
+
+    await queryRunner.query(`
+      CREATE PROCEDURE sp_market_find_by_currencies(
+        IN p_base_currency_id INT,
+        IN p_quote_currency_id INT
+      )
+      BEGIN
+        SELECT 
+          mp.pair_id,
+          mp.base_currency_id,
+          mp.quote_currency_id,
+          mp.symbol,
+          mp.price_scale,
+          mp.amount_scale,
+          mp.min_order_amount,
+          mp.maker_fee_rate,
+          mp.taker_fee_rate,
+          mp.is_active,
+          mp.created_at,
+          bc.symbol as base_currency_symbol,
+          bc.name as base_currency_name,
+          qc.symbol as quote_currency_symbol,
+          qc.name as quote_currency_name
+        FROM market_pairs mp
+        INNER JOIN currencies bc ON mp.base_currency_id = bc.currency_id
+        INNER JOIN currencies qc ON mp.quote_currency_id = qc.currency_id
+        WHERE mp.base_currency_id = p_base_currency_id
+          AND mp.quote_currency_id = p_quote_currency_id
+        LIMIT 1;
+      END;
+    `);
+
+    // ============================================
+    // PROCEDURE 12: sp_market_order_book_bids
+    // Purpose: Order book bids
+    // ============================================
+    await queryRunner.query(`
+      DROP PROCEDURE IF EXISTS sp_market_order_book_bids;
+    `);
+
+    await queryRunner.query(`
+      CREATE PROCEDURE sp_market_order_book_bids(
+        IN p_pair_id INT,
+        IN p_limit INT
+      )
+      BEGIN
+        SELECT 
+          price,
+          SUM(amount - filled_amount) AS amount,
+          COUNT(*) AS orders
+        FROM orders
+        WHERE pair_id = p_pair_id
+          AND side = 'BUY'
+          AND status IN ('OPEN', 'PARTIAL')
+          AND price IS NOT NULL
+        GROUP BY price
+        ORDER BY price DESC
+        LIMIT p_limit;
+      END;
+    `);
+
+    // ============================================
+    // PROCEDURE 13: sp_market_order_book_asks
+    // Purpose: Order book asks
+    // ============================================
+    await queryRunner.query(`
+      DROP PROCEDURE IF EXISTS sp_market_order_book_asks;
+    `);
+
+    await queryRunner.query(`
+      CREATE PROCEDURE sp_market_order_book_asks(
+        IN p_pair_id INT,
+        IN p_limit INT
+      )
+      BEGIN
+        SELECT 
+          price,
+          SUM(amount - filled_amount) AS amount,
+          COUNT(*) AS orders
+        FROM orders
+        WHERE pair_id = p_pair_id
+          AND side = 'SELL'
+          AND status IN ('OPEN', 'PARTIAL')
+          AND price IS NOT NULL
+        GROUP BY price
+        ORDER BY price ASC
+        LIMIT p_limit;
+      END;
+    `);
+
+    // ============================================
+    // PROCEDURE 14: sp_market_ticker
+    // Purpose: 24h ticker statistics
+    // ============================================
+    await queryRunner.query(`
+      DROP PROCEDURE IF EXISTS sp_market_ticker;
+    `);
+
+    await queryRunner.query(`
+      CREATE PROCEDURE sp_market_ticker(
+        IN p_pair_id INT
+      )
+      BEGIN
+        SELECT
+          (SELECT price FROM trades WHERE pair_id = p_pair_id ORDER BY created_at DESC LIMIT 1) AS last_price,
+          (SELECT price FROM trades WHERE pair_id = p_pair_id AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ORDER BY created_at ASC LIMIT 1) AS open_24h,
+          (SELECT MAX(price) FROM trades WHERE pair_id = p_pair_id AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS high_24h,
+          (SELECT MIN(price) FROM trades WHERE pair_id = p_pair_id AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS low_24h,
+          (SELECT SUM(amount) FROM trades WHERE pair_id = p_pair_id AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS volume_24h,
+          (SELECT SUM(price * amount) FROM trades WHERE pair_id = p_pair_id AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS quote_volume_24h,
+          (SELECT price FROM orders WHERE pair_id = p_pair_id AND side = 'BUY' AND status IN ('OPEN', 'PARTIAL') AND price IS NOT NULL ORDER BY price DESC LIMIT 1) AS best_bid,
+          (SELECT price FROM orders WHERE pair_id = p_pair_id AND side = 'SELL' AND status IN ('OPEN', 'PARTIAL') AND price IS NOT NULL ORDER BY price ASC LIMIT 1) AS best_ask;
+      END;
+    `);
+
+    // ============================================
+    // PROCEDURE 15: sp_market_recent_trades
+    // Purpose: Recent trades for a pair
+    // ============================================
+    await queryRunner.query(`
+      DROP PROCEDURE IF EXISTS sp_market_recent_trades;
+    `);
+
+    await queryRunner.query(`
+      CREATE PROCEDURE sp_market_recent_trades(
+        IN p_pair_id INT,
+        IN p_limit INT
+      )
+      BEGIN
+        SELECT
+          trade_id,
+          pair_id,
+          taker_order_id,
+          maker_order_id,
+          price,
+          amount,
+          taker_fee,
+          maker_fee,
+          fee_currency_id,
+          created_at
+        FROM trades
+        WHERE pair_id = p_pair_id
+        ORDER BY created_at DESC
+        LIMIT p_limit;
+      END;
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -496,5 +650,10 @@ export class CreateMarketsProcedures1768226500000 implements MigrationInterface 
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_symbol_exists;`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_pair_exists;`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_active;`);
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_by_currencies;`);
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_order_book_bids;`);
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_order_book_asks;`);
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_ticker;`);
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_recent_trades;`);
   }
 }

@@ -39,16 +39,9 @@ export class MarketsService {
     const result = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
-        const options: any = {
-          relations: ['base_currency', 'quote_currency'],
-          order: { symbol: 'ASC' },
-        };
-
-        if (!includeInactive) {
-          options.where = { is_active: true };
-        }
-
-        return this.marketRepository.findWithPagination(page, limit, options);
+        return this.marketRepository.findWithPagination(page, limit, {
+          includeInactive,
+        });
       },
       this.CACHE_TTL,
     );
