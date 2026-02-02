@@ -12,15 +12,7 @@ import {
   IsBoolean,
   IsPort,
 } from 'class-validator';
-
-/**
- * Environment Variables Enum
- */
-export enum Environment {
-  Development = 'development',
-  Production = 'production',
-  Test = 'test',
-}
+import { Environment } from './config.types';
 
 /**
  * Environment Variables Schema

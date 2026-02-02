@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
-import { EnvironmentVariables, Environment } from './env.validation';
+import { EnvironmentVariables } from './env.validation';
+import { Environment } from './config.types';
 
 /**
  * Application Configuration Interface
