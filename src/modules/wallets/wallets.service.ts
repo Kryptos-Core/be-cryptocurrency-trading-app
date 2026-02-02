@@ -338,12 +338,14 @@ export class WalletsService {
     available: string,
     frozen: string,
   ): WalletBalanceDto {
-    const total = this.calculateTotal(available, frozen);
+    const safeAvailable = available ?? '0';
+    const safeFrozen = frozen ?? '0';
+    const total = this.calculateTotal(safeAvailable, safeFrozen);
     return {
       userId,
       currencyId,
-      available: available ?? '0',
-      frozen: frozen ?? '0',
+      available: safeAvailable.toString(),
+      frozen: safeFrozen.toString(),
       total,
     } as WalletBalanceDto;
   }
