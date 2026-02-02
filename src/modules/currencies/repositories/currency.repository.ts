@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
 import { Currency } from '@/entities/currency.entity';
-import { FindManyOptions } from 'typeorm';
 
 /**
  * Currency Repository
@@ -17,14 +16,31 @@ export class CurrencyRepository extends BaseRepository<Currency> {
   }
 
   /**
+   * Override findById to use stored procedure
+   * Database Procedure Pattern: sp_currency_find_by_id
+   */
+  async findById(id: number | string): Promise<Currency | null> {
+    try {
+      const result = await this.dataSource.query('CALL sp_currency_find_by_id(?)', [
+        id,
+      ]);
+      return result?.[0]?.[0] || null;
+    } catch (error) {
+      this.logger.error(`Error finding currency by ID: ${id}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Find currency by symbol
    * Custom method specific to Currency entity
    */
   async findBySymbol(symbol: string): Promise<Currency | null> {
     try {
-      return await this.findOne({
-        where: { symbol: symbol.toUpperCase() } as any,
-      });
+      const result = await this.dataSource.query('CALL sp_currency_find_by_symbol(?)', [
+        symbol.toUpperCase(),
+      ]);
+      return result?.[0]?.[0] || null;
     } catch (error) {
       this.logger.error(`Error finding currency by symbol: ${symbol}`, error);
       throw error;
@@ -37,10 +53,8 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   async findActive(): Promise<Currency[]> {
     try {
-      return await this.find({
-        where: { is_active: true } as any,
-        order: { symbol: 'ASC' },
-      });
+      const result = await this.dataSource.query('CALL sp_currency_find_active()');
+      return result?.[0] || [];
     } catch (error) {
       this.logger.error('Error finding active currencies', error);
       throw error;
@@ -52,10 +66,8 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   async findTradable(): Promise<Currency[]> {
     try {
-      return await this.find({
-        where: { is_tradable: true, is_active: true } as any,
-        order: { symbol: 'ASC' },
-      });
+      const result = await this.dataSource.query('CALL sp_currency_find_tradable()');
+      return result?.[0] || [];
     } catch (error) {
       this.logger.error('Error finding tradable currencies', error);
       throw error;
@@ -67,15 +79,19 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   async symbolExists(symbol: string, excludeCurrencyId?: number): Promise<boolean> {
     try {
-      const where: any = { symbol: symbol.toUpperCase() };
       if (excludeCurrencyId) {
-        // For update operations, exclude current currency
         const currency = await this.findById(excludeCurrencyId);
-        if (currency && (currency as any).symbol === symbol.toUpperCase()) {
-          return false; // Same currency, symbol doesn't conflict
+        if (currency && currency.symbol === symbol.toUpperCase()) {
+          return false;
         }
       }
-      return await this.exists(where);
+
+      await this.dataSource.query(
+        'CALL sp_currency_symbol_exists(?, ?, @exists)',
+        [symbol.toUpperCase(), excludeCurrencyId || null],
+      );
+      const result = await this.dataSource.query('SELECT @exists as exists');
+      return result?.[0]?.exists === 1 || result?.[0]?.exists === true;
     } catch (error) {
       this.logger.error(`Error checking symbol existence: ${symbol}`, error);
       throw error;
@@ -87,21 +103,109 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    * Template Method Pattern: Override base method
    */
   async create(entity: Partial<Currency>): Promise<Currency> {
-    // Normalize symbol to uppercase
-    if (entity.symbol) {
-      entity.symbol = entity.symbol.toUpperCase();
+    try {
+      const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+
+      await this.dataSource.query(
+        'CALL sp_currency_create(?, ?, ?, ?, ?, ?, @currency_id)',
+        [
+          symbol,
+          entity.name,
+          entity.precision_scale ?? 8,
+          entity.min_withdraw ?? '0',
+          entity.is_tradable ?? true,
+          entity.is_active ?? true,
+        ],
+      );
+
+      const idResult = await this.dataSource.query('SELECT @currency_id as currency_id');
+      const currencyId = idResult?.[0]?.currency_id;
+      if (!currencyId) {
+        throw new Error('Failed to create currency');
+      }
+
+      const created = await this.findById(currencyId);
+      if (!created) {
+        throw new Error('Failed to fetch created currency');
+      }
+      return created;
+    } catch (error) {
+      this.logger.error('Error creating currency', error);
+      throw error;
     }
-    return super.create(entity);
   }
 
   /**
    * Override update to normalize symbol to uppercase
    */
   async update(id: number | string, entity: Partial<Currency>): Promise<Currency> {
-    // Normalize symbol to uppercase if provided
-    if (entity.symbol) {
-      entity.symbol = entity.symbol.toUpperCase();
+    try {
+      const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+
+      await this.dataSource.query('CALL sp_currency_update(?, ?, ?, ?, ?, ?, ?)', [
+        id,
+        symbol,
+        entity.name ?? null,
+        entity.precision_scale ?? null,
+        entity.min_withdraw ?? null,
+        entity.is_tradable ?? null,
+        entity.is_active ?? null,
+      ]);
+
+      const updated = await this.findById(id);
+      if (!updated) {
+        throw new Error(`Currency with ID ${id} not found after update`);
+      }
+      return updated;
+    } catch (error) {
+      this.logger.error(`Error updating currency with ID: ${id}`, error);
+      throw error;
     }
-    return super.update(id, entity);
+  }
+
+  /**
+   * Override delete to use stored procedure (soft delete)
+   */
+  async delete(id: number | string): Promise<void> {
+    try {
+      await this.dataSource.query('CALL sp_currency_delete(?)', [id]);
+    } catch (error) {
+      this.logger.error(`Error deleting currency with ID: ${id}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Override findWithPagination to use stored procedures
+   */
+  async findWithPagination(
+    page: number = 1,
+    limit: number = 10,
+    options?: any,
+  ): Promise<{ data: Currency[]; total: number; page: number; limit: number }> {
+    try {
+      const skip = (page - 1) * limit;
+      const includeInactive = options?.includeInactive ?? false;
+
+      const result = await this.dataSource.query('CALL sp_currency_find_all(?, ?, ?)', [
+        skip,
+        limit,
+        includeInactive,
+      ]);
+
+      await this.dataSource.query('CALL sp_currency_count(?, @total)', [includeInactive]);
+      const totalResult = await this.dataSource.query('SELECT @total as total');
+      const total = totalResult?.[0]?.total || 0;
+
+      return {
+        data: result?.[0] || [],
+        total,
+        page,
+        limit,
+      };
+    } catch (error) {
+      this.logger.error('Error finding currencies with pagination', error);
+      throw error;
+    }
   }
 }

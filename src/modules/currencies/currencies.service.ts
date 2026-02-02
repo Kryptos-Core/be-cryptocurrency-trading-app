@@ -36,15 +36,9 @@ export class CurrenciesService {
     const result = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
-        const options: any = {
-          order: { symbol: 'ASC' },
-        };
-
-        if (!includeInactive) {
-          options.where = { is_active: true };
-        }
-
-        return this.currencyRepository.findWithPagination(page, limit, options);
+        return this.currencyRepository.findWithPagination(page, limit, {
+          includeInactive,
+        });
       },
       this.CACHE_TTL,
     );
