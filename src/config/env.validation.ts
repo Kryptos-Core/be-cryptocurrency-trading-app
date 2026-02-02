@@ -12,7 +12,7 @@ import {
   IsBoolean,
   IsPort,
 } from 'class-validator';
-import { Environment } from './config.types';
+import { Environment } from '@/common/enums';
 
 /**
  * Environment Variables Schema

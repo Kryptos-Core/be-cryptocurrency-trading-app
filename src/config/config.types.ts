@@ -1,13 +1,5 @@
 /**
- * Configuration Module Types & Enums
- * Central location for all config-related type definitions
+ * @deprecated Use @/common/enums instead
+ * Kept for backward compatibility during migration
  */
-
-/**
- * Application Environment Types
- */
-export enum Environment {
-  Development = 'development',
-  Production = 'production',
-  Test = 'test',
-}
+export { Environment } from '@/common/enums';

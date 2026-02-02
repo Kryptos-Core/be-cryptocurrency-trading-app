@@ -8,7 +8,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { WalletTransactionAction, WalletReferenceType } from '../wallet.types';
+import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 
 /**
  * Wallet Transaction DTO

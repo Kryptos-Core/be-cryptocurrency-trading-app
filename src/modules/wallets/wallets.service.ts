@@ -8,7 +8,7 @@ import {
 } from '@/common/exceptions';
 import { WalletBalanceDto } from './dto/wallet-balance.dto';
 import { WalletTransactionDto } from './dto/wallet-transaction.dto';
-import { WalletTransactionAction, WalletReferenceType } from './wallet.types';
+import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 
 /**
  * Wallets Service - Business Logic Layer
