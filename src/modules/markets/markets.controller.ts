@@ -221,6 +221,31 @@ export class MarketsController {
   }
 
   /**
+   * Get OHLCV by pair ID
+   * GET /markets/:id/ohlcv?interval=1h&limit=100
+   * IMPORTANT: Must be before @Get(':id') to avoid route conflict
+   */
+  @Get(':id/ohlcv')
+  @ApiOperation({
+    summary: 'Get OHLCV data',
+    description: 'Get candlestick data for a market pair',
+  })
+  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiQuery({ name: 'interval', required: false, type: String, example: '1h' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
+  @ApiSuccessResponse('OHLCV retrieved successfully')
+  @ApiNotFoundResponse('Market pair not found')
+  @ApiBadRequestResponse('Invalid interval')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getOHLCV(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('interval') interval: string = '1h',
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+  ) {
+    return this.marketsService.getOHLCV(id, interval, limit);
+  }
+
+  /**
    * Get recent trades by pair ID
    * GET /markets/:id/trades?limit=50
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict

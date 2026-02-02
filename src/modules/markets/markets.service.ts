@@ -431,6 +431,23 @@ export class MarketsService {
   }
 
   /**
+   * Get OHLCV data for a market pair
+   */
+  async getOHLCV(pairId: number, interval: string = '1h', limit: number = 100) {
+    await this.findOne(pairId);
+
+    const intervalSec = this.resolveIntervalSeconds(interval);
+    const candles = await this.marketRepository.getOHLCV(pairId, intervalSec, limit);
+
+    return {
+      pair_id: pairId,
+      interval,
+      interval_sec: intervalSec,
+      candles,
+    };
+  }
+
+  /**
    * Invalidate all market-related cache
    * Cache Invalidation Pattern: Clear cache when data changes
    */
@@ -442,5 +459,32 @@ export class MarketsService {
       this.logger.error('Error invalidating market cache', error);
       // Don't throw - cache invalidation failure shouldn't break the operation
     }
+  }
+
+  private resolveIntervalSeconds(interval: string): number {
+    const normalized = interval?.toLowerCase?.() || '';
+    const map: Record<string, number> = {
+      '1m': 60,
+      '3m': 180,
+      '5m': 300,
+      '15m': 900,
+      '30m': 1800,
+      '1h': 3600,
+      '2h': 7200,
+      '4h': 14400,
+      '6h': 21600,
+      '12h': 43200,
+      '1d': 86400,
+      '1w': 604800,
+    };
+
+    const seconds = map[normalized];
+    if (!seconds) {
+      throw new BadRequestException(
+        `Invalid interval. Supported: ${Object.keys(map).join(', ')}`,
+      );
+    }
+
+    return seconds;
   }
 }

@@ -190,12 +190,12 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   private mapProcedureResultToEntity(row: any): MarketPair {
     const pair = new MarketPair();
-    pair.pair_id = row.pair_id;
-    pair.base_currency_id = row.base_currency_id;
-    pair.quote_currency_id = row.quote_currency_id;
-    pair.symbol = row.symbol;
-    pair.price_scale = row.price_scale;
-    pair.amount_scale = row.amount_scale;
+    pair.pair_id = row.pair_id || 0;
+    pair.base_currency_id = row.base_currency_id || 0;
+    pair.quote_currency_id = row.quote_currency_id || 0;
+    pair.symbol = row.symbol || '';
+    pair.price_scale = row.price_scale ?? 2;
+    pair.amount_scale = row.amount_scale ?? 6;
     pair.min_order_amount = row.min_order_amount?.toString() || '0.0001';
     pair.maker_fee_rate = row.maker_fee_rate?.toString() || '0.001';
     pair.taker_fee_rate = row.taker_fee_rate?.toString() || '0.001';
@@ -205,14 +205,14 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     // Map currency relations if available
     if (row.base_currency_symbol || row.quote_currency_symbol) {
       pair.base_currency = {
-        currency_id: row.base_currency_id,
-        symbol: row.base_currency_symbol,
-        name: row.base_currency_name,
+        currency_id: row.base_currency_id || 0,
+        symbol: row.base_currency_symbol || '',
+        name: row.base_currency_name || '',
       } as any;
       pair.quote_currency = {
-        currency_id: row.quote_currency_id,
-        symbol: row.quote_currency_symbol,
-        name: row.quote_currency_name,
+        currency_id: row.quote_currency_id || 0,
+        symbol: row.quote_currency_symbol || '',
+        name: row.quote_currency_name || '',
       } as any;
     }
 
@@ -328,6 +328,66 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       return rows.map((row: any) => this.mapTradeRow(row));
     } catch (error) {
       this.logger.error(`Error getting recent trades for pair: ${pairId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get OHLCV data for a market pair
+   * Direct query to ohlcv table (no stored procedure)
+   */
+  async getOHLCV(
+    pairId: number,
+    intervalSec: number,
+    limit: number = 100,
+  ): Promise<
+    {
+      pair_id: number;
+      interval_sec: number;
+      open_time: Date;
+      open: string;
+      high: string;
+      low: string;
+      close: string;
+      volume: string;
+    }[]
+  > {
+    try {
+      const rows = await this.dataSource.query(
+        `
+          SELECT
+            pair_id,
+            interval_sec,
+            open_time,
+            \`open\`,
+            high,
+            low,
+            close,
+            volume
+          FROM ohlcv
+          WHERE pair_id = ? AND interval_sec = ?
+          ORDER BY open_time DESC
+          LIMIT ?
+        `,
+        [pairId, intervalSec, limit],
+      );
+
+      const data = rows || [];
+
+      return data
+        .map((row: any) => ({
+          pair_id: row.pair_id,
+          interval_sec: row.interval_sec,
+          open_time: row.open_time,
+          open: row.open?.toString() || '0',
+          high: row.high?.toString() || '0',
+          low: row.low?.toString() || '0',
+          close: row.close?.toString() || '0',
+          volume: row.volume?.toString() || '0',
+        }))
+        .reverse();
+    } catch (error) {
+      this.logger.error(`Error getting OHLCV for pair: ${pairId}`, error);
       throw error;
     }
   }
