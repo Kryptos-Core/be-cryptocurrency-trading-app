@@ -7,10 +7,8 @@ import {
   BusinessException,
 } from '@/common/exceptions';
 import { WalletBalanceDto } from './dto/wallet-balance.dto';
-import {
-  WalletTransactionDto,
-  WalletTransactionAction,
-} from './dto/wallet-transaction.dto';
+import { WalletTransactionDto } from './dto/wallet-transaction.dto';
+import { WalletTransactionAction, WalletReferenceType } from './wallet.types';
 
 /**
  * Wallets Service - Business Logic Layer
