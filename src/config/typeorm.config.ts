@@ -12,6 +12,8 @@ export const getTypeOrmConfig = (
   password: configService.get<string>('DB_PASSWORD'),
   database: configService.get<string>('DB_NAME'),
   entities: [path.join(__dirname, '../entities/*.entity{.ts,.js}')],
+  migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+  migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
   synchronize: false, // Turn off auto-sync, use migration instead
   logging: configService.get<string>('NODE_ENV') !== 'production',
 });

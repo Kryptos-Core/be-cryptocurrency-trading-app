@@ -24,7 +24,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
       const result = await this.dataSource.query('CALL sp_currency_find_by_id(?)', [
         id,
       ]);
-      return result?.[0]?.[0] || null;
+      return this.mapProcedureResultToEntity(result[0][0]);
     } catch (error) {
       this.logger.error(`Error finding currency by ID: ${id}`, error);
       throw error;
@@ -40,7 +40,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
       const result = await this.dataSource.query('CALL sp_currency_find_by_symbol(?)', [
         symbol.toUpperCase(),
       ]);
-      return result?.[0]?.[0] || null;
+      return this.mapProcedureResultToEntity(result[0][0]);
     } catch (error) {
       this.logger.error(`Error finding currency by symbol: ${symbol}`, error);
       throw error;
@@ -54,7 +54,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
   async findActive(): Promise<Currency[]> {
     try {
       const result = await this.dataSource.query('CALL sp_currency_find_active()');
-      return result?.[0] || [];
+      return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
     } catch (error) {
       this.logger.error('Error finding active currencies', error);
       throw error;
@@ -67,7 +67,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
   async findTradable(): Promise<Currency[]> {
     try {
       const result = await this.dataSource.query('CALL sp_currency_find_tradable()');
-      return result?.[0] || [];
+      return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
     } catch (error) {
       this.logger.error('Error finding tradable currencies', error);
       throw error;
@@ -198,7 +198,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
       const total = totalResult?.[0]?.total || 0;
 
       return {
-        data: result?.[0] || [],
+        data: result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [],
         total,
         page,
         limit,
@@ -207,5 +207,26 @@ export class CurrencyRepository extends BaseRepository<Currency> {
       this.logger.error('Error finding currencies with pagination', error);
       throw error;
     }
+  }
+
+  /**
+   * Map stored procedure result to Currency entity
+   * Converts MySQL types to proper TypeScript types
+   * - TINYINT(1) boolean fields: 1/0 → true/false
+   * - DECIMAL fields: keep as string for precision
+   */
+  private mapProcedureResultToEntity(row: any): Currency | null {
+    if (!row) return null;
+    
+    const currency = new Currency();
+    currency.currency_id = row.currency_id || 0;
+    currency.symbol = row.symbol || '';
+    currency.name = row.name || '';
+    currency.precision_scale = row.precision_scale ?? 8;
+    currency.min_withdraw = row.min_withdraw?.toString() || '0';
+    currency.is_tradable = row.is_tradable === 1 || row.is_tradable === true;
+    currency.is_active = row.is_active === 1 || row.is_active === true;
+    
+    return currency;
   }
 }
