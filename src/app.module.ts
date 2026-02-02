@@ -7,6 +7,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { MarketsModule } from './modules/markets/markets.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { WalletsModule } from './modules/wallets/wallets.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
@@ -32,6 +33,7 @@ import appConfig from './config/app.config';
     UsersModule,
     CurrenciesModule,
     MarketsModule,
+    WalletsModule,
   ],
 })
 export class AppModule {}
