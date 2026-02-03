@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { TradingGateway } from './websocket/trading.gateway';
 import { TradingSubscriptionService } from './services/trading-subscription.service';
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
+import { BinancePriceFeedService } from './services/binance-price-feed.service';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { TradingPriceStreamService } from './services/trading-price-stream.servi
     TradingGateway,
     TradingSubscriptionService,
     TradingPriceStreamService,
+    BinancePriceFeedService,
   ],
-  exports: [TradingPriceStreamService],
+  exports: [TradingPriceStreamService, BinancePriceFeedService],
 })
 export class TradingModule {}
