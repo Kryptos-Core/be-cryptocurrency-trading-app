@@ -20,7 +20,7 @@ import { IRepository } from './interfaces/irepository.interface';
 @Injectable()
 export abstract class BaseRepository<T extends ObjectLiteral> implements IRepository<T> {
   protected readonly logger: Logger;
-  protected readonly repository: Repository<T>;
+  protected _repository: Repository<T> | null = null;
   protected readonly dataSource: DataSource;
 
   constructor(
@@ -28,8 +28,19 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     dataSource: DataSource,
   ) {
     this.dataSource = dataSource;
-    this.repository = dataSource.getRepository(entity);
     this.logger = new Logger(this.constructor.name);
+  }
+
+  /**
+   * Get repository with lazy initialization
+   * This ensures the repository is only initialized when actually needed,
+   * after TypeORM has fully initialized the DataSource with all entities
+   */
+  protected get repository(): Repository<T> {
+    if (!this._repository) {
+      this._repository = this.dataSource.getRepository(this.entity);
+    }
+    return this._repository;
   }
 
   /**
