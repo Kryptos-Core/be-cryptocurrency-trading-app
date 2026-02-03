@@ -35,9 +35,30 @@ export class WalletLedger {
 
   @Column({
     type: 'enum',
-    enum: ['DEPOSIT', 'WITHDRAW', 'ORDER', 'TRADE', 'ADJUST', 'TRANSFER'],
+    enum: [
+      'DEPOSIT',
+      'WITHDRAW',
+      'ORDER',
+      'TRADE',
+      'ADJUST',
+      'TRANSFER',
+      'EXTERNAL_DEPOSIT',
+      'EXTERNAL_WITHDRAWAL',
+      'EXTERNAL_SYNC',
+      'RECONCILIATION',
+    ],
   })
-  ref_type!: 'DEPOSIT' | 'WITHDRAW' | 'ORDER' | 'TRADE' | 'ADJUST' | 'TRANSFER';
+  ref_type!:
+    | 'DEPOSIT'
+    | 'WITHDRAW'
+    | 'ORDER'
+    | 'TRADE'
+    | 'ADJUST'
+    | 'TRANSFER'
+    | 'EXTERNAL_DEPOSIT'
+    | 'EXTERNAL_WITHDRAWAL'
+    | 'EXTERNAL_SYNC'
+    | 'RECONCILIATION';
 
   @Column({ type: 'bigint' })
   ref_id!: number;

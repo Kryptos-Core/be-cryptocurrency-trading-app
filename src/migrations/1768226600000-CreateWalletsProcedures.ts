@@ -179,7 +179,7 @@ export class CreateWalletsProcedures1768226600000 implements MigrationInterface 
       CREATE PROCEDURE sp_wallet_ledger_create(
         IN p_user_id BIGINT,
         IN p_currency_id INT,
-        IN p_ref_type ENUM('DEPOSIT', 'WITHDRAW', 'ORDER', 'TRADE', 'ADJUST', 'TRANSFER'),
+        IN p_ref_type ENUM('DEPOSIT', 'WITHDRAW', 'ORDER', 'TRADE', 'ADJUST', 'TRANSFER', 'EXTERNAL_DEPOSIT', 'EXTERNAL_WITHDRAWAL', 'EXTERNAL_SYNC', 'RECONCILIATION'),
         IN p_ref_id BIGINT,
         IN p_direction ENUM('CREDIT', 'DEBIT'),
         IN p_amount DECIMAL(36, 18),
