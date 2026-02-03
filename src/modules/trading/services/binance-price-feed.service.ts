@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
 import { TradingPriceStreamService } from './trading-price-stream.service';
+import { MarketsService } from '@/modules/markets/markets.service';
 import { TickerMessage } from '../interfaces/websocket.interface';
 
 /**
@@ -22,6 +23,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly tradingPriceStreamService: TradingPriceStreamService,
+    private readonly marketsService: MarketsService,
   ) {
     // Use mainnet Spot API by default
     this.baseUrl = 'https://api.binance.com/api/v3';
@@ -38,24 +40,24 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
    */
   private async loadPairSymbolMapping(): Promise<void> {
     try {
-      // In production, fetch from database via MarketPairRepository
-      // For now, using common pairs
-      const commonPairs: { [key: number]: string } = {
-        1: 'BTCUSDT',
-        2: 'ETHUSDT',
-        3: 'BNBUSDT',
-        4: 'ADAUSDT',
-        5: 'SOLUSDT',
-        6: 'DOGEUSDT',
-        7: 'XRPUSDT',
-        8: 'PEPEUSDT',
-      };
+      const activePairs = await this.marketsService.findActive();
 
-      for (const [pairId, symbol] of Object.entries(commonPairs)) {
-        this.pairSymbolMap.set(parseInt(pairId), symbol);
+      this.pairSymbolMap.clear();
+
+      for (const pair of activePairs) {
+        const normalizedSymbol = String(pair.symbol)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '');
+
+        if (!normalizedSymbol) {
+          this.logger.warn(`⚠️ Skipping pair ${pair.pair_id}: invalid symbol ${pair.symbol}`);
+          continue;
+        }
+
+        this.pairSymbolMap.set(pair.pair_id, normalizedSymbol);
       }
 
-      this.logger.log(`✅ Loaded ${this.pairSymbolMap.size} trading pairs for price feed`);
+      this.logger.log(`✅ Loaded ${this.pairSymbolMap.size} trading pairs from DB for price feed`);
     } catch (error) {
       this.logger.error('Failed to load pair symbol mapping:', error);
     }
