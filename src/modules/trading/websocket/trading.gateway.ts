@@ -68,12 +68,12 @@ export class TradingGateway
     this.logger.log('🔌 Trading WebSocket Gateway initialized');
     
     // Listen to price updates from Redis Pub/Sub
-    this.priceStreamService.onPriceUpdate((message) => {
+    this.priceStreamService.onPriceUpdate((message: TickerMessage) => {
       this.broadcastPriceUpdate(message);
     });
 
     // Listen to OHLC updates from Redis Pub/Sub
-    this.priceStreamService.onCandleUpdate((message) => {
+    this.priceStreamService.onCandleUpdate((message: OHLCMessage) => {
       this.broadcastCandleUpdate(message);
     });
   }
@@ -104,6 +104,14 @@ export class TradingGateway
     // Clean up
     clearTimeout(client.data.authTimeout);
     
+    // Leave all rooms
+    client.rooms.forEach((room) => {
+      if (room !== client.id) {  // Don't leave client's own room
+        client.leave(room);
+        this.logger.debug(`✅ Client ${client.id} left room ${room}`);
+      }
+    });
+    
     // Unsubscribe from all pairs
     if (client.data.authenticated) {
       await this.subscriptionService.unsubscribeClientFromAll(client.id);
@@ -123,20 +131,24 @@ export class TradingGateway
       const token = message.data?.token;
       
       if (!token) {
+        this.logger.warn(`⚠️  [${client.id}] Auth failed: No token provided`);
         return this.sendError(client, 'AUTH_FAILED', 'Token is required');
       }
 
       // Verify JWT token
-      const payload = await this.jwtService.verifyAsync(token.replace('Bearer ', ''));
+      const cleanToken = token.replace('Bearer ', '');
+      this.logger.debug(`🔑 [${client.id}] Verifying token: ${cleanToken.substring(0, 30)}...`);
+      
+      const payload = await this.jwtService.verifyAsync(cleanToken);
       
       client.data.authenticated = true;
-      client.data.user_id = payload.userId || payload.user_id;
+      client.data.user_id = payload.userId || payload.user_id || payload.sub;
       client.data.permissions = payload.permissions || [];
 
       // Clear auth timeout
       clearTimeout(client.data.authTimeout);
 
-      this.logger.debug(`✅ Client ${client.id} authenticated as user ${payload.userId}`);
+      this.logger.log(`✅ [${client.id}] Auth success for user: ${payload.userId || payload.user_id || payload.sub}`);
 
       // Send auth success response
       client.emit('auth_response', {
@@ -144,7 +156,7 @@ export class TradingGateway
         data: {
           success: true,
           message: 'Authentication successful',
-          user_id: payload.userId,
+          user_id: payload.userId || payload.user_id || payload.sub,
           permissions: payload.permissions,
         },
         timestamp: Date.now(),
@@ -152,7 +164,8 @@ export class TradingGateway
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Invalid token';
-      this.logger.warn(`❌ Auth failed for client ${client.id}: ${errorMessage}`);
+      const errorCode = error instanceof Error && 'name' in error ? (error as any).name : 'UNKNOWN';
+      this.logger.warn(`❌ [${client.id}] Auth failed [${errorCode}]: ${errorMessage}`);
       return this.sendError(client, 'AUTH_FAILED', errorMessage);
     }
   }
@@ -191,6 +204,21 @@ export class TradingGateway
         channels,
         interval,
       );
+
+      // Join Socket.IO rooms for each channel
+      for (const channel of channels) {
+        let room = '';
+        if (channel === 'ticker') {
+          room = `pair:${pair_id}:ticker`;
+        } else if (channel === 'ohlc') {
+          room = `pair:${pair_id}:ohlc:${interval}`;
+        }
+        
+        if (room) {
+          client.join(room);
+          this.logger.debug(`✅ Client ${client.id} joined room ${room}`);
+        }
+      }
 
       this.logger.debug(
         `📡 Client ${client.id} subscribed to pair ${pair_id} with channels: ${channels.join(', ')}`,
@@ -236,6 +264,30 @@ export class TradingGateway
 
       // Unsubscribe client from pair
       await this.subscriptionService.unsubscribe(client.id, pair_id, channels);
+
+      // Leave Socket.IO rooms for each channel
+      for (const channel of channels) {
+        let room = '';
+        if (channel === 'ticker') {
+          room = `pair:${pair_id}:ticker`;
+        } else if (channel === 'ohlc') {
+          // Note: For OHLC, we'd need the interval, but it's not provided in unsubscribe
+          // Leave all OHLC intervals for this pair
+          const rooms = client.rooms;
+          for (const r of rooms) {
+            if (r.startsWith(`pair:${pair_id}:ohlc:`)) {
+              client.leave(r);
+              this.logger.debug(`✅ Client ${client.id} left room ${r}`);
+            }
+          }
+          continue;
+        }
+        
+        if (room) {
+          client.leave(room);
+          this.logger.debug(`✅ Client ${client.id} left room ${room}`);
+        }
+      }
 
       this.logger.debug(
         `📡 Client ${client.id} unsubscribed from pair ${pair_id}`,
