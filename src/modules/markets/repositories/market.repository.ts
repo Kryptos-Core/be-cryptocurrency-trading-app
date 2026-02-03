@@ -18,6 +18,37 @@ export class MarketRepository extends BaseRepository<MarketPair> {
   }
 
   /**
+   * Override findOne to use stored procedure
+   * Database Procedure Pattern: sp_market_find_by_id
+   * Supports finding by pair_id or other options
+   */
+  async findOne(options: any): Promise<MarketPair | null> {
+    try {
+      // If options has a where clause with pair_id, use it
+      if (options?.where?.pair_id !== undefined) {
+        const id = options.where.pair_id;
+        const result = await this.dataSource.query('CALL sp_market_find_by_id(?)', [id]);
+        if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
+          return null;
+        }
+        return this.mapProcedureResultToEntity(result[0][0]);
+      }
+
+      // Fallback: try to find by using the parent implementation
+      // This is a safety measure, but normally we should have pair_id in the where clause
+      if (options?.where?.symbol !== undefined) {
+        return this.findBySymbol(options.where.symbol);
+      }
+
+      // If neither pair_id nor symbol is provided, return null
+      return null;
+    } catch (error) {
+      this.logger.error(`Error finding one market pair`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Override findById to use stored procedure
    * Database Procedure Pattern: sp_market_find_by_id
    */
