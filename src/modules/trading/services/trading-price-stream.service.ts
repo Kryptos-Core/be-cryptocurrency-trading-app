@@ -6,6 +6,7 @@ import {
   RedisPubSubMessage,
   TickerMessage,
   OHLCMessage,
+  CandleInterval,
 } from '../interfaces/websocket.interface';
 
 /**
@@ -16,6 +17,18 @@ import {
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TradingPriceStreamService.name);
+
+  private readonly intervalMsMap: Record<CandleInterval, number> = {
+    '1m': 60_000,
+    '5m': 5 * 60_000,
+    '15m': 15 * 60_000,
+    '1h': 60 * 60_000,
+    '4h': 4 * 60 * 60_000,
+    '1d': 24 * 60 * 60_000,
+  };
+
+  private candleCache: Map<string, OHLCMessage> = new Map();
+  private candleKeyByPairInterval: Map<string, string> = new Map();
 
   // Event listeners
   private priceUpdateListeners: ((ticker: TickerMessage) => void)[] = [];
@@ -69,6 +82,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    */
   private handlePriceUpdate(event: PriceUpdateEvent) {
     this.logger.debug(`📊 Price update for pair ${event.pair_id}: ${event.ticker.last_price}`);
+
+    this.aggregateCandle(event);
     
     // Notify all listeners
     for (const listener of this.priceUpdateListeners) {
@@ -95,6 +110,77 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       } catch (error) {
         this.logger.error('Error in candle update listener:', error);
       }
+    }
+  }
+
+  private aggregateCandle(event: PriceUpdateEvent) {
+    const price = Number(event.ticker.last_price);
+    if (!Number.isFinite(price)) {
+      return;
+    }
+
+    const timestamp = event.timestamp || Date.now();
+    const priceString = event.ticker.last_price;
+
+    for (const [interval, intervalMs] of Object.entries(this.intervalMsMap) as [
+      CandleInterval,
+      number,
+    ][]) {
+      const openTime = Math.floor(timestamp / intervalMs) * intervalMs;
+      const pairIntervalKey = `${event.pair_id}:${interval}`;
+      const currentKey = this.candleKeyByPairInterval.get(pairIntervalKey);
+
+      if (!currentKey || !currentKey.endsWith(`:${openTime}`)) {
+        if (currentKey) {
+          const prev = this.candleCache.get(currentKey);
+          if (prev) {
+            const closed = {
+              ...prev,
+              close_time: openTime,
+              is_closed: true,
+            };
+            this.candleCache.set(currentKey, closed);
+            void this.publishCandleUpdate(closed);
+          }
+        }
+
+        const newKey = `${pairIntervalKey}:${openTime}`;
+        const candle: OHLCMessage = {
+          pair_id: event.pair_id,
+          interval,
+          open_time: openTime,
+          close_time: openTime + intervalMs,
+          open: priceString,
+          high: priceString,
+          low: priceString,
+          close: priceString,
+          volume: '0',
+          quote_volume: '0',
+          trades_count: 0,
+          is_closed: false,
+        };
+
+        this.candleCache.set(newKey, candle);
+        this.candleKeyByPairInterval.set(pairIntervalKey, newKey);
+        void this.publishCandleUpdate(candle);
+        continue;
+      }
+
+      const candle = this.candleCache.get(currentKey);
+      if (!candle) {
+        continue;
+      }
+
+      const high = Math.max(Number(candle.high), price);
+      const low = Math.min(Number(candle.low), price);
+
+      candle.high = String(high);
+      candle.low = String(low);
+      candle.close = priceString;
+      candle.close_time = openTime + intervalMs;
+
+      this.candleCache.set(currentKey, candle);
+      void this.publishCandleUpdate(candle);
     }
   }
 
