@@ -433,10 +433,10 @@ WS_MAX_SUBSCRIPTIONS=20   # Per client
 ## Performance Optimization
 
 ### Current Implementation
-- ✅ Redis Pub/Sub for multi-instance scaling
-- ✅ Room-based broadcasting (`pair:X:ticker`, `pair:X:ohlc:interval`)
-- ✅ Efficient JSON serialization
-- ✅ Connection pooling via Redis
+- Redis Pub/Sub for multi-instance scaling
+- Room-based broadcasting (`pair:X:ticker`, `pair:X:ohlc:interval`)
+- Efficient JSON serialization
+- Connection pooling via Redis
 
 ### Potential Improvements
 - [ ] Implement message compression (gzip)
@@ -499,9 +499,3 @@ WS_MAX_SUBSCRIPTIONS=20   # Per client
 6. **Analytics** - Track subscription patterns and usage
 7. **Load Balancing** - Sticky sessions or state sharing
 8. **Metrics** - Prometheus/OpenTelemetry integration
-
-## See Also
-
-- [MARKETS_API_PURPOSE.md](./MARKETS_API_PURPOSE.md) - Market data endpoints
-- [BASE_REPOSITORY_USAGE.md](./BASE_REPOSITORY_USAGE.md) - Data layer
-- [REDIS_USAGE.md](./REDIS_USAGE.md) - Redis integration
