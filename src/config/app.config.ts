@@ -52,6 +52,30 @@ export interface AppConfig {
     apiUrl?: string;
     apiKey?: string;
   };
+  trading: {
+    environment: 'testnet' | 'mainnet';
+    exchangeMode: 'binance' | 'mock';
+    binance: {
+      testnet: {
+        enabled: boolean;
+        apiKey: string;
+        apiSecret: string;
+        baseUrl: string;
+      };
+      mainnet: {
+        enabled: boolean;
+        apiKey: string;
+        apiSecret: string;
+        baseUrl: string;
+      };
+    };
+  };
+  wallet: {
+    syncEnabled: boolean;
+    syncInterval: number;
+    reconciliationThreshold: string;
+    enableExternalSync: boolean;
+  };
 }
 
 /**
@@ -117,6 +141,53 @@ export class AppConfigBuilder {
     return this;
   }
 
+  setTrading(
+    environment: 'testnet' | 'mainnet',
+    exchangeMode: 'binance' | 'mock',
+    binanceTestnetEnabled: boolean,
+    binanceTestnetApiKey: string,
+    binanceTestnetApiSecret: string,
+    binanceTestnetBaseUrl: string,
+    binanceMainnetApiKey: string,
+    binanceMainnetApiSecret: string,
+    binanceMainnetBaseUrl: string,
+  ): this {
+    this.config.trading = {
+      environment,
+      exchangeMode,
+      binance: {
+        testnet: {
+          enabled: binanceTestnetEnabled,
+          apiKey: binanceTestnetApiKey,
+          apiSecret: binanceTestnetApiSecret,
+          baseUrl: binanceTestnetBaseUrl,
+        },
+        mainnet: {
+          enabled: false,
+          apiKey: binanceMainnetApiKey,
+          apiSecret: binanceMainnetApiSecret,
+          baseUrl: binanceMainnetBaseUrl,
+        },
+      },
+    };
+    return this;
+  }
+
+  setWallet(
+    syncEnabled: boolean,
+    syncInterval: number,
+    reconciliationThreshold: string,
+    enableExternalSync: boolean,
+  ): this {
+    this.config.wallet = {
+      syncEnabled,
+      syncInterval,
+      reconciliationThreshold,
+      enableExternalSync,
+    };
+    return this;
+  }
+
   build(): AppConfig {
     // Validate required fields
     if (!this.config.app) {
@@ -174,6 +245,23 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
     .setRateLimit(env.RATE_LIMIT_TTL || 60, env.RATE_LIMIT_MAX || 100)
     .setSecurity(env.BCRYPT_ROUNDS || 10, env.API_KEY)
     .setExternal(env.EXTERNAL_API_URL, env.EXTERNAL_API_KEY)
+    .setTrading(
+      (env.TRADING_ENVIRONMENT as 'testnet' | 'mainnet') || 'testnet',
+      (env.EXCHANGE_MODE as 'binance' | 'mock') || 'mock',
+      env.BINANCE_TESTNET_ENABLED || false,
+      env.BINANCE_TESTNET_API_KEY || '',
+      env.BINANCE_TESTNET_API_SECRET || '',
+      env.BINANCE_TESTNET_BASE_URL || 'https://testnet.binancefutures.com',
+      env.BINANCE_MAINNET_API_KEY || '',
+      env.BINANCE_MAINNET_API_SECRET || '',
+      env.BINANCE_MAINNET_BASE_URL || 'https://fapi.binance.com',
+    )
+    .setWallet(
+      env.BINANCE_TESTNET_ENABLED || false,
+      env.WALLET_SYNC_INTERVAL || 30000,
+      env.WALLET_RECONCILIATION_THRESHOLD || '0.00000001',
+      env.EXCHANGE_MODE === 'binance',
+    )
     .build();
 }
 

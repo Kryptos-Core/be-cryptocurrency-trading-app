@@ -93,6 +93,8 @@ export enum WalletTransactionAction {
   FREEZE = 'FREEZE',
   UNFREEZE = 'UNFREEZE',
   TRANSFER = 'TRANSFER',
+  SYNC_EXTERNAL = 'SYNC_EXTERNAL',
+  RECONCILE = 'RECONCILE',
 }
 
 /** Wallet transaction reference types for audit trail */
@@ -103,6 +105,10 @@ export enum WalletReferenceType {
   TRADE = 'TRADE',
   ADJUST = 'ADJUST',
   TRANSFER = 'TRANSFER',
+  EXTERNAL_DEPOSIT = 'EXTERNAL_DEPOSIT',
+  EXTERNAL_WITHDRAWAL = 'EXTERNAL_WITHDRAWAL',
+  EXTERNAL_SYNC = 'EXTERNAL_SYNC',
+  RECONCILIATION = 'RECONCILIATION',
 }
 
 /** Wallet ledger entry direction - Double-entry accounting */

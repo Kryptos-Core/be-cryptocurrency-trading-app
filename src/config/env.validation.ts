@@ -141,6 +141,56 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   EXTERNAL_API_KEY?: string;
+
+  // Trading Configuration
+  @IsEnum(['testnet', 'mainnet'])
+  @IsOptional()
+  TRADING_ENVIRONMENT?: string = 'testnet';
+
+  @IsEnum(['binance', 'mock'])
+  @IsOptional()
+  EXCHANGE_MODE?: string = 'mock';
+
+  // Binance Testnet Configuration
+  @IsBoolean()
+  @IsOptional()
+  BINANCE_TESTNET_ENABLED?: boolean = false;
+
+  @IsString()
+  @IsOptional()
+  BINANCE_TESTNET_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  BINANCE_TESTNET_API_SECRET?: string;
+
+  @IsUrl()
+  @IsOptional()
+  BINANCE_TESTNET_BASE_URL?: string = 'https://testnet.binancefutures.com';
+
+  // Binance Mainnet Configuration
+  @IsString()
+  @IsOptional()
+  BINANCE_MAINNET_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  BINANCE_MAINNET_API_SECRET?: string;
+
+  @IsUrl()
+  @IsOptional()
+  BINANCE_MAINNET_BASE_URL?: string = 'https://fapi.binance.com';
+
+  // Wallet Sync Configuration
+  @IsInt()
+  @Min(1000)
+  @Max(300000)
+  @IsOptional()
+  WALLET_SYNC_INTERVAL?: number = 30000; // 30 seconds
+
+  @IsString()
+  @IsOptional()
+  WALLET_RECONCILIATION_THRESHOLD?: string = '0.00000001';
 }
 
 /**
@@ -178,6 +228,17 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'API_KEY',
     'EXTERNAL_API_URL',
     'EXTERNAL_API_KEY',
+    'TRADING_ENVIRONMENT',
+    'EXCHANGE_MODE',
+    'BINANCE_TESTNET_ENABLED',
+    'BINANCE_TESTNET_API_KEY',
+    'BINANCE_TESTNET_API_SECRET',
+    'BINANCE_TESTNET_BASE_URL',
+    'BINANCE_MAINNET_API_KEY',
+    'BINANCE_MAINNET_API_SECRET',
+    'BINANCE_MAINNET_BASE_URL',
+    'WALLET_SYNC_INTERVAL',
+    'WALLET_RECONCILIATION_THRESHOLD',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

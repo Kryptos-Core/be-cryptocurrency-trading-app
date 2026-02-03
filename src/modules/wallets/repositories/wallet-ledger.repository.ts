@@ -6,7 +6,17 @@ import { WalletLedger } from '@/entities/wallet-ledger.entity';
 export interface LedgerEntryInput {
   userId: number;
   currencyId: number;
-  refType: 'DEPOSIT' | 'WITHDRAW' | 'ORDER' | 'TRADE' | 'ADJUST' | 'TRANSFER';
+  refType:
+    | 'DEPOSIT'
+    | 'WITHDRAW'
+    | 'ORDER'
+    | 'TRADE'
+    | 'ADJUST'
+    | 'TRANSFER'
+    | 'EXTERNAL_DEPOSIT'
+    | 'EXTERNAL_WITHDRAWAL'
+    | 'EXTERNAL_SYNC'
+    | 'RECONCILIATION';
   refId: number;
   direction: 'CREDIT' | 'DEBIT';
   amount: string;
