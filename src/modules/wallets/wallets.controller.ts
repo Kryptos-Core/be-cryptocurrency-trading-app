@@ -55,6 +55,25 @@ export class WalletsController {
   }
 
   /**
+   * Get transaction history (ledger) for current user and currency
+   * GET /wallets/ledger?currencyId=1
+   */
+  @Get('ledger')
+  @ApiOperation({
+    summary: 'Get transaction history',
+    description: 'Retrieve recent ledger entries (deposits, withdrawals) for a currency',
+  })
+  @ApiQuery({ name: 'currencyId', required: true, type: Number, example: 1 })
+  @ApiSuccessResponse('Transaction history retrieved successfully')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getLedger(
+    @CurrentUser('userId') userId: number,
+    @Query('currencyId', ParseIntPipe) currencyId: number,
+  ) {
+    return this.walletsService.getTransactionHistory(userId, currencyId);
+  }
+
+  /**
    * Apply wallet transaction
    * POST /wallets/transactions
    */

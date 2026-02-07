@@ -63,6 +63,32 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
   }
 
   /**
+   * Find recent ledger entries by user and currency (for transaction history).
+   * Uses raw SQL to avoid TypeORM entity metadata issues in some runtimes.
+   */
+  async findRecentByUserAndCurrency(
+    userId: number,
+    currencyId: number,
+    limit: number = 100,
+  ): Promise<Array<{ ref_type: string; ref_id: number; direction: string; amount: string; created_at: Date }>> {
+    const rows = await this.dataSource.query(
+      `SELECT ref_type, ref_id, direction, amount, created_at
+       FROM wallet_ledger
+       WHERE user_id = ? AND currency_id = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      [userId, currencyId, limit],
+    );
+    return (rows || []).map((r: any) => ({
+      ref_type: r.ref_type,
+      ref_id: Number(r.ref_id),
+      direction: r.direction,
+      amount: String(r.amount ?? '0'),
+      created_at: r.created_at instanceof Date ? r.created_at : new Date(r.created_at),
+    }));
+  }
+
+  /**
    * Double-entry accounting: create both CREDIT and DEBIT entries for same ref
    */
   async createDoubleEntry(

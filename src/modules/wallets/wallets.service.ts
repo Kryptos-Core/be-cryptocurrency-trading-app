@@ -5,8 +5,10 @@ import { WalletLedgerRepository } from './repositories/wallet-ledger.repository'
 import {
   BadRequestException,
   BusinessException,
+  ConflictException,
 } from '@/common/exceptions';
 import { WalletBalanceDto } from './dto/wallet-balance.dto';
+import { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
 import { WalletTransactionDto } from './dto/wallet-transaction.dto';
 import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 import { ExchangeService } from '@/modules/exchange/exchange.service';
@@ -26,6 +28,28 @@ export class WalletsService {
     private readonly walletLedgerRepository: WalletLedgerRepository,
     private readonly exchangeService: ExchangeService,
   ) {}
+
+  /**
+   * Get transaction history (ledger entries) for a user and currency
+   */
+  async getTransactionHistory(
+    userId: number,
+    currencyId: number,
+    limit: number = 100,
+  ): Promise<WalletLedgerEntryDto[]> {
+    const entries = await this.walletLedgerRepository.findRecentByUserAndCurrency(
+      userId,
+      currencyId,
+      limit,
+    );
+    return entries.map((e) => ({
+      refType: e.ref_type,
+      refId: e.ref_id,
+      direction: e.direction,
+      amount: String(e.amount),
+      createdAt: e.created_at instanceof Date ? e.created_at.toISOString() : String(e.created_at),
+    }));
+  }
 
   /**
    * Get wallet balance for a user and currency
@@ -54,22 +78,33 @@ export class WalletsService {
   ): Promise<WalletBalanceDto> {
     const amount = this.parseAmount(dto.amount);
 
-    return this.walletRepository.transaction(async (manager) => {
-      switch (dto.action) {
-        case WalletTransactionAction.CREDIT:
-          return this.credit(userId, dto, amount, manager);
-        case WalletTransactionAction.DEBIT:
-          return this.debit(userId, dto, amount, manager);
-        case WalletTransactionAction.FREEZE:
-          return this.freeze(userId, dto, amount, manager);
-        case WalletTransactionAction.UNFREEZE:
-          return this.unfreeze(userId, dto, amount, manager);
-        case WalletTransactionAction.TRANSFER:
-          return this.transfer(userId, dto, amount, manager);
-        default:
-          throw new BadRequestException('Invalid wallet action', 'INVALID_ACTION');
+    try {
+      return await this.walletRepository.transaction(async (manager) => {
+        switch (dto.action) {
+          case WalletTransactionAction.CREDIT:
+            return this.credit(userId, dto, amount, manager);
+          case WalletTransactionAction.DEBIT:
+            return this.debit(userId, dto, amount, manager);
+          case WalletTransactionAction.FREEZE:
+            return this.freeze(userId, dto, amount, manager);
+          case WalletTransactionAction.UNFREEZE:
+            return this.unfreeze(userId, dto, amount, manager);
+          case WalletTransactionAction.TRANSFER:
+            return this.transfer(userId, dto, amount, manager);
+          default:
+            throw new BadRequestException('Invalid wallet action', 'INVALID_ACTION');
+        }
+      });
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+        throw new ConflictException(
+          'Duplicate transaction reference. Please try again.',
+          'DUPLICATE_LEDGER_ENTRY',
+        );
       }
-    });
+      throw err;
+    }
   }
 
   private async credit(
