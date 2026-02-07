@@ -1,0 +1,13 @@
+[
+  { "base_symbol": "BTC", "quote_symbol": "USDT", "symbol": "BTC/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.0001" },
+  { "base_symbol": "ETH", "quote_symbol": "USDT", "symbol": "ETH/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.001" },
+  { "base_symbol": "BNB", "quote_symbol": "USDT", "symbol": "BNB/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.01" },
+  { "base_symbol": "SOL", "quote_symbol": "USDT", "symbol": "SOL/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.01" },
+  { "base_symbol": "XRP", "quote_symbol": "USDT", "symbol": "XRP/USDT", "price_scale": 4, "amount_scale": 2, "min_order_amount": "1" },
+  { "base_symbol": "ADA", "quote_symbol": "USDT", "symbol": "ADA/USDT", "price_scale": 4, "amount_scale": 2, "min_order_amount": "1" },
+  { "base_symbol": "DOGE", "quote_symbol": "USDT", "symbol": "DOGE/USDT", "price_scale": 6, "amount_scale": 0, "min_order_amount": "10" },
+  { "base_symbol": "MATIC", "quote_symbol": "USDT", "symbol": "MATIC/USDT", "price_scale": 4, "amount_scale": 2, "min_order_amount": "1" },
+  { "base_symbol": "LINK", "quote_symbol": "USDT", "symbol": "LINK/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.01" },
+  { "base_symbol": "LTC", "quote_symbol": "USDT", "symbol": "LTC/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.01" },
+  { "base_symbol": "DOT", "quote_symbol": "USDT", "symbol": "DOT/USDT", "price_scale": 2, "amount_scale": 6, "min_order_amount": "0.1" }
+]
