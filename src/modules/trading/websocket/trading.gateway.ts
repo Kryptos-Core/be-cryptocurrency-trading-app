@@ -82,7 +82,7 @@ export class TradingGateway
    * Handle client connection
    */
   async handleConnection(client: Socket) {
-    this.logger.debug(`📥 Client connected: ${client.id}`);
+    // Log suppressed to avoid console spam; enable temporarily for debugging
     
     // Client must authenticate within 10 seconds
     const authTimeout = setTimeout(() => {
@@ -99,19 +99,10 @@ export class TradingGateway
    * Handle client disconnection
    */
   async handleDisconnect(client: Socket) {
-    this.logger.debug(`📤 Client disconnected: ${client.id}`);
-    
-    // Clean up
     clearTimeout(client.data.authTimeout);
-    
-    // Leave all rooms
     client.rooms.forEach((room) => {
-      if (room !== client.id) {  // Don't leave client's own room
-        client.leave(room);
-        this.logger.debug(`✅ Client ${client.id} left room ${room}`);
-      }
+      if (room !== client.id) client.leave(room);
     });
-    
     // Unsubscribe from all pairs
     if (client.data.authenticated) {
       await this.subscriptionService.unsubscribeClientFromAll(client.id);
@@ -137,18 +128,11 @@ export class TradingGateway
 
       // Verify JWT token
       const cleanToken = token.replace('Bearer ', '');
-      this.logger.debug(`🔑 [${client.id}] Verifying token: ${cleanToken.substring(0, 30)}...`);
-      
       const payload = await this.jwtService.verifyAsync(cleanToken);
-      
       client.data.authenticated = true;
       client.data.user_id = payload.userId || payload.user_id || payload.sub;
       client.data.permissions = payload.permissions || [];
-
-      // Clear auth timeout
       clearTimeout(client.data.authTimeout);
-
-      this.logger.log(`✅ [${client.id}] Auth success for user: ${payload.userId || payload.user_id || payload.sub}`);
 
       // Send auth success response
       client.emit('auth_response', {
@@ -214,16 +198,8 @@ export class TradingGateway
           room = `pair:${pair_id}:ohlc:${interval}`;
         }
         
-        if (room) {
-          client.join(room);
-          this.logger.debug(`✅ Client ${client.id} joined room ${room}`);
-        }
+        if (room) client.join(room);
       }
-
-      this.logger.debug(
-        `📡 Client ${client.id} subscribed to pair ${pair_id} with channels: ${channels.join(', ')}`,
-      );
-
       // Send subscription confirmation
       client.emit('subscribed', {
         type: 'subscribed',
@@ -275,24 +251,12 @@ export class TradingGateway
           // Leave all OHLC intervals for this pair
           const rooms = client.rooms;
           for (const r of rooms) {
-            if (r.startsWith(`pair:${pair_id}:ohlc:`)) {
-              client.leave(r);
-              this.logger.debug(`✅ Client ${client.id} left room ${r}`);
-            }
+            if (r.startsWith(`pair:${pair_id}:ohlc:`)) client.leave(r);
           }
           continue;
         }
-        
-        if (room) {
-          client.leave(room);
-          this.logger.debug(`✅ Client ${client.id} left room ${room}`);
-        }
+        if (room) client.leave(room);
       }
-
-      this.logger.debug(
-        `📡 Client ${client.id} unsubscribed from pair ${pair_id}`,
-      );
-
       // Send unsubscription confirmation
       client.emit('unsubscribed', {
         type: 'unsubscribed',
@@ -315,7 +279,6 @@ export class TradingGateway
   @SubscribeMessage('pong')
   handlePong(@ConnectedSocket() client: Socket) {
     client.data.last_pong = Date.now();
-    this.logger.debug(`💓 Client ${client.id} sent pong`);
   }
 
   /**
@@ -329,8 +292,6 @@ export class TradingGateway
       data: ticker,
       timestamp: Date.now(),
     } as WebSocketMessage<TickerMessage>);
-
-    this.logger.debug(`📊 Broadcast ticker for pair ${ticker.pair_id} to room ${room}`);
   }
 
   /**
@@ -344,10 +305,6 @@ export class TradingGateway
       data: candle,
       timestamp: Date.now(),
     } as WebSocketMessage<OHLCMessage>);
-
-    this.logger.debug(
-      `📊 Broadcast OHLC for pair ${candle.pair_id} (${candle.interval}) to room ${room}`,
-    );
   }
 
   /**

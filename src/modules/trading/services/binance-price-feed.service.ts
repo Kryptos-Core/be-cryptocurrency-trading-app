@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
 import { TradingPriceStreamService } from './trading-price-stream.service';
-import { MarketsService } from '@/modules/markets/markets.service';
+import { MarketRepository } from '@/modules/markets/repositories';
 import { TickerMessage } from '../interfaces/websocket.interface';
 
 /**
@@ -23,7 +23,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly tradingPriceStreamService: TradingPriceStreamService,
-    private readonly marketsService: MarketsService,
+    private readonly marketRepository: MarketRepository,
   ) {
     // Use mainnet Spot API by default
     this.baseUrl = 'https://api.binance.com/api/v3';
@@ -36,11 +36,12 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Load mapping from database: pair_id -> symbol
+   * Load mapping from database: pair_id -> symbol.
+   * Uses repository directly to avoid stale cache (e.g. empty list from before db:seed).
    */
   private async loadPairSymbolMapping(): Promise<void> {
     try {
-      const activePairs = await this.marketsService.findActive();
+      const activePairs = await this.marketRepository.findActive();
 
       this.pairSymbolMap.clear();
 

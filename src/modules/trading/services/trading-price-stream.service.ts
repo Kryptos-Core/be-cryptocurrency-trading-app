@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { RedisService } from '@/common/services';
+import { MarketRepository } from '@/modules/markets/repositories';
 import {
   PriceUpdateEvent,
   CandleUpdateEvent,
@@ -30,14 +31,26 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   private candleCache: Map<string, OHLCMessage> = new Map();
   private candleKeyByPairInterval: Map<string, string> = new Map();
 
+  /** Buffer closed candles and flush to DB in batch to avoid DDoS-ing DB on every tick */
+  private readonly ohlcvPersistBuffer = new Map<string, OHLCMessage>();
+  private static readonly OHLCV_FLUSH_MS = 5000;
+  private ohlcvFlushTimer: NodeJS.Timeout | null = null;
+
   // Event listeners
   private priceUpdateListeners: ((ticker: TickerMessage) => void)[] = [];
   private candleUpdateListeners: ((candle: OHLCMessage) => void)[] = [];
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly marketRepository: MarketRepository,
+  ) {}
 
   async onModuleInit() {
     await this.initializeRedisSubscriber();
+    this.ohlcvFlushTimer = setInterval(
+      () => void this.flushOhlcvBuffer(),
+      TradingPriceStreamService.OHLCV_FLUSH_MS,
+    );
   }
 
   /**
@@ -81,8 +94,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    * Handle price update from Redis
    */
   private handlePriceUpdate(event: PriceUpdateEvent) {
-    this.logger.debug(`📊 Price update for pair ${event.pair_id}: ${event.ticker.last_price}`);
-
     this.aggregateCandle(event);
     
     // Notify all listeners
@@ -99,10 +110,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    * Handle candle update from Redis
    */
   private handleCandleUpdate(event: CandleUpdateEvent) {
-    this.logger.debug(
-      `📊 Candle update for pair ${event.pair_id} (${event.candle.interval}): ${event.candle.close}`,
-    );
-    
     // Notify all listeners
     for (const listener of this.candleUpdateListeners) {
       try {
@@ -147,6 +154,7 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
         const newKey = `${pairIntervalKey}:${openTime}`;
         const candle: OHLCMessage = {
           pair_id: event.pair_id,
+          symbol: event.ticker.symbol,
           interval,
           open_time: openTime,
           close_time: openTime + intervalMs,
@@ -217,10 +225,20 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
       const publisher = this.redisService.getPublisher();
       await publisher.publish('trading:price_update', JSON.stringify(message));
-      this.logger.debug(`📤 Published price update for pair ${ticker.pair_id}`);
     } catch (error) {
       this.logger.error('Failed to publish price update:', error);
     }
+  }
+
+  /**
+   * Queue candle for DB persist only when it is closed.
+   * Prevents DDoS on DB: no write on every tick, only closed candles are buffered and flushed in batch.
+   */
+  private persistCandleToDb(candle: OHLCMessage): void {
+    if (!candle.is_closed) return;
+    const intervalSec = this.intervalMsMap[candle.interval] / 1000;
+    const key = `${candle.pair_id}:${intervalSec}:${candle.open_time}`;
+    this.ohlcvPersistBuffer.set(key, candle);
   }
 
   /**
@@ -229,6 +247,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    */
   async publishCandleUpdate(candle: OHLCMessage) {
     try {
+      this.persistCandleToDb(candle);
+
       const message: RedisPubSubMessage = {
         event: 'candle_update',
         data: {
@@ -241,7 +261,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
       const publisher = this.redisService.getPublisher();
       await publisher.publish('trading:candle_update', JSON.stringify(message));
-      this.logger.debug(`📤 Published candle update for pair ${candle.pair_id}`);
     } catch (error) {
       this.logger.error('Failed to publish candle update:', error);
     }
@@ -251,8 +270,44 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    * Clean up resources
    */
   async onModuleDestroy() {
-    // Redis connections are managed by RedisService
+    if (this.ohlcvFlushTimer) {
+      clearInterval(this.ohlcvFlushTimer);
+      this.ohlcvFlushTimer = null;
+    }
+    await this.flushOhlcvBuffer();
     this.priceUpdateListeners = [];
     this.candleUpdateListeners = [];
+  }
+
+  /**
+   * Flush buffered closed candles to DB in one batch (reduces DB load).
+   */
+  private async flushOhlcvBuffer(): Promise<void> {
+    if (this.ohlcvPersistBuffer.size === 0) return;
+    const snapshot = Array.from(this.ohlcvPersistBuffer.values());
+    this.ohlcvPersistBuffer.clear();
+    try {
+      const intervalMsMap = this.intervalMsMap;
+      const rows = snapshot.map((c) => ({
+        pairId: c.pair_id,
+        intervalSec: intervalMsMap[c.interval] / 1000,
+        openTime: new Date(c.open_time),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume ?? '0',
+      }));
+      await this.marketRepository.upsertOHLCVBatch(rows);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to flush OHLCV buffer (${snapshot.length} candles): ${(err as Error)?.message ?? err}`,
+      );
+      // Re-enqueue so next flush can retry (optional; could drop to avoid duplicates)
+      for (const c of snapshot) {
+        const key = `${c.pair_id}:${this.intervalMsMap[c.interval] / 1000}:${c.open_time}`;
+        this.ohlcvPersistBuffer.set(key, c);
+      }
+    }
   }
 }

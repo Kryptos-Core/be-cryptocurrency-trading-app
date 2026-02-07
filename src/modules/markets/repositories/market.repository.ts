@@ -365,7 +365,8 @@ export class MarketRepository extends BaseRepository<MarketPair> {
 
   /**
    * Get OHLCV data for a market pair
-   * Direct query to ohlcv table (no stored procedure)
+   * Database Procedure Pattern: sp_ohlcv_get_by_pair_interval
+   * Used for TradingView chart historical data (Repository Pattern)
    */
   async getOHLCV(
     pairId: number,
@@ -384,28 +385,13 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     }[]
   > {
     try {
-      const rows = await this.dataSource.query(
-        `
-          SELECT
-            pair_id,
-            interval_sec,
-            open_time,
-            \`open\`,
-            high,
-            low,
-            close,
-            volume
-          FROM ohlcv
-          WHERE pair_id = ? AND interval_sec = ?
-          ORDER BY open_time DESC
-          LIMIT ?
-        `,
+      const result = await this.dataSource.query(
+        'CALL sp_ohlcv_get_by_pair_interval(?, ?, ?)',
         [pairId, intervalSec, limit],
       );
 
-      const data = rows || [];
-
-      return data
+      const rows = result?.[0] ?? [];
+      return rows
         .map((row: any) => ({
           pair_id: row.pair_id,
           interval_sec: row.interval_sec,
@@ -419,6 +405,83 @@ export class MarketRepository extends BaseRepository<MarketPair> {
         .reverse();
     } catch (error) {
       this.logger.error(`Error getting OHLCV for pair: ${pairId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upsert one OHLCV candle (insert or update on duplicate key).
+   * Used to persist realtime candle stream to DB so GET /markets/:id/ohlcv returns data.
+   * Database Procedure Pattern: sp_ohlcv_upsert
+   */
+  async upsertOHLCV(
+    pairId: number,
+    intervalSec: number,
+    openTime: Date,
+    open: string,
+    high: string,
+    low: string,
+    close: string,
+    volume: string,
+  ): Promise<void> {
+    try {
+      await this.dataSource.query(
+        'CALL sp_ohlcv_upsert(?, ?, ?, ?, ?, ?, ?, ?)',
+        [pairId, intervalSec, openTime, open, high, low, close, volume],
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error upserting OHLCV for pair ${pairId} interval_sec ${intervalSec} open_time ${openTime.toISOString()}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Batch upsert OHLCV candles in one query to reduce DB round-trips.
+   * Use when persisting many closed candles (e.g. after buffer flush).
+   */
+  async upsertOHLCVBatch(
+    rows: Array<{
+      pairId: number;
+      intervalSec: number;
+      openTime: Date;
+      open: string;
+      high: string;
+      low: string;
+      close: string;
+      volume: string;
+    }>,
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    try {
+      const placeholders = rows
+        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?)')
+        .join(', ');
+      const sql = `INSERT INTO ohlcv (pair_id, interval_sec, open_time, \`open\`, high, low, \`close\`, volume)
+VALUES ${placeholders}
+ON DUPLICATE KEY UPDATE
+  high = VALUES(high),
+  low = VALUES(low),
+  \`close\` = VALUES(\`close\`),
+  volume = VALUES(volume)`;
+      const params = rows.flatMap((r) => [
+        r.pairId,
+        r.intervalSec,
+        r.openTime,
+        r.open,
+        r.high,
+        r.low,
+        r.close,
+        r.volume,
+      ]);
+      await this.dataSource.query(sql, params);
+    } catch (error) {
+      this.logger.error(
+        `Error batch upserting OHLCV (${rows.length} rows): ${(error as Error)?.message ?? error}`,
+        error,
+      );
       throw error;
     }
   }

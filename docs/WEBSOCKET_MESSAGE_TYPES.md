@@ -118,7 +118,7 @@ type: 'ohlc'
   type: 'ohlc',
   data: {
     pair_id: 1,
-    symbol: 'BTC/USDT',
+    symbol: 'BTC/USDT',   // Optional - for TradingView chart display
     interval: '5m',
     open_time: 1707044700000,
     close_time: 1707044999999,
@@ -127,7 +127,8 @@ type: 'ohlc'
     low: '73700.00',
     close: '73920.00',
     volume: '123.456',
-    quote_asset_volume: '9123456.78'
+    quote_volume: '9123456.78',
+    is_closed: true
   },
   timestamp: 1707044963100
 }
@@ -271,7 +272,7 @@ interface TickerMessage {
 
 interface OHLCMessage {
   pair_id: number;
-  symbol: string;
+  symbol?: string;  // Optional - for TradingView chart label
   interval: CandleInterval;
   open_time: number;
   close_time: number;
@@ -280,7 +281,8 @@ interface OHLCMessage {
   low: string;
   close: string;
   volume: string;
-  quote_asset_volume: string;
+  quote_volume: string;
+  is_closed: boolean;
 }
 
 // Errors

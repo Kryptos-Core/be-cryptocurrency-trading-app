@@ -84,6 +84,8 @@ export interface TickerMessage {
 // ============ OHLC Candle ============
 export interface OHLCMessage {
   pair_id: number;
+  /** Symbol for display (e.g. BTC/USDT) - used by TradingView chart */
+  symbol?: string;
   interval: CandleInterval;
   open_time: number;
   close_time: number;
