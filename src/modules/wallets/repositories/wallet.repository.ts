@@ -38,25 +38,49 @@ export class WalletRepository extends BaseRepository<Wallet> {
   }
 
   /**
-   * Get or create wallet and lock row for update (pessimistic write)
-   * Transaction safety: ensures consistent balance updates
+   * Get or create wallet and lock row for update (pessimistic write).
+   * Uses raw SQL inside transaction to avoid EntityManager.getRepository(Wallet) metadata issues.
    */
   async getOrCreateForUpdate(
     userId: number,
     currencyId: number,
     manager: EntityManager,
   ): Promise<Wallet> {
-    const result = await manager.query('CALL sp_wallet_get_or_create_for_update(?, ?)', [
-      userId,
-      currencyId,
-    ]);
+    const rows = await manager.query(
+      `SELECT wallet_id, user_id, currency_id, available, frozen, updated_at
+       FROM wallets WHERE user_id = ? AND currency_id = ? LIMIT 1 FOR UPDATE`,
+      [userId, currencyId],
+    );
 
-    const wallet = result?.[0]?.[0] as Wallet | undefined;
-    if (!wallet) {
+    let row = rows?.[0];
+    if (!row) {
+      await manager.query(
+        `INSERT INTO wallets (user_id, currency_id, available, frozen) VALUES (?, ?, '0', '0')`,
+        [userId, currencyId],
+      );
+      const after = await manager.query(
+        `SELECT wallet_id, user_id, currency_id, available, frozen, updated_at
+         FROM wallets WHERE user_id = ? AND currency_id = ? LIMIT 1 FOR UPDATE`,
+        [userId, currencyId],
+      );
+      row = after?.[0];
+    }
+
+    if (!row) {
+      this.logger.error(
+        `getOrCreateForUpdate: wallet still null after insert. userId=${userId}, currencyId=${currencyId}`,
+      );
       throw new Error('Failed to get or create wallet');
     }
 
-    return wallet;
+    return {
+      wallet_id: row.wallet_id,
+      user_id: row.user_id,
+      currency_id: row.currency_id,
+      available: row.available ?? '0',
+      frozen: row.frozen ?? '0',
+      updated_at: row.updated_at,
+    } as Wallet;
   }
 
   /**
