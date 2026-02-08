@@ -30,7 +30,9 @@ export class WalletsService {
   ) {}
 
   /**
-   * Get transaction history (ledger entries) for a user and currency
+   * Get transaction history (ledger entries) for a user and currency.
+   * Deduplicates by (refType, refId): for DEPOSIT keeps only CREDIT, for WITHDRAW only DEBIT,
+   * so old double-entry rows created before the fix show as one record each.
    */
   async getTransactionHistory(
     userId: number,
@@ -42,13 +44,29 @@ export class WalletsService {
       currencyId,
       limit,
     );
-    return entries.map((e) => ({
-      refType: e.ref_type,
-      refId: e.ref_id,
-      direction: e.direction,
-      amount: String(e.amount),
-      createdAt: e.created_at instanceof Date ? e.created_at.toISOString() : String(e.created_at),
-    }));
+    const canonicalDirection: Record<string, string> = {
+      DEPOSIT: 'CREDIT',
+      WITHDRAW: 'DEBIT',
+      EXTERNAL_DEPOSIT: 'CREDIT',
+      EXTERNAL_WITHDRAWAL: 'DEBIT',
+    };
+    const seen = new Set<string>();
+    const result: WalletLedgerEntryDto[] = [];
+    for (const e of entries) {
+      const key = `${e.ref_type}:${e.ref_id}`;
+      const wantDir = canonicalDirection[e.ref_type] ?? e.direction;
+      if (seen.has(key)) continue;
+      if (e.direction !== wantDir) continue;
+      seen.add(key);
+      result.push({
+        refType: e.ref_type,
+        refId: e.ref_id,
+        direction: e.direction,
+        amount: String(e.amount),
+        createdAt: e.created_at instanceof Date ? e.created_at.toISOString() : String(e.created_at),
+      });
+    }
+    return result;
   }
 
   /**
@@ -126,12 +144,13 @@ export class WalletsService {
       manager,
     );
 
-    await this.walletLedgerRepository.createDoubleEntry(
+    await this.walletLedgerRepository.createEntry(
       {
         userId,
         currencyId: dto.currencyId,
         refType: dto.refType,
         refId: dto.refId,
+        direction: 'CREDIT',
         amount: amount.toString(),
         balanceAfter: this.calculateTotal(updated.available, updated.frozen),
       },
@@ -160,12 +179,13 @@ export class WalletsService {
       manager,
     );
 
-    await this.walletLedgerRepository.createDoubleEntry(
+    await this.walletLedgerRepository.createEntry(
       {
         userId,
         currencyId: dto.currencyId,
         refType: dto.refType,
         refId: dto.refId,
+        direction: 'DEBIT',
         amount: amount.toString(),
         balanceAfter: this.calculateTotal(updated.available, updated.frozen),
       },
