@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { RedisService } from '@/common/services';
 import { MarketRepository } from '@/modules/markets/repositories';
 import {
@@ -17,8 +17,6 @@ import {
  */
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(TradingPriceStreamService.name);
-
   private readonly intervalMsMap: Record<CandleInterval, number> = {
     '1m': 60_000,
     '5m': 5 * 60_000,
@@ -74,18 +72,15 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
           } else if (channel === 'trading:candle_update') {
             this.handleCandleUpdate(data.data as CandleUpdateEvent);
           }
-        } catch (error) {
-          this.logger.error(`Failed to process message from ${channel}:`, error);
+        } catch {
+          // Message processing failed (silent)
         }
       });
 
-      subscriber.on('error', (error) => {
-        this.logger.error('Redis subscriber error:', error);
+      subscriber.on('error', () => {
+        // Redis subscriber error (silent)
       });
-
-      this.logger.log('✅ Subscribed to Redis trading channels');
     } catch (error) {
-      this.logger.error('Failed to initialize Redis subscriber:', error);
       throw error;
     }
   }
@@ -100,8 +95,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     for (const listener of this.priceUpdateListeners) {
       try {
         listener(event.ticker);
-      } catch (error) {
-        this.logger.error('Error in price update listener:', error);
+      } catch {
+        // Listener error (silent)
       }
     }
   }
@@ -114,8 +109,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     for (const listener of this.candleUpdateListeners) {
       try {
         listener(event.candle);
-      } catch (error) {
-        this.logger.error('Error in candle update listener:', error);
+      } catch {
+        // Listener error (silent)
       }
     }
   }
@@ -225,8 +220,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
       const publisher = this.redisService.getPublisher();
       await publisher.publish('trading:price_update', JSON.stringify(message));
-    } catch (error) {
-      this.logger.error('Failed to publish price update:', error);
+    } catch {
+      // Publish failed (silent)
     }
   }
 
@@ -261,8 +256,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
       const publisher = this.redisService.getPublisher();
       await publisher.publish('trading:candle_update', JSON.stringify(message));
-    } catch (error) {
-      this.logger.error('Failed to publish candle update:', error);
+    } catch {
+      // Publish failed (silent)
     }
   }
 
@@ -300,9 +295,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       }));
       await this.marketRepository.upsertOHLCVBatch(rows);
     } catch (err) {
-      this.logger.warn(
-        `Failed to flush OHLCV buffer (${snapshot.length} candles): ${(err as Error)?.message ?? err}`,
-      );
       // Re-enqueue so next flush can retry (optional; could drop to avoid duplicates)
       for (const c of snapshot) {
         const key = `${c.pair_id}:${this.intervalMsMap[c.interval] / 1000}:${c.open_time}`;

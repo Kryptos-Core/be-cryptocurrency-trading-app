@@ -8,7 +8,7 @@ import {
   MessageBody,
   OnGatewayInit,
 } from '@nestjs/websockets';
-import { Logger, UseFilters, UseGuards } from '@nestjs/common';
+import { UseFilters } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { TradingSubscriptionService } from '../services/trading-subscription.service';
 import { TradingPriceStreamService } from '../services/trading-price-stream.service';
@@ -53,8 +53,6 @@ export class TradingGateway
   @WebSocketServer()
   server!: Server;
 
-  private readonly logger = new Logger(TradingGateway.name);
-
   constructor(
     private readonly subscriptionService: TradingSubscriptionService,
     private readonly priceStreamService: TradingPriceStreamService,
@@ -65,8 +63,6 @@ export class TradingGateway
    * Initialize gateway and start listening to Redis Pub/Sub
    */
   afterInit(server: Server) {
-    this.logger.log('🔌 Trading WebSocket Gateway initialized');
-    
     // Listen to price updates from Redis Pub/Sub
     this.priceStreamService.onPriceUpdate((message: TickerMessage) => {
       this.broadcastPriceUpdate(message);
@@ -82,14 +78,9 @@ export class TradingGateway
    * Handle client connection
    */
   async handleConnection(client: Socket) {
-    // Log suppressed to avoid console spam; enable temporarily for debugging
-    
     // Client must authenticate within 10 seconds
     const authTimeout = setTimeout(() => {
-      if (!client.data.authenticated) {
-        this.logger.warn(`⚠️ Client ${client.id} not authenticated, disconnecting`);
-        client.disconnect();
-      }
+      if (!client.data.authenticated) client.disconnect();
     }, 10000);
 
     client.data.authTimeout = authTimeout;
@@ -121,10 +112,7 @@ export class TradingGateway
     try {
       const token = message.data?.token;
       
-      if (!token) {
-        this.logger.warn(`⚠️  [${client.id}] Auth failed: No token provided`);
-        return this.sendError(client, 'AUTH_FAILED', 'Token is required');
-      }
+      if (!token) return this.sendError(client, 'AUTH_FAILED', 'Token is required');
 
       // Verify JWT token
       const cleanToken = token.replace('Bearer ', '');
@@ -148,8 +136,6 @@ export class TradingGateway
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Invalid token';
-      const errorCode = error instanceof Error && 'name' in error ? (error as any).name : 'UNKNOWN';
-      this.logger.warn(`❌ [${client.id}] Auth failed [${errorCode}]: ${errorMessage}`);
       return this.sendError(client, 'AUTH_FAILED', errorMessage);
     }
   }
@@ -214,7 +200,6 @@ export class TradingGateway
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Subscription failed';
-      this.logger.error(`❌ Subscribe failed: ${errorMessage}`);
       return this.sendError(client, 'SERVER_ERROR', errorMessage);
     }
   }
@@ -325,7 +310,5 @@ export class TradingGateway
       },
       timestamp: Date.now(),
     } as WebSocketMessage);
-
-    this.logger.warn(`⚠️ Error sent to client ${client.id}: ${code} - ${message}`);
   }
 }

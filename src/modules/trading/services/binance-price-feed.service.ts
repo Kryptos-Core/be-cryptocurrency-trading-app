@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
 import { TradingPriceStreamService } from './trading-price-stream.service';
@@ -12,7 +12,6 @@ import { TickerMessage } from '../interfaces/websocket.interface';
  */
 @Injectable()
 export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(BinancePriceFeedService.name);
   private readonly baseUrl: string;
   private priceFeedIntervals: Map<number, NodeJS.Timeout> = new Map();
   private readonly updateIntervalMs: number = 1000; // 1 second between updates
@@ -27,7 +26,6 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   ) {
     // Use mainnet Spot API by default
     this.baseUrl = 'https://api.binance.com/api/v3';
-    this.logger.log('🔌 Binance Price Feed Service initialized (Mainnet)');
   }
 
   async onModuleInit() {
@@ -50,17 +48,13 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
           .toUpperCase()
           .replace(/[^A-Z0-9]/g, '');
 
-        if (!normalizedSymbol) {
-          this.logger.warn(`⚠️ Skipping pair ${pair.pair_id}: invalid symbol ${pair.symbol}`);
-          continue;
-        }
+        if (!normalizedSymbol) continue;
 
         this.pairSymbolMap.set(pair.pair_id, normalizedSymbol);
       }
 
-      this.logger.log(`✅ Loaded ${this.pairSymbolMap.size} trading pairs from DB for price feed`);
-    } catch (error) {
-      this.logger.error('Failed to load pair symbol mapping:', error);
+    } catch {
+      // Pair mapping load failed (silent)
     }
   }
 
@@ -68,20 +62,11 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
    * Start price feed for all configured pairs
    */
   private async startPriceFeed(): Promise<void> {
-    if (this.isRunning) {
-      this.logger.warn('Price feed is already running');
-      return;
-    }
-
+    if (this.isRunning) return;
     this.isRunning = true;
-    this.logger.log('📊 Starting Binance price feed...');
-
-    // Start fetching price for each pair
     for (const [pairId, symbol] of this.pairSymbolMap.entries()) {
       this.startPairPriceFeed(pairId, symbol);
     }
-
-    this.logger.log(`✅ Price feed started for ${this.pairSymbolMap.size} pairs`);
   }
 
   /**
@@ -97,7 +82,6 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     }, this.updateIntervalMs);
 
     this.priceFeedIntervals.set(pairId, interval);
-    this.logger.debug(`📈 Price feed started for ${symbol} (pair_id: ${pairId})`);
   }
 
   /**
@@ -108,10 +92,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       // Fetch 24h ticker data from Binance
       const tickerData = await this.fetchTicker24h(symbol);
 
-      if (!tickerData) {
-        this.logger.debug(`⚠️ Failed to fetch ticker data for ${symbol}`);
-        return;
-      }
+      if (!tickerData) return;
 
       // Build ticker message
       const tickerMessage: TickerMessage = {
@@ -140,8 +121,8 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
         JSON.stringify(tickerMessage),
         300, // 5 minute TTL
       );
-    } catch (error) {
-      this.logger.debug(`Error fetching price for ${symbol}:`, (error as Error).message);
+    } catch {
+      // Fetch/publish failed (silent)
     }
   }
 
@@ -154,10 +135,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       const url = `${this.baseUrl}/ticker/24hr?symbol=${symbol}`;
       const response = await fetch(url);
 
-      if (!response.ok) {
-        this.logger.warn(`Binance API error: ${response.status} for ${symbol}`);
-        return null;
-      }
+      if (!response.ok) return null;
 
       const data: any = await response.json();
 
@@ -180,8 +158,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
         closeTime: data.closeTime,
         count: data.count,
       };
-    } catch (error) {
-      this.logger.debug(`Failed to fetch ticker for ${symbol}:`, (error as Error).message);
+    } catch {
       return null;
     }
   }
@@ -201,8 +178,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
 
       const data: any = await response.json();
       return parseFloat(data.price);
-    } catch (error) {
-      this.logger.debug(`Failed to get current price for ${symbol}:`, (error as Error).message);
+    } catch {
       return null;
     }
   }
@@ -211,17 +187,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
    * Add a new pair to the price feed
    */
   async addPair(pairId: number, symbol: string): Promise<void> {
-    if (this.pairSymbolMap.has(pairId)) {
-      this.logger.warn(`Pair ${symbol} (${pairId}) is already being tracked`);
-      return;
-    }
-
+    if (this.pairSymbolMap.has(pairId)) return;
     this.pairSymbolMap.set(pairId, symbol);
-
-    if (this.isRunning) {
-      this.startPairPriceFeed(pairId, symbol);
-      this.logger.log(`📈 Added new pair to price feed: ${symbol} (${pairId})`);
-    }
+    if (this.isRunning) this.startPairPriceFeed(pairId, symbol);
   }
 
   /**
@@ -233,7 +201,6 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       clearInterval(interval);
       this.priceFeedIntervals.delete(pairId);
       this.pairSymbolMap.delete(pairId);
-      this.logger.log(`⏹️ Removed pair from price feed (pair_id: ${pairId})`);
     }
   }
 
@@ -272,7 +239,6 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.priceFeedIntervals.clear();
-    this.logger.log('⏹️ Price feed stopped');
   }
 
   /**

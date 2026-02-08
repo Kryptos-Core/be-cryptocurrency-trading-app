@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { ClientSubscription, CandleInterval, SubscriptionChannel } from '../interfaces/websocket.interface';
 import { Server } from 'socket.io';
 
@@ -9,8 +9,6 @@ import { Server } from 'socket.io';
  */
 @Injectable()
 export class TradingSubscriptionService {
-  private readonly logger = new Logger(TradingSubscriptionService.name);
-
   // Track all active subscriptions: clientId -> Set<pair_id>
   private clientSubscriptions = new Map<string, Set<number>>();
 
@@ -61,10 +59,6 @@ export class TradingSubscriptionService {
 
     // Update subscription count
     this.subscriptionCounts.set(clientId, subscriptionCount + 1);
-
-    this.logger.log(
-      `✅ Client ${clientId} (user ${userId}) subscribed to pair ${pairId} (${channels.join(',')})`,
-    );
   }
 
   /**
@@ -91,8 +85,6 @@ export class TradingSubscriptionService {
     // Update subscription count
     const count = this.subscriptionCounts.get(clientId) || 0;
     this.subscriptionCounts.set(clientId, Math.max(0, count - 1));
-
-    this.logger.log(`✅ Client ${clientId} unsubscribed from pair ${pairId}`);
   }
 
   /**
@@ -111,8 +103,6 @@ export class TradingSubscriptionService {
 
     this.clientSubscriptions.delete(clientId);
     this.subscriptionCounts.delete(clientId);
-
-    this.logger.log(`✅ Client ${clientId} unsubscribed from all pairs`);
   }
 
   /**
@@ -161,6 +151,5 @@ export class TradingSubscriptionService {
     this.clientSubscriptions.clear();
     this.pairSubscribers.clear();
     this.subscriptionCounts.clear();
-    this.logger.log('🔄 All subscriptions reset');
   }
 }
