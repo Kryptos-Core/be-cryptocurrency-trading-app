@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { Trade } from '@/entities/trade.entity';
+import { IMarketTickerData } from '../interfaces/market-ticker.interface';
 
 /**
  * Market Repository
@@ -305,10 +306,86 @@ export class MarketRepository extends BaseRepository<MarketPair> {
   }
 
   /**
-   * Get market ticker (24h statistics)
-   * Complex Query: Aggregates trades for ticker data
+   * Get latest close price from OHLCV (for ticker fallback when no trades).
+   * Returns '0' when no rows (repository contract: no throw).
    */
-  async getTicker(pairId: number): Promise<any> {
+  async getLatestCloseFromOHLCV(pairId: number): Promise<string> {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT \`close\` FROM ohlcv WHERE pair_id = ? ORDER BY open_time DESC LIMIT 1`,
+        [pairId],
+      );
+      const row = Array.isArray(rows) ? rows[0] : null;
+      const close = row?.close;
+      return close != null ? String(close) : '0';
+    } catch {
+      return '0';
+    }
+  }
+
+  /**
+   * Get close price from OHLCV at ~24h ago (for ticker change24h when no trades).
+   * Returns '0' when no candle that old (caller may use getEarliestCloseFromOHLCV as fallback).
+   */
+  async getOHLCVClose24hAgo(pairId: number): Promise<string> {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT \`close\` FROM ohlcv
+         WHERE pair_id = ? AND open_time <= DATE_SUB(NOW(), INTERVAL 23 HOUR)
+         ORDER BY open_time DESC LIMIT 1`,
+        [pairId],
+      );
+      const row = Array.isArray(rows) ? rows[0] : null;
+      const close = row?.close;
+      return close != null ? String(close) : '0';
+    } catch {
+      return '0';
+    }
+  }
+
+  /**
+   * Get close of the earliest OHLCV candle for pair (fallback for change24h when no candle at 24h ago).
+   * Markets with under 24h of data can still show volatility from first known price to current.
+   * Returns '0' when no rows (repository contract: no throw).
+   */
+  async getEarliestCloseFromOHLCV(pairId: number): Promise<string> {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT \`close\` FROM ohlcv WHERE pair_id = ? ORDER BY open_time ASC LIMIT 1`,
+        [pairId],
+      );
+      const row = Array.isArray(rows) ? rows[0] : null;
+      const close = row?.close;
+      return close != null ? String(close) : '0';
+    } catch {
+      return '0';
+    }
+  }
+
+  /**
+   * Sum volume from OHLCV in last 24h (for ticker volume24h when no trades).
+   * Returns '0' when no rows (repository contract: no throw).
+   */
+  async getOHLCVVolume24h(pairId: number): Promise<string> {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT COALESCE(SUM(volume), 0) as total FROM ohlcv
+         WHERE pair_id = ? AND open_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+        [pairId],
+      );
+      const row = Array.isArray(rows) ? rows[0] : null;
+      const total = row?.total;
+      return total != null ? String(total) : '0';
+    } catch {
+      return '0';
+    }
+  }
+
+  /**
+   * Get market ticker (24h statistics) from trades (stored procedure).
+   * Returns zeroed string fields when no data; service layer may apply OHLCV fallback.
+   */
+  async getTicker(pairId: number): Promise<IMarketTickerData> {
     try {
       const result = await this.dataSource.query('CALL sp_market_ticker(?)', [pairId]);
       const row = result?.[0]?.[0] || {};
@@ -405,6 +482,54 @@ export class MarketRepository extends BaseRepository<MarketPair> {
         .reverse();
     } catch (error) {
       this.logger.error(`Error getting OHLCV for pair: ${pairId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get OHLCV data for a market pair within a time range (for chart range filter).
+   */
+  async getOHLCVByRange(
+    pairId: number,
+    intervalSec: number,
+    fromDate: Date,
+    limit: number = 500,
+  ): Promise<
+    {
+      pair_id: number;
+      interval_sec: number;
+      open_time: Date;
+      open: string;
+      high: string;
+      low: string;
+      close: string;
+      volume: string;
+    }[]
+  > {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT pair_id, interval_sec, open_time, \`open\`, high, low, \`close\`, volume
+         FROM ohlcv
+         WHERE pair_id = ? AND interval_sec = ? AND open_time >= ?
+         ORDER BY open_time DESC
+         LIMIT ?`,
+        [pairId, intervalSec, fromDate, limit],
+      );
+      const list = Array.isArray(rows) ? rows : [];
+      return list
+        .map((row: any) => ({
+          pair_id: row.pair_id,
+          interval_sec: row.interval_sec,
+          open_time: row.open_time,
+          open: row.open?.toString() || '0',
+          high: row.high?.toString() || '0',
+          low: row.low?.toString() || '0',
+          close: row.close?.toString() || '0',
+          volume: row.volume?.toString() || '0',
+        }))
+        .reverse();
+    } catch (error) {
+      this.logger.error(`Error getting OHLCV by range for pair: ${pairId}`, error);
       throw error;
     }
   }

@@ -1,19 +1,28 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { MarketRepository } from './repositories';
-import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
+import { CreateMarketPairDto, UpdateMarketPairDto, MarketTickerDto } from './dto';
 import { MarketPair } from '@/entities/market-pair.entity';
+import { IMarketTickerData } from './interfaces/market-ticker.interface';
 import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
+
+/** Default string for missing/zero price (repository contract). */
+const TICKER_ZERO = '0';
+/** Decimal places for change percentage (e.g. "0.52"). */
+const CHANGE_PERCENT_DECIMALS = 2;
+/** Decimal places for price/amount strings (e.g. changeAmount24h). */
+const PRICE_AMOUNT_DECIMALS = 18;
 
 /**
  * Markets Service - Business Logic Layer
  * Service Layer Pattern: Business logic tập trung
  * Single Responsibility Principle: Chỉ xử lý market business logic
  * Dependency Inversion: Phụ thuộc vào Repository abstraction
+ * Cache-Aside: Ticker/orderbook cached with short TTL
  */
 @Injectable()
-export class MarketsService {
+export class MarketsService implements OnModuleInit {
   private readonly logger = new Logger(MarketsService.name);
   private readonly CACHE_KEY_PREFIX = 'markets:';
   private readonly CACHE_TTL = 300; // 5 minutes for market data (shorter than currencies)
@@ -24,6 +33,10 @@ export class MarketsService {
     private readonly cacheService: CacheService,
     private readonly currenciesService: CurrenciesService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.invalidateCache();
+  }
 
   /**
    * Find all market pairs with pagination
@@ -313,33 +326,98 @@ export class MarketsService {
   }
 
   /**
-   * Get market ticker (24h statistics)
-   * Cache-Aside Pattern: Cache ticker with shorter TTL
+   * Get market ticker (24h statistics).
+   * Cache-Aside Pattern: Cache ticker with shorter TTL.
+   * Returns typed DTO for API response.
    */
-  async getTicker(pairId: number): Promise<any> {
+  async getTicker(pairId: number): Promise<MarketTickerDto> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}ticker:${pairId}`;
 
     return this.cacheService.getOrSet(
       cacheKey,
       async () => {
         const pair = await this.findOne(pairId);
-        const tickerData = await this.marketRepository.getTicker(pairId);
-
-        return {
-          symbol: pair.symbol,
-          pairId: pair.pair_id,
-          ...tickerData,
-          timestamp: new Date().toISOString(),
-        };
+        let tickerData = await this.marketRepository.getTicker(pairId);
+        tickerData = await this.applyOHLCVFallbackIfNeeded(pairId, tickerData);
+        return this.buildTickerResponse(pair, tickerData);
       },
       this.TICKER_CACHE_TTL,
     );
   }
 
   /**
+   * When lastPrice is missing or zero, build ticker from OHLCV (latest close, 24h-ago or earliest close, volume).
+   * Single Responsibility: centralizes OHLCV fallback logic.
+   */
+  private async applyOHLCVFallbackIfNeeded(
+    pairId: number,
+    tickerData: IMarketTickerData,
+  ): Promise<IMarketTickerData> {
+    if (tickerData?.lastPrice && this.parsePrice(tickerData.lastPrice) > 0) {
+      return tickerData;
+    }
+    const fallbackPrice = await this.marketRepository.getLatestCloseFromOHLCV(pairId);
+    if (!fallbackPrice || this.parsePrice(fallbackPrice) <= 0) {
+      return tickerData;
+    }
+    const [open24hOhlcv, volume24hOhlcv, earliestClose] = await Promise.all([
+      this.marketRepository.getOHLCVClose24hAgo(pairId),
+      this.marketRepository.getOHLCVVolume24h(pairId),
+      this.marketRepository.getEarliestCloseFromOHLCV(pairId),
+    ]);
+    const last = this.parsePrice(fallbackPrice);
+    const open24hValue = this.resolveOpen24h(open24hOhlcv, earliestClose, last);
+    const changeAmount = last - open24hValue;
+    const changePercent =
+      open24hValue > 0
+        ? ((changeAmount / open24hValue) * 100).toFixed(CHANGE_PERCENT_DECIMALS)
+        : TICKER_ZERO;
+    const fallbackStr = fallbackPrice;
+    const useFallback = (v: string) => (v === TICKER_ZERO ? fallbackStr : v);
+    return {
+      ...tickerData,
+      lastPrice: fallbackStr,
+      open24h: String(open24hValue),
+      high24h: useFallback(tickerData.high24h),
+      low24h: useFallback(tickerData.low24h),
+      bestBid: useFallback(tickerData.bestBid),
+      bestAsk: useFallback(tickerData.bestAsk),
+      change24h: changePercent,
+      changeAmount24h: changeAmount.toFixed(PRICE_AMOUNT_DECIMALS),
+      volume24h:
+        volume24hOhlcv != null && this.parsePrice(volume24hOhlcv) >= 0 ? volume24hOhlcv : tickerData.volume24h,
+      quoteVolume24h:
+        tickerData.quoteVolume24h === TICKER_ZERO
+          ? (this.parsePrice(volume24hOhlcv || TICKER_ZERO) * last).toFixed(PRICE_AMOUNT_DECIMALS)
+          : tickerData.quoteVolume24h,
+    };
+  }
+
+  private parsePrice(value: string): number {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /** Prefer 24h-ago close; if none (e.g. under 24h data), use earliest close; else current (0% change). */
+  private resolveOpen24h(open24hOhlcv: string, earliestClose: string, last: number): number {
+    if (open24hOhlcv && this.parsePrice(open24hOhlcv) > 0) return this.parsePrice(open24hOhlcv);
+    if (earliestClose && this.parsePrice(earliestClose) > 0) return this.parsePrice(earliestClose);
+    return last;
+  }
+
+  private buildTickerResponse(pair: MarketPair, tickerData: IMarketTickerData): MarketTickerDto {
+    return {
+      symbol: pair.symbol,
+      pairId: pair.pair_id,
+      ...tickerData,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
    * Get ticker by symbol
    */
-  async getTickerBySymbol(symbol: string): Promise<any> {
+  async getTickerBySymbol(symbol: string): Promise<MarketTickerDto> {
     const pair = await this.findBySymbol(symbol);
     return this.getTicker(pair.pair_id);
   }
@@ -347,7 +425,7 @@ export class MarketsService {
   /**
    * Get all tickers for active pairs
    */
-  async getAllTickers(): Promise<any[]> {
+  async getAllTickers(): Promise<MarketTickerDto[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}tickers:all`;
 
     return this.cacheService.getOrSet(
@@ -430,19 +508,44 @@ export class MarketsService {
     return this.getRecentTrades(pair.pair_id, limit);
   }
 
+  /** Chart range filter: 1d, 1M, 3M, 1y, 5y → fromDate = now - range */
+  private static readonly RANGE_MS: Record<string, number> = {
+    '1d': 24 * 60 * 60 * 1000,
+    '1M': 30 * 24 * 60 * 60 * 1000,
+    '3M': 90 * 24 * 60 * 60 * 1000,
+    '1y': 365 * 24 * 60 * 60 * 1000,
+    '5y': 5 * 365 * 24 * 60 * 60 * 1000,
+  };
+
   /**
    * Get OHLCV data for a market pair
+   * @param range Optional: 1d | 1M | 3M | 1y | 5y — filter candles to this time range
    */
-  async getOHLCV(pairId: number, interval: string = '1h', limit: number = 100) {
+  async getOHLCV(
+    pairId: number,
+    interval: string = '1h',
+    limit: number = 100,
+    range?: string,
+  ) {
     await this.findOne(pairId);
 
     const intervalSec = this.resolveIntervalSeconds(interval);
-    const candles = await this.marketRepository.getOHLCV(pairId, intervalSec, limit);
+    const rangeMs = range ? MarketsService.RANGE_MS[range] : null;
+    const candles =
+      rangeMs != null
+        ? await this.marketRepository.getOHLCVByRange(
+            pairId,
+            intervalSec,
+            new Date(Date.now() - rangeMs),
+            Math.min(limit, 500),
+          )
+        : await this.marketRepository.getOHLCV(pairId, intervalSec, limit);
 
     return {
       pair_id: pairId,
       interval,
       interval_sec: intervalSec,
+      range: range ?? null,
       candles,
     };
   }
