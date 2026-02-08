@@ -49,3 +49,22 @@ npm run start:dev
 ```
 
 Swagger: `http://localhost:3000/api`
+
+---
+
+## Seed DB & tài khoản test
+
+Chạy seed để nạp dữ liệu mẫu (currencies, users, market pairs, OHLCV, wallets):
+
+```bash
+npm run db:seed
+```
+
+**Tài khoản test (đăng nhập ngay sau khi seed):**
+
+| Email | Password | Ghi chú |
+|-------|----------|---------|
+| admin@example.com | Admin@123! | Admin |
+| trader1@example.com | Trader@123! | Trader 1 |
+| trader2@example.com | Trader@123! | Trader 2 |
+| trader3@example.com | Trader@123! | Trader 3 |

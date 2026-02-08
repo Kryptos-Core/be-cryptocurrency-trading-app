@@ -1,0 +1,30 @@
+[
+  {
+    "email": "admin@example.com",
+    "password": "Admin@123!",
+    "first_name": "Admin",
+    "last_name": "User",
+    "status": "ACTIVE"
+  },
+  {
+    "email": "trader1@example.com",
+    "password": "Trader@123!",
+    "first_name": "Trader",
+    "last_name": "One",
+    "status": "ACTIVE"
+  },
+  {
+    "email": "trader2@example.com",
+    "password": "Trader@123!",
+    "first_name": "Trader",
+    "last_name": "Two",
+    "status": "ACTIVE"
+  },
+  {
+    "email": "trader3@example.com",
+    "password": "Trader@123!",
+    "first_name": "Trader",
+    "last_name": "Three",
+    "status": "ACTIVE"
+  }
+]
