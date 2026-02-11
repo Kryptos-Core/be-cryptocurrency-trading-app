@@ -323,6 +323,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Get keys by pattern
    */
   async keys(pattern: string): Promise<string[]> {
+    if (!this.client) return [];
     return this.client.keys(pattern);
   }
 

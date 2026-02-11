@@ -91,7 +91,7 @@ export class TradingGateway
    */
   async handleDisconnect(client: Socket) {
     clearTimeout(client.data.authTimeout);
-    client.rooms.forEach((room) => {
+    client.rooms.forEach((room: string) => {
       if (room !== client.id) client.leave(room);
     });
     // Unsubscribe from all pairs

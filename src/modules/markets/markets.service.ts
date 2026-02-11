@@ -35,7 +35,7 @@ export class MarketsService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.invalidateCache();
+    // Skip cache invalidation on startup – cache is empty; avoid calling Redis before it's ready
   }
 
   /**
