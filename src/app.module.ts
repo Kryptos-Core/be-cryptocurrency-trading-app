@@ -9,6 +9,7 @@ import { MarketsModule } from './modules/markets/markets.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { MatchingModule } from './modules/matching/matching.module';
 import { TradingModule } from './modules/trading/trading.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
@@ -37,6 +38,7 @@ import appConfig from './config/app.config';
     MarketsModule,
     WalletsModule,
     OrdersModule,
+    MatchingModule,
     TradingModule,
   ],
 })

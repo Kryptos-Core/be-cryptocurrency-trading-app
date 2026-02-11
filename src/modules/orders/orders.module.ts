@@ -7,6 +7,7 @@ import { OrderRepository } from './repositories';
 import { OrderValidationStrategy } from './strategies';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { MatchingModule } from '@/modules/matching/matching.module';
 
 /**
  * Orders Module
@@ -18,6 +19,7 @@ import { WalletsModule } from '@/modules/wallets/wallets.module';
     TypeOrmModule.forFeature([Order]),
     MarketsModule,
     WalletsModule,
+    MatchingModule,
   ],
   providers: [OrdersService, OrderRepository, OrderValidationStrategy],
   controllers: [OrdersController],

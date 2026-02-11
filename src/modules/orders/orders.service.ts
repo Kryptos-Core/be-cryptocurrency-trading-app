@@ -13,6 +13,7 @@ import {
 import { Order } from '@/entities/order.entity';
 import { MarketRepository } from '@/modules/markets/repositories';
 import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import { MatchingService } from '@/modules/matching/matching.service';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400; // 24h
@@ -30,6 +31,7 @@ export class OrdersService {
     private readonly walletRepository: WalletRepository,
     private readonly cacheService: CacheService,
     private readonly validationStrategy: OrderValidationStrategy,
+    private readonly matchingService: MatchingService,
   ) {}
 
   async create(command: CreateOrderCommand): Promise<Order> {
@@ -103,9 +105,28 @@ export class OrdersService {
       throw new BusinessException('Order creation failed', 'ORDER_CREATE_FAILED');
     }
 
-    const order = await this.orderRepository.findById(result.order_id);
+    let order = await this.orderRepository.findById(result.order_id);
     if (!order) {
       throw new BusinessException('Order created but not found', 'ORDER_NOT_FOUND');
+    }
+
+    if (order.status === 'OPEN' || order.status === 'PARTIAL') {
+      const remaining =
+        parseFloat(order.amount) - parseFloat(order.filled_amount ?? '0');
+      if (remaining > 0) {
+        try {
+          await this.matchingService.runMatch({
+            takerOrder: this.orderToOrderBookOrder(order),
+            pairId: order.pair_id,
+            feeCurrencyId: pair.quote_currency_id,
+            makerFeeRate: pair.maker_fee_rate ?? '0.001',
+            takerFeeRate: pair.taker_fee_rate ?? '0.001',
+          });
+          order = (await this.orderRepository.findById(result.order_id)) ?? order;
+        } catch (e) {
+          // Don't fail create if matching fails (e.g. lock, DB)
+        }
+      }
     }
 
     await this.cacheService.set(cacheKey, this.orderToPlain(order), IDEMPOTENCY_TTL_SEC);
@@ -231,5 +252,35 @@ export class OrdersService {
     const o = new Order();
     Object.assign(o, plain);
     return o;
+  }
+
+  private orderToOrderBookOrder(o: Order): {
+    order_id: number;
+    pair_id: number;
+    user_id: number;
+    side: 'BUY' | 'SELL';
+    type: 'LIMIT' | 'MARKET';
+    price: string | null;
+    amount: string;
+    filled_amount: string;
+    status: string;
+    created_at: Date;
+    remaining: string;
+  } {
+    const filled = parseFloat(o.filled_amount ?? '0');
+    const amount = parseFloat(o.amount ?? '0');
+    return {
+      order_id: o.order_id,
+      pair_id: o.pair_id,
+      user_id: o.user_id,
+      side: o.side,
+      type: o.type,
+      price: o.price ?? null,
+      amount: o.amount,
+      filled_amount: o.filled_amount ?? '0',
+      status: o.status,
+      created_at: o.created_at,
+      remaining: String(amount - filled),
+    };
   }
 }
