@@ -1118,6 +1118,251 @@
 				}
 			],
 			"description": "CRUD operations và market data endpoints cho markets module"
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Create Order (Limit Buy)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"pairId\": 1,\n  \"side\": \"BUY\",\n  \"type\": \"LIMIT\",\n  \"price\": \"50000\",\n  \"amount\": \"0.001\",\n  \"timeInForce\": \"GTC\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"orders"
+							]
+						},
+						"description": "Create a limit BUY order. Idempotency: same idempotencyKey returns same order."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order (Limit Sell)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"pairId\": 1,\n  \"side\": \"SELL\",\n  \"type\": \"LIMIT\",\n  \"price\": \"60000\",\n  \"amount\": \"0.001\",\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"orders"
+							]
+						},
+						"description": "Create a limit SELL order."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order Book (Bids/Asks)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders/book/1?side=BUY&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"orders",
+								"book",
+								"1"
+							],
+							"query": [
+								{
+									"key": "side",
+									"value": "BUY",
+									"description": "BUY or SELL"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get order book levels for pair (1) and side. Use side=SELL for asks."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Orders",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders/my?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"orders",
+								"my"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "OPEN",
+									"description": "Optional: OPEN, PARTIAL, FILLED, CANCELLED, REJECTED"
+								}
+							]
+						},
+						"description": "List current user orders with optional status filter."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"orders",
+								"1"
+							]
+						},
+						"description": "Get one order by ID (own orders only). Replace 1 with orderId."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Order",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders/1/cancel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"orders",
+								"1",
+								"cancel"
+							]
+						},
+						"description": "Cancel an open/partial order. Replace 1 with orderId."
+					},
+					"response": []
+				}
+			],
+			"description": "Orders: create (buy/sell), order book, my orders, get by ID, cancel. Idempotency by idempotencyKey."
 		}
 	],
 	"event": [
