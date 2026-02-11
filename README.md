@@ -68,3 +68,5 @@ npm run db:seed
 | trader1@example.com | Trader@123! | Trader 1 |
 | trader2@example.com | Trader@123! | Trader 2 |
 | trader3@example.com | Trader@123! | Trader 3 |
+
+**Lưu ý:** Nếu FE/Postman nhận **401 Invalid credentials** khi login, cần chạy `npm run db:seed` trước (để tạo user trong DB). Backend so sánh mật khẩu bằng bcrypt; email không phân biệt hoa thường.
