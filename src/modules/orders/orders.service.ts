@@ -1,0 +1,235 @@
+import { Injectable } from '@nestjs/common';
+import { OrderRepository } from './repositories';
+import { OrderValidationStrategy } from './strategies';
+import { CreateOrderCommand } from './commands/create-order.command';
+import { CancelOrderCommand } from './commands/cancel-order.command';
+import { canCancelOrder } from './states';
+import { CacheService } from '@/common/services';
+import {
+  NotFoundException,
+  BusinessException,
+  ForbiddenException,
+} from '@/common/exceptions';
+import { Order } from '@/entities/order.entity';
+import { MarketRepository } from '@/modules/markets/repositories';
+import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+
+const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
+const IDEMPOTENCY_TTL_SEC = 86400; // 24h
+
+/**
+ * Orders Service
+ * Service Layer Pattern: Orchestrates order creation, cancellation, and queries.
+ * Idempotency Pattern: Redis + DB for duplicate order prevention.
+ */
+@Injectable()
+export class OrdersService {
+  constructor(
+    private readonly orderRepository: OrderRepository,
+    private readonly marketRepository: MarketRepository,
+    private readonly walletRepository: WalletRepository,
+    private readonly cacheService: CacheService,
+    private readonly validationStrategy: OrderValidationStrategy,
+  ) {}
+
+  async create(command: CreateOrderCommand): Promise<Order> {
+    const { userId, dto } = command;
+    const cacheKey = `${IDEMPOTENCY_CACHE_PREFIX}${userId}:${dto.idempotencyKey}`;
+
+    const cached = await this.cacheService.get<Order>(cacheKey);
+    if (cached) {
+      return this.mapToOrder(cached);
+    }
+
+    const existing = await this.orderRepository.findByUserIdempotency(
+      userId,
+      dto.idempotencyKey,
+    );
+    if (existing) {
+      await this.cacheService.set(cacheKey, this.orderToPlain(existing), IDEMPOTENCY_TTL_SEC);
+      return existing;
+    }
+
+    const pair = await this.marketRepository.findById(dto.pairId);
+    if (!pair) {
+      throw new NotFoundException('Market pair', dto.pairId);
+    }
+
+    const baseCurrencyId = pair.base_currency_id;
+    const quoteCurrencyId = pair.quote_currency_id;
+    const quoteWallet = await this.walletRepository.findByUserCurrency(
+      userId,
+      quoteCurrencyId,
+    );
+    const baseWallet = await this.walletRepository.findByUserCurrency(
+      userId,
+      baseCurrencyId,
+    );
+    const availableQuote = quoteWallet?.available ?? '0';
+    const availableBase = baseWallet?.available ?? '0';
+
+    this.validationStrategy.validate({
+      pairId: dto.pairId,
+      side: dto.side,
+      type: dto.type,
+      amount: dto.amount,
+      price: dto.type === 'LIMIT' ? dto.price : undefined,
+      timeInForce: dto.timeInForce,
+      minOrderAmount: pair.min_order_amount ?? '0.0001',
+      availableBalance: dto.side === 'BUY' ? availableQuote : availableBase,
+    });
+
+    const price = dto.type === 'LIMIT' ? dto.price! : null;
+    const result = await this.orderRepository.createOrderViaProcedure({
+      userId,
+      pairId: dto.pairId,
+      side: dto.side,
+      type: dto.type,
+      price,
+      amount: dto.amount,
+      timeInForce: dto.timeInForce ?? 'GTC',
+      clientOrderId: dto.clientOrderId ?? null,
+      idempotencyKey: dto.idempotencyKey,
+    });
+
+    if (result.error_code) {
+      this.throwFromProcedureError(
+        result.error_code,
+        result.error_message ?? undefined,
+      );
+    }
+
+    if (result.order_id == null) {
+      throw new BusinessException('Order creation failed', 'ORDER_CREATE_FAILED');
+    }
+
+    const order = await this.orderRepository.findById(result.order_id);
+    if (!order) {
+      throw new BusinessException('Order created but not found', 'ORDER_NOT_FOUND');
+    }
+
+    await this.cacheService.set(cacheKey, this.orderToPlain(order), IDEMPOTENCY_TTL_SEC);
+    return order;
+  }
+
+  async cancel(command: CancelOrderCommand): Promise<Order> {
+    const { userId, orderId } = command;
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order', orderId);
+    }
+    if (order.user_id !== userId) {
+      throw new ForbiddenException('You can only cancel your own orders');
+    }
+    if (!canCancelOrder(order.status as any)) {
+      throw new BusinessException(
+        `Order cannot be cancelled (status: ${order.status})`,
+        'INVALID_STATE',
+      );
+    }
+
+    const result = await this.orderRepository.cancelOrderViaProcedure(
+      orderId,
+      userId,
+    );
+
+    if (result.error_code) {
+      this.throwFromProcedureError(
+        result.error_code,
+        result.error_message ?? undefined,
+      );
+    }
+
+    if (!result.cancelled) {
+      throw new BusinessException('Cancel failed', 'CANCEL_FAILED');
+    }
+
+    const updated = await this.orderRepository.findById(orderId);
+    if (!updated) {
+      throw new BusinessException('Order cancelled but not found', 'ORDER_NOT_FOUND');
+    }
+    return updated;
+  }
+
+  async findOne(orderId: number, userId: number): Promise<Order> {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order', orderId);
+    }
+    if (order.user_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+    return order;
+  }
+
+  getOrderBook(
+    pairId: number,
+    side: 'BUY' | 'SELL',
+    limit: number = 50,
+  ) {
+    return this.orderRepository.getOrderBook(pairId, side, limit);
+  }
+
+  async findMyOrders(
+    userId: number,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ): Promise<{ data: Order[]; total: number; page: number; limit: number }> {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.orderRepository.findByUser(userId, status ?? null, skip, limit),
+      this.orderRepository.countByUser(userId, status ?? null),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  private throwFromProcedureError(code: string, message?: string): void {
+    const msg = message ?? code;
+    switch (code) {
+      case 'PAIR_NOT_FOUND':
+        throw new NotFoundException('Market pair', '');
+      case 'INVALID_PRICE':
+      case 'INVALID_AMOUNT':
+        throw new BusinessException(msg, code);
+      case 'INSUFFICIENT_BALANCE':
+        throw new BusinessException(msg, 'INSUFFICIENT_BALANCE');
+      case 'ORDER_NOT_FOUND':
+        throw new NotFoundException('Order', '');
+      case 'FORBIDDEN':
+        throw new ForbiddenException(msg);
+      case 'INVALID_STATE':
+        throw new BusinessException(msg, 'INVALID_STATE');
+      default:
+        throw new BusinessException(msg, code);
+    }
+  }
+
+  private orderToPlain(o: Order): Record<string, any> {
+    return {
+      order_id: o.order_id,
+      user_id: o.user_id,
+      pair_id: o.pair_id,
+      side: o.side,
+      type: o.type,
+      price: o.price,
+      amount: o.amount,
+      filled_amount: o.filled_amount,
+      avg_price: o.avg_price,
+      status: o.status,
+      time_in_force: o.time_in_force,
+      reserved_quote: o.reserved_quote,
+      reserved_base: o.reserved_base,
+      client_order_id: o.client_order_id,
+      idempotency_key: o.idempotency_key,
+      created_at: o.created_at,
+      updated_at: o.updated_at,
+    };
+  }
+
+  private mapToOrder(plain: Record<string, any>): Order {
+    const o = new Order();
+    Object.assign(o, plain);
+    return o;
+  }
+}
