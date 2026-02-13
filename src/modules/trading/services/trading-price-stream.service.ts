@@ -1,6 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { RedisService } from '@/common/services';
-import { MarketRepository } from '@/modules/markets/repositories';
 import {
   PriceUpdateEvent,
   CandleUpdateEvent,
@@ -12,8 +11,9 @@ import {
 
 /**
  * Trading Price Stream Service
- * Manages real-time price data streaming from Binance
- * Uses Redis Pub/Sub for scalability across multiple server instances
+ * Manages real-time price data streaming; uses Redis Pub/Sub for scalability.
+ * OHLCV is no longer persisted to DB: chart/ticker data is fetched on-demand via
+ * Price Oracle (Binance/Uniswap time-range APIs).
  */
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {
@@ -29,26 +29,13 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   private candleCache: Map<string, OHLCMessage> = new Map();
   private candleKeyByPairInterval: Map<string, string> = new Map();
 
-  /** Buffer closed candles and flush to DB in batch to avoid DDoS-ing DB on every tick */
-  private readonly ohlcvPersistBuffer = new Map<string, OHLCMessage>();
-  private static readonly OHLCV_FLUSH_MS = 5000;
-  private ohlcvFlushTimer: NodeJS.Timeout | null = null;
-
-  // Event listeners
   private priceUpdateListeners: ((ticker: TickerMessage) => void)[] = [];
   private candleUpdateListeners: ((candle: OHLCMessage) => void)[] = [];
 
-  constructor(
-    private readonly redisService: RedisService,
-    private readonly marketRepository: MarketRepository,
-  ) {}
+  constructor(private readonly redisService: RedisService) {}
 
   async onModuleInit() {
     await this.initializeRedisSubscriber();
-    this.ohlcvFlushTimer = setInterval(
-      () => void this.flushOhlcvBuffer(),
-      TradingPriceStreamService.OHLCV_FLUSH_MS,
-    );
   }
 
   /**
@@ -226,24 +213,11 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * Queue candle for DB persist only when it is closed.
-   * Prevents DDoS on DB: no write on every tick, only closed candles are buffered and flushed in batch.
-   */
-  private persistCandleToDb(candle: OHLCMessage): void {
-    if (!candle.is_closed) return;
-    const intervalSec = this.intervalMsMap[candle.interval] / 1000;
-    const key = `${candle.pair_id}:${intervalSec}:${candle.open_time}`;
-    this.ohlcvPersistBuffer.set(key, candle);
-  }
-
-  /**
-   * Publish candle update to Redis
-   * Called by other services (e.g., CandleAggregationService)
+   * Publish candle update to Redis (real-time only; no DB persist).
+   * Chart/ticker OHLCV is fetched on-demand via Price Oracle (time-range APIs).
    */
   async publishCandleUpdate(candle: OHLCMessage) {
     try {
-      this.persistCandleToDb(candle);
-
       const message: RedisPubSubMessage = {
         event: 'candle_update',
         data: {
@@ -261,45 +235,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     }
   }
 
-  /**
-   * Clean up resources
-   */
   async onModuleDestroy() {
-    if (this.ohlcvFlushTimer) {
-      clearInterval(this.ohlcvFlushTimer);
-      this.ohlcvFlushTimer = null;
-    }
-    await this.flushOhlcvBuffer();
     this.priceUpdateListeners = [];
     this.candleUpdateListeners = [];
-  }
-
-  /**
-   * Flush buffered closed candles to DB in one batch (reduces DB load).
-   */
-  private async flushOhlcvBuffer(): Promise<void> {
-    if (this.ohlcvPersistBuffer.size === 0) return;
-    const snapshot = Array.from(this.ohlcvPersistBuffer.values());
-    this.ohlcvPersistBuffer.clear();
-    try {
-      const intervalMsMap = this.intervalMsMap;
-      const rows = snapshot.map((c) => ({
-        pairId: c.pair_id,
-        intervalSec: intervalMsMap[c.interval] / 1000,
-        openTime: new Date(c.open_time),
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume ?? '0',
-      }));
-      await this.marketRepository.upsertOHLCVBatch(rows);
-    } catch (err) {
-      // Re-enqueue so next flush can retry (optional; could drop to avoid duplicates)
-      for (const c of snapshot) {
-        const key = `${c.pair_id}:${this.intervalMsMap[c.interval] / 1000}:${c.open_time}`;
-        this.ohlcvPersistBuffer.set(key, c);
-      }
-    }
   }
 }

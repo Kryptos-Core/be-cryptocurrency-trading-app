@@ -68,9 +68,6 @@ export class MarketPair {
   @OneToMany('Trade', 'pair')
   trades!: any[];
 
-  @OneToMany('OHLCV', 'pair')
-  ohlcv_data!: any[];
-
   @OneToMany('PriceAlert', 'pair')
   price_alerts!: any[];
 }

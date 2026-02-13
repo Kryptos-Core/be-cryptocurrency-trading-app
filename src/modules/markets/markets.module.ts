@@ -5,19 +5,21 @@ import { MarketsController } from './markets.controller';
 import { MarketRepository } from './repositories';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
+import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
 
 /**
  * Markets Module
  * Module Pattern: Encapsulate markets feature
- * Dependency Injection: Register providers and exports
+ * OHLCV/ticker from Price Oracle (on-demand; no DB persist).
  */
 @Module({
   imports: [
     TypeOrmModule.forFeature([MarketPair]),
-    CurrenciesModule, // Import to use CurrenciesService for validation
+    CurrenciesModule,
+    PriceOracleModule,
   ],
   providers: [MarketsService, MarketRepository],
   controllers: [MarketsController],
-  exports: [MarketsService, MarketRepository], // Export for use in other modules
+  exports: [MarketsService, MarketRepository],
 })
 export class MarketsModule {}

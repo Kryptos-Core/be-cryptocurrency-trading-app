@@ -1,6 +1,7 @@
 /**
  * Seed script: clear DB (trading data + users) and import seed data.
- * Seeds: currencies, users, market_pairs, ohlcv, wallets, wallet_ledger.
+ * Seeds: currencies, users, market_pairs, wallets, wallet_ledger.
+ * OHLCV is no longer seeded (provided on-demand by Price Oracle).
  *
  * Usage: npm run db:seed   or   npm run db:reset
  */
@@ -22,15 +23,6 @@ function getLastInsertId(res: unknown): number {
   return Number(r?.id ?? r?.['LAST_INSERT_ID()'] ?? 0);
 }
 
-const INTERVAL_SEC: Record<string, number> = {
-  '1m': 60,
-  '5m': 300,
-  '15m': 900,
-  '1h': 3600,
-  '4h': 14400,
-  '1d': 86400,
-};
-
 async function run() {
   const dataSource = new DataSource({
     type: 'mysql',
@@ -49,7 +41,7 @@ async function run() {
   const q = dataSource.createQueryRunner();
 
   try {
-    console.log('🗑️  Clearing DB (wallet_ledger, wallets, orders, trades, price_alerts, deposits, withdrawals, user_sessions, users, ohlcv, market_pairs, currencies)...');
+    console.log('🗑️  Clearing DB (wallet_ledger, wallets, orders, trades, price_alerts, deposits, withdrawals, user_sessions, users, market_pairs, currencies)...');
     await q.query('SET FOREIGN_KEY_CHECKS = 0');
     await q.query('DELETE FROM wallet_ledger');
     await q.query('DELETE FROM wallets');
@@ -60,7 +52,6 @@ async function run() {
     await q.query('DELETE FROM withdrawals');
     await q.query('DELETE FROM user_sessions');
     await q.query('DELETE FROM users');
-    await q.query('DELETE FROM ohlcv');
     await q.query('DELETE FROM market_pairs');
     await q.query('DELETE FROM currencies');
     await q.query('SET FOREIGN_KEY_CHECKS = 1');
@@ -154,55 +145,6 @@ async function run() {
       pairSymbolToId[p.symbol.toUpperCase()] = getLastInsertId(res);
     }
     console.log('✅ Market pairs seeded.');
-
-    // --- OHLCV (WebSocket-style: symbol, interval, open_time ms, open, high, low, close, volume) ---
-    const ohlcvPath = path.join(seedDir, 'ohlcv.json');
-    const ohlcvRows: Array<{
-      symbol: string;
-      interval: string;
-      open_time: number;
-      close_time: number;
-      open: string;
-      high: string;
-      low: string;
-      close: string;
-      volume: string;
-      quote_volume?: string;
-      trades_count?: number;
-      is_closed?: boolean;
-    }> = JSON.parse(fs.readFileSync(ohlcvPath, 'utf-8'));
-
-    console.log(`📥 Seeding ${ohlcvRows.length} OHLCV candles...`);
-    const batch: Array<{ pairId: number; intervalSec: number; openTime: Date; open: string; high: string; low: string; close: string; volume: string }> = [];
-    for (const row of ohlcvRows) {
-      const pairId = pairSymbolToId[row.symbol?.toUpperCase() ?? row.symbol];
-      if (pairId == null) {
-        console.warn(`Skip OHLCV ${row.symbol} ${row.interval}: pair not found`);
-        continue;
-      }
-      const intervalSec = INTERVAL_SEC[row.interval] ?? 60;
-      const openTime = new Date(row.open_time);
-      batch.push({
-        pairId,
-        intervalSec,
-        openTime,
-        open: row.open,
-        high: row.high,
-        low: row.low,
-        close: row.close,
-        volume: row.volume ?? '0',
-      });
-    }
-
-    if (batch.length > 0) {
-      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-      const sql = `INSERT INTO ohlcv (pair_id, interval_sec, open_time, \`open\`, high, low, \`close\`, volume)
-VALUES ${placeholders}
-ON DUPLICATE KEY UPDATE high = VALUES(high), low = VALUES(low), \`close\` = VALUES(\`close\`), volume = VALUES(volume)`;
-      const params = batch.flatMap((r) => [r.pairId, r.intervalSec, r.openTime, r.open, r.high, r.low, r.close, r.volume]);
-      await q.query(sql, params);
-    }
-    console.log('✅ OHLCV seeded.');
 
     // --- Wallets & wallet_ledger ---
     const walletsPath = path.join(seedDir, 'wallets.json');

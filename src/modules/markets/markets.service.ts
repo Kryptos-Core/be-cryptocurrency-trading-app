@@ -3,6 +3,7 @@ import { MarketRepository } from './repositories';
 import { CreateMarketPairDto, UpdateMarketPairDto, MarketTickerDto } from './dto';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { IMarketTickerData } from './interfaces/market-ticker.interface';
+import { OHLCVProviderRegistry } from '@/modules/price-oracle';
 import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
@@ -32,6 +33,7 @@ export class MarketsService implements OnModuleInit {
     private readonly marketRepository: MarketRepository,
     private readonly cacheService: CacheService,
     private readonly currenciesService: CurrenciesService,
+    private readonly ohlcvProviderRegistry: OHLCVProviderRegistry,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -338,7 +340,7 @@ export class MarketsService implements OnModuleInit {
       async () => {
         const pair = await this.findOne(pairId);
         let tickerData = await this.marketRepository.getTicker(pairId);
-        tickerData = await this.applyOHLCVFallbackIfNeeded(pairId, tickerData);
+        tickerData = await this.applyOHLCVFallbackIfNeeded(pairId, pair.symbol, tickerData);
         return this.buildTickerResponse(pair, tickerData);
       },
       this.TICKER_CACHE_TTL,
@@ -346,25 +348,50 @@ export class MarketsService implements OnModuleInit {
   }
 
   /**
-   * When lastPrice is missing or zero, build ticker from OHLCV (latest close, 24h-ago or earliest close, volume).
-   * Single Responsibility: centralizes OHLCV fallback logic.
+   * When lastPrice is missing or zero, build ticker from Oracle OHLCV (on-demand 24h range).
+   * Single Responsibility: centralizes OHLCV fallback via Price Oracle (no DB).
    */
   private async applyOHLCVFallbackIfNeeded(
     pairId: number,
+    symbol: string,
     tickerData: IMarketTickerData,
   ): Promise<IMarketTickerData> {
     if (tickerData?.lastPrice && this.parsePrice(tickerData.lastPrice) > 0) {
       return tickerData;
     }
-    const fallbackPrice = await this.marketRepository.getLatestCloseFromOHLCV(pairId);
-    if (!fallbackPrice || this.parsePrice(fallbackPrice) <= 0) {
-      return tickerData;
+    const toDate = new Date();
+    const fromDate = new Date(toDate.getTime() - 25 * 60 * 60 * 1000);
+    const candles = await this.ohlcvProviderRegistry.getOHLCVByRange(
+      pairId,
+      symbol,
+      60,
+      fromDate,
+      toDate,
+      1500,
+    );
+    if (candles.length === 0) return tickerData;
+    const sorted = [...candles].sort(
+      (a, b) => new Date(a.open_time).getTime() - new Date(b.open_time).getTime(),
+    );
+    const lastCandle = sorted[sorted.length - 1];
+    const fallbackPrice = lastCandle.close;
+    if (!fallbackPrice || this.parsePrice(fallbackPrice) <= 0) return tickerData;
+
+    const nowMs = toDate.getTime();
+    const cutoff24h = nowMs - 23 * 60 * 60 * 1000;
+    let open24hOhlcv = '';
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const t = new Date(sorted[i].open_time).getTime();
+      if (t <= cutoff24h) {
+        open24hOhlcv = sorted[i].close;
+        break;
+      }
     }
-    const [open24hOhlcv, volume24hOhlcv, earliestClose] = await Promise.all([
-      this.marketRepository.getOHLCVClose24hAgo(pairId),
-      this.marketRepository.getOHLCVVolume24h(pairId),
-      this.marketRepository.getEarliestCloseFromOHLCV(pairId),
-    ]);
+    const volume24hOhlcv = sorted
+      .filter((c) => new Date(c.open_time).getTime() >= nowMs - 24 * 60 * 60 * 1000)
+      .reduce((sum, c) => sum + this.parsePrice(c.volume), 0);
+    const earliestClose = sorted[0]?.close ?? '';
+
     const last = this.parsePrice(fallbackPrice);
     const open24hValue = this.resolveOpen24h(open24hOhlcv, earliestClose, last);
     const changeAmount = last - open24hValue;
@@ -372,11 +399,10 @@ export class MarketsService implements OnModuleInit {
       open24hValue > 0
         ? ((changeAmount / open24hValue) * 100).toFixed(CHANGE_PERCENT_DECIMALS)
         : TICKER_ZERO;
-    const fallbackStr = fallbackPrice;
-    const useFallback = (v: string) => (v === TICKER_ZERO ? fallbackStr : v);
+    const useFallback = (v: string) => (v === TICKER_ZERO ? fallbackPrice : v);
     return {
       ...tickerData,
-      lastPrice: fallbackStr,
+      lastPrice: fallbackPrice,
       open24h: String(open24hValue),
       high24h: useFallback(tickerData.high24h),
       low24h: useFallback(tickerData.low24h),
@@ -384,11 +410,10 @@ export class MarketsService implements OnModuleInit {
       bestAsk: useFallback(tickerData.bestAsk),
       change24h: changePercent,
       changeAmount24h: changeAmount.toFixed(PRICE_AMOUNT_DECIMALS),
-      volume24h:
-        volume24hOhlcv != null && this.parsePrice(volume24hOhlcv) >= 0 ? volume24hOhlcv : tickerData.volume24h,
+      volume24h: volume24hOhlcv >= 0 ? String(volume24hOhlcv) : tickerData.volume24h,
       quoteVolume24h:
         tickerData.quoteVolume24h === TICKER_ZERO
-          ? (this.parsePrice(volume24hOhlcv || TICKER_ZERO) * last).toFixed(PRICE_AMOUNT_DECIMALS)
+          ? (volume24hOhlcv * last).toFixed(PRICE_AMOUNT_DECIMALS)
           : tickerData.quoteVolume24h,
     };
   }
@@ -518,7 +543,7 @@ export class MarketsService implements OnModuleInit {
   };
 
   /**
-   * Get OHLCV data for a market pair
+   * Get OHLCV data for a market pair (on-demand from Price Oracle; no DB).
    * @param range Optional: 1d | 1M | 3M | 1y | 5y — filter candles to this time range
    */
   async getOHLCV(
@@ -527,26 +552,37 @@ export class MarketsService implements OnModuleInit {
     limit: number = 100,
     range?: string,
   ) {
-    await this.findOne(pairId);
-
+    const pair = await this.findOne(pairId);
     const intervalSec = this.resolveIntervalSeconds(interval);
-    const rangeMs = range ? MarketsService.RANGE_MS[range] : null;
-    const candles =
-      rangeMs != null
-        ? await this.marketRepository.getOHLCVByRange(
-            pairId,
-            intervalSec,
-            new Date(Date.now() - rangeMs),
-            Math.min(limit, 500),
-          )
-        : await this.marketRepository.getOHLCV(pairId, intervalSec, limit);
+    const rangeMs = range ? MarketsService.RANGE_MS[range] : 7 * 24 * 60 * 60 * 1000;
+    const fromDate = new Date(Date.now() - rangeMs);
+    const toDate = new Date();
+    const symbol = String(pair.symbol).toUpperCase().replace(/[^A-Z0-9]/g, '') || pair.symbol;
+
+    const candles = await this.ohlcvProviderRegistry.getOHLCVByRange(
+      pairId,
+      symbol,
+      intervalSec,
+      fromDate,
+      toDate,
+      Math.min(limit, 500),
+    );
 
     return {
       pair_id: pairId,
       interval,
       interval_sec: intervalSec,
       range: range ?? null,
-      candles,
+      candles: candles.map((c) => ({
+        pair_id: c.pair_id,
+        interval_sec: c.interval_sec,
+        open_time: c.open_time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+      })),
     };
   }
 

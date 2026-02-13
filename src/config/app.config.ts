@@ -76,6 +76,13 @@ export interface AppConfig {
     reconciliationThreshold: string;
     enableExternalSync: boolean;
   };
+  /** Price oracle: on-demand OHLCV from Uniswap V3 + Binance (no DB persist). */
+  priceOracle?: {
+    uniswap: {
+      subgraphUrl: string;
+      symbolToPoolId: Record<string, string>;
+    };
+  };
 }
 
 /**
@@ -188,6 +195,19 @@ export class AppConfigBuilder {
     return this;
   }
 
+  setPriceOracle(
+    uniswapSubgraphUrl: string,
+    uniswapSymbolToPoolId: Record<string, string>,
+  ): this {
+    this.config.priceOracle = {
+      uniswap: {
+        subgraphUrl: uniswapSubgraphUrl,
+        symbolToPoolId: uniswapSymbolToPoolId || {},
+      },
+    };
+    return this;
+  }
+
   build(): AppConfig {
     // Validate required fields
     if (!this.config.app) {
@@ -262,7 +282,21 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.WALLET_RECONCILIATION_THRESHOLD || '0.00000001',
       env.EXCHANGE_MODE === 'binance',
     )
+    .setPriceOracle(
+      (env as any).UNISWAP_SUBGRAPH_URL || 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3',
+      parseUniswapSymbolToPoolId((env as any).UNISWAP_SYMBOL_POOL_MAP),
+    )
     .build();
+}
+
+function parseUniswapSymbolToPoolId(json?: string): Record<string, string> {
+  if (!json || typeof json !== 'string') return {};
+  try {
+    const o = JSON.parse(json);
+    return o && typeof o === 'object' ? o : {};
+  } catch {
+    return {};
+  }
 }
 
 /**

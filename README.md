@@ -54,7 +54,7 @@ Swagger: `http://localhost:3000/api`
 
 ## Seed DB & tài khoản test
 
-Chạy seed để nạp dữ liệu mẫu (currencies, users, market pairs, OHLCV, wallets):
+Chạy seed để nạp dữ liệu mẫu (currencies, users, market pairs, wallets):
 
 ```bash
 npm run db:seed
