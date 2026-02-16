@@ -107,11 +107,11 @@ export class CurrenciesController {
     summary: 'Get currency by ID',
     description: 'Retrieve a specific currency by its ID',
   })
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Currency retrieved successfully')
   @ApiNotFoundResponse('Currency not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  async findOne(@Param('id') id: string) {
     return this.currenciesService.findOne(id);
   }
 
@@ -159,7 +159,7 @@ export class CurrenciesController {
     summary: 'Update currency',
     description: 'Update a specific currency by its ID',
   })
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiBody({ type: UpdateCurrencyDto })
   @ApiSuccessResponse('Currency updated successfully')
   @ApiBadRequestResponse('Invalid input data')
@@ -167,7 +167,7 @@ export class CurrenciesController {
   @ApiConflictResponse('Currency symbol already exists')
   @ApiUnauthorizedResponse('Unauthorized')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateCurrencyDto: UpdateCurrencyDto,
   ) {
     return this.currenciesService.update(id, updateCurrencyDto);
@@ -183,13 +183,13 @@ export class CurrenciesController {
     summary: 'Delete currency',
     description: 'Soft delete a currency by setting is_active to false',
   })
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Currency deleted successfully', {
     schema: { example: null },
   })
   @ApiNotFoundResponse('Currency not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async remove(@Param('id', ParseIntPipe) id: number) {
+  async remove(@Param('id') id: string) {
     await this.currenciesService.remove(id);
   }
 }

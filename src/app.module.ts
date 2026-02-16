@@ -11,6 +11,7 @@ import { WalletsModule } from './modules/wallets/wallets.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { MatchingModule } from './modules/matching/matching.module';
 import { TradingModule } from './modules/trading/trading.module';
+import { ExchangeModule } from './modules/exchange/exchange.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
@@ -40,6 +41,7 @@ import appConfig from './config/app.config';
     OrdersModule,
     MatchingModule,
     TradingModule,
+    ExchangeModule,
   ],
 })
 export class AppModule {}

@@ -56,7 +56,7 @@ export class CurrenciesService {
    * Find currency by ID
    * Cache-Aside Pattern: Cache individual currency
    */
-  async findOne(currencyId: number): Promise<Currency> {
+  async findOne(currencyId: string): Promise<Currency> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}id:${currencyId}`;
 
     const currency = await this.cacheService.getOrSet(
@@ -167,7 +167,7 @@ export class CurrenciesService {
    * Update currency
    * Invalidate cache after update
    */
-  async update(currencyId: number, updateCurrencyDto: UpdateCurrencyDto): Promise<Currency> {
+  async update(currencyId: string, updateCurrencyDto: UpdateCurrencyDto): Promise<Currency> {
     // Verify currency exists
     const currency = await this.findOne(currencyId);
 
@@ -213,7 +213,7 @@ export class CurrenciesService {
    * Delete currency (soft delete - set is_active to false)
    * Invalidate cache after deletion
    */
-  async remove(currencyId: number): Promise<void> {
+  async remove(currencyId: string): Promise<void> {
     // Verify currency exists
     await this.findOne(currencyId);
 
@@ -230,7 +230,7 @@ export class CurrenciesService {
    * Hard delete currency
    * Use with caution - only if currency has no dependencies
    */
-  async hardDelete(currencyId: number): Promise<void> {
+  async hardDelete(currencyId: string): Promise<void> {
     // Verify currency exists
     await this.findOne(currencyId);
 

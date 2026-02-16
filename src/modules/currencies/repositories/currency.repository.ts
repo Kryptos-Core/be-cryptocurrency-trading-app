@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
+import { newUuid } from '@/common/utils/uuid.util';
 import { Currency } from '@/entities/currency.entity';
 
 /**
@@ -77,7 +78,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
   /**
    * Check if symbol exists
    */
-  async symbolExists(symbol: string, excludeCurrencyId?: number): Promise<boolean> {
+  async symbolExists(symbol: string, excludeCurrencyId?: string): Promise<boolean> {
     try {
       if (excludeCurrencyId) {
         const currency = await this.findById(excludeCurrencyId);
@@ -99,30 +100,22 @@ export class CurrencyRepository extends BaseRepository<Currency> {
   }
 
   /**
-   * Override create to normalize symbol to uppercase
-   * Template Method Pattern: Override base method
+   * Override create (UUID v7: currency_id passed IN)
    */
   async create(entity: Partial<Currency>): Promise<Currency> {
     try {
+      const currencyId = entity.currency_id ?? newUuid();
       const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(
-        'CALL sp_currency_create(?, ?, ?, ?, ?, ?, @currency_id)',
-        [
-          symbol,
-          entity.name,
-          entity.precision_scale ?? 8,
-          entity.min_withdraw ?? '0',
-          entity.is_tradable ?? true,
-          entity.is_active ?? true,
-        ],
-      );
-
-      const idResult = await this.dataSource.query('SELECT @currency_id as currency_id');
-      const currencyId = idResult?.[0]?.currency_id;
-      if (!currencyId) {
-        throw new Error('Failed to create currency');
-      }
+      await this.dataSource.query('CALL sp_currency_create(?, ?, ?, ?, ?, ?, ?)', [
+        currencyId,
+        symbol,
+        entity.name,
+        entity.precision_scale ?? 8,
+        entity.min_withdraw ?? '0',
+        (entity.is_tradable ?? true) ? 1 : 0,
+        (entity.is_active ?? true) ? 1 : 0,
+      ]);
 
       const created = await this.findById(currencyId);
       if (!created) {
@@ -219,7 +212,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     if (!row) return null;
     
     const currency = new Currency();
-    currency.currency_id = row.currency_id || 0;
+    currency.currency_id = String(row.currency_id ?? '');
     currency.symbol = row.symbol || '';
     currency.name = row.name || '';
     currency.precision_scale = row.precision_scale ?? 8;

@@ -139,7 +139,7 @@ export class MarketsService implements OnModuleInit {
   async create(createMarketPairDto: CreateMarketPairDto): Promise<MarketPair> {
     // Validate base currency exists and is tradable
     const baseCurrency = await this.currenciesService.findOne(
-      createMarketPairDto.baseCurrencyId,
+      String(createMarketPairDto.baseCurrencyId),
     );
     if (!baseCurrency.is_tradable || !baseCurrency.is_active) {
       throw new BadRequestException(
@@ -149,7 +149,7 @@ export class MarketsService implements OnModuleInit {
 
     // Validate quote currency exists and is tradable
     const quoteCurrency = await this.currenciesService.findOne(
-      createMarketPairDto.quoteCurrencyId,
+      String(createMarketPairDto.quoteCurrencyId),
     );
     if (!quoteCurrency.is_tradable || !quoteCurrency.is_active) {
       throw new BadRequestException(
@@ -220,7 +220,7 @@ export class MarketsService implements OnModuleInit {
     // Validate base currency if being updated
     if (updateMarketPairDto.baseCurrencyId) {
       const baseCurrency = await this.currenciesService.findOne(
-        updateMarketPairDto.baseCurrencyId,
+        String(updateMarketPairDto.baseCurrencyId),
       );
       if (!baseCurrency.is_tradable || !baseCurrency.is_active) {
         throw new BadRequestException(
@@ -232,7 +232,7 @@ export class MarketsService implements OnModuleInit {
     // Validate quote currency if being updated
     if (updateMarketPairDto.quoteCurrencyId) {
       const quoteCurrency = await this.currenciesService.findOne(
-        updateMarketPairDto.quoteCurrencyId,
+        String(updateMarketPairDto.quoteCurrencyId),
       );
       if (!quoteCurrency.is_tradable || !quoteCurrency.is_active) {
         throw new BadRequestException(
