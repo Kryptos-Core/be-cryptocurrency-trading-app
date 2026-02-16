@@ -197,7 +197,7 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       const message: RedisPubSubMessage = {
         event: 'price_update',
         data: {
-          pair_id: parseInt(ticker.pair_id as any),
+          pair_id: ticker.pair_id,
           timestamp: Date.now(),
           source: 'binance',
           ticker,

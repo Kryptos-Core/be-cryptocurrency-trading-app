@@ -35,8 +35,8 @@ export class WalletsService {
    * so old double-entry rows created before the fix show as one record each.
    */
   async getTransactionHistory(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     limit: number = 100,
   ): Promise<WalletLedgerEntryDto[]> {
     const entries = await this.walletLedgerRepository.findRecentByUserAndCurrency(
@@ -72,7 +72,7 @@ export class WalletsService {
   /**
    * Get wallet balance for a user and currency
    */
-  async getBalance(userId: number, currencyId: number): Promise<WalletBalanceDto> {
+  async getBalance(userId: string, currencyId: string): Promise<WalletBalanceDto> {
     const wallet = await this.walletRepository.findByUserCurrency(userId, currencyId);
 
     if (!wallet) {
@@ -91,7 +91,7 @@ export class WalletsService {
    * Apply wallet transaction (credit, debit, freeze, unfreeze, transfer)
    */
   async applyTransaction(
-    userId: number,
+    userId: string,
     dto: WalletTransactionDto,
   ): Promise<WalletBalanceDto> {
     const amount = this.parseAmount(dto.amount);
@@ -126,14 +126,15 @@ export class WalletsService {
   }
 
   private async credit(
-    userId: number,
+    userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
     manager: any,
   ): Promise<WalletBalanceDto> {
+    const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepository.getOrCreateForUpdate(
       userId,
-      dto.currencyId,
+      currencyId,
       manager,
     );
 
@@ -147,7 +148,7 @@ export class WalletsService {
     await this.walletLedgerRepository.createEntry(
       {
         userId,
-        currencyId: dto.currencyId,
+        currencyId,
         refType: dto.refType,
         refId: dto.refId,
         direction: 'CREDIT',
@@ -157,18 +158,19 @@ export class WalletsService {
       manager,
     );
 
-    return this.buildBalanceDto(userId, dto.currencyId, updated.available, updated.frozen);
+    return this.buildBalanceDto(userId, currencyId, updated.available, updated.frozen);
   }
 
   private async debit(
-    userId: number,
+    userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
     manager: any,
   ): Promise<WalletBalanceDto> {
+    const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepository.getOrCreateForUpdate(
       userId,
-      dto.currencyId,
+      currencyId,
       manager,
     );
 
@@ -182,7 +184,7 @@ export class WalletsService {
     await this.walletLedgerRepository.createEntry(
       {
         userId,
-        currencyId: dto.currencyId,
+        currencyId,
         refType: dto.refType,
         refId: dto.refId,
         direction: 'DEBIT',
@@ -192,18 +194,19 @@ export class WalletsService {
       manager,
     );
 
-    return this.buildBalanceDto(userId, dto.currencyId, updated.available, updated.frozen);
+    return this.buildBalanceDto(userId, currencyId, updated.available, updated.frozen);
   }
 
   private async freeze(
-    userId: number,
+    userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
     manager: any,
   ): Promise<WalletBalanceDto> {
+    const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepository.getOrCreateForUpdate(
       userId,
-      dto.currencyId,
+      currencyId,
       manager,
     );
 
@@ -217,7 +220,7 @@ export class WalletsService {
     await this.walletLedgerRepository.createDoubleEntry(
       {
         userId,
-        currencyId: dto.currencyId,
+        currencyId,
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
@@ -226,18 +229,19 @@ export class WalletsService {
       manager,
     );
 
-    return this.buildBalanceDto(userId, dto.currencyId, updated.available, updated.frozen);
+    return this.buildBalanceDto(userId, currencyId, updated.available, updated.frozen);
   }
 
   private async unfreeze(
-    userId: number,
+    userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
     manager: any,
   ): Promise<WalletBalanceDto> {
+    const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepository.getOrCreateForUpdate(
       userId,
-      dto.currencyId,
+      currencyId,
       manager,
     );
 
@@ -251,7 +255,7 @@ export class WalletsService {
     await this.walletLedgerRepository.createDoubleEntry(
       {
         userId,
-        currencyId: dto.currencyId,
+        currencyId,
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
@@ -260,36 +264,36 @@ export class WalletsService {
       manager,
     );
 
-    return this.buildBalanceDto(userId, dto.currencyId, updated.available, updated.frozen);
+    return this.buildBalanceDto(userId, currencyId, updated.available, updated.frozen);
   }
 
   private async transfer(
-    userId: number,
+    userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
     manager: any,
   ): Promise<WalletBalanceDto> {
-    if (!dto.targetUserId) {
+    const targetId = String(dto.targetUserId ?? '');
+    if (!targetId) {
       throw new BadRequestException('targetUserId is required for TRANSFER', 'TARGET_REQUIRED');
     }
 
-    if (dto.targetUserId === userId) {
+    if (targetId === userId) {
       throw new BadRequestException('Cannot transfer to the same user', 'INVALID_TARGET');
     }
 
     const [firstUserId, secondUserId] =
-      userId < dto.targetUserId
-        ? [userId, dto.targetUserId]
-        : [dto.targetUserId, userId];
+      userId.localeCompare(targetId) < 0 ? [userId, targetId] : [targetId, userId];
 
+    const currencyId = String(dto.currencyId);
     const firstWallet = await this.walletRepository.getOrCreateForUpdate(
       firstUserId,
-      dto.currencyId,
+      currencyId,
       manager,
     );
     const secondWallet = await this.walletRepository.getOrCreateForUpdate(
       secondUserId,
-      dto.currencyId,
+      currencyId,
       manager,
     );
 
@@ -313,7 +317,7 @@ export class WalletsService {
     await this.walletLedgerRepository.createDoubleEntry(
       {
         userId,
-        currencyId: dto.currencyId,
+        currencyId,
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
@@ -327,8 +331,8 @@ export class WalletsService {
 
     await this.walletLedgerRepository.createDoubleEntry(
       {
-        userId: dto.targetUserId,
-        currencyId: dto.currencyId,
+        userId: targetId,
+        currencyId,
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
@@ -342,14 +346,14 @@ export class WalletsService {
 
     return this.buildBalanceDto(
       userId,
-      dto.currencyId,
+      currencyId,
       sourceUpdated.available,
       sourceUpdated.frozen,
     );
   }
 
   private async applyDelta(
-    walletId: number,
+    walletId: string,
     deltaAvailable: Decimal,
     deltaFrozen: Decimal,
     manager: any,
@@ -390,8 +394,8 @@ export class WalletsService {
   }
 
   private buildBalanceDto(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     available: string,
     frozen: string,
   ): WalletBalanceDto {
@@ -404,7 +408,7 @@ export class WalletsService {
       available: safeAvailable.toString(),
       frozen: safeFrozen.toString(),
       total,
-    } as WalletBalanceDto;
+    };
   }
 
   /**
@@ -412,8 +416,8 @@ export class WalletsService {
    * Fetches actual balance from Binance and updates internal wallet
    */
   async syncBalanceWithExchange(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
   ): Promise<WalletBalanceDto> {
     // Get currency symbol from database
     const wallet = await this.walletRepository.findByUserCurrency(userId, currencyId);
@@ -453,8 +457,8 @@ export class WalletsService {
    * Note: Reconciliation entries are only created once per user/currency to avoid unique constraint violations
    */
   async reconcileBalance(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     manager?: any,
   ): Promise<{ internalBalance: string; externalBalance: string; discrepancy: string; status: string }> {
     const wallet = await this.walletRepository.findByUserCurrency(userId, currencyId);
@@ -529,8 +533,8 @@ export class WalletsService {
    * Process external deposit from exchange (Binance to internal wallet)
    */
   async processExternalDeposit(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     txId: string,
     amount: string,
     manager?: any,
@@ -567,8 +571,8 @@ export class WalletsService {
    * Create withdrawal request to exchange (internal wallet to Binance)
    */
   async createWithdrawalRequest(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     amount: string,
     manager?: any,
   ): Promise<{ withdrawalId: string; status: string; amount: string }> {

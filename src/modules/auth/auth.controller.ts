@@ -120,7 +120,7 @@ export class AuthController {
     },
   })
   @ApiUnauthorizedResponse('Unauthorized - Invalid or missing token')
-  async getProfile(@CurrentUser('userId') userId: number) {
+  async getProfile(@CurrentUser('userId') userId: string) {
     return this.authService.getProfile(userId);
   }
 }

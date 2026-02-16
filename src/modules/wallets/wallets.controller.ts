@@ -5,7 +5,6 @@ import {
   Query,
   Body,
   UseGuards,
-  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -44,12 +43,12 @@ export class WalletsController {
     summary: 'Get wallet balance',
     description: 'Retrieve wallet balance for a specific currency',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: Number, example: 1 })
+  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Wallet balance retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async getBalance(
-    @CurrentUser('userId') userId: number,
-    @Query('currencyId', ParseIntPipe) currencyId: number,
+    @CurrentUser('userId') userId: string,
+    @Query('currencyId') currencyId: string,
   ) {
     return this.walletsService.getBalance(userId, currencyId);
   }
@@ -63,12 +62,12 @@ export class WalletsController {
     summary: 'Get transaction history',
     description: 'Retrieve recent ledger entries (deposits, withdrawals) for a currency',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: Number, example: 1 })
+  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Transaction history retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async getLedger(
-    @CurrentUser('userId') userId: number,
-    @Query('currencyId', ParseIntPipe) currencyId: number,
+    @CurrentUser('userId') userId: string,
+    @Query('currencyId') currencyId: string,
   ) {
     return this.walletsService.getTransactionHistory(userId, currencyId);
   }
@@ -87,7 +86,7 @@ export class WalletsController {
   @ApiBadRequestResponse('Invalid input data')
   @ApiUnauthorizedResponse('Unauthorized')
   async applyTransaction(
-    @CurrentUser('userId') userId: number,
+    @CurrentUser('userId') userId: string,
     @Body() dto: WalletTransactionDto,
   ) {
     return this.walletsService.applyTransaction(userId, dto);
@@ -102,13 +101,13 @@ export class WalletsController {
     summary: 'Sync balance with Binance',
     description: 'Fetch and sync wallet balance from Binance testnet',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: Number, example: 1 })
+  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Balance synced successfully')
   @ApiBadRequestResponse('Sync failed')
   @ApiUnauthorizedResponse('Unauthorized')
   async syncBalanceWithExchange(
-    @CurrentUser('userId') userId: number,
-    @Query('currencyId', ParseIntPipe) currencyId: number,
+    @CurrentUser('userId') userId: string,
+    @Query('currencyId') currencyId: string,
   ) {
     return this.walletsService.syncBalanceWithExchange(userId, currencyId);
   }
@@ -122,13 +121,13 @@ export class WalletsController {
     summary: 'Get exchange balance',
     description: 'Get current balance directly from Binance exchange',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: Number, example: 1 })
+  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Exchange balance retrieved successfully')
   @ApiBadRequestResponse('Failed to get balance from exchange')
   @ApiUnauthorizedResponse('Unauthorized')
   async getExchangeBalance(
-    @CurrentUser('userId') userId: number,
-    @Query('currencyId', ParseIntPipe) currencyId: number,
+    @CurrentUser('userId') userId: string,
+    @Query('currencyId') currencyId: string,
   ) {
     return this.walletsService.syncBalanceWithExchange(userId, currencyId);
   }
@@ -142,13 +141,13 @@ export class WalletsController {
     summary: 'Check reconciliation status',
     description: 'Check balance discrepancy between internal wallet and Binance',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: Number, example: 1 })
+  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiSuccessResponse('Reconciliation status retrieved')
   @ApiBadRequestResponse('Reconciliation check failed')
   @ApiUnauthorizedResponse('Unauthorized')
   async getReconciliationStatus(
-    @CurrentUser('userId') userId: number,
-    @Query('currencyId', ParseIntPipe) currencyId: number,
+    @CurrentUser('userId') userId: string,
+    @Query('currencyId') currencyId: string,
   ) {
     return this.walletsService.reconcileBalance(userId, currencyId);
   }
@@ -165,7 +164,7 @@ export class WalletsController {
   @ApiBody({
     schema: {
       properties: {
-        currencyId: { type: 'number', example: 1 },
+        currencyId: { type: 'string', example: '018e9a7b-1234-7abc-8000-000000000002' },
         txId: { type: 'string', example: 'tx_123456789' },
         amount: { type: 'string', example: '10.5' },
       },
@@ -175,10 +174,10 @@ export class WalletsController {
   @ApiBadRequestResponse('Invalid deposit data')
   @ApiUnauthorizedResponse('Unauthorized')
   async processExternalDeposit(
-    @CurrentUser('userId') userId: number,
+    @CurrentUser('userId') userId: string,
     @Body()
     body: {
-      currencyId: number;
+      currencyId: string;
       txId: string;
       amount: string;
     },
@@ -204,7 +203,7 @@ export class WalletsController {
   @ApiBody({
     schema: {
       properties: {
-        currencyId: { type: 'number', example: 1 },
+        currencyId: { type: 'string', example: '018e9a7b-1234-7abc-8000-000000000002' },
         amount: { type: 'string', example: '5.25' },
       },
     },
@@ -213,8 +212,8 @@ export class WalletsController {
   @ApiBadRequestResponse('Invalid withdrawal request')
   @ApiUnauthorizedResponse('Unauthorized')
   async createWithdrawalRequest(
-    @CurrentUser('userId') userId: number,
-    @Body() body: { currencyId: number; amount: string },
+    @CurrentUser('userId') userId: string,
+    @Body() body: { currencyId: string; amount: string },
   ) {
     return this.walletsService.createWithdrawalRequest(
       userId,

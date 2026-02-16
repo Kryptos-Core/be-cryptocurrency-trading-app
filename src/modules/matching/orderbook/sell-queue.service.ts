@@ -15,7 +15,7 @@ export class SellQueueService implements IOrderQueue {
     this.sort();
   }
 
-  remove(orderId: number): boolean {
+  remove(orderId: string): boolean {
     const idx = this.orders.findIndex((o) => o.order_id === orderId);
     if (idx === -1) return false;
     this.orders.splice(idx, 1);

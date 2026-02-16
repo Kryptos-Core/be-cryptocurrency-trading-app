@@ -36,8 +36,8 @@ export class MatchingService {
    */
   async runMatch(params: {
     takerOrder: OrderBookOrder;
-    pairId: number;
-    feeCurrencyId: number;
+    pairId: string;
+    feeCurrencyId: string;
     makerFeeRate: string;
     takerFeeRate: string;
   }): Promise<TradeExecutionResult[]> {
@@ -95,9 +95,9 @@ export class MatchingService {
       };
 
       const orderBookAdapter = {
-        peekBestMaker: (p: number, side: 'BUY' | 'SELL') =>
+        peekBestMaker: (p: string, side: 'BUY' | 'SELL') =>
           this.orderBookService.peekBestMaker(p, side),
-        popBestMaker: (p: number, side: 'BUY' | 'SELL') =>
+        popBestMaker: (p: string, side: 'BUY' | 'SELL') =>
           this.orderBookService.popBestMaker(p, side),
         addOrder: (o: OrderBookOrder) => this.orderBookService.addOrder(o),
       };
@@ -127,7 +127,7 @@ export class MatchingService {
   }
 
   /** Load OPEN/PARTIAL orders from DB into in-memory book (Database Procedure Pattern). */
-  async ensureBookLoaded(pairId: number): Promise<void> {
+  async ensureBookLoaded(pairId: string): Promise<void> {
     if (this.orderBookService.size(pairId) > 0) return;
     const [buys, sells] = await Promise.all([
       this.matchingRepository.getOpenOrdersForPair(pairId, 'BUY'),

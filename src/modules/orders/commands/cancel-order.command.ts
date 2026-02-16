@@ -3,8 +3,8 @@
  */
 export class CancelOrderCommand {
   constructor(
-    public readonly userId: number,
-    public readonly orderId: number,
+    public readonly userId: string,
+    public readonly orderId: string,
     public readonly idempotencyKey?: string,
   ) {}
 }

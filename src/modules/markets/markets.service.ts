@@ -73,7 +73,7 @@ export class MarketsService implements OnModuleInit {
    * Find market pair by ID
    * Cache-Aside Pattern: Cache individual pair
    */
-  async findOne(pairId: number): Promise<MarketPair> {
+  async findOne(pairId: string): Promise<MarketPair> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}id:${pairId}`;
 
     const pair = await this.cacheService.getOrSet(
@@ -164,8 +164,8 @@ export class MarketsService implements OnModuleInit {
 
     // Check if pair already exists
     const pairExists = await this.marketRepository.pairExists(
-      createMarketPairDto.baseCurrencyId,
-      createMarketPairDto.quoteCurrencyId,
+      String(createMarketPairDto.baseCurrencyId),
+      String(createMarketPairDto.quoteCurrencyId),
     );
     if (pairExists) {
       throw new ConflictException(
@@ -190,8 +190,8 @@ export class MarketsService implements OnModuleInit {
 
     // Create market pair
     const pair = await this.marketRepository.create({
-      base_currency_id: createMarketPairDto.baseCurrencyId,
-      quote_currency_id: createMarketPairDto.quoteCurrencyId,
+      base_currency_id: String(createMarketPairDto.baseCurrencyId),
+      quote_currency_id: String(createMarketPairDto.quoteCurrencyId),
       symbol: symbol.toUpperCase(),
       price_scale: createMarketPairDto.priceScale ?? 2,
       amount_scale: createMarketPairDto.amountScale ?? 6,
@@ -213,7 +213,7 @@ export class MarketsService implements OnModuleInit {
    * Update market pair
    * Business Logic: Validate updates, check conflicts
    */
-  async update(pairId: number, updateMarketPairDto: UpdateMarketPairDto): Promise<MarketPair> {
+  async update(pairId: string, updateMarketPairDto: UpdateMarketPairDto): Promise<MarketPair> {
     // Verify pair exists
     const pair = await this.findOne(pairId);
 
@@ -242,8 +242,12 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Check if new pair combination conflicts
-    const newBaseId = updateMarketPairDto.baseCurrencyId || pair.base_currency_id;
-    const newQuoteId = updateMarketPairDto.quoteCurrencyId || pair.quote_currency_id;
+    const newBaseId = updateMarketPairDto.baseCurrencyId != null
+      ? String(updateMarketPairDto.baseCurrencyId)
+      : pair.base_currency_id;
+    const newQuoteId = updateMarketPairDto.quoteCurrencyId != null
+      ? String(updateMarketPairDto.quoteCurrencyId)
+      : pair.quote_currency_id;
 
     if (newBaseId === newQuoteId) {
       throw new BadRequestException('Base and quote currencies cannot be the same');
@@ -283,9 +287,9 @@ export class MarketsService implements OnModuleInit {
     // Update pair
     const updateData: Partial<MarketPair> = {};
     if (updateMarketPairDto.baseCurrencyId !== undefined)
-      updateData.base_currency_id = updateMarketPairDto.baseCurrencyId;
+      updateData.base_currency_id = String(updateMarketPairDto.baseCurrencyId);
     if (updateMarketPairDto.quoteCurrencyId !== undefined)
-      updateData.quote_currency_id = updateMarketPairDto.quoteCurrencyId;
+      updateData.quote_currency_id = String(updateMarketPairDto.quoteCurrencyId);
     if (updateMarketPairDto.symbol !== undefined)
       updateData.symbol = updateMarketPairDto.symbol;
     if (updateMarketPairDto.priceScale !== undefined)
@@ -314,7 +318,7 @@ export class MarketsService implements OnModuleInit {
   /**
    * Delete market pair (soft delete - set is_active to false)
    */
-  async remove(pairId: number): Promise<void> {
+  async remove(pairId: string): Promise<void> {
     // Verify pair exists
     await this.findOne(pairId);
 
@@ -332,7 +336,7 @@ export class MarketsService implements OnModuleInit {
    * Cache-Aside Pattern: Cache ticker with shorter TTL.
    * Returns typed DTO for API response.
    */
-  async getTicker(pairId: number): Promise<MarketTickerDto> {
+  async getTicker(pairId: string): Promise<MarketTickerDto> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}ticker:${pairId}`;
 
     return this.cacheService.getOrSet(
@@ -352,7 +356,7 @@ export class MarketsService implements OnModuleInit {
    * Single Responsibility: centralizes OHLCV fallback via Price Oracle (no DB).
    */
   private async applyOHLCVFallbackIfNeeded(
-    pairId: number,
+    pairId: string,
     symbol: string,
     tickerData: IMarketTickerData,
   ): Promise<IMarketTickerData> {
@@ -470,7 +474,7 @@ export class MarketsService implements OnModuleInit {
    * Get order book for a market pair
    * Cache-Aside Pattern: Cache order book with short TTL
    */
-  async getOrderBook(pairId: number, limit: number = 20): Promise<any> {
+  async getOrderBook(pairId: string, limit: number = 20): Promise<any> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}orderbook:${pairId}:${limit}`;
 
     return this.cacheService.getOrSet(
@@ -504,7 +508,7 @@ export class MarketsService implements OnModuleInit {
   /**
    * Get recent trades for a market pair
    */
-  async getRecentTrades(pairId: number, limit: number = 50): Promise<any[]> {
+  async getRecentTrades(pairId: string, limit: number = 50): Promise<any[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}trades:${pairId}:${limit}`;
 
     return this.cacheService.getOrSet(
@@ -547,7 +551,7 @@ export class MarketsService implements OnModuleInit {
    * @param range Optional: 1d | 1M | 3M | 1y | 5y — filter candles to this time range
    */
   async getOHLCV(
-    pairId: number,
+    pairId: string,
     interval: string = '1h',
     limit: number = 100,
     range?: string,

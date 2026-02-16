@@ -32,31 +32,31 @@ export interface AuthMessage {
 export interface AuthResponseMessage {
   success: boolean;
   message: string;
-  user_id?: number;
+  user_id?: string;
   permissions?: string[];
 }
 
 // ============ Subscription ============
 export interface SubscribeMessage {
-  pair_id: number;
+  pair_id: string;
   channels: SubscriptionChannel[];
   interval?: CandleInterval;
 }
 
 export interface SubscribedMessage {
-  pair_id: number;
+  pair_id: string;
   channels: SubscriptionChannel[];
   interval?: CandleInterval;
   subscribed_at: number;
 }
 
 export interface UnsubscribeMessage {
-  pair_id: number;
+  pair_id: string;
   channels: SubscriptionChannel[];
 }
 
 export interface UnsubscribedMessage {
-  pair_id: number;
+  pair_id: string;
   channels: SubscriptionChannel[];
 }
 
@@ -66,7 +66,7 @@ export type CandleInterval = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 
 // ============ Ticker ============
 export interface TickerMessage {
-  pair_id: number;
+  pair_id: string;
   symbol: string;
   last_price: string;
   bid: string;
@@ -83,7 +83,7 @@ export interface TickerMessage {
 
 // ============ OHLC Candle ============
 export interface OHLCMessage {
-  pair_id: number;
+  pair_id: string;
   /** Symbol for display (e.g. BTC/USDT) - used by TradingView chart */
   symbol?: string;
   interval: CandleInterval;
@@ -120,8 +120,8 @@ export type WebSocketErrorCode =
 // ============ Subscription State ============
 export interface ClientSubscription {
   client_id: string;
-  user_id: number;
-  pair_id: number;
+  user_id: string;
+  pair_id: string;
   channels: Set<SubscriptionChannel>;
   interval?: CandleInterval;
   subscribed_at: number;
@@ -129,14 +129,14 @@ export interface ClientSubscription {
 }
 
 export interface PriceUpdateEvent {
-  pair_id: number;
+  pair_id: string;
   timestamp: number;
   source: 'binance' | 'internal';
   ticker: TickerMessage;
 }
 
 export interface CandleUpdateEvent {
-  pair_id: number;
+  pair_id: string;
   timestamp: number;
   candle: OHLCMessage;
 }

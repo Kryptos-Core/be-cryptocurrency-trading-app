@@ -9,8 +9,8 @@ export class MarketTickerDto {
   @ApiProperty({ example: 'BTC/USDT' })
   symbol!: string;
 
-  @ApiProperty({ example: 1 })
-  pairId!: number;
+  @ApiProperty({ example: '018e9a7b-1234-7abc-8000-000000000001' })
+  pairId!: string;
 
   @ApiProperty({ example: '50000.00', description: 'Last trade price' })
   lastPrice!: string;

@@ -10,11 +10,11 @@ import { OrderBookOrder } from '../interfaces';
 @Injectable()
 export class OrderBookService {
   private readonly books = new Map<
-    number,
+    string,
     { buy: BuyQueueService; sell: SellQueueService }
   >();
 
-  private getBook(pairId: number): {
+  private getBook(pairId: string): {
     buy: BuyQueueService;
     sell: SellQueueService;
   } {
@@ -35,31 +35,31 @@ export class OrderBookService {
     else book.sell.add(order);
   }
 
-  removeOrder(pairId: number, orderId: number, side: 'BUY' | 'SELL'): boolean {
+  removeOrder(pairId: string, orderId: string, side: 'BUY' | 'SELL'): boolean {
     const book = this.books.get(pairId);
     if (!book) return false;
     return side === 'BUY' ? book.buy.remove(orderId) : book.sell.remove(orderId);
   }
 
-  getBestBid(pairId: number): OrderBookOrder | null {
+  getBestBid(pairId: string): OrderBookOrder | null {
     return this.getBook(pairId).buy.peekBest();
   }
 
-  getBestAsk(pairId: number): OrderBookOrder | null {
+  getBestAsk(pairId: string): OrderBookOrder | null {
     return this.getBook(pairId).sell.peekBest();
   }
 
-  popBestMaker(pairId: number, side: 'BUY' | 'SELL'): OrderBookOrder | null {
+  popBestMaker(pairId: string, side: 'BUY' | 'SELL'): OrderBookOrder | null {
     const book = this.getBook(pairId);
     return side === 'BUY' ? book.buy.popBest() : book.sell.popBest();
   }
 
-  peekBestMaker(pairId: number, side: 'BUY' | 'SELL'): OrderBookOrder | null {
+  peekBestMaker(pairId: string, side: 'BUY' | 'SELL'): OrderBookOrder | null {
     const book = this.getBook(pairId);
     return side === 'BUY' ? book.buy.peekBest() : book.sell.peekBest();
   }
 
-  loadOrders(pairId: number, orders: OrderBookOrder[]): void {
+  loadOrders(pairId: string, orders: OrderBookOrder[]): void {
     this.books.set(pairId, {
       buy: new BuyQueueService(),
       sell: new SellQueueService(),
@@ -67,7 +67,7 @@ export class OrderBookService {
     orders.forEach((o) => this.addOrder(o));
   }
 
-  size(pairId: number, side?: 'BUY' | 'SELL'): number {
+  size(pairId: string, side?: 'BUY' | 'SELL'): number {
     const book = this.getBook(pairId);
     if (side === 'BUY') return book.buy.size();
     if (side === 'SELL') return book.sell.size();

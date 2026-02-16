@@ -9,7 +9,7 @@ import { UnauthorizedException } from '@/common/exceptions';
  * Áp dụng: Strategy Pattern (Design Pattern)
  */
 export interface JwtPayload {
-  sub: number; // user_id
+  sub: string; // user_id (UUID v7)
   email: string;
   iat?: number;
   exp?: number;

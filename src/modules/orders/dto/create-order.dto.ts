@@ -3,24 +3,20 @@ import {
   IsNotEmpty,
   IsOptional,
   IsEnum,
-  IsNumber,
-  Min,
   Matches,
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
 
 /**
  * Create Order DTO
  * DTO Pattern: Data transfer for order creation (buy/sell)
  */
 export class CreateOrderDto {
-  @ApiProperty({ description: 'Market pair ID', example: 1 })
-  @IsNumber()
-  @Min(1)
-  @Transform(({ value }) => Number(value))
-  pairId!: number;
+  @ApiProperty({ description: 'Market pair ID (UUID)', example: '018e9a7b-1234-7abc-8000-000000000001' })
+  @IsString()
+  @IsNotEmpty()
+  pairId!: string;
 
   @ApiProperty({ description: 'Order side', enum: ['BUY', 'SELL'] })
   @IsEnum(['BUY', 'SELL'])

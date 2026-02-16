@@ -31,7 +31,7 @@ export class OHLCVProviderRegistry implements IOHLCVProvider {
   }
 
   async getOHLCVByRange(
-    pairId: number,
+    pairId: string,
     symbol: string,
     intervalSec: number,
     fromDate: Date,

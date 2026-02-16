@@ -4,8 +4,8 @@ import { BaseRepository } from '@/common/repositories';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
 
 export interface LedgerEntryInput {
-  userId: number;
-  currencyId: number;
+  userId: string;
+  currencyId: string;
   refType:
     | 'DEPOSIT'
     | 'WITHDRAW'
@@ -67,8 +67,8 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
    * Uses raw SQL to avoid TypeORM entity metadata issues in some runtimes.
    */
   async findRecentByUserAndCurrency(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     limit: number = 100,
   ): Promise<Array<{ ref_type: string; ref_id: number; direction: string; amount: string; created_at: Date }>> {
     const rows = await this.dataSource.query(

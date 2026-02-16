@@ -3,7 +3,7 @@
  * No persistence: APIs support start/end time; we fetch when needed.
  */
 export interface OHLCVCandleDto {
-  pair_id: number;
+  pair_id: string;
   interval_sec: number;
   open_time: Date;
   open: string;
@@ -31,7 +31,7 @@ export interface IOHLCVProvider {
    * @param limit - Max candles to return
    */
   getOHLCVByRange(
-    pairId: number,
+    pairId: string,
     symbol: string,
     intervalSec: number,
     fromDate: Date,

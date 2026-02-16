@@ -18,8 +18,8 @@ export class WalletRepository extends BaseRepository<Wallet> {
    * Find wallet by user and currency
    */
   async findByUserCurrency(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     manager?: EntityManager,
   ): Promise<Wallet | null> {
     try {
@@ -27,7 +27,9 @@ export class WalletRepository extends BaseRepository<Wallet> {
         'CALL sp_wallet_find_by_user_currency(?, ?)',
         [userId, currencyId],
       );
-      return result?.[0]?.[0] || null;
+      const row = result?.[0]?.[0];
+      if (!row) return null;
+      return this.mapRowToWallet(row);
     } catch (error) {
       this.logger.error(
         `Error finding wallet by user ${userId} and currency ${currencyId}`,
@@ -42,8 +44,8 @@ export class WalletRepository extends BaseRepository<Wallet> {
    * Uses raw SQL inside transaction to avoid EntityManager.getRepository(Wallet) metadata issues.
    */
   async getOrCreateForUpdate(
-    userId: number,
-    currencyId: number,
+    userId: string,
+    currencyId: string,
     manager: EntityManager,
   ): Promise<Wallet> {
     const rows = await manager.query(
@@ -73,10 +75,14 @@ export class WalletRepository extends BaseRepository<Wallet> {
       throw new Error('Failed to get or create wallet');
     }
 
+    return this.mapRowToWallet(row);
+  }
+
+  private mapRowToWallet(row: any): Wallet {
     return {
-      wallet_id: row.wallet_id,
-      user_id: row.user_id,
-      currency_id: row.currency_id,
+      wallet_id: String(row.wallet_id ?? ''),
+      user_id: String(row.user_id ?? ''),
+      currency_id: String(row.currency_id ?? ''),
       available: row.available ?? '0',
       frozen: row.frozen ?? '0',
       updated_at: row.updated_at,
@@ -88,7 +94,7 @@ export class WalletRepository extends BaseRepository<Wallet> {
    * Returns updated wallet row
    */
   async applyBalanceDelta(
-    walletId: number,
+    walletId: string,
     deltaAvailable: string,
     deltaFrozen: string,
     manager: EntityManager,
@@ -110,6 +116,6 @@ export class WalletRepository extends BaseRepository<Wallet> {
       throw new Error('Failed to load updated wallet');
     }
 
-    return updated;
+    return this.mapRowToWallet(updated);
   }
 }

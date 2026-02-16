@@ -3,9 +3,9 @@
  * Immutable view for matching.
  */
 export interface OrderBookOrder {
-  order_id: number;
-  pair_id: number;
-  user_id: number;
+  order_id: string;
+  pair_id: string;
+  user_id: string;
   side: 'BUY' | 'SELL';
   type: 'LIMIT' | 'MARKET';
   price: string | null;
@@ -21,15 +21,15 @@ export interface OrderBookOrder {
  * Result of one trade execution (Observer / Event payload).
  */
 export interface TradeExecutionResult {
-  trade_id: number;
-  pair_id: number;
-  maker_order_id: number;
-  taker_order_id: number;
+  trade_id: string;
+  pair_id: string;
+  maker_order_id: string;
+  taker_order_id: string;
   price: string;
   amount: string;
   taker_fee: string;
   maker_fee: string;
-  fee_currency_id: number;
+  fee_currency_id: string;
   created_at: Date;
 }
 
@@ -37,10 +37,10 @@ export interface TradeExecutionResult {
  * Context passed to matching strategy (Strategy Pattern).
  */
 export interface MatchingContext {
-  pairId: number;
+  pairId: string;
   takerOrder: OrderBookOrder;
   /** Fee currency (e.g. quote_currency_id) */
-  feeCurrencyId: number;
+  feeCurrencyId: string;
   makerFeeRate: string;
   takerFeeRate: string;
 }
@@ -64,8 +64,8 @@ export interface IMatchingStrategy {
   match(
     context: MatchingContext,
     orderBook: {
-      peekBestMaker: (pairId: number, side: 'BUY' | 'SELL') => OrderBookOrder | null;
-      popBestMaker: (pairId: number, side: 'BUY' | 'SELL') => OrderBookOrder | null;
+      peekBestMaker: (pairId: string, side: 'BUY' | 'SELL') => OrderBookOrder | null;
+      popBestMaker: (pairId: string, side: 'BUY' | 'SELL') => OrderBookOrder | null;
       addOrder: (order: OrderBookOrder) => void;
     },
     executeTrade: TradeExecutor,
@@ -77,7 +77,7 @@ export interface IMatchingStrategy {
  */
 export interface IOrderQueue {
   add(order: OrderBookOrder): void;
-  remove(orderId: number): boolean;
+  remove(orderId: string): boolean;
   peekBest(): OrderBookOrder | null;
   popBest(): OrderBookOrder | null;
   size(): number;

@@ -4,7 +4,7 @@ import { ValidationException, BusinessException } from '@/common/exceptions';
  * Context for order validation (Strategy Pattern)
  */
 export interface OrderValidationContext {
-  pairId: number;
+  pairId: string;
   side: 'BUY' | 'SELL';
   type: 'LIMIT' | 'MARKET';
   amount: string;

@@ -6,8 +6,8 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseIntPipe,
   DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,7 +35,7 @@ export class OrdersController {
   @Post()
   @ApiOperation({ summary: 'Create order', description: 'Create a new buy/sell order (idempotent by idempotencyKey).' })
   async create(
-    @CurrentUser('userId') userId: number,
+    @CurrentUser('userId') userId: string,
     @Body() dto: CreateOrderDto,
   ) {
     return this.ordersService.create({
@@ -46,11 +46,11 @@ export class OrdersController {
 
   @Get('book/:pairId')
   @ApiOperation({ summary: 'Order book', description: 'Get order book for a pair and side.' })
-  @ApiParam({ name: 'pairId', type: Number })
+  @ApiParam({ name: 'pairId', type: String, description: 'Pair UUID' })
   @ApiQuery({ name: 'side', required: true, enum: ['BUY', 'SELL'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getOrderBook(
-    @Param('pairId', ParseIntPipe) pairId: number,
+    @Param('pairId') pairId: string,
     @Query('side') side: 'BUY' | 'SELL',
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
@@ -63,7 +63,7 @@ export class OrdersController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'] })
   async findMyOrders(
-    @CurrentUser('userId') userId: number,
+    @CurrentUser('userId') userId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('status') status?: string,
@@ -73,20 +73,20 @@ export class OrdersController {
 
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order', description: 'Get one order by ID (own orders only).' })
-  @ApiParam({ name: 'orderId', type: Number })
+  @ApiParam({ name: 'orderId', type: String, description: 'Order UUID' })
   async findOne(
-    @CurrentUser('userId') userId: number,
-    @Param('orderId', ParseIntPipe) orderId: number,
+    @CurrentUser('userId') userId: string,
+    @Param('orderId') orderId: string,
   ) {
     return this.ordersService.findOne(orderId, userId);
   }
 
   @Post(':orderId/cancel')
   @ApiOperation({ summary: 'Cancel order', description: 'Cancel an open/partial order.' })
-  @ApiParam({ name: 'orderId', type: Number })
+  @ApiParam({ name: 'orderId', type: String, description: 'Order UUID' })
   async cancel(
-    @CurrentUser('userId') userId: number,
-    @Param('orderId', ParseIntPipe) orderId: number,
+    @CurrentUser('userId') userId: string,
+    @Param('orderId') orderId: string,
     @Body() dto: CancelOrderDto,
   ) {
     return this.ordersService.cancel({

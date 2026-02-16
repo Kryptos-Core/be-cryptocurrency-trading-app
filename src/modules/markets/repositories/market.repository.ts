@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
+import { newUuid } from '@/common/utils/uuid.util';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { Trade } from '@/entities/trade.entity';
 import { IMarketTickerData } from '../interfaces/market-ticker.interface';
@@ -180,9 +181,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_pair_exists
    */
   async pairExists(
-    baseCurrencyId: number,
-    quoteCurrencyId: number,
-    excludePairId?: number,
+    baseCurrencyId: string,
+    quoteCurrencyId: string,
+    excludePairId?: string,
   ): Promise<boolean> {
     try {
       const result = await this.dataSource.query('CALL sp_market_pair_exists(?, ?, ?, @exists)', [
@@ -202,7 +203,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Check if symbol exists using stored procedure
    * Database Procedure Pattern: sp_market_symbol_exists
    */
-  async symbolExists(symbol: string, excludePairId?: number): Promise<boolean> {
+  async symbolExists(symbol: string, excludePairId?: string): Promise<boolean> {
     try {
       const result = await this.dataSource.query('CALL sp_market_symbol_exists(?, ?, @exists)', [
         symbol.toUpperCase(),
@@ -222,9 +223,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   private mapProcedureResultToEntity(row: any): MarketPair {
     const pair = new MarketPair();
-    pair.pair_id = row.pair_id || 0;
-    pair.base_currency_id = row.base_currency_id || 0;
-    pair.quote_currency_id = row.quote_currency_id || 0;
+    pair.pair_id = String(row.pair_id ?? '');
+    pair.base_currency_id = String(row.base_currency_id ?? '');
+    pair.quote_currency_id = String(row.quote_currency_id ?? '');
     pair.symbol = row.symbol || '';
     pair.price_scale = row.price_scale ?? 2;
     pair.amount_scale = row.amount_scale ?? 6;
@@ -237,12 +238,12 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     // Map currency relations if available
     if (row.base_currency_symbol || row.quote_currency_symbol) {
       pair.base_currency = {
-        currency_id: row.base_currency_id || 0,
+        currency_id: String(row.base_currency_id ?? ''),
         symbol: row.base_currency_symbol || '',
         name: row.base_currency_name || '',
       } as any;
       pair.quote_currency = {
-        currency_id: row.quote_currency_id || 0,
+        currency_id: String(row.quote_currency_id ?? ''),
         symbol: row.quote_currency_symbol || '',
         name: row.quote_currency_name || '',
       } as any;
@@ -253,15 +254,15 @@ export class MarketRepository extends BaseRepository<MarketPair> {
 
   private mapTradeRow(row: any): Trade {
     const trade = new Trade();
-    trade.trade_id = row.trade_id;
-    trade.pair_id = row.pair_id;
-    trade.taker_order_id = row.taker_order_id;
-    trade.maker_order_id = row.maker_order_id;
+    trade.trade_id = String(row.trade_id ?? '');
+    trade.pair_id = String(row.pair_id ?? '');
+    trade.taker_order_id = String(row.taker_order_id ?? '');
+    trade.maker_order_id = String(row.maker_order_id ?? '');
     trade.price = row.price?.toString() || '0';
     trade.amount = row.amount?.toString() || '0';
     trade.taker_fee = row.taker_fee?.toString() || '0';
     trade.maker_fee = row.maker_fee?.toString() || '0';
-    trade.fee_currency_id = row.fee_currency_id;
+    trade.fee_currency_id = String(row.fee_currency_id ?? '');
     trade.created_at = row.created_at;
     return trade;
   }
@@ -271,7 +272,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Complex Query: Aggregates orders by price level
    */
   async getOrderBook(
-    pairId: number,
+    pairId: string,
     limit: number = 20,
   ): Promise<{ bids: any[]; asks: any[] }> {
     try {
@@ -313,7 +314,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Get market ticker (24h statistics) from trades (stored procedure).
    * Returns zeroed string fields when no data; service layer may apply OHLCV fallback.
    */
-  async getTicker(pairId: number): Promise<IMarketTickerData> {
+  async getTicker(pairId: string): Promise<IMarketTickerData> {
     try {
       const result = await this.dataSource.query('CALL sp_market_ticker(?)', [pairId]);
       const row = result?.[0]?.[0] || {};
@@ -354,7 +355,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
   /**
    * Get recent trades for a market pair
    */
-  async getRecentTrades(pairId: number, limit: number = 50): Promise<Trade[]> {
+  async getRecentTrades(pairId: string, limit: number = 50): Promise<Trade[]> {
     try {
       const result = await this.dataSource.query('CALL sp_market_recent_trades(?, ?)', [
         pairId,
@@ -370,38 +371,26 @@ export class MarketRepository extends BaseRepository<MarketPair> {
 
   /**
    * Override create to use stored procedure
-   * Database Procedure Pattern: sp_market_create
+   * Database Procedure Pattern: sp_market_create (UUID v7: pair_id passed IN)
    */
   async create(entity: Partial<MarketPair>): Promise<MarketPair> {
     try {
-      // Normalize symbol to uppercase
+      const pairId = entity.pair_id ?? newUuid();
       const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      // Call stored procedure
-      const result = await this.dataSource.query(
-        'CALL sp_market_create(?, ?, ?, ?, ?, ?, ?, ?, ?, @pair_id)',
-        [
-          entity.base_currency_id,
-          entity.quote_currency_id,
-          symbol,
-          entity.price_scale ?? 2,
-          entity.amount_scale ?? 6,
-          entity.min_order_amount ?? '0.0001',
-          entity.maker_fee_rate ?? 0.001,
-          entity.taker_fee_rate ?? 0.001,
-          entity.is_active ?? true,
-        ],
-      );
+      await this.dataSource.query('CALL sp_market_create(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+        pairId,
+        entity.base_currency_id,
+        entity.quote_currency_id,
+        symbol,
+        entity.price_scale ?? 2,
+        entity.amount_scale ?? 6,
+        entity.min_order_amount ?? '0.0001',
+        entity.maker_fee_rate ?? 0.001,
+        entity.taker_fee_rate ?? 0.001,
+        entity.is_active ?? true,
+      ]);
 
-      // Get the created pair ID
-      const idResult = await this.dataSource.query('SELECT @pair_id as pair_id');
-      const pairId = idResult[0]?.pair_id;
-
-      if (!pairId) {
-        throw new Error('Failed to create market pair');
-      }
-
-      // Fetch the created pair using stored procedure
       const createdPair = await this.findById(pairId);
       if (!createdPair) {
         throw new Error('Failed to fetch created market pair');

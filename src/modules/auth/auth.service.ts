@@ -106,7 +106,7 @@ export class AuthService {
   /**
    * Get user profile by ID
    */
-  async getProfile(userId: number): Promise<Partial<User>> {
+  async getProfile(userId: string): Promise<Partial<User>> {
     // Note: This would also use a repository method if needed
     // For now, service handles the error, repository would be called if we had this in repo
     throw new UnauthorizedException('User profile endpoint should be called from users service');

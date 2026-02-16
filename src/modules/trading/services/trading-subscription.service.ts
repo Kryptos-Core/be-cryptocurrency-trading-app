@@ -10,10 +10,10 @@ import { Server } from 'socket.io';
 @Injectable()
 export class TradingSubscriptionService {
   // Track all active subscriptions: clientId -> Set<pair_id>
-  private clientSubscriptions = new Map<string, Set<number>>();
+  private clientSubscriptions = new Map<string, Set<string>>();
 
   // Track pairs: pair_id -> Set<clientId>
-  private pairSubscribers = new Map<number, Set<string>>();
+  private pairSubscribers = new Map<string, Set<string>>();
 
   // Rate limiting: clientId -> subscription count
   private subscriptionCounts = new Map<string, number>();
@@ -27,8 +27,8 @@ export class TradingSubscriptionService {
    */
   async subscribe(
     clientId: string,
-    userId: number,
-    pairId: number,
+    userId: string,
+    pairId: string,
     channels: SubscriptionChannel[],
     interval?: CandleInterval,
   ): Promise<void> {
@@ -66,7 +66,7 @@ export class TradingSubscriptionService {
    */
   async unsubscribe(
     clientId: string,
-    pairId: number,
+    pairId: string,
     channels: SubscriptionChannel[],
   ): Promise<void> {
     const clientSubs = this.clientSubscriptions.get(clientId);
@@ -108,21 +108,21 @@ export class TradingSubscriptionService {
   /**
    * Get all clients subscribed to a pair
    */
-  getSubscribersForPair(pairId: number): Set<string> {
+  getSubscribersForPair(pairId: string): Set<string> {
     return this.pairSubscribers.get(pairId) || new Set();
   }
 
   /**
    * Get all pairs a client is subscribed to
    */
-  getSubscriptionsForClient(clientId: string): Set<number> {
+  getSubscriptionsForClient(clientId: string): Set<string> {
     return this.clientSubscriptions.get(clientId) || new Set();
   }
 
   /**
    * Check if client is subscribed to a pair
    */
-  isSubscribed(clientId: string, pairId: number): boolean {
+  isSubscribed(clientId: string, pairId: string): boolean {
     return this.clientSubscriptions.get(clientId)?.has(pairId) ?? false;
   }
 

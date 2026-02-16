@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { newUuid } from '@/common/utils/uuid.util';
 import { OrderRepository } from './repositories';
 import { OrderValidationStrategy } from './strategies';
 import { CreateOrderCommand } from './commands/create-order.command';
@@ -82,7 +83,9 @@ export class OrdersService {
     });
 
     const price = dto.type === 'LIMIT' ? dto.price! : null;
+    const orderId = newUuid();
     const result = await this.orderRepository.createOrderViaProcedure({
+      orderId,
       userId,
       pairId: dto.pairId,
       side: dto.side,
@@ -139,7 +142,7 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order', orderId);
     }
-    if (Number(order.user_id) !== Number(userId)) {
+    if (order.user_id !== userId) {
       throw new ForbiddenException('You can only cancel your own orders');
     }
     if (!canCancelOrder(order.status as any)) {
@@ -172,19 +175,19 @@ export class OrdersService {
     return updated;
   }
 
-  async findOne(orderId: number, userId: number): Promise<Order> {
+  async findOne(orderId: string, userId: string): Promise<Order> {
     const order = await this.orderRepository.findById(orderId);
     if (!order) {
       throw new NotFoundException('Order', orderId);
     }
-    if (Number(order.user_id) !== Number(userId)) {
+    if (order.user_id !== userId) {
       throw new ForbiddenException('Access denied');
     }
     return order;
   }
 
   getOrderBook(
-    pairId: number,
+    pairId: string,
     side: 'BUY' | 'SELL',
     limit: number = 50,
   ) {
@@ -192,7 +195,7 @@ export class OrdersService {
   }
 
   async findMyOrders(
-    userId: number,
+    userId: string,
     page: number = 1,
     limit: number = 20,
     status?: string,
@@ -255,9 +258,9 @@ export class OrdersService {
   }
 
   private orderToOrderBookOrder(o: Order): {
-    order_id: number;
-    pair_id: number;
-    user_id: number;
+    order_id: string;
+    pair_id: string;
+    user_id: string;
     side: 'BUY' | 'SELL';
     type: 'LIMIT' | 'MARKET';
     price: string | null;

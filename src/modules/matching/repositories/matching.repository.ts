@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { OrderBookOrder } from '../interfaces';
 
 export interface TradeExecuteResult {
-  trade_id: number | null;
+  trade_id: string | null;
   error_code: string | null;
   error_message: string | null;
 }
@@ -17,7 +17,7 @@ export class MatchingRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   async getOpenOrdersForPair(
-    pairId: number,
+    pairId: string,
     side: 'BUY' | 'SELL',
   ): Promise<OrderBookOrder[]> {
     const result = await this.dataSource.query(
@@ -29,12 +29,12 @@ export class MatchingRepository {
   }
 
   async executeTrade(params: {
-    pairId: number;
-    makerOrderId: number;
-    takerOrderId: number;
+    pairId: string;
+    makerOrderId: string;
+    takerOrderId: string;
     price: string;
     amount: string;
-    feeCurrencyId: number;
+    feeCurrencyId: string;
     takerFee: string;
     makerFee: string;
   }): Promise<TradeExecuteResult> {
@@ -65,9 +65,9 @@ export class MatchingRepository {
     const amount = parseFloat(r.amount ?? '0');
     const filled = parseFloat(r.filled_amount ?? '0');
     return {
-      order_id: Number(r.order_id),
-      pair_id: Number(r.pair_id),
-      user_id: Number(r.user_id),
+      order_id: String(r.order_id ?? ''),
+      pair_id: String(r.pair_id ?? ''),
+      user_id: String(r.user_id ?? ''),
       side: r.side,
       type: r.type,
       price: r.price != null ? String(r.price) : null,

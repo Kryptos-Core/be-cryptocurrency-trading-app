@@ -18,8 +18,8 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
   async match(
     context: MatchingContext,
     orderBook: {
-      peekBestMaker: (pairId: number, side: 'BUY' | 'SELL') => OrderBookOrder | null;
-      popBestMaker: (pairId: number, side: 'BUY' | 'SELL') => OrderBookOrder | null;
+      peekBestMaker: (pairId: string, side: 'BUY' | 'SELL') => OrderBookOrder | null;
+      popBestMaker: (pairId: string, side: 'BUY' | 'SELL') => OrderBookOrder | null;
       addOrder: (order: OrderBookOrder) => void;
     },
     executeTrade: TradeExecutor,

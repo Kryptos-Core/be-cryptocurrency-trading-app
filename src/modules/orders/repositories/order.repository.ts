@@ -10,7 +10,7 @@ export interface OrderBookLevel {
 }
 
 export interface CreateOrderProcedureResult {
-  order_id: number | null;
+  order_id: string | null;
   error_code: string | null;
   error_message: string | null;
 }
@@ -32,7 +32,7 @@ export class OrderRepository extends BaseRepository<Order> {
     super(Order, dataSource);
   }
 
-  override async findById(id: number | string): Promise<Order | null> {
+  override async findById(id: string): Promise<Order | null> {
     try {
       const result = await this.dataSource.query('CALL sp_order_find_by_id(?)', [
         id,
@@ -46,7 +46,7 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   async findByUserIdempotency(
-    userId: number,
+    userId: string,
     idempotencyKey: string,
   ): Promise<Order | null> {
     try {
@@ -66,7 +66,7 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   async getOrderBook(
-    pairId: number,
+    pairId: string,
     side: 'BUY' | 'SELL',
     limit: number = 50,
   ): Promise<OrderBookLevel[]> {
@@ -99,8 +99,9 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   async createOrderViaProcedure(params: {
-    userId: number;
-    pairId: number;
+    orderId: string;
+    userId: string;
+    pairId: string;
     side: 'BUY' | 'SELL';
     type: 'LIMIT' | 'MARKET';
     price: string | null;
@@ -111,8 +112,9 @@ export class OrderRepository extends BaseRepository<Order> {
   }): Promise<CreateOrderProcedureResult> {
     try {
       await this.dataSource.query(
-        'CALL sp_order_create(?, ?, ?, ?, ?, ?, ?, ?, ?, @p_order_id, @p_error_code, @p_error_message)',
+        'CALL sp_order_create(?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)',
         [
+          params.orderId,
           params.userId,
           params.pairId,
           params.side,
@@ -125,10 +127,10 @@ export class OrderRepository extends BaseRepository<Order> {
         ],
       );
       const [out] = await this.dataSource.query(
-        'SELECT @p_order_id AS order_id, @p_error_code AS error_code, @p_error_message AS error_message',
+        'SELECT @p_error_code AS error_code, @p_error_message AS error_message',
       );
       return {
-        order_id: out?.order_id ?? null,
+        order_id: out?.error_code ? null : params.orderId,
         error_code: out?.error_code ?? null,
         error_message: out?.error_message ?? null,
       };
@@ -139,8 +141,8 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   async cancelOrderViaProcedure(
-    orderId: number,
-    userId: number,
+    orderId: string,
+    userId: string,
   ): Promise<CancelOrderProcedureResult> {
     try {
       await this.dataSource.query(
@@ -162,7 +164,7 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   async findByUser(
-    userId: number,
+    userId: string,
     status: string | null,
     skip: number,
     limit: number,
@@ -181,7 +183,7 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   async countByUser(
-    userId: number,
+    userId: string,
     status: string | null,
   ): Promise<number> {
     try {
@@ -199,9 +201,9 @@ export class OrderRepository extends BaseRepository<Order> {
 
   private mapRowToOrder(row: any): Order {
     const order = new Order();
-    order.order_id = Number(row.order_id);
-    order.user_id = Number(row.user_id);
-    order.pair_id = Number(row.pair_id);
+    order.order_id = String(row.order_id ?? '');
+    order.user_id = String(row.user_id ?? '');
+    order.pair_id = String(row.pair_id ?? '');
     order.side = row.side;
     order.type = row.type;
     order.price = row.price != null ? String(row.price) : (null as any);

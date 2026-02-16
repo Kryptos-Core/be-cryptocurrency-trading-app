@@ -13,9 +13,9 @@ import { TickerMessage } from '../interfaces/websocket.interface';
 @Injectable()
 export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   private readonly baseUrl: string;
-  private priceFeedIntervals: Map<number, NodeJS.Timeout> = new Map();
+  private priceFeedIntervals: Map<string, NodeJS.Timeout> = new Map();
   private readonly updateIntervalMs: number = 1000; // 1 second between updates
-  private readonly pairSymbolMap: Map<number, string> = new Map(); // pair_id -> symbol
+  private readonly pairSymbolMap: Map<string, string> = new Map(); // pair_id -> symbol
   private isRunning: boolean = false;
 
   constructor(
@@ -72,7 +72,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   /**
    * Start price feed for a specific trading pair
    */
-  private startPairPriceFeed(pairId: number, symbol: string): void {
+  private startPairPriceFeed(pairId: string, symbol: string): void {
     // Initial fetch
     this.fetchAndPublishPrice(pairId, symbol);
 
@@ -87,7 +87,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   /**
    * Fetch price from Binance and publish to Redis
    */
-  private async fetchAndPublishPrice(pairId: number, symbol: string): Promise<void> {
+  private async fetchAndPublishPrice(pairId: string, symbol: string): Promise<void> {
     try {
       // Fetch 24h ticker data from Binance
       const tickerData = await this.fetchTicker24h(symbol);
@@ -186,7 +186,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   /**
    * Add a new pair to the price feed
    */
-  async addPair(pairId: number, symbol: string): Promise<void> {
+  async addPair(pairId: string, symbol: string): Promise<void> {
     if (this.pairSymbolMap.has(pairId)) return;
     this.pairSymbolMap.set(pairId, symbol);
     if (this.isRunning) this.startPairPriceFeed(pairId, symbol);
@@ -195,7 +195,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   /**
    * Remove a pair from the price feed
    */
-  async removePair(pairId: number): Promise<void> {
+  async removePair(pairId: string): Promise<void> {
     const interval = this.priceFeedIntervals.get(pairId);
     if (interval) {
       clearInterval(interval);

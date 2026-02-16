@@ -29,7 +29,7 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
   readonly name = 'binance';
 
   async getOHLCVByRange(
-    pairId: number,
+    pairId: string,
     symbol: string,
     intervalSec: number,
     fromDate: Date,

@@ -5,7 +5,7 @@ import { CreateOrderDto } from '../dto';
  */
 export class CreateOrderCommand {
   constructor(
-    public readonly userId: number,
+    public readonly userId: string,
     public readonly dto: CreateOrderDto,
   ) {}
 }

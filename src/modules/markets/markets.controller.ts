@@ -194,7 +194,7 @@ export class MarketsController {
   @ApiSuccessResponse('Market ticker retrieved successfully')
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async getTicker(@Param('id', ParseIntPipe) id: number) {
+  async getTicker(@Param('id') id: string) {
     return this.marketsService.getTicker(id);
   }
 
@@ -214,7 +214,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async getOrderBook(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
   ) {
     return this.marketsService.getOrderBook(id, limit);
@@ -246,7 +246,7 @@ export class MarketsController {
   @ApiBadRequestResponse('Invalid interval')
   @ApiUnauthorizedResponse('Unauthorized')
   async getOHLCV(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Query('interval') interval: string = '1h',
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
     @Query('range') range?: string,
@@ -270,7 +270,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async getRecentTrades(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
   ) {
     return this.marketsService.getRecentTrades(id, limit);
@@ -290,7 +290,7 @@ export class MarketsController {
   @ApiSuccessResponse('Market pair retrieved successfully')
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  async findOne(@Param('id') id: string) {
     return this.marketsService.findOne(id);
   }
 
@@ -329,7 +329,7 @@ export class MarketsController {
   @ApiConflictResponse('Market pair already exists')
   @ApiUnauthorizedResponse('Unauthorized')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateMarketPairDto: UpdateMarketPairDto,
   ) {
     return this.marketsService.update(id, updateMarketPairDto);
@@ -351,7 +351,7 @@ export class MarketsController {
   })
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async remove(@Param('id', ParseIntPipe) id: number) {
+  async remove(@Param('id') id: string) {
     await this.marketsService.remove(id);
   }
 }
