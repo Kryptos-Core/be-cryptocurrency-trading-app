@@ -85,7 +85,7 @@ export class UsersController {
   })
   @ApiSuccessResponse('User profile retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
-  async getCurrentUser(@CurrentUser('userId') userId: number) {
+  async getCurrentUser(@CurrentUser('userId') userId: string) {
     return this.usersService.findOne(userId);
   }
 
@@ -98,11 +98,11 @@ export class UsersController {
     summary: 'Get user by ID',
     description: 'Retrieve a specific user by their ID',
   })
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @ApiSuccessResponse('User retrieved successfully')
   @ApiNotFoundResponse('User not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  async findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
@@ -120,7 +120,7 @@ export class UsersController {
   @ApiBadRequestResponse('Invalid input data')
   @ApiUnauthorizedResponse('Unauthorized')
   async updateCurrentUser(
-    @CurrentUser('userId') userId: number,
+    @CurrentUser('userId') userId: string,
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(userId, updateUserDto);
@@ -135,13 +135,13 @@ export class UsersController {
     summary: 'Update user by ID',
     description: 'Update a specific user by their ID (Admin only)',
   })
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @ApiBody({ type: UpdateUserDto })
   @ApiSuccessResponse('User updated successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiNotFoundResponse('User not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto) {
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
 
@@ -154,11 +154,11 @@ export class UsersController {
     summary: 'Delete user by ID',
     description: 'Delete a specific user by their ID (Admin only)',
   })
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @ApiSuccessResponse('User deleted successfully')
   @ApiNotFoundResponse('User not found')
   @ApiUnauthorizedResponse('Unauthorized')
-  async remove(@Param('id', ParseIntPipe) id: number) {
+  async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
     return { message: 'User deleted successfully' };
   }

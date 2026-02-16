@@ -28,9 +28,9 @@ export class UsersService {
   }
 
   /**
-   * Find user by ID
+   * Find user by ID (UUID string)
    */
-  async findOne(userId: number): Promise<User> {
+  async findOne(userId: string): Promise<User> {
     const user = await this.usersRepository.findById(userId);
 
     if (!user) {
@@ -63,7 +63,7 @@ export class UsersService {
   /**
    * Update user
    */
-  async update(userId: number, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
     // Verify user exists
     const user = await this.findOne(userId);
 
@@ -88,7 +88,7 @@ export class UsersService {
   /**
    * Delete user (soft delete)
    */
-  async remove(userId: number): Promise<void> {
+  async remove(userId: string): Promise<void> {
     // Verify user exists
     await this.findOne(userId);
 

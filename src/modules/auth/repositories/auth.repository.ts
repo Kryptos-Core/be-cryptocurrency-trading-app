@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
 
 /**
@@ -40,16 +41,11 @@ export class AuthRepository {
     lastName?: string
   ): Promise<User> {
     try {
-      const result = await this.dataSource.query(
-        'CALL sp_user_create(?, ?, ?, ?)',
-        [email.toLowerCase(), passwordHash, firstName || null, lastName || null],
+      const userId = newUuid();
+      await this.dataSource.query(
+        'CALL sp_user_create(?, ?, ?, ?, ?)',
+        [userId, email.toLowerCase(), passwordHash, firstName || null, lastName || null],
       );
-
-      const userId = result[0]?.[0]?.user_id;
-
-      if (!userId) {
-        throw new Error('Failed to create user - no ID returned');
-      }
 
       // Fetch and return created user
       const userResult = await this.dataSource.query(

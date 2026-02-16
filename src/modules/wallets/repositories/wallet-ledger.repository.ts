@@ -47,7 +47,7 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
         entry.userId,
         entry.currencyId,
         entry.refType,
-        entry.refId,
+        String(entry.refId),
         entry.direction,
         entry.amount,
         entry.balanceAfter,

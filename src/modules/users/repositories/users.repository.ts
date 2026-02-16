@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
 
 /**
@@ -18,9 +19,9 @@ export class UsersRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
-   * Find user by ID using stored procedure
+   * Find user by ID using stored procedure (UUID string)
    */
-  async findById(userId: number): Promise<User | null> {
+  async findById(userId: string): Promise<User | null> {
     try {
       const result = await this.dataSource.query(
         'CALL sp_user_find_by_id(?)',
@@ -83,23 +84,15 @@ export class UsersRepository {
   }
 
   /**
-   * Create new user
+   * Create new user (UUID v7)
    */
   async create(email: string, passwordHash: string): Promise<User> {
     try {
-      const result = await this.dataSource.query(
-        'CALL sp_user_create(?, ?)',
-        [email.toLowerCase(), passwordHash],
+      const userId = newUuid();
+      await this.dataSource.query(
+        'CALL sp_user_create(?, ?, ?, ?, ?)',
+        [userId, email.toLowerCase(), passwordHash, null, null],
       );
-
-      // Return full user object with ID
-      const userId = result[0]?.[0]?.user_id;
-      
-      if (!userId) {
-        throw new Error('Failed to create user - no ID returned');
-      }
-
-      // Fetch created user
       return this.findById(userId) as Promise<User>;
     } catch (error) {
       this.logger.error(`Error creating user: ${email}`, error);
@@ -111,7 +104,7 @@ export class UsersRepository {
    * Update user
    */
   async update(
-    userId: number,
+    userId: string,
     updates: { email?: string; status?: string },
   ): Promise<void> {
     try {
@@ -134,7 +127,7 @@ export class UsersRepository {
   /**
    * Delete user (soft delete - set status to BANNED)
    */
-  async delete(userId: number): Promise<void> {
+  async delete(userId: string): Promise<void> {
     try {
       await this.dataSource.query('CALL sp_user_delete(?)', [userId]);
       this.logger.log(`User deleted (soft): ${userId}`);
@@ -175,7 +168,7 @@ export class UsersRepository {
   /**
    * Check if email exists (excluding specific user ID)
    */
-  async emailExists(email: string, excludeUserId?: number): Promise<boolean> {
+  async emailExists(email: string, excludeUserId?: string): Promise<boolean> {
     try {
       const result = await this.dataSource.query(
         'CALL sp_user_email_exists(?, ?)',
