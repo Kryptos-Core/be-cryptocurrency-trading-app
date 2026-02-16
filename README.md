@@ -52,6 +52,28 @@ Swagger: `http://localhost:3000/api`
 
 ---
 
+## WebSocket (Socket.IO)
+
+Trading WebSocket dùng **Socket.IO**, namespace `trading`.
+
+| Mục | Giá trị |
+|-----|--------|
+| **Base URL** | `http://localhost:3000` (hoặc `http://<IP>:3000` nếu chạy trên máy khác) |
+| **Port** | `3000` (hoặc biến env `PORT` của backend) |
+| **Namespace** | `trading` |
+| **URL đầy đủ** | `http://localhost:3000` với namespace `/trading` (Socket.IO tự thêm path `/socket.io`) |
+
+**Lỗi "The remote computer refused the network connection" (errno 1225) thường do:**
+
+1. **Sai port** — App đang connect tới port khác (vd: 50179). Cấu hình lại base URL dùng **port 3000** (trùng với backend).
+2. **Backend chưa chạy** — Chạy `npm run start:dev` trong thư mục backend, đảm bảo log có dòng `Server running on http://localhost:3000`.
+3. **Android emulator** — Trong emulator, `localhost` là bản thân emulator. Dùng `http://10.0.2.2:3000` thay cho `http://localhost:3000`.
+4. **Thiết bị thật / iOS simulator** — Dùng IP máy chạy backend (vd: `http://192.168.1.x:3000`), không dùng `localhost` từ máy/ simulator khác.
+
+**Luồng kết nối:** Connect → gửi event `auth` với `{ token: "JWT..." }` → nhận `auth_response` → gửi `subscribe` với `{ pair_id, channels: ['ticker','ohlc'], interval: '1m' }` → nhận `ticker` và `ohlc`.
+
+---
+
 ## Seed DB & tài khoản test
 
 Chạy seed để nạp dữ liệu mẫu (currencies, users, market pairs, wallets):

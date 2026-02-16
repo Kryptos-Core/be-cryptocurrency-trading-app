@@ -287,17 +287,21 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       const bids = bidsResult?.[0] || [];
       const asks = asksResult?.[0] || [];
 
+      const toLevel = (row: any) => ({
+        price: row.price?.toString() ?? '0',
+        amount: row.amount?.toString() ?? '0',
+        orders: parseInt(row.orders?.toString() ?? '0', 10) || 0,
+      });
+      const validPrice = (row: any) => {
+        const p = row?.price;
+        if (p == null) return false;
+        const n = Number(p);
+        return Number.isFinite(n) && n > 0;
+      };
+
       return {
-        bids: bids.map((bid: any) => ({
-          price: bid.price?.toString() || '0',
-          amount: bid.amount?.toString() || '0',
-          orders: parseInt(bid.orders?.toString() || '0') || 0,
-        })),
-        asks: asks.map((ask: any) => ({
-          price: ask.price?.toString() || '0',
-          amount: ask.amount?.toString() || '0',
-          orders: parseInt(ask.orders?.toString() || '0') || 0,
-        })),
+        bids: bids.filter(validPrice).map(toLevel),
+        asks: asks.filter(validPrice).map(toLevel),
       };
     } catch (error) {
       this.logger.error(`Error getting order book for pair: ${pairId}`, error);

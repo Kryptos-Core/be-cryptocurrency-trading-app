@@ -77,11 +77,18 @@ export class OrderRepository extends BaseRepository<Order> {
         limit,
       ]);
       const rows = result?.[0] ?? [];
-      return rows.map((r: any) => ({
-        price: String(r.price ?? '0'),
-        remaining: String(r.remaining ?? '0'),
-        order_count: Number(r.order_count ?? 0),
-      }));
+      return rows
+        .filter((r: any) => {
+          const p = r?.price;
+          if (p == null) return false;
+          const n = Number(p);
+          return Number.isFinite(n) && n > 0;
+        })
+        .map((r: any) => ({
+          price: String(r.price ?? '0'),
+          remaining: String(r.remaining ?? '0'),
+          order_count: Number(r.order_count ?? 0),
+        }));
     } catch (error) {
       this.logger.error(
         `Error getting order book: pair=${pairId}, side=${side}`,

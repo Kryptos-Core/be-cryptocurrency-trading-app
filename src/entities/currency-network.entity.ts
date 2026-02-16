@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   ManyToOne,
   ForeignKey,
@@ -14,12 +14,12 @@ import { Currency } from './currency.entity';
   unique: true,
 })
 export class CurrencyNetwork {
-  @PrimaryGeneratedColumn()
-  network_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  network_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  currency_id!: number;
+  currency_id!: string;
 
   @Column({ type: 'varchar', length: 32 })
   network_code!: string;

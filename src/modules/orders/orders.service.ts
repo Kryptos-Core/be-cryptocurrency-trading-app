@@ -139,7 +139,7 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order', orderId);
     }
-    if (order.user_id !== userId) {
+    if (Number(order.user_id) !== Number(userId)) {
       throw new ForbiddenException('You can only cancel your own orders');
     }
     if (!canCancelOrder(order.status as any)) {
@@ -177,7 +177,7 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order', orderId);
     }
-    if (order.user_id !== userId) {
+    if (Number(order.user_id) !== Number(userId)) {
       throw new ForbiddenException('Access denied');
     }
     return order;
