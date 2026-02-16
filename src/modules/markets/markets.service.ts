@@ -118,18 +118,29 @@ export class MarketsService implements OnModuleInit {
 
   /**
    * Get all active market pairs
-   * Cache-Aside Pattern: Cache active list
+   * Cache-Aside Pattern: Cache active list.
+   * If cache returned empty [], invalidate and re-fetch once (avoid stale empty after sync).
    */
   async findActive(): Promise<MarketPair[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}active`;
 
-    return this.cacheService.getOrSet(
+    const cached = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
         return this.marketRepository.findActive();
       },
       this.CACHE_TTL,
     );
+
+    if (Array.isArray(cached) && cached.length === 0) {
+      await this.cacheService.invalidatePattern(`${this.CACHE_KEY_PREFIX}*`);
+      const fresh = await this.marketRepository.findActive();
+      if (fresh.length > 0) {
+        await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
+        return fresh;
+      }
+    }
+    return cached;
   }
 
   /**

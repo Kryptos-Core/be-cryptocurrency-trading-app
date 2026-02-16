@@ -98,34 +98,56 @@ export class CurrenciesService {
 
   /**
    * Get all active currencies
-   * Cache-Aside Pattern: Cache active list
+   * Cache-Aside Pattern: Cache active list.
+   * If cache returned empty [], invalidate and re-fetch once (avoid stale empty after sync).
    */
   async findActive(): Promise<Currency[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}active`;
 
-    return this.cacheService.getOrSet(
+    const cached = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
         return this.currencyRepository.findActive();
       },
       this.CACHE_TTL,
     );
+
+    if (Array.isArray(cached) && cached.length === 0) {
+      await this.cacheService.invalidatePattern(`${this.CACHE_KEY_PREFIX}*`);
+      const fresh = await this.currencyRepository.findActive();
+      if (fresh.length > 0) {
+        await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
+        return fresh;
+      }
+    }
+    return cached;
   }
 
   /**
    * Get all tradable currencies
-   * Cache-Aside Pattern: Cache tradable list
+   * Cache-Aside Pattern: Cache tradable list.
+   * If cache returned empty [], invalidate and re-fetch once.
    */
   async findTradable(): Promise<Currency[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}tradable`;
 
-    return this.cacheService.getOrSet(
+    const cached = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
         return this.currencyRepository.findTradable();
       },
       this.CACHE_TTL,
     );
+
+    if (Array.isArray(cached) && cached.length === 0) {
+      await this.cacheService.invalidatePattern(`${this.CACHE_KEY_PREFIX}*`);
+      const fresh = await this.currencyRepository.findTradable();
+      if (fresh.length > 0) {
+        await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
+        return fresh;
+      }
+    }
+    return cached;
   }
 
   /**
