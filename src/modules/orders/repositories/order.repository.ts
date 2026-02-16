@@ -112,7 +112,7 @@ export class OrderRepository extends BaseRepository<Order> {
   }): Promise<CreateOrderProcedureResult> {
     try {
       await this.dataSource.query(
-        'CALL sp_order_create(?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)',
+        'CALL sp_order_create(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)',
         [
           params.orderId,
           params.userId,
