@@ -42,7 +42,8 @@ export class MarketsService implements OnModuleInit {
 
   /**
    * Find all market pairs with pagination
-   * Cache-Aside Pattern: Check cache first, then database
+   * Cache-Aside Pattern: Check cache first, then database.
+   * If cache returned empty pairs[], invalidate and re-fetch once (avoid stale empty after sync).
    */
   async findAll(
     page: number = 1,
@@ -61,8 +62,25 @@ export class MarketsService implements OnModuleInit {
       this.CACHE_TTL,
     );
 
+    const pairs = result.data ?? [];
+    if (Array.isArray(pairs) && pairs.length === 0) {
+      await this.cacheService.invalidatePattern(`${this.CACHE_KEY_PREFIX}*`);
+      const fresh = await this.marketRepository.findWithPagination(page, limit, {
+        includeInactive,
+      });
+      if (fresh.data.length > 0) {
+        await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
+        return {
+          pairs: fresh.data,
+          total: fresh.total,
+          page: fresh.page,
+          limit: fresh.limit,
+        };
+      }
+    }
+
     return {
-      pairs: result.data,
+      pairs,
       total: result.total,
       page: result.page,
       limit: result.limit,
