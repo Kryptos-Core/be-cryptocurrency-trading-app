@@ -8,6 +8,7 @@ import {
   ConflictException,
 } from '@/common/exceptions';
 import { WalletBalanceDto } from './dto/wallet-balance.dto';
+import { WalletListItemDto } from './dto/wallet-list-item.dto';
 import { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
 import { WalletTransactionDto } from './dto/wallet-transaction.dto';
 import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
@@ -67,6 +68,30 @@ export class WalletsService {
       });
     }
     return result;
+  }
+
+  /**
+   * Get all wallets for the current user (optionally exclude zero balances).
+   */
+  async getWallets(
+    userId: string,
+    includeZero: boolean = true,
+  ): Promise<WalletListItemDto[]> {
+    const rows = await this.walletRepository.findByUser(userId, includeZero);
+    return rows.map((w) => {
+      const available = String(w.available ?? '0');
+      const frozen = String(w.frozen ?? '0');
+      const total = new Decimal(available).plus(frozen).toString();
+      return {
+        walletId: w.wallet_id,
+        currencyId: w.currency_id,
+        symbol: (w as any).currency_symbol ?? '',
+        name: (w as any).currency_name ?? '',
+        available,
+        frozen,
+        total,
+      };
+    });
   }
 
   /**

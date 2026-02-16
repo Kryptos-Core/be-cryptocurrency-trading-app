@@ -15,6 +15,36 @@ export class WalletRepository extends BaseRepository<Wallet> {
   }
 
   /**
+   * Find all wallets for a user, with currency symbol/name.
+   * When includeZero is false, excludes wallets where available and frozen are both 0.
+   */
+  async findByUser(
+    userId: string,
+    includeZero: boolean = true,
+  ): Promise<Array<Wallet & { currency_symbol: string; currency_name: string }>> {
+    try {
+      const sql = `
+        SELECT w.wallet_id, w.user_id, w.currency_id, w.available, w.frozen, w.updated_at,
+               c.symbol AS currency_symbol, c.name AS currency_name
+        FROM wallets w
+        INNER JOIN currencies c ON c.currency_id = w.currency_id
+        WHERE w.user_id = ?
+        ${includeZero ? '' : 'AND (w.available > 0 OR w.frozen > 0)'}
+        ORDER BY c.symbol
+      `;
+      const rows = await this.dataSource.query(sql, [userId]);
+      return (rows || []).map((row: any) => ({
+        ...this.mapRowToWallet(row),
+        currency_symbol: row.currency_symbol ?? '',
+        currency_name: row.currency_name ?? '',
+      }));
+    } catch (error) {
+      this.logger.error(`Error finding wallets by user: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Find wallet by user and currency
    */
   async findByUserCurrency(

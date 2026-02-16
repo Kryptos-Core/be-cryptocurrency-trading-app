@@ -35,6 +35,26 @@ export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
 
   /**
+   * Get current user's wallets (all or exclude zero balances).
+   * GET /wallets?include_zero=false
+   */
+  @Get()
+  @ApiOperation({
+    summary: 'List wallets',
+    description: 'Get all wallets for the current user. Use include_zero=false to hide zero balances.',
+  })
+  @ApiQuery({ name: 'include_zero', required: false, type: Boolean, example: false })
+  @ApiSuccessResponse('Wallet list retrieved successfully')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getWallets(
+    @CurrentUser('userId') userId: string,
+    @Query('include_zero') includeZero?: string,
+  ) {
+    const include = includeZero !== 'false' && includeZero !== '0';
+    return this.walletsService.getWallets(userId, include);
+  }
+
+  /**
    * Get current user's wallet balance by currency
    * GET /wallets/balance?currencyId=1
    */
