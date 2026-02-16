@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -14,16 +14,16 @@ import { MarketPair } from './market-pair.entity';
 @Index('idx_alert_user', ['user_id', 'is_active'])
 @Index('idx_alert_pair', ['pair_id', 'is_active'])
 export class PriceAlert {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  alert_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  alert_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => MarketPair)
-  pair_id!: number;
+  pair_id!: string;
 
   @Column({ type: 'decimal', precision: 36, scale: 18 })
   target_price!: string;

@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
@@ -18,16 +18,16 @@ import { MarketPair } from './market-pair.entity';
 @Index('idx_orders_pair_status', ['pair_id', 'status', 'created_at'])
 @Index('idx_orders_book', ['pair_id', 'side', 'status', 'price', 'created_at'])
 export class Order {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  order_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  order_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => MarketPair)
-  pair_id!: number;
+  pair_id!: string;
 
   @Column({ type: 'enum', enum: ['BUY', 'SELL'] })
   side!: 'BUY' | 'SELL';

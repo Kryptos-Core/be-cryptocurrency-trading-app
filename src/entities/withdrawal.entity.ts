@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -15,20 +15,20 @@ import { CurrencyNetwork } from './currency-network.entity';
 @Index('uk_withdraw_idem', ['user_id', 'idempotency_key'], { unique: true })
 @Index('idx_withdraw_user', ['user_id', 'status'])
 export class Withdrawal {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  withdraw_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  withdraw_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  currency_id!: number;
+  currency_id!: string;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'char', length: 36, nullable: true })
   @ForeignKey(() => CurrencyNetwork)
-  network_id!: number;
+  network_id!: string | null;
 
   @Column({ type: 'decimal', precision: 36, scale: 18 })
   amount!: string;

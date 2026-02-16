@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   OneToMany,
@@ -12,8 +12,8 @@ import { Withdrawal } from './withdrawal.entity';
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
 export class User {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  user_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  user_id!: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;

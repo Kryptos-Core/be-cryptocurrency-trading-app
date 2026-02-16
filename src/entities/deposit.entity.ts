@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -15,20 +15,20 @@ import { CurrencyNetwork } from './currency-network.entity';
 @Index('uk_deposit_tx', ['currency_id', 'tx_hash'], { unique: true })
 @Index('idx_deposit_user', ['user_id', 'status'])
 export class Deposit {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  deposit_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  deposit_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  currency_id!: number;
+  currency_id!: string;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'char', length: 36, nullable: true })
   @ForeignKey(() => CurrencyNetwork)
-  network_id!: number;
+  network_id!: string | null;
 
   @Column({ type: 'decimal', precision: 36, scale: 18 })
   amount!: string;

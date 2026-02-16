@@ -1,9 +1,7 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
-  CreateDateColumn,
-  UpdateDateColumn,
   OneToMany,
   Index,
 } from 'typeorm';
@@ -13,8 +11,8 @@ import { CurrencyNetwork } from './currency-network.entity';
 @Entity('currencies')
 @Index('uk_currency_symbol', ['symbol'], { unique: true })
 export class Currency {
-  @PrimaryGeneratedColumn()
-  currency_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  currency_id!: string;
 
   @Column({ type: 'varchar', length: 16, unique: true })
   symbol!: string;

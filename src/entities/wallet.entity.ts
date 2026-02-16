@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   ManyToOne,
   ForeignKey,
@@ -19,16 +19,16 @@ import { WalletLedger } from './wallet-ledger.entity';
 })
 @Index('idx_wallet_user', ['user_id'])
 export class Wallet {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  wallet_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  wallet_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  currency_id!: number;
+  currency_id!: string;
 
   @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
   available!: string;

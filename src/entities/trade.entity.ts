@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -16,20 +16,20 @@ import { Currency } from './currency.entity';
 @Index('idx_trades_taker', ['taker_order_id'])
 @Index('idx_trades_maker', ['maker_order_id'])
 export class Trade {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  trade_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  trade_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => MarketPair)
-  pair_id!: number;
+  pair_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Order)
-  taker_order_id!: number;
+  taker_order_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Order)
-  maker_order_id!: number;
+  maker_order_id!: string;
 
   @Column({ type: 'decimal', precision: 36, scale: 18 })
   price!: string;
@@ -43,9 +43,9 @@ export class Trade {
   @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
   maker_fee!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  fee_currency_id!: number;
+  fee_currency_id!: string;
 
   @CreateDateColumn()
   created_at!: Date;

@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -22,16 +22,20 @@ import { Wallet } from './wallet.entity';
 @Index('idx_ledger_user_time', ['user_id', 'created_at'])
 @Index('idx_ledger_ref', ['ref_type', 'ref_id'])
 export class WalletLedger {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  ledger_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  ledger_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  currency_id!: number;
+  currency_id!: string;
+
+  @Column({ type: 'char', length: 36 })
+  @ForeignKey(() => Wallet)
+  wallet_id!: string;
 
   @Column({
     type: 'enum',
@@ -60,8 +64,9 @@ export class WalletLedger {
     | 'EXTERNAL_SYNC'
     | 'RECONCILIATION';
 
-  @Column({ type: 'bigint' })
-  ref_id!: number;
+  /** Reference to order_id, trade_id, deposit_id, withdraw_id, etc. (UUID). */
+  @Column({ type: 'char', length: 36 })
+  ref_id!: string;
 
   @Column({ type: 'enum', enum: ['CREDIT', 'DEBIT'] })
   direction!: 'CREDIT' | 'DEBIT';

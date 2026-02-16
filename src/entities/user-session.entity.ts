@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -13,12 +13,12 @@ import { User } from './user.entity';
 @Index('idx_sessions_user', ['user_id'])
 @Index('idx_sessions_exp', ['expires_at'])
 export class UserSession {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  session_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  session_id!: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
-  user_id!: number;
+  user_id!: string;
 
   @Column({ type: 'varbinary' })
   refresh_token_hash!: Buffer;

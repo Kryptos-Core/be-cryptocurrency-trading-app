@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -17,16 +17,16 @@ import { Currency } from './currency.entity';
 })
 @Index('idx_pair_active', ['is_active'])
 export class MarketPair {
-  @PrimaryGeneratedColumn()
-  pair_id!: number;
+  @PrimaryColumn({ type: 'char', length: 36 })
+  pair_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  base_currency_id!: number;
+  base_currency_id!: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'char', length: 36 })
   @ForeignKey(() => Currency)
-  quote_currency_id!: number;
+  quote_currency_id!: string;
 
   @Column({ type: 'varchar', length: 32, unique: true })
   symbol!: string;
