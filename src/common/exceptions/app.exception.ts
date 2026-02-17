@@ -95,3 +95,17 @@ export class InternalServerException extends AppException {
     Object.setPrototypeOf(this, InternalServerException.prototype);
   }
 }
+
+/**
+ * Service Unavailable (503) – e.g. external API rate limit (Binance IP ban)
+ */
+export class ServiceUnavailableException extends AppException {
+  constructor(
+    message: string,
+    code: string = 'SERVICE_UNAVAILABLE',
+    context?: Record<string, any>,
+  ) {
+    super(code, message, 503, context);
+    Object.setPrototypeOf(this, ServiceUnavailableException.prototype);
+  }
+}
