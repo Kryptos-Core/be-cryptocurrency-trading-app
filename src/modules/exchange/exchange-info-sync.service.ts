@@ -2,8 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CacheService } from '@/common/services';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { MarketRepository } from '@/modules/markets/repositories';
+import { ServiceUnavailableException } from '@/common/exceptions';
 
 const BINANCE_EXCHANGE_INFO_URL = 'https://api.binance.com/api/v3/exchangeInfo';
+/** Cache exchangeInfo 1 hour to avoid Binance request weight / IP ban (418). */
+const EXCHANGE_INFO_CACHE_KEY = 'exchange:binance:exchangeInfo';
+const EXCHANGE_INFO_CACHE_TTL = 3600;
 
 interface BinanceSymbolInfo {
   symbol: string;
@@ -51,13 +55,44 @@ export class ExchangeInfoSyncService {
 
   /**
    * Fetch Binance Spot exchangeInfo (public, no API key).
+   * Uses cache (1h) to reduce request weight and avoid 418 IP ban.
+   * On 418, throws ServiceUnavailableException with retryAfterMs.
    */
-  async fetchBinanceExchangeInfo(): Promise<BinanceExchangeInfo> {
-    const res = await fetch(BINANCE_EXCHANGE_INFO_URL);
-    if (!res.ok) {
-      throw new Error(`Binance exchangeInfo failed: ${res.status} ${await res.text()}`);
+  async fetchBinanceExchangeInfo(forceRefresh = false): Promise<BinanceExchangeInfo> {
+    if (!forceRefresh) {
+      const cached = await this.cacheService.get<BinanceExchangeInfo>(EXCHANGE_INFO_CACHE_KEY);
+      if (cached?.symbols?.length) {
+        this.logger.debug('Using cached Binance exchangeInfo');
+        return cached;
+      }
     }
-    return (await res.json()) as BinanceExchangeInfo;
+
+    const res = await fetch(BINANCE_EXCHANGE_INFO_URL);
+    const bodyText = await res.text();
+
+    if (res.status === 418) {
+      // "IP banned until 1771291118565" – parse and return retry-after
+      const untilMs = bodyText.match(/IP banned until (\d+)/)?.[1];
+      const retryAfterMs = untilMs ? Math.max(0, Number(untilMs) - Date.now()) : null;
+      const retryAfterSec = retryAfterMs != null ? Math.ceil(retryAfterMs / 1000) : null;
+      throw new ServiceUnavailableException(
+        'Binance rate limit: IP temporarily banned. Use WebSocket for live data; retry sync later.',
+        'BINANCE_RATE_LIMIT',
+        {
+          retryAfterMs: retryAfterMs ?? undefined,
+          retryAfterSec: retryAfterSec ?? undefined,
+          hint: 'Please use WebSocket Streams for live updates to avoid bans.',
+        },
+      );
+    }
+
+    if (!res.ok) {
+      throw new Error(`Binance exchangeInfo failed: ${res.status} ${bodyText}`);
+    }
+
+    const data = JSON.parse(bodyText) as BinanceExchangeInfo;
+    await this.cacheService.set(EXCHANGE_INFO_CACHE_KEY, data, EXCHANGE_INFO_CACHE_TTL);
+    return data;
   }
 
   /**
@@ -65,8 +100,9 @@ export class ExchangeInfoSyncService {
    * - Only symbols with status === 'TRADING'.
    * - Currencies: upsert by symbol (create if not exists).
    * - Market pairs: create if symbol (BASE/QUOTE) not exists; skip if exists.
+   * @param forceRefresh If true, bypass cache and fetch fresh exchangeInfo (use sparingly to avoid 418).
    */
-  async syncFromBinance(): Promise<{
+  async syncFromBinance(forceRefresh = false): Promise<{
     currenciesCreated: number;
     currenciesSkipped: number;
     pairsCreated: number;
@@ -81,7 +117,7 @@ export class ExchangeInfoSyncService {
       errors: [] as string[],
     };
 
-    const data = await this.fetchBinanceExchangeInfo();
+    const data = await this.fetchBinanceExchangeInfo(forceRefresh);
     const symbols = (data.symbols || []).filter(
       (s: BinanceSymbolInfo) => s.status === 'TRADING',
     );
