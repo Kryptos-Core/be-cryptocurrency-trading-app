@@ -4,6 +4,8 @@ import { IOHLCVProvider, OHLCVCandleDto } from '../interfaces/ohlcv-provider.int
 
 /** Only daily candles (1d) from Uniswap V4 poolDayData; other intervals fallback to Binance. */
 const UNISWAP_SUPPORTED_INTERVAL_SEC = 86400;
+/** Timeout for Subgraph fetch to avoid hanging (then fallback to Binance). */
+const SUBGRAPH_FETCH_MS = 8000;
 
 /**
  * Uniswap V4 OHLCV provider (on-demand by time range).
@@ -61,6 +63,8 @@ export class UniswapV4OHLCVProvider implements IOHLCVProvider {
   }
 }`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SUBGRAPH_FETCH_MS);
     try {
       const res = await fetch(this.subgraphUrl, {
         method: 'POST',
@@ -74,9 +78,12 @@ export class UniswapV4OHLCVProvider implements IOHLCVProvider {
             first: Math.min(limit, 1000),
           },
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (!res.ok) return [];
-      const json = (await res.json()) as { data?: { poolDayDatas?: unknown[] } };
+      const json = (await res.json()) as { data?: { poolDayDatas?: unknown[] }; errors?: unknown[] };
+      if (json?.errors?.length) return [];
       const list = json?.data?.poolDayDatas;
       if (!Array.isArray(list)) return [];
 
@@ -94,6 +101,7 @@ export class UniswapV4OHLCVProvider implements IOHLCVProvider {
         };
       });
     } catch {
+      clearTimeout(timeoutId);
       return [];
     }
   }

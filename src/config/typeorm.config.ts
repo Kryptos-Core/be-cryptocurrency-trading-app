@@ -16,4 +16,10 @@ export const getTypeOrmConfig = (
   migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
   synchronize: false, // Turn off auto-sync, use migration instead
   logging: configService.get<string>('NODE_ENV') !== 'production',
+  // Connection timeout (ms). After Docker restart, MySQL may be slow to accept; increase if ETIMEDOUT
+  connectTimeout: 30000,
+  extra: {
+    connectionLimit: 10,
+    connectTimeout: 30000,
+  },
 });
