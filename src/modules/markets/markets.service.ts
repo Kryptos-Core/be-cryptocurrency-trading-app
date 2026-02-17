@@ -49,7 +49,14 @@ export class MarketsService implements OnModuleInit {
     page: number = 1,
     limit: number = 10,
     includeInactive: boolean = false,
-  ): Promise<{ pairs: MarketPair[]; total: number; page: number; limit: number }> {
+    includeTickers: boolean = false,
+  ): Promise<{
+    pairs: MarketPair[];
+    total: number;
+    page: number;
+    limit: number;
+    tickers?: MarketTickerDto[];
+  }> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}`;
 
     const result = await this.cacheService.getOrSet(
@@ -70,20 +77,25 @@ export class MarketsService implements OnModuleInit {
       });
       if (fresh.data.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
+        const tickers = includeTickers ? await this.getTickersForPairs(fresh.data) : undefined;
         return {
           pairs: fresh.data,
           total: fresh.total,
           page: fresh.page,
           limit: fresh.limit,
+          ...(tickers != null && { tickers }),
         };
       }
     }
 
+    const tickers =
+      includeTickers && pairs.length > 0 ? await this.getTickersForPairs(pairs) : undefined;
     return {
       pairs,
       total: result.total,
       page: result.page,
       limit: result.limit,
+      ...(tickers != null && { tickers }),
     };
   }
 
@@ -481,7 +493,37 @@ export class MarketsService implements OnModuleInit {
   }
 
   /**
-   * Get all tickers for active pairs
+   * Get ticker data for given pairs from DB only (no per-pair cache, no OHLCV fallback).
+   * Used by getAllTickers and findAll(includeTickers) to avoid N× getTicker + OHLCV timeout.
+   */
+  private async getTickersForPairs(pairs: MarketPair[]): Promise<MarketTickerDto[]> {
+    if (pairs.length === 0) return [];
+    const tickerDataList = await Promise.all(
+      pairs.map((pair) => this.marketRepository.getTicker(pair.pair_id)),
+    );
+    return pairs.map((pair, i) =>
+      this.buildTickerResponse(pair, tickerDataList[i] ?? this.emptyTickerData()),
+    );
+  }
+
+  private emptyTickerData(): IMarketTickerData {
+    return {
+      lastPrice: TICKER_ZERO,
+      open24h: TICKER_ZERO,
+      high24h: TICKER_ZERO,
+      low24h: TICKER_ZERO,
+      volume24h: TICKER_ZERO,
+      quoteVolume24h: TICKER_ZERO,
+      change24h: TICKER_ZERO,
+      changeAmount24h: TICKER_ZERO,
+      bestBid: TICKER_ZERO,
+      bestAsk: TICKER_ZERO,
+    };
+  }
+
+  /**
+   * Get all tickers for active pairs.
+   * Uses batch DB read (no OHLCV fallback) to avoid timeout when many pairs.
    */
   async getAllTickers(): Promise<MarketTickerDto[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}tickers:all`;
@@ -490,10 +532,7 @@ export class MarketsService implements OnModuleInit {
       cacheKey,
       async () => {
         const activePairs = await this.findActive();
-        const tickers = await Promise.all(
-          activePairs.map((pair) => this.getTicker(pair.pair_id)),
-        );
-        return tickers;
+        return this.getTickersForPairs(activePairs);
       },
       this.TICKER_CACHE_TTL,
     );

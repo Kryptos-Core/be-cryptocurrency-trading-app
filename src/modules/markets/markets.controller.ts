@@ -57,6 +57,13 @@ export class MarketsController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'includeInactive', required: false, type: Boolean, example: false })
+  @ApiQuery({
+    name: 'includeTickers',
+    required: false,
+    type: Boolean,
+    example: false,
+    description: 'Include 24h tickers for the returned pairs (one request instead of GET /markets + GET /markets/tickers/all)',
+  })
   @ApiSuccessResponse('Market pairs retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findAll(
@@ -64,8 +71,10 @@ export class MarketsController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Query('includeInactive', new ParseBoolPipe({ optional: true }))
     includeInactive: boolean = false,
+    @Query('includeTickers', new ParseBoolPipe({ optional: true }))
+    includeTickers: boolean = false,
   ) {
-    return this.marketsService.findAll(page, limit, includeInactive);
+    return this.marketsService.findAll(page, limit, includeInactive, includeTickers);
   }
 
   /**
