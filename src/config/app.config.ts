@@ -76,7 +76,7 @@ export interface AppConfig {
     reconciliationThreshold: string;
     enableExternalSync: boolean;
   };
-  /** Price oracle: on-demand OHLCV from Uniswap V3 + Binance (no DB persist). */
+  /** Price oracle: on-demand OHLCV from Uniswap V4 + Binance (no DB persist). */
   priceOracle?: {
     uniswap: {
       subgraphUrl: string;
@@ -283,7 +283,8 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.EXCHANGE_MODE === 'binance',
     )
     .setPriceOracle(
-      (env as any).UNISWAP_SUBGRAPH_URL || 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3',
+      (env as any).UNISWAP_SUBGRAPH_URL ||
+        'https://gateway.thegraph.com/api/subgraphs/id/DiYPVdygkfjDWhbxGSqAQxwBKmfKnkWQojqeM2rkLb3G',
       parseUniswapSymbolToPoolId((env as any).UNISWAP_SYMBOL_POOL_MAP),
     )
     .build();

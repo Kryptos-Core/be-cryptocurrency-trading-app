@@ -15,7 +15,7 @@ export interface OHLCVCandleDto {
 
 /**
  * Oracle interface for OHLCV data by time range.
- * Strategy pattern: Binance, Uniswap V3, or other providers implement this.
+ * Strategy pattern: Binance, Uniswap V4, or other providers implement this.
  * Single Responsibility: one way to get historical candles.
  */
 export interface IOHLCVProvider {

@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IOHLCVProvider, OHLCVCandleDto } from './interfaces/ohlcv-provider.interface';
 import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
-import { UniswapV3OHLCVProvider } from './providers/uniswap-v3-ohlcv.provider';
+import { UniswapV4OHLCVProvider } from './providers/uniswap-v4-ohlcv.provider';
 
 /**
  * Registry of OHLCV providers with fallback (Strategy + Composite).
- * Primary: Uniswap V3 when symbol is configured; Fallback: Binance.
+ * Primary: Uniswap V4 when symbol is configured; Fallback: Binance.
  * Dependency Inversion: depends on IOHLCVProvider abstractions.
  */
 @Injectable()
@@ -19,7 +19,7 @@ export class OHLCVProviderRegistry implements IOHLCVProvider {
   constructor(
     private readonly configService: ConfigService,
     private readonly binanceProvider: BinanceOHLCVProvider,
-    private readonly uniswapProvider: UniswapV3OHLCVProvider,
+    private readonly uniswapProvider: UniswapV4OHLCVProvider,
   ) {
     this.providers = [uniswapProvider, binanceProvider];
     const symbolToPoolId =
