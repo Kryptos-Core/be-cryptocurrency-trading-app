@@ -6,9 +6,24 @@ import { AllExceptionsFilter } from './common/filters';
 import { ResponseInterceptor, LoggingInterceptor } from './common/interceptors';
 import { setupSwagger } from './config/swagger.config';
 
+const logger = new Logger('Bootstrap');
+
+function setupProcessErrorHandlers(): void {
+  process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+    logger.error('Unhandled Rejection', reason instanceof Error ? reason.stack : String(reason));
+    process.exit(1);
+  });
+
+  process.on('uncaughtException', (err: Error) => {
+    logger.error('Uncaught Exception', err.stack ?? err.message);
+    process.exit(1);
+  });
+}
+
 async function bootstrap() {
+  setupProcessErrorHandlers();
+
   const app = await NestFactory.create(AppModule);
-  const logger = new Logger('Bootstrap');
 
   // Enable WebSocket with Socket.io
   app.useWebSocketAdapter(new IoAdapter(app));

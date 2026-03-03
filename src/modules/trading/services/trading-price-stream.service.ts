@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { RedisService } from '@/common/services';
 import {
   PriceUpdateEvent,
@@ -9,6 +9,10 @@ import {
   CandleInterval,
 } from '../interfaces/websocket.interface';
 
+const RATE_LIMIT_LOG_MS = 60_000;
+const PUBLISH_RETRY_COUNT = 3;
+const PUBLISH_RETRY_DELAY_MS = 100;
+
 /**
  * Trading Price Stream Service
  * Manages real-time price data streaming; uses Redis Pub/Sub for scalability.
@@ -17,6 +21,11 @@ import {
  */
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TradingPriceStreamService.name);
+  private lastLogAt: Record<string, number> = {};
+  private lastSuccessfulPriceUpdateAt: number | null = null;
+  private lastPublishError: string | null = null;
+
   private readonly intervalMsMap: Record<CandleInterval, number> = {
     '1m': 60_000,
     '5m': 5 * 60_000,
@@ -59,13 +68,17 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
           } else if (channel === 'trading:candle_update') {
             this.handleCandleUpdate(data.data as CandleUpdateEvent);
           }
-        } catch {
-          // Message processing failed (silent)
+        } catch (err) {
+          if (this.shouldLog('subscriber_message')) {
+            this.logger.warn('Redis subscriber message parse failed', err instanceof Error ? err.stack : String(err));
+          }
         }
       });
 
-      subscriber.on('error', () => {
-        // Redis subscriber error (silent)
+      subscriber.on('error', (err: Error) => {
+        if (this.shouldLog('subscriber_error')) {
+          this.logger.error('Redis subscriber error', err?.stack ?? err?.message ?? String(err));
+        }
       });
     } catch (error) {
       throw error;
@@ -188,50 +201,97 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     this.candleUpdateListeners.push(listener);
   }
 
+  private shouldLog(key: string, windowMs: number = RATE_LIMIT_LOG_MS): boolean {
+    const now = Date.now();
+    if (now - (this.lastLogAt[key] ?? 0) < windowMs) return false;
+    this.lastLogAt[key] = now;
+    return true;
+  }
+
+  private async publishWithRetry<T>(
+    fn: () => Promise<T>,
+  ): Promise<{ ok: boolean; error?: string }> {
+    let lastErr: Error | null = null;
+    for (let i = 0; i < PUBLISH_RETRY_COUNT; i++) {
+      try {
+        await fn();
+        return { ok: true };
+      } catch (err) {
+        lastErr = err instanceof Error ? err : new Error(String(err));
+        if (i < PUBLISH_RETRY_COUNT - 1) {
+          await new Promise((r) => setTimeout(r, PUBLISH_RETRY_DELAY_MS));
+        }
+      }
+    }
+    const msg = lastErr?.message ?? String(lastErr);
+    return { ok: false, error: msg };
+  }
+
   /**
-   * Publish price update to Redis
-   * Called by other services (e.g., BinanceService)
+   * Publish price update to Redis (with retry).
+   * Called by other services (e.g., BinancePriceFeedService).
    */
   async publishPriceUpdate(ticker: TickerMessage) {
-    try {
-      const message: RedisPubSubMessage = {
-        event: 'price_update',
-        data: {
-          pair_id: ticker.pair_id,
-          timestamp: Date.now(),
-          source: 'binance',
-          ticker,
-        },
+    const message: RedisPubSubMessage = {
+      event: 'price_update',
+      data: {
+        pair_id: ticker.pair_id,
         timestamp: Date.now(),
-      };
-
+        source: 'binance',
+        ticker,
+      },
+      timestamp: Date.now(),
+    };
+    const payload = JSON.stringify(message);
+    const { ok, error } = await this.publishWithRetry(async () => {
       const publisher = this.redisService.getPublisher();
-      await publisher.publish('trading:price_update', JSON.stringify(message));
-    } catch {
-      // Publish failed (silent)
+      await publisher.publish('trading:price_update', payload);
+    });
+    if (ok) {
+      this.lastSuccessfulPriceUpdateAt = Date.now();
+      this.lastPublishError = null;
+    } else {
+      this.lastPublishError = error ?? 'Unknown';
+      if (this.shouldLog('publish_price')) {
+        this.logger.error('Publish price update failed after retries', error);
+      }
     }
   }
 
   /**
-   * Publish candle update to Redis (real-time only; no DB persist).
+   * Health state for price feed (e.g. monitoring / admin).
+   */
+  getPriceFeedHealth(): {
+    lastSuccessfulUpdateAt: number | null;
+    lastError: string | null;
+  } {
+    return {
+      lastSuccessfulUpdateAt: this.lastSuccessfulPriceUpdateAt,
+      lastError: this.lastPublishError,
+    };
+  }
+
+  /**
+   * Publish candle update to Redis (real-time only; no DB persist). Uses retry.
    * Chart/ticker OHLCV is fetched on-demand via Price Oracle (time-range APIs).
    */
   async publishCandleUpdate(candle: OHLCMessage) {
-    try {
-      const message: RedisPubSubMessage = {
-        event: 'candle_update',
-        data: {
-          pair_id: candle.pair_id,
-          timestamp: Date.now(),
-          candle,
-        },
+    const message: RedisPubSubMessage = {
+      event: 'candle_update',
+      data: {
+        pair_id: candle.pair_id,
         timestamp: Date.now(),
-      };
-
+        candle,
+      },
+      timestamp: Date.now(),
+    };
+    const payload = JSON.stringify(message);
+    const { ok, error } = await this.publishWithRetry(async () => {
       const publisher = this.redisService.getPublisher();
-      await publisher.publish('trading:candle_update', JSON.stringify(message));
-    } catch {
-      // Publish failed (silent)
+      await publisher.publish('trading:candle_update', payload);
+    });
+    if (!ok && this.shouldLog('publish_candle')) {
+      this.logger.error('Publish candle update failed after retries', error);
     }
   }
 
