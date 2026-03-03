@@ -12,6 +12,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { MatchingModule } from './modules/matching/matching.module';
 import { TradingModule } from './modules/trading/trading.module';
 import { ExchangeModule } from './modules/exchange/exchange.module';
+import { HealthModule } from './health/health.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
@@ -42,6 +43,7 @@ import appConfig from './config/app.config';
     MatchingModule,
     TradingModule,
     ExchangeModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

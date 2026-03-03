@@ -59,8 +59,10 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
-  logger.log(`🚀 Server running on http://localhost:${port}`);
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
+  const base = `http://127.0.0.1:${port}`;
+  logger.log(`🚀 Server running on ${base} (API: ${base}/api/v1, health: ${base}/api/v1/health)`);
 }
 
 bootstrap();
