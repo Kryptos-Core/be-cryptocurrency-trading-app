@@ -7,6 +7,8 @@ import {
 } from '../interfaces/price-feed.interface';
 
 const BINANCE_WS_BASE = 'wss://stream.binance.com:9443';
+/** Max symbols in combined stream URL; beyond this URL can exceed server limit (414 URI Too Long). */
+const MAX_SYMBOLS_FOR_COMBINED_STREAM = 200;
 const RECONNECT_INITIAL_MS = 1000;
 const RECONNECT_MAX_MS = 60_000;
 const RATE_LIMIT_LOG_MS = 60_000;
@@ -51,6 +53,8 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
   private ws: WebSocket | null = null;
   private tickerCallback: ((ticker: TickerMessage) => void) | null = null;
   private symbols: string[] = [];
+  private trackedSymbolSet: Set<string> = new Set();
+  private useAllTickerStream = false;
   private getPairIdForSymbol: SymbolToPairIdResolver = () => undefined;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempt = 0;
@@ -81,6 +85,8 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
       return;
     }
     this.symbols = symbols;
+    this.trackedSymbolSet = new Set(symbols.map((s) => s.toUpperCase()));
+    this.useAllTickerStream = symbols.length > MAX_SYMBOLS_FOR_COMBINED_STREAM;
     this.getPairIdForSymbol = getPairIdForSymbol;
     this.destroyed = false;
     this.reconnectAttempt = 0;
@@ -88,10 +94,33 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
   }
 
   private buildUrl(): string {
+    if (this.useAllTickerStream) {
+      return `${BINANCE_WS_BASE}/ws/!ticker@arr`;
+    }
     const streams = this.symbols
       .map((s) => `${s.toLowerCase()}@ticker`)
       .join('/');
     return `${BINANCE_WS_BASE}/stream?streams=${streams}`;
+  }
+
+  private payloadToTicker(data: BinanceTickerPayload): TickerMessage | null {
+    const pairId = this.getPairIdForSymbol(data.s);
+    if (!pairId) return null;
+    return {
+      pair_id: pairId,
+      symbol: data.s,
+      last_price: String(data.c ?? '0'),
+      bid: String(data.b ?? '0'),
+      ask: String(data.a ?? '0'),
+      volume_24h: String(data.v ?? '0'),
+      volume_24h_usd: String(data.q ?? '0'),
+      change_24h: String(data.p ?? '0'),
+      change_percent_24h: String(data.P ?? '0'),
+      high_24h: String(data.h ?? '0'),
+      low_24h: String(data.l ?? '0'),
+      open_24h: String(data.o ?? '0'),
+      timestamp: String(Date.now()),
+    };
   }
 
   private async connectInternal(): Promise<void> {
@@ -105,33 +134,28 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
         this.ws.on('open', () => {
           this.reconnectAttempt = 0;
           this.logger.log(
-            `Binance WebSocket connected; streams: ${this.symbols.join(', ')}`,
+            this.useAllTickerStream
+              ? `Binance WebSocket connected; stream=!ticker@arr (${this.symbols.length} symbols tracked)`
+              : `Binance WebSocket connected; streams: ${this.symbols.join(', ')}`,
           );
           resolve();
         });
 
         this.ws.on('message', (raw: Buffer) => {
           try {
-            const msg = JSON.parse(raw.toString()) as BinanceCombinedMessage;
+            const parsed = JSON.parse(raw.toString());
+            if (this.useAllTickerStream && Array.isArray(parsed)) {
+              for (const data of parsed as BinanceTickerPayload[]) {
+                if (!data?.s || !this.trackedSymbolSet.has(data.s)) continue;
+                const ticker = this.payloadToTicker(data);
+                if (ticker) this.tickerCallback?.(ticker);
+              }
+              return;
+            }
+            const msg = parsed as BinanceCombinedMessage;
             if (!msg.stream || !msg.data) return;
-            const pairId = this.getPairIdForSymbol(msg.data.s);
-            if (!pairId) return;
-            const ticker: TickerMessage = {
-              pair_id: pairId,
-              symbol: msg.data.s,
-              last_price: String(msg.data.c ?? '0'),
-              bid: String(msg.data.b ?? '0'),
-              ask: String(msg.data.a ?? '0'),
-              volume_24h: String(msg.data.v ?? '0'),
-              volume_24h_usd: String(msg.data.q ?? '0'),
-              change_24h: String(msg.data.p ?? '0'),
-              change_percent_24h: String(msg.data.P ?? '0'),
-              high_24h: String(msg.data.h ?? '0'),
-              low_24h: String(msg.data.l ?? '0'),
-              open_24h: String(msg.data.o ?? '0'),
-              timestamp: String(Date.now()),
-            };
-            this.tickerCallback?.(ticker);
+            const ticker = this.payloadToTicker(msg.data);
+            if (ticker) this.tickerCallback?.(ticker);
           } catch (err) {
             if (this.shouldLog('parse')) {
               this.logger.warn(
