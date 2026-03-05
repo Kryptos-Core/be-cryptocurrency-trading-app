@@ -46,13 +46,14 @@ export class MarketsController {
   constructor(private readonly marketsService: MarketsService) {}
 
   /**
-   * Get all market pairs with pagination
-   * GET /markets?page=1&limit=10&includeInactive=false
+   * Get all market pairs with pagination, search and filter
+   * GET /markets?page=1&limit=10&includeInactive=false&search=BTC&baseSymbol=BTC&quoteSymbol=USDT
    */
   @Get()
   @ApiOperation({
     summary: 'Get all market pairs',
-    description: 'Retrieve a paginated list of all market pairs',
+    description:
+      'Retrieve a paginated list of market pairs. Use search for partial symbol match (e.g. "BTC"); baseSymbol/quoteSymbol filter by base/quote currency.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
@@ -64,6 +65,24 @@ export class MarketsController {
     example: false,
     description: 'Include 24h tickers for the returned pairs (one request instead of GET /markets + GET /markets/tickers/all)',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by symbol (partial match, e.g. "BTC" matches BTC/USDT, ETH/BTC)',
+  })
+  @ApiQuery({
+    name: 'baseSymbol',
+    required: false,
+    type: String,
+    description: 'Filter by base currency symbol (e.g. BTC)',
+  })
+  @ApiQuery({
+    name: 'quoteSymbol',
+    required: false,
+    type: String,
+    description: 'Filter by quote currency symbol (e.g. USDT)',
+  })
   @ApiSuccessResponse('Market pairs retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findAll(
@@ -73,8 +92,19 @@ export class MarketsController {
     includeInactive: boolean = false,
     @Query('includeTickers', new ParseBoolPipe({ optional: true }))
     includeTickers: boolean = false,
+    @Query('search') search?: string,
+    @Query('baseSymbol') baseSymbol?: string,
+    @Query('quoteSymbol') quoteSymbol?: string,
   ) {
-    return this.marketsService.findAll(page, limit, includeInactive, includeTickers);
+    return this.marketsService.findAll(
+      page,
+      limit,
+      includeInactive,
+      includeTickers,
+      search,
+      baseSymbol,
+      quoteSymbol,
+    );
   }
 
   /**

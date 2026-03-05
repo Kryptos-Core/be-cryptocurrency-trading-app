@@ -41,7 +41,7 @@ export class MarketsService implements OnModuleInit {
   }
 
   /**
-   * Find all market pairs with pagination
+   * Find all market pairs with pagination and optional search/filter
    * Cache-Aside Pattern: Check cache first, then database.
    * If cache returned empty pairs[], invalidate and re-fetch once (avoid stale empty after sync).
    */
@@ -50,6 +50,9 @@ export class MarketsService implements OnModuleInit {
     limit: number = 10,
     includeInactive: boolean = false,
     includeTickers: boolean = false,
+    search?: string | null,
+    baseSymbol?: string | null,
+    quoteSymbol?: string | null,
   ): Promise<{
     pairs: MarketPair[];
     total: number;
@@ -57,13 +60,19 @@ export class MarketsService implements OnModuleInit {
     limit: number;
     tickers?: MarketTickerDto[];
   }> {
-    const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}`;
+    const searchNorm = search?.trim() ?? '';
+    const baseNorm = baseSymbol?.trim() ?? '';
+    const quoteNorm = quoteSymbol?.trim() ?? '';
+    const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}:${searchNorm}:${baseNorm}:${quoteNorm}`;
 
     const result = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
         return this.marketRepository.findWithPagination(page, limit, {
           includeInactive,
+          search: searchNorm || undefined,
+          baseSymbol: baseNorm || undefined,
+          quoteSymbol: quoteNorm || undefined,
         });
       },
       this.CACHE_TTL,
@@ -74,6 +83,9 @@ export class MarketsService implements OnModuleInit {
       await this.cacheService.invalidatePattern(`${this.CACHE_KEY_PREFIX}*`);
       const fresh = await this.marketRepository.findWithPagination(page, limit, {
         includeInactive,
+        search: searchNorm || undefined,
+        baseSymbol: baseNorm || undefined,
+        quoteSymbol: quoteNorm || undefined,
       });
       if (fresh.data.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
@@ -492,17 +504,40 @@ export class MarketsService implements OnModuleInit {
     return this.getTicker(pair.pair_id);
   }
 
+  /** Max concurrent OHLCV fallback requests to avoid timeout when enriching list tickers. */
+  private static readonly TICKER_FALLBACK_CONCURRENCY = 5;
+
   /**
-   * Get ticker data for given pairs from DB only (no per-pair cache, no OHLCV fallback).
-   * Used by getAllTickers and findAll(includeTickers) to avoid N× getTicker + OHLCV timeout.
+   * Get ticker data for given pairs. Uses DB first; for pairs with no/zero price,
+   * applies OHLCV fallback (Price Oracle) in batches to match single-ticker API behaviour.
    */
   private async getTickersForPairs(pairs: MarketPair[]): Promise<MarketTickerDto[]> {
     if (pairs.length === 0) return [];
     const tickerDataList = await Promise.all(
       pairs.map((pair) => this.marketRepository.getTicker(pair.pair_id)),
     );
+    const finalTickerData: IMarketTickerData[] = pairs.map(
+      (_, i) => tickerDataList[i] ?? this.emptyTickerData(),
+    );
+    const needFallback: { pair: MarketPair; data: IMarketTickerData; index: number }[] = [];
+    finalTickerData.forEach((data, i) => {
+      if (!data?.lastPrice || this.parsePrice(data.lastPrice) <= 0) {
+        needFallback.push({ pair: pairs[i], data, index: i });
+      }
+    });
+    for (let b = 0; b < needFallback.length; b += MarketsService.TICKER_FALLBACK_CONCURRENCY) {
+      const batch = needFallback.slice(b, b + MarketsService.TICKER_FALLBACK_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(({ pair, data }) =>
+          this.applyOHLCVFallbackIfNeeded(pair.pair_id, pair.symbol, data),
+        ),
+      );
+      batch.forEach((item, j) => {
+        finalTickerData[item.index] = results[j];
+      });
+    }
     return pairs.map((pair, i) =>
-      this.buildTickerResponse(pair, tickerDataList[i] ?? this.emptyTickerData()),
+      this.buildTickerResponse(pair, finalTickerData[i] ?? this.emptyTickerData()),
     );
   }
 

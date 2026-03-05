@@ -149,13 +149,70 @@ export class MarketRepository extends BaseRepository<MarketPair> {
   }
 
   /**
-   * Override findWithPagination to use stored procedures
+   * Find all with optional search and filter (Database Procedure Pattern: sp_market_find_all_filtered)
+   * Used when search or baseSymbol or quoteSymbol is provided.
+   */
+  async findAllWithFilter(
+    page: number = 1,
+    limit: number = 10,
+    options: {
+      includeInactive?: boolean;
+      search?: string | null;
+      baseSymbol?: string | null;
+      quoteSymbol?: string | null;
+    } = {},
+  ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
+    try {
+      const skip = (page - 1) * limit;
+      const includeInactive = options.includeInactive ?? false;
+      const search = options.search?.trim() || null;
+      const baseSymbol = options.baseSymbol?.trim() || null;
+      const quoteSymbol = options.quoteSymbol?.trim() || null;
+
+      const result = await this.dataSource.query(
+        'CALL sp_market_find_all_filtered(?, ?, ?, ?, ?, ?)',
+        [skip, limit, includeInactive, search, baseSymbol, quoteSymbol],
+      );
+
+      await this.dataSource.query('CALL sp_market_count_filtered(?, ?, ?, ?, @total)', [
+        includeInactive,
+        search,
+        baseSymbol,
+        quoteSymbol,
+      ]);
+      const totalResult = await this.dataSource.query('SELECT @total as total');
+      const total = totalResult[0]?.total || 0;
+
+      const data = result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
+      return { data, total, page, limit };
+    } catch (error) {
+      this.logger.error('Error finding market pairs with filter', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Override findWithPagination to use stored procedures.
+   * Uses sp_market_find_all_filtered when search/baseSymbol/quoteSymbol provided; otherwise sp_market_find_all.
    */
   async findWithPagination(
     page: number = 1,
     limit: number = 10,
     options?: any,
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
+    const hasFilter =
+      (options?.search != null && String(options.search).trim() !== '') ||
+      (options?.baseSymbol != null && String(options.baseSymbol).trim() !== '') ||
+      (options?.quoteSymbol != null && String(options.quoteSymbol).trim() !== '');
+
+    if (hasFilter) {
+      return this.findAllWithFilter(page, limit, {
+        includeInactive: options?.includeInactive ?? false,
+        search: options?.search ?? null,
+        baseSymbol: options?.baseSymbol ?? null,
+        quoteSymbol: options?.quoteSymbol ?? null,
+      });
+    }
     return this.findAll(page, limit, options?.includeInactive ?? false);
   }
 

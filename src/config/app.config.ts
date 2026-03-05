@@ -76,7 +76,7 @@ export interface AppConfig {
     reconciliationThreshold: string;
     enableExternalSync: boolean;
   };
-  /** Price oracle: on-demand OHLCV from Uniswap V4 + Binance (no DB persist). */
+  /** Price oracle: on-demand OHLCV. App uses Binance only (no DB persist). UNISWAP_* env not used. */
   priceOracle?: {
     uniswap: {
       subgraphUrl: string;

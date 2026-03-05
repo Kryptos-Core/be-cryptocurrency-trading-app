@@ -1,34 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { IOHLCVProvider, OHLCVCandleDto } from './interfaces/ohlcv-provider.interface';
 import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
-import { UniswapV4OHLCVProvider } from './providers/uniswap-v4-ohlcv.provider';
 
 /**
- * Registry of OHLCV providers with fallback (Strategy + Composite).
- * Primary: Uniswap V4 when symbol is configured; Fallback: Binance.
- * Dependency Inversion: depends on IOHLCVProvider abstractions.
+ * Registry of OHLCV providers. Binance-only for free demo (no Uniswap/The Graph).
+ * Dependency Inversion: depends on IOHLCVProvider abstraction.
  */
 @Injectable()
 export class OHLCVProviderRegistry implements IOHLCVProvider {
   readonly name = 'registry';
 
-  private readonly providers: IOHLCVProvider[];
-  private readonly uniswapSymbols: Set<string>;
-
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly binanceProvider: BinanceOHLCVProvider,
-    private readonly uniswapProvider: UniswapV4OHLCVProvider,
-  ) {
-    this.providers = [uniswapProvider, binanceProvider];
-    const symbolToPoolId =
-      this.configService.get<Record<string, string>>('app.priceOracle.uniswap.symbolToPoolId') || {};
-    this.uniswapSymbols = new Set([
-      ...Object.keys(symbolToPoolId),
-      ...Object.keys(symbolToPoolId).map((s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')),
-    ]);
-  }
+  constructor(private readonly binanceProvider: BinanceOHLCVProvider) {}
 
   async getOHLCVByRange(
     pairId: string,
@@ -38,21 +20,6 @@ export class OHLCVProviderRegistry implements IOHLCVProvider {
     toDate: Date,
     limit: number,
   ): Promise<OHLCVCandleDto[]> {
-    const normalized = this.normalizeSymbol(symbol);
-    const tryUniswapFirst = this.uniswapSymbols.has(symbol) || this.uniswapSymbols.has(normalized);
-
-    if (tryUniswapFirst) {
-      const candles = await this.uniswapProvider.getOHLCVByRange(
-        pairId,
-        symbol,
-        intervalSec,
-        fromDate,
-        toDate,
-        limit,
-      );
-      if (candles.length > 0) return candles;
-    }
-
     return this.binanceProvider.getOHLCVByRange(
       pairId,
       symbol,
@@ -61,9 +28,5 @@ export class OHLCVProviderRegistry implements IOHLCVProvider {
       toDate,
       limit,
     );
-  }
-
-  private normalizeSymbol(symbol: string): string {
-    return String(symbol).toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 }

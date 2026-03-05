@@ -19,14 +19,24 @@ const INTERVAL_TO_BINANCE: Record<number, string> = {
 
 const BINANCE_KLINES_URL = 'https://api.binance.com/api/v3/klines';
 
+/** In-memory cache TTL (ms) for getOHLCVByRange to reduce Binance calls and avoid rate limit. */
+const CACHE_TTL_MS = 60_000;
+
+interface CacheEntry {
+  data: OHLCVCandleDto[];
+  expiresAt: number;
+}
+
 /**
  * Binance Spot OHLCV provider (on-demand by time range).
  * Fetches from GET /api/v3/klines?symbol=&interval=&startTime=&endTime=&limit=
- * No DB write; every request is a fresh API call.
+ * Short TTL cache (60s) per symbol+interval+range to reduce requests for free demo long-term.
  */
 @Injectable()
 export class BinanceOHLCVProvider implements IOHLCVProvider {
   readonly name = 'binance';
+
+  private readonly cache = new Map<string, CacheEntry>();
 
   async getOHLCVByRange(
     pairId: string,
@@ -45,6 +55,13 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
 
     const startTime = fromDate.getTime();
     const endTime = toDate.getTime();
+    const cacheKey = `${normalized}_${intervalSec}_${startTime}_${endTime}_${limit}`;
+    const now = Date.now();
+    const hit = this.cache.get(cacheKey);
+    if (hit && hit.expiresAt > now) {
+      return hit.data;
+    }
+
     const params = new URLSearchParams({
       symbol: normalized,
       interval: binanceInterval,
@@ -60,7 +77,7 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
       const rows = Array.isArray(raw) ? raw : [];
       if (rows.length === 0) return [];
 
-      return rows.map((row: unknown) => {
+      const data = rows.map((row: unknown) => {
         const r = Array.isArray(row) ? row : [];
         return {
           pair_id: pairId,
@@ -73,6 +90,8 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
           volume: String(r[5] ?? 0),
         };
       });
+      this.cache.set(cacheKey, { data, expiresAt: now + CACHE_TTL_MS });
+      return data;
     } catch {
       return [];
     }
