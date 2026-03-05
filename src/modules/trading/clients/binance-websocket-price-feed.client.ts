@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import WebSocket from 'ws';
-import { TickerMessage } from '../interfaces/websocket.interface';
+import { TickerMessage, OHLCMessage, CandleInterval } from '../interfaces/websocket.interface';
 import {
   IPriceFeedClient,
   SymbolToPairIdResolver,
@@ -12,6 +12,9 @@ const MAX_SYMBOLS_FOR_COMBINED_STREAM = 200;
 const RECONNECT_INITIAL_MS = 1000;
 const RECONNECT_MAX_MS = 60_000;
 const RATE_LIMIT_LOG_MS = 60_000;
+/** Binance closes connections after 24h; reconnect before that. */
+const CONNECTION_MAX_AGE_MS = 23 * 60 * 60 * 1000;
+const KLINE_INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 /** Binance 24hr ticker stream payload (single symbol). */
 interface BinanceTickerPayload {
@@ -40,7 +43,26 @@ interface BinanceTickerPayload {
 /** Combined stream message: { stream, data }. */
 interface BinanceCombinedMessage {
   stream: string;
-  data: BinanceTickerPayload;
+  data: BinanceTickerPayload | BinanceKlinePayload;
+}
+
+/** Binance kline stream data (data.k). */
+interface BinanceKlinePayload {
+  e: string;
+  E: number;
+  s: string;
+  k: {
+    t: number;
+    T: number;
+    o: string;
+    h: string;
+    l: string;
+    c: string;
+    v: string;
+    n: number;
+    x: boolean;
+    q?: string;
+  };
 }
 
 /**
@@ -52,11 +74,14 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
   private readonly logger = new Logger(BinanceWebSocketPriceFeedClient.name);
   private ws: WebSocket | null = null;
   private tickerCallback: ((ticker: TickerMessage) => void) | null = null;
+  private candleCallback: ((candle: OHLCMessage) => void) | null = null;
   private symbols: string[] = [];
+  private klineSymbols: string[] = [];
   private trackedSymbolSet: Set<string> = new Set();
   private useAllTickerStream = false;
   private getPairIdForSymbol: SymbolToPairIdResolver = () => undefined;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private proactiveReconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempt = 0;
   private lastLogAt: Record<string, number> = {};
   private destroyed = false;
@@ -72,6 +97,10 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
     this.tickerCallback = callback;
   }
 
+  onCandle(callback: (candle: OHLCMessage) => void): void {
+    this.candleCallback = callback;
+  }
+
   isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
@@ -79,14 +108,17 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
   async connect(
     symbols: string[],
     getPairIdForSymbol: SymbolToPairIdResolver,
+    options?: { klineSymbols?: string[] },
   ): Promise<void> {
-    if (symbols.length === 0) {
+    if (symbols.length === 0 && (options?.klineSymbols?.length ?? 0) === 0) {
       this.logger.warn('Connect called with no symbols; skipping.');
       return;
     }
     this.symbols = symbols;
+    this.klineSymbols = options?.klineSymbols ?? [];
     this.trackedSymbolSet = new Set(symbols.map((s) => s.toUpperCase()));
-    this.useAllTickerStream = symbols.length > MAX_SYMBOLS_FOR_COMBINED_STREAM;
+    this.useAllTickerStream =
+      this.klineSymbols.length === 0 && symbols.length > MAX_SYMBOLS_FOR_COMBINED_STREAM;
     this.getPairIdForSymbol = getPairIdForSymbol;
     this.destroyed = false;
     this.reconnectAttempt = 0;
@@ -94,13 +126,44 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
   }
 
   private buildUrl(): string {
+    const parts: string[] = [];
     if (this.useAllTickerStream) {
       return `${BINANCE_WS_BASE}/ws/!ticker@arr`;
     }
-    const streams = this.symbols
-      .map((s) => `${s.toLowerCase()}@ticker`)
-      .join('/');
-    return `${BINANCE_WS_BASE}/stream?streams=${streams}`;
+    for (const s of this.symbols) {
+      parts.push(`${s.toLowerCase()}@ticker`);
+    }
+    for (const s of this.klineSymbols) {
+      const sym = s.toLowerCase();
+      for (const interval of KLINE_INTERVALS) {
+        parts.push(`${sym}@kline_${interval}`);
+      }
+    }
+    if (parts.length === 0) return `${BINANCE_WS_BASE}/ws/!ticker@arr`;
+    return `${BINANCE_WS_BASE}/stream?streams=${parts.join('/')}`;
+  }
+
+  private payloadToCandle(stream: string, data: BinanceKlinePayload): OHLCMessage | null {
+    const pairId = this.getPairIdForSymbol(data.s);
+    if (!pairId) return null;
+    const match = /kline_(.+)$/.exec(stream);
+    const interval = (match?.[1] ?? '1m') as CandleInterval;
+    const k = data.k;
+    return {
+      pair_id: pairId,
+      symbol: data.s,
+      interval,
+      open_time: k.t,
+      close_time: k.T,
+      open: String(k.o ?? '0'),
+      high: String(k.h ?? '0'),
+      low: String(k.l ?? '0'),
+      close: String(k.c ?? '0'),
+      volume: String(k.v ?? '0'),
+      quote_volume: String(k.q ?? '0'),
+      trades_count: k.n ?? 0,
+      is_closed: Boolean(k.x),
+    };
   }
 
   private payloadToTicker(data: BinanceTickerPayload): TickerMessage | null {
@@ -124,7 +187,7 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
   }
 
   private async connectInternal(): Promise<void> {
-    if (this.destroyed || this.symbols.length === 0) return;
+    if (this.destroyed || (this.symbols.length === 0 && this.klineSymbols.length === 0)) return;
 
     const url = this.buildUrl();
     return new Promise((resolve) => {
@@ -133,6 +196,17 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
 
         this.ws.on('open', () => {
           this.reconnectAttempt = 0;
+          if (this.proactiveReconnectTimer) {
+            clearTimeout(this.proactiveReconnectTimer);
+            this.proactiveReconnectTimer = null;
+          }
+          this.proactiveReconnectTimer = setTimeout(() => {
+            this.proactiveReconnectTimer = null;
+            if (this.ws?.readyState === WebSocket.OPEN) {
+              this.logger.log('Proactive reconnect before 24h limit');
+              this.ws.close();
+            }
+          }, CONNECTION_MAX_AGE_MS);
           this.logger.log(
             this.useAllTickerStream
               ? `Binance WebSocket connected; stream=!ticker@arr (${this.symbols.length} symbols tracked)`
@@ -154,8 +228,16 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
             }
             const msg = parsed as BinanceCombinedMessage;
             if (!msg.stream || !msg.data) return;
-            const ticker = this.payloadToTicker(msg.data);
-            if (ticker) this.tickerCallback?.(ticker);
+            if (msg.stream.includes('kline')) {
+              const klineData = msg.data as BinanceKlinePayload;
+              if (klineData?.k) {
+                const candle = this.payloadToCandle(msg.stream, klineData);
+                if (candle) this.candleCallback?.(candle);
+              }
+            } else {
+              const ticker = this.payloadToTicker(msg.data as BinanceTickerPayload);
+              if (ticker) this.tickerCallback?.(ticker);
+            }
           } catch (err) {
             if (this.shouldLog('parse')) {
               this.logger.warn(
@@ -177,6 +259,10 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
 
         this.ws.on('close', (code: number, reason: Buffer) => {
           this.ws = null;
+          if (this.proactiveReconnectTimer) {
+            clearTimeout(this.proactiveReconnectTimer);
+            this.proactiveReconnectTimer = null;
+          }
           if (this.destroyed) {
             resolve();
             return;
@@ -226,6 +312,10 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    if (this.proactiveReconnectTimer) {
+      clearTimeout(this.proactiveReconnectTimer);
+      this.proactiveReconnectTimer = null;
+    }
     if (this.ws) {
       this.ws.removeAllListeners();
       if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
@@ -234,6 +324,7 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
       this.ws = null;
     }
     this.tickerCallback = null;
+    this.candleCallback = null;
     this.logger.log('Binance WebSocket disconnected');
   }
 }

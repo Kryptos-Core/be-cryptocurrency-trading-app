@@ -2,17 +2,23 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
 import { TradingPriceStreamService } from './trading-price-stream.service';
+import { TradingSubscriptionService } from './trading-subscription.service';
 import { MarketRepository } from '@/modules/markets/repositories';
-import { TickerMessage } from '../interfaces/websocket.interface';
+import { TickerMessage, OHLCMessage } from '../interfaces/websocket.interface';
 import { BinanceWebSocketPriceFeedClient } from '../clients/binance-websocket-price-feed.client';
 import { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
 
 const RATE_LIMIT_LOG_MS = 60_000;
+const DEBOUNCE_RECONNECT_MS = 4000;
+const MAX_TICKER_SYMBOLS = 80;
+const MAX_KLINE_SYMBOLS = 2;
+const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
+const EXCHANGE_INFO_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Binance Price Feed Service
  * Uses Binance WebSocket Streams (combined @ticker) for real-time price data and publishes to Redis.
- * Avoids REST rate limits (418) and supports automatic reconnect with exponential backoff.
+ * Subscribe on-demand: only symbols that have at least one client subscription; debounce reconnect to avoid rate limit.
  */
 @Injectable()
 export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
@@ -20,13 +26,18 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   private lastLogAt: Record<string, number> = {};
   private readonly baseUrl: string;
   private readonly pairSymbolMap: Map<string, string> = new Map(); // pair_id -> symbol
+  private requestedTickerSymbols: string[] = [];
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isRunning: boolean = false;
   private readonly priceFeedClient: BinanceWebSocketPriceFeedClient;
+  private binanceSymbolsCache: Set<string> = new Set();
+  private binanceSymbolsCacheExpiry = 0;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly tradingPriceStreamService: TradingPriceStreamService,
+    private readonly tradingSubscriptionService: TradingSubscriptionService,
     private readonly marketRepository: MarketRepository,
   ) {
     this.baseUrl = 'https://api.binance.com/api/v3';
@@ -42,7 +53,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     await this.loadPairSymbolMapping();
-    await this.startPriceFeed();
+    await this.requestSymbolsForSubscriptions();
   }
 
   /**
@@ -75,14 +86,76 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Fetch Binance exchangeInfo and cache symbol list (1h TTL). Only subscribe to symbols that exist on Binance.
+   */
+  private async getBinanceSymbolsSet(): Promise<Set<string>> {
+    const now = Date.now();
+    if (this.binanceSymbolsCache.size > 0 && now < this.binanceSymbolsCacheExpiry) {
+      return this.binanceSymbolsCache;
+    }
+    try {
+      const res = await fetch(`${this.baseUrl}/exchangeInfo`);
+      if (!res.ok) return this.binanceSymbolsCache;
+      const data = (await res.json()) as { symbols?: Array<{ symbol?: string }> };
+      const symbols = data.symbols ?? [];
+      this.binanceSymbolsCache = new Set(
+        symbols.map((s) => String(s.symbol ?? '').toUpperCase()).filter(Boolean),
+      );
+      this.binanceSymbolsCacheExpiry = now + EXCHANGE_INFO_CACHE_TTL_MS;
+    } catch (err) {
+      if (this.shouldLog('exchange_info')) {
+        this.logger.warn('ExchangeInfo fetch failed', err instanceof Error ? err.message : String(err));
+      }
+    }
+    return this.binanceSymbolsCache;
+  }
+
+  /**
+   * Called when subscriptions change. Builds symbol set from subscribed pair IDs, filters by Binance, debounces, then reconnects.
+   */
+  async requestSymbolsForSubscriptions(): Promise<void> {
+    await this.loadPairSymbolMapping();
+    const binanceSet = await this.getBinanceSymbolsSet();
+    const pairIds = this.tradingSubscriptionService.getSubscribedPairIds();
+    const symbolSet = new Set<string>();
+    for (const pairId of pairIds) {
+      const symbol = this.pairSymbolMap.get(String(pairId));
+      if (symbol && (binanceSet.size === 0 || binanceSet.has(symbol))) symbolSet.add(symbol);
+    }
+    for (const s of DEFAULT_SYMBOLS) {
+      if (this.pairSymbolMap.size > 0) {
+        const hasSymbol = Array.from(this.pairSymbolMap.values()).some((v) => v === s);
+        if (hasSymbol && (binanceSet.size === 0 || binanceSet.has(s))) symbolSet.add(s);
+      }
+    }
+    let symbols = Array.from(symbolSet).sort();
+    if (symbols.length > MAX_TICKER_SYMBOLS) {
+      symbols = symbols.slice(0, MAX_TICKER_SYMBOLS);
+    }
+    const prev = new Set(this.requestedTickerSymbols);
+    const same =
+      symbols.length === prev.size && symbols.every((s) => prev.has(s));
+    if (same) return;
+    this.requestedTickerSymbols = symbols;
+
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      void this.startPriceFeed(true);
+    }, DEBOUNCE_RECONNECT_MS);
+  }
+
+  /**
    * Start price feed via Binance WebSocket (combined ticker stream).
-   * @param forceReconnect when true, reconnects even if already running (e.g. after add/remove pair).
+   * @param forceReconnect when true, reconnects even if already running (e.g. after symbol set change).
    */
   private async startPriceFeed(forceReconnect = false): Promise<void> {
     if (!forceReconnect && this.isRunning) return;
     const symbols = this.getTrackedSymbols();
     if (symbols.length === 0) {
-      this.logger.log('No pairs configured; price feed not started.');
+      this.logger.log('No symbols requested; price feed not started.');
       if (!forceReconnect) this.isRunning = false;
       return;
     }
@@ -100,7 +173,28 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
-    await this.priceFeedClient.connect(symbols, this.getPairIdForSymbolResolver());
+    this.priceFeedClient.onCandle(async (candle: OHLCMessage) => {
+      try {
+        await this.tradingPriceStreamService.publishCandleUpdate(candle, { source: 'binance_kline' });
+      } catch (err) {
+        if (this.shouldLog('publish_candle')) {
+          this.logger.warn('Publish candle failed', err instanceof Error ? err.stack : String(err));
+        }
+      }
+    });
+
+    const ohlcPairIds = this.tradingSubscriptionService.getPairIdsWithOhlcSubscription(MAX_KLINE_SYMBOLS);
+    const klineSymbols: string[] = [];
+    for (const pairId of ohlcPairIds) {
+      const sym = this.pairSymbolMap.get(String(pairId));
+      if (sym && (this.binanceSymbolsCache.size === 0 || this.binanceSymbolsCache.has(sym))) {
+        klineSymbols.push(sym);
+      }
+    }
+
+    await this.priceFeedClient.connect(symbols, this.getPairIdForSymbolResolver(), {
+      klineSymbols: klineSymbols.length > 0 ? klineSymbols : undefined,
+    });
   }
 
   /**
@@ -119,36 +213,28 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Add a pair; reconnects WebSocket with updated symbol list.
+   * Add a pair to resolution map; refreshes subscription-based symbol set (debounced).
    */
   async addPair(pairId: string, symbol: string): Promise<void> {
     const normalized = String(symbol).toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!normalized || this.pairSymbolMap.has(pairId)) return;
     this.pairSymbolMap.set(pairId, normalized);
-    if (this.isRunning) {
-      await this.priceFeedClient.disconnect();
-      await this.startPriceFeed(true);
-    }
+    await this.requestSymbolsForSubscriptions();
   }
 
   /**
-   * Remove a pair; reconnects WebSocket with updated symbol list.
+   * Remove a pair from resolution map; refreshes subscription-based symbol set (debounced).
    */
   async removePair(pairId: string): Promise<void> {
     if (!this.pairSymbolMap.has(pairId)) return;
     this.pairSymbolMap.delete(pairId);
-    if (this.isRunning) {
-      await this.priceFeedClient.disconnect();
-      if (this.pairSymbolMap.size > 0) {
-        await this.startPriceFeed(true);
-      } else {
-        this.isRunning = false;
-      }
-    }
+    await this.requestSymbolsForSubscriptions();
   }
 
   getTrackedSymbols(): string[] {
-    return Array.from(this.pairSymbolMap.values());
+    return this.requestedTickerSymbols.length > 0
+      ? [...this.requestedTickerSymbols]
+      : [];
   }
 
   getStats(): {
@@ -160,7 +246,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   } {
     return {
       isRunning: this.isRunning,
-      trackedPairs: this.pairSymbolMap.size,
+      trackedPairs: this.requestedTickerSymbols.length,
       symbols: this.getTrackedSymbols(),
       feedType: 'websocket',
       connected: this.priceFeedClient.isConnected(),
@@ -169,6 +255,10 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
 
   async stopPriceFeed(): Promise<void> {
     this.isRunning = false;
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
     await this.priceFeedClient.disconnect();
   }
 

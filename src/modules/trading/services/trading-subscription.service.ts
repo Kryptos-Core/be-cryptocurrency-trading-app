@@ -2,6 +2,12 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ClientSubscription, CandleInterval, SubscriptionChannel } from '../interfaces/websocket.interface';
 import { Server } from 'socket.io';
 
+/** Per-client per-pair subscription detail (for OHLC chart symbol resolution). */
+interface PairSubscriptionDetail {
+  channels: SubscriptionChannel[];
+  interval?: CandleInterval;
+}
+
 /**
  * Trading Subscription Service
  * Manages client subscriptions to trading pairs
@@ -14,6 +20,9 @@ export class TradingSubscriptionService {
 
   // Track pairs: pair_id -> Set<clientId>
   private pairSubscribers = new Map<string, Set<string>>();
+
+  // Per-client per-pair detail (channels + interval) for OHLC/kline stream
+  private clientPairDetails = new Map<string, Map<string, PairSubscriptionDetail>>();
 
   // Rate limiting: clientId -> subscription count
   private subscriptionCounts = new Map<string, number>();
@@ -57,6 +66,11 @@ export class TradingSubscriptionService {
     }
     this.pairSubscribers.get(pairId)!.add(clientId);
 
+    if (!this.clientPairDetails.has(clientId)) {
+      this.clientPairDetails.set(clientId, new Map());
+    }
+    this.clientPairDetails.get(clientId)!.set(pairId, { channels, interval });
+
     // Update subscription count
     this.subscriptionCounts.set(clientId, subscriptionCount + 1);
   }
@@ -82,6 +96,8 @@ export class TradingSubscriptionService {
       pairSubs.delete(clientId);
     }
 
+    this.clientPairDetails.get(clientId)?.delete(pairId);
+
     // Update subscription count
     const count = this.subscriptionCounts.get(clientId) || 0;
     this.subscriptionCounts.set(clientId, Math.max(0, count - 1));
@@ -103,6 +119,23 @@ export class TradingSubscriptionService {
 
     this.clientSubscriptions.delete(clientId);
     this.subscriptionCounts.delete(clientId);
+    this.clientPairDetails.delete(clientId);
+  }
+
+  /**
+   * Get up to 2 pair IDs that have at least one OHLC subscriber (for Binance kline stream).
+   */
+  getPairIdsWithOhlcSubscription(max = 2): string[] {
+    const set = new Set<string>();
+    for (const pairMap of this.clientPairDetails.values()) {
+      for (const [pairId, detail] of pairMap) {
+        if (detail.channels?.includes('ohlc')) {
+          set.add(pairId);
+          if (set.size >= max) return Array.from(set);
+        }
+      }
+    }
+    return Array.from(set);
   }
 
   /**
@@ -113,10 +146,17 @@ export class TradingSubscriptionService {
   }
 
   /**
+   * Get all pair IDs that have at least one subscriber (for on-demand price feed).
+   */
+  getSubscribedPairIds(): string[] {
+    return Array.from(this.pairSubscribers.keys());
+  }
+
+  /**
    * Get all pairs a client is subscribed to
    */
   getSubscriptionsForClient(clientId: string): Set<string> {
-    return this.clientSubscriptions.get(clientId) || new Set();
+    return this.clientSubscriptions.get(clientId) ?? new Set();
   }
 
   /**
@@ -151,5 +191,6 @@ export class TradingSubscriptionService {
     this.clientSubscriptions.clear();
     this.pairSubscribers.clear();
     this.subscriptionCounts.clear();
+    this.clientPairDetails.clear();
   }
 }

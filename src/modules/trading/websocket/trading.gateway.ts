@@ -12,6 +12,7 @@ import { UseFilters } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { TradingSubscriptionService } from '../services/trading-subscription.service';
 import { TradingPriceStreamService } from '../services/trading-price-stream.service';
+import { BinancePriceFeedService } from '../services/binance-price-feed.service';
 import {
   WebSocketMessage,
   AuthMessage,
@@ -56,6 +57,7 @@ export class TradingGateway
   constructor(
     private readonly subscriptionService: TradingSubscriptionService,
     private readonly priceStreamService: TradingPriceStreamService,
+    private readonly binancePriceFeedService: BinancePriceFeedService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -97,6 +99,7 @@ export class TradingGateway
     // Unsubscribe from all pairs
     if (client.data.authenticated) {
       await this.subscriptionService.unsubscribeClientFromAll(client.id);
+      await this.binancePriceFeedService.requestSymbolsForSubscriptions();
     }
   }
 
@@ -174,6 +177,7 @@ export class TradingGateway
         channels,
         interval,
       );
+      await this.binancePriceFeedService.requestSymbolsForSubscriptions();
 
       // Join Socket.IO rooms for each channel
       for (const channel of channels) {
@@ -225,6 +229,7 @@ export class TradingGateway
 
       // Unsubscribe client from pair
       await this.subscriptionService.unsubscribe(client.id, pair_id, channels);
+      await this.binancePriceFeedService.requestSymbolsForSubscriptions();
 
       // Leave Socket.IO rooms for each channel
       for (const channel of channels) {

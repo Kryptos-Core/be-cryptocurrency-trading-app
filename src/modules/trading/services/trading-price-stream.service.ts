@@ -37,6 +37,9 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
   private candleCache: Map<string, OHLCMessage> = new Map();
   private candleKeyByPairInterval: Map<string, string> = new Map();
+  /** When a (pair_id, interval) has recent Binance kline, skip overwriting with aggregated ticker. TTL 90s. */
+  private lastBinanceCandleAt: Map<string, number> = new Map();
+  private static readonly BINANCE_CANDLE_PRIORITY_MS = 90_000;
 
   private priceUpdateListeners: ((ticker: TickerMessage) => void)[] = [];
   private candleUpdateListeners: ((candle: OHLCMessage) => void)[] = [];
@@ -105,6 +108,10 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    * Handle candle update from Redis
    */
   private handleCandleUpdate(event: CandleUpdateEvent) {
+    if (event.source === 'binance_kline' && event.candle) {
+      const key = `${event.candle.pair_id}:${event.candle.interval}`;
+      this.lastBinanceCandleAt.set(key, Date.now());
+    }
     // Notify all listeners
     for (const listener of this.candleUpdateListeners) {
       try {
@@ -136,17 +143,19 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
         if (currentKey) {
           const prev = this.candleCache.get(currentKey);
           if (prev) {
-            const closed = {
-              ...prev,
-              close_time: openTime,
-              is_closed: true,
-            };
-            this.candleCache.set(currentKey, closed);
-            void this.publishCandleUpdate(closed);
-          }
+        const closed = {
+          ...prev,
+          close_time: openTime,
+          is_closed: true,
+        };
+        this.candleCache.set(currentKey, closed);
+        if (!this.shouldSkipAggregateForPairInterval(event.pair_id, interval)) {
+          void this.publishCandleUpdate(closed, { source: 'aggregated' });
         }
+      }
+    }
 
-        const newKey = `${pairIntervalKey}:${openTime}`;
+    const newKey = `${pairIntervalKey}:${openTime}`;
         const candle: OHLCMessage = {
           pair_id: event.pair_id,
           symbol: event.ticker.symbol,
@@ -165,7 +174,9 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
         this.candleCache.set(newKey, candle);
         this.candleKeyByPairInterval.set(pairIntervalKey, newKey);
-        void this.publishCandleUpdate(candle);
+        if (!this.shouldSkipAggregateForPairInterval(event.pair_id, interval)) {
+          void this.publishCandleUpdate(candle, { source: 'aggregated' });
+        }
         continue;
       }
 
@@ -183,8 +194,22 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       candle.close_time = openTime + intervalMs;
 
       this.candleCache.set(currentKey, candle);
-      void this.publishCandleUpdate(candle);
+      if (!this.shouldSkipAggregateForPairInterval(event.pair_id, interval)) {
+        void this.publishCandleUpdate(candle, { source: 'aggregated' });
+      }
     }
+  }
+
+  private shouldSkipAggregateForPairInterval(pairId: string, interval: CandleInterval): boolean {
+    const key = `${pairId}:${interval}`;
+    const at = this.lastBinanceCandleAt.get(key);
+    if (at == null) return false;
+    const now = Date.now();
+    if (now - at > TradingPriceStreamService.BINANCE_CANDLE_PRIORITY_MS) {
+      this.lastBinanceCandleAt.delete(key);
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -273,15 +298,16 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
   /**
    * Publish candle update to Redis (real-time only; no DB persist). Uses retry.
-   * Chart/ticker OHLCV is fetched on-demand via Price Oracle (time-range APIs).
+   * source: 'binance_kline' so downstream can prefer it over aggregated ticker.
    */
-  async publishCandleUpdate(candle: OHLCMessage) {
+  async publishCandleUpdate(candle: OHLCMessage, options?: { source?: 'binance_kline' | 'aggregated' }) {
     const message: RedisPubSubMessage = {
       event: 'candle_update',
       data: {
         pair_id: candle.pair_id,
         timestamp: Date.now(),
         candle,
+        ...(options?.source && { source: options.source }),
       },
       timestamp: Date.now(),
     };
