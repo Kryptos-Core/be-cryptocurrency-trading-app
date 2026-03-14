@@ -200,6 +200,10 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   TRON_HOT_WALLET_PRIVATE_KEY?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  BLOCKCHAIN_ALLOW_TEST_SIGNATURE?: boolean = false;
 }
 
 /**
@@ -250,6 +254,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'WALLET_RECONCILIATION_THRESHOLD',
     'ETH_HOT_WALLET_PRIVATE_KEY',
     'TRON_HOT_WALLET_PRIVATE_KEY',
+    'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

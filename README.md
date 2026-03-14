@@ -75,5 +75,10 @@ Sau đó khởi động backend. Nếu DB đang rỗng ở phần market catalog
 | trader1@example.com | Trader@123! | Trader 1 |
 | trader2@example.com | Trader@123! | Trader 2 |
 | trader3@example.com | Trader@123! | Trader 3 |
+| guest@example.com | Guest@123! | Guest |
+| verified@example.com | Verified@123! | Verified User (KYC) |
+| risk@example.com | Risk@123! | Risk Officer |
+| support@example.com | Support@123! | Support Agent |
+| maker@example.com | Maker@123! | Market Maker |
 
 **Lưu ý:** Nếu FE/Postman nhận **401 Invalid credentials** khi login, cần chạy `npm run db:seed` trước (để tạo user trong DB). Backend so sánh mật khẩu bằng bcrypt; email không phân biệt hoa thường.

@@ -30,5 +30,45 @@
     "last_name": "Three",
     "status": "ACTIVE",
     "role": "TRADER"
+  },
+  {
+    "email": "guest@example.com",
+    "password": "Guest@123!",
+    "first_name": "Guest",
+    "last_name": "User",
+    "status": "ACTIVE",
+    "role": "GUEST"
+  },
+  {
+    "email": "verified@example.com",
+    "password": "Verified@123!",
+    "first_name": "Verified",
+    "last_name": "User",
+    "status": "ACTIVE",
+    "role": "VERIFIED_USER"
+  },
+  {
+    "email": "risk@example.com",
+    "password": "Risk@123!",
+    "first_name": "Risk",
+    "last_name": "Officer",
+    "status": "ACTIVE",
+    "role": "RISK_OFFICER"
+  },
+  {
+    "email": "support@example.com",
+    "password": "Support@123!",
+    "first_name": "Support",
+    "last_name": "Agent",
+    "status": "ACTIVE",
+    "role": "SUPPORT_AGENT"
+  },
+  {
+    "email": "maker@example.com",
+    "password": "Maker@123!",
+    "first_name": "Market",
+    "last_name": "Maker",
+    "status": "ACTIVE",
+    "role": "MARKET_MAKER"
   }
 ]

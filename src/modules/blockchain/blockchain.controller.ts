@@ -22,6 +22,8 @@ import {
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
 } from '@/common/decorators';
+import { BadRequestException } from '@/common/exceptions';
+import { BlockchainNetwork } from '@/common/enums';
 import { WalletLinkingService } from './wallet-linking.service';
 import { OnchainTransferService } from './onchain-transfer.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
@@ -145,6 +147,75 @@ export class BlockchainController {
   }
 
   // ============ NẠP / RÚT TIỀN ============
+
+  /**
+   * Lấy địa chỉ nạp tiền theo mạng
+   * GET /blockchain/deposit/address
+   */
+  @Get('deposit/address')
+  @ApiOperation({
+    summary: 'Lấy địa chỉ nạp tiền theo mạng',
+    description:
+      'Trả về địa chỉ ví nhận tiền (hot wallet) của platform cho chain được chọn.',
+  })
+  @ApiQuery({
+    name: 'chain',
+    required: true,
+    type: String,
+    example: 'ETH_SEPOLIA',
+  })
+  @ApiSuccessResponse('Địa chỉ nạp tiền theo mạng')
+  @ApiBadRequestResponse('Thiếu chain hoặc chain không hợp lệ')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  getDepositAddress(@Query('chain') chain?: string) {
+    if (!chain) {
+      throw new BadRequestException('Thiếu query param chain', 'CHAIN_REQUIRED');
+    }
+
+    const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
+    const provider = this.providerFactory.getProvider(normalizedChain);
+
+    return {
+      chain: normalizedChain,
+      depositAddress: provider.getHotWalletAddress(),
+      note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
+    };
+  }
+
+  /**
+   * Preview giao dịch nạp theo txHash
+   * GET /blockchain/deposit/preview
+   */
+  @Get('deposit/preview')
+  @ApiOperation({
+    summary: 'Preview nạp tiền theo txHash',
+    description:
+      'Kiểm tra nhanh giao dịch on-chain để FE tự điền amount trước khi submit deposit.',
+  })
+  @ApiQuery({ name: 'chain', required: true, type: String, example: 'ETH_SEPOLIA' })
+  @ApiQuery({ name: 'txHash', required: true, type: String })
+  @ApiSuccessResponse('Thông tin preview giao dịch nạp')
+  @ApiBadRequestResponse('Thiếu chain/txHash hoặc txHash không hợp lệ')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  async previewDeposit(
+    @CurrentUser('userId') userId: string,
+    @Query('chain') chain?: string,
+    @Query('txHash') txHash?: string,
+  ) {
+    if (!chain) {
+      throw new BadRequestException('Thiếu query param chain', 'CHAIN_REQUIRED');
+    }
+    if (!txHash) {
+      throw new BadRequestException('Thiếu query param txHash', 'TX_HASH_REQUIRED');
+    }
+
+    const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
+    return this.onchainTransferService.previewDepositTx(
+      userId,
+      normalizedChain,
+      txHash,
+    );
+  }
 
   /**
    * Nạp tiền thủ công — submit txHash

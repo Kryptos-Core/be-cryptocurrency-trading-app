@@ -23,6 +23,59 @@ import { SubmitDepositDto, RequestWithdrawalDto } from './dto';
 export class OnchainTransferService {
   private readonly logger = new Logger(OnchainTransferService.name);
 
+
+  /**
+   * Preview giao dịch nạp tiền theo txHash để FE tự điền amount
+   * Không tạo bản ghi giao dịch, chỉ đọc trạng thái on-chain.
+   */
+  async previewDepositTx(
+    userId: string,
+    chain: BlockchainNetwork,
+    txHash: string,
+  ): Promise<{
+    chain: string;
+    txHash: string;
+    status: string;
+    confirmations: number;
+    fromAddress: string;
+    toAddress: string;
+    onchainAmount: string;
+    senderLinked: boolean;
+  }> {
+    const provider = this.providerFactory.getProvider(chain);
+    const txStatus = await provider.getTransactionStatus(txHash);
+
+    if (txStatus.status === 'NOT_FOUND') {
+      throw new BadRequestException(
+        'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash.',
+        'TX_NOT_FOUND',
+      );
+    }
+
+    if (txStatus.status === 'FAILED') {
+      throw new BadRequestException(
+        'Giao dịch on-chain đã thất bại.',
+        'TX_FAILED',
+      );
+    }
+
+    const linked = await this.walletLinkingService.findVerifiedWallet(
+      userId,
+      chain,
+      txStatus.from,
+    );
+
+    return {
+      chain,
+      txHash,
+      status: txStatus.status,
+      confirmations: txStatus.confirmations,
+      fromAddress: txStatus.from,
+      toAddress: txStatus.to,
+      onchainAmount: txStatus.value,
+      senderLinked: !!linked,
+    };
+  }
   /** TTL lock deposit (giây) */
   private static readonly DEPOSIT_LOCK_TTL = 600; // 10 phút
   /** TTL lock withdrawal (giây) */

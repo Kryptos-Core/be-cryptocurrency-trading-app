@@ -26,6 +26,8 @@ export class WalletLinkingService {
   private static readonly NONCE_TTL = 300; // 5 phút
   /** TTL cache danh sách ví liên kết (giây) */
   private static readonly LINKED_CACHE_TTL = 600; // 10 phút
+  /** Prefix bắt buộc cho test signature bypass */
+  private static readonly TEST_SIGNATURE_PREFIX = 'TEST_SIG::';
 
   constructor(
     private readonly dataSource: DataSource,
@@ -115,12 +117,43 @@ export class WalletLinkingService {
       );
     }
 
-    // Xác minh chữ ký bằng blockchain provider
-    const isValid = await provider.verifySignature(
-      dto.address,
-      cached.message,
-      dto.signature,
+    const isTestSignature = dto.signature.startsWith(
+      WalletLinkingService.TEST_SIGNATURE_PREFIX,
     );
+
+    if (isTestSignature && !this.isTestSignatureBypassEnabled()) {
+      throw new BadRequestException(
+        'Test signature bypass đang tắt. Chỉ cho phép khi NODE_ENV=development và BLOCKCHAIN_ALLOW_TEST_SIGNATURE=true.',
+        'TEST_SIGNATURE_BYPASS_DISABLED',
+      );
+    }
+
+    let isValid = false;
+
+    if (isTestSignature) {
+      const payload = dto.signature
+        .slice(WalletLinkingService.TEST_SIGNATURE_PREFIX.length)
+        .trim();
+
+      if (!payload) {
+        throw new BadRequestException(
+          `Sai định dạng test signature. Yêu cầu prefix ${WalletLinkingService.TEST_SIGNATURE_PREFIX} kèm payload.`,
+          'INVALID_TEST_SIGNATURE_FORMAT',
+        );
+      }
+
+      isValid = true;
+      this.logger.warn(
+        `!!! SECURITY WARNING !!! [TEST_SIGNATURE_BYPASS_USED] userId=${userId}, chain=${dto.chain}, address=${dto.address}`,
+      );
+    } else {
+      // Xác minh chữ ký bằng blockchain provider
+      isValid = await provider.verifySignature(
+        dto.address,
+        cached.message,
+        dto.signature,
+      );
+    }
 
     if (!isValid) {
       throw new BadRequestException(
@@ -308,5 +341,15 @@ export class WalletLinkingService {
 
   private async invalidateLinkedCache(userId: string): Promise<void> {
     await this.cacheService.delete(this.linkedCacheKey(userId));
+  }
+
+  private isTestSignatureBypassEnabled(): boolean {
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    const allow = (process.env.BLOCKCHAIN_ALLOW_TEST_SIGNATURE || '').toLowerCase();
+
+    const allowByEnv =
+      allow === 'true' || allow === '1' || allow === 'yes' || allow === 'on';
+
+    return nodeEnv === 'development' && allowByEnv;
   }
 }
