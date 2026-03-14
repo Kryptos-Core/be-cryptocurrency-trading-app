@@ -1,9 +1,16 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 import { ConfigService } from '@nestjs/config';
 import { uuidv7 } from 'uuidv7';
+import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { FiatDeposit } from '@/entities/fiat-deposit.entity';
 // @ts-ignore
 const { PayOS } = require('@payos/node');
 
@@ -11,11 +18,13 @@ const { PayOS } = require('@payos/node');
 export class DepositsService {
   private readonly logger = new Logger(DepositsService.name);
   private payOS: any;
+  private readonly depositCurrencySymbol: string;
 
   constructor(
     private readonly fiatDepositRepo: FiatDepositRepository,
     private readonly walletsService: WalletsService,
     private readonly configService: ConfigService,
+    private readonly currencyRepository: CurrencyRepository,
   ) {
     const clientId = this.configService.get<string>('PAYOS_CLIENT_ID');
     const apiKey = this.configService.get<string>('PAYOS_API_KEY');
@@ -31,6 +40,57 @@ export class DepositsService {
     } else {
       this.logger.warn('PayOS config missing (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY). Deposit API will fail if called.');
     }
+
+    this.depositCurrencySymbol =
+      this.configService
+        .get<string>('PAYOS_DEPOSIT_CURRENCY_SYMBOL')
+        ?.trim()
+        .toUpperCase() || 'USDT';
+  }
+
+  private async resolveDepositCurrencyId(): Promise<number> {
+    const currency = await this.currencyRepository.findBySymbol(
+      this.depositCurrencySymbol,
+    );
+    if (!currency?.currency_id) {
+      throw new Error(
+        `Deposit currency symbol ${this.depositCurrencySymbol} not found. Configure PAYOS_DEPOSIT_CURRENCY_SYMBOL to a valid currency symbol.`,
+      );
+    }
+    const parsedCurrencyId = Number(currency.currency_id);
+    if (!Number.isInteger(parsedCurrencyId) || parsedCurrencyId <= 0) {
+      throw new Error(
+        `Deposit currency ID must be a positive integer, got: ${currency.currency_id}`,
+      );
+    }
+    return parsedCurrencyId;
+  }
+
+  private async markDepositPaid(
+    deposit: FiatDeposit,
+    source: 'webhook' | 'manual_sync',
+  ): Promise<void> {
+    const depositCurrencyId = await this.resolveDepositCurrencyId();
+
+    await this.fiatDepositRepo.transaction(async (manager) => {
+      const updatedDeposit = await this.fiatDepositRepo.updateStatus(
+        deposit.order_code,
+        'PAID',
+        manager,
+      );
+
+      await this.walletsService.applyTransaction(deposit.user_id, {
+        currencyId: depositCurrencyId,
+        action: WalletTransactionAction.CREDIT,
+        amount: updatedDeposit.amount,
+        refType: WalletReferenceType.EXTERNAL_DEPOSIT,
+        refId: Number(updatedDeposit.order_code),
+      });
+    });
+
+    this.logger.log(
+      `Deposit ${deposit.deposit_id} marked PAID via ${source} and credited to ${this.depositCurrencySymbol} wallet`,
+    );
   }
 
   async createPaymentLink(userId: string, amount: number) {
@@ -88,32 +148,14 @@ export class DepositsService {
       // If payment not successful, we don't process balance update
       // Depending on PayOS webhook structure, successful codes indicate payment passed.
       if (verifiedData.code === '00' || verifiedData.desc === 'success' || verifiedData.success) {
-        
+
         // Find existing deposit
         const deposit = await this.fiatDepositRepo.findByOrderCode(Number(verifiedData.orderCode));
         if (!deposit || deposit.status === 'PAID') {
           return { message: 'Order already paid or not found' };
         }
 
-        // We wrap database updates and wallet application in a single flow
-        await this.fiatDepositRepo.transaction(async (manager) => {
-          // Update status
-          const updatedDeposit = await this.fiatDepositRepo.updateStatus(deposit.order_code, 'PAID', manager);
-          
-          // Credit user's wallet. Assume we drop it to a "VND" wallet, or auto convert.
-          // In this system, user often trades "USDT". For now, we fund "VND" currency.
-          // Note: ensuring "VND" currency object exists in the currency tables!
-          // We will use 2 as an example currency ID, assuming you have seeded it.
-          const VND_CURRENCY_ID = 2; 
-          
-          await this.walletsService.applyTransaction(deposit.user_id, {
-            currencyId: VND_CURRENCY_ID,
-            action: WalletTransactionAction.CREDIT,
-            amount: updatedDeposit.amount,
-            refType: WalletReferenceType.EXTERNAL_DEPOSIT, 
-            refId: Number(updatedDeposit.order_code) // or deposit_id integer hash if needed
-          });
-        });
+        await this.markDepositPaid(deposit, 'webhook');
         
         return { success: true, message: 'Deposit successfully paid' };
       }
@@ -127,5 +169,56 @@ export class DepositsService {
 
   async getMyDeposits(userId: string) {
     return this.fiatDepositRepo.findByUser(userId);
+  }
+
+  async syncPaymentStatusForUser(userId: string, orderCode: number) {
+    if (!this.payOS) {
+      throw new Error('PayOS is not configured on this server');
+    }
+
+    const deposit = await this.fiatDepositRepo.findByOrderCode(orderCode);
+    if (!deposit || deposit.user_id !== userId) {
+      throw new NotFoundException('Deposit not found for this order code');
+    }
+
+    if (deposit.status === 'PAID') {
+      return {
+        orderCode,
+        localStatus: deposit.status,
+        payosStatus: 'PAID',
+        updated: false,
+      };
+    }
+
+    const paymentLink = await this.payOS.paymentRequests.get(orderCode);
+    const payosStatus = String(paymentLink?.status || 'PENDING').toUpperCase();
+
+    if (payosStatus === 'PAID') {
+      await this.markDepositPaid(deposit, 'manual_sync');
+
+      return {
+        orderCode,
+        localStatus: 'PAID',
+        payosStatus,
+        updated: true,
+      };
+    }
+
+    if (payosStatus === 'CANCELLED' || payosStatus === 'EXPIRED' || payosStatus === 'FAILED') {
+      await this.fiatDepositRepo.updateStatus(orderCode, 'CANCELLED');
+      return {
+        orderCode,
+        localStatus: 'CANCELLED',
+        payosStatus,
+        updated: true,
+      };
+    }
+
+    return {
+      orderCode,
+      localStatus: deposit.status,
+      payosStatus,
+      updated: false,
+    };
   }
 }

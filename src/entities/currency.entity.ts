@@ -55,4 +55,11 @@ export class Currency {
 
   @OneToMany('Trade', 'fee_currency')
   trades!: any[];
+
+  // ------------------------------------------------------------------------
+  // Thêm các thuộc tính ảo (Virtual properties) để map thêm Market Data trả về API
+  // ------------------------------------------------------------------------
+  lastPrice?: string;
+  priceChangePercent24h?: string;
+  volume24h?: string;
 }

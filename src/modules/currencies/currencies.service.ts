@@ -4,6 +4,7 @@ import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
 import { Currency } from '@/entities/currency.entity';
 import { NotFoundException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
+import { MarketsService } from '@/modules/markets/markets.service';
 
 /**
  * Currencies Service - Business Logic Layer
@@ -20,7 +21,38 @@ export class CurrenciesService {
   constructor(
     private readonly currencyRepository: CurrencyRepository,
     private readonly cacheService: CacheService,
+    private readonly marketsService: MarketsService,
   ) {}
+
+  /** Helper method to map Ticker info to currencies */
+  private async mapTickersToCurrencies(currencies: Currency[]): Promise<Currency[]> {
+    if (!currencies || currencies.length === 0) return currencies;
+
+    try {
+      const tickers = await this.marketsService.getAllTickers();
+      
+      return currencies.map((currency) => {
+        // Find best ticker matching Base Currency = current Currency (e.g. BTC in BTC/USDT)
+        // Prefer pair ending with USDT to get best pricing base logic
+        const matchedTickers = tickers.filter(t => t.symbol.startsWith(`${currency.symbol}/`));
+        let bestTicker = matchedTickers.find(t => t.symbol.endsWith('/USDT'));
+        if (!bestTicker && matchedTickers.length > 0) {
+          bestTicker = matchedTickers[0]; // fallback to any matched trading pair
+        }
+
+        if (bestTicker) {
+          currency.lastPrice = bestTicker.lastPrice;
+          currency.priceChangePercent24h = bestTicker.change24h;
+          currency.volume24h = bestTicker.quoteVolume24h; // Or volume24h depending on FE need
+        }
+
+        return currency;
+      });
+    } catch (error: any) {
+      this.logger.warn(`Failed to map Ticker Data to Currencies: ${error.message}`);
+      return currencies; // return without tickers gracefully
+    }
+  }
 
   /**
    * Find all currencies with pagination
@@ -44,8 +76,10 @@ export class CurrenciesService {
     );
 
     // Map 'data' to 'currencies' to match return type
+    const mappedCurrencies = await this.mapTickersToCurrencies(result.data);
+    
     return {
-      currencies: result.data,
+      currencies: mappedCurrencies,
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -117,10 +151,10 @@ export class CurrenciesService {
       const fresh = await this.currencyRepository.findActive();
       if (fresh.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
-        return fresh;
+        return await this.mapTickersToCurrencies(fresh);
       }
     }
-    return cached;
+    return await this.mapTickersToCurrencies(cached);
   }
 
   /**
@@ -144,10 +178,10 @@ export class CurrenciesService {
       const fresh = await this.currencyRepository.findTradable();
       if (fresh.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
-        return fresh;
+        return await this.mapTickersToCurrencies(fresh);
       }
     }
-    return cached;
+    return await this.mapTickersToCurrencies(cached);
   }
 
   /**

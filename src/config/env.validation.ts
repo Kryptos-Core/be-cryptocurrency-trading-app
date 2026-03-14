@@ -225,6 +225,10 @@ export class EnvironmentVariables {
   @IsUrl()
   @IsOptional()
   PAYOS_CANCEL_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  PAYOS_DEPOSIT_CURRENCY_SYMBOL?: string = 'USDT';
 }
 
 /**
@@ -281,6 +285,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'PAYOS_CHECKSUM_KEY',
     'PAYOS_RETURN_URL',
     'PAYOS_CANCEL_URL',
+    'PAYOS_DEPOSIT_CURRENCY_SYMBOL',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

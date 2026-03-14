@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Req, UseGuards, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+  Get,
+  Param,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DepositsService } from './deposits.service';
 import { CreateFiatDepositDto } from './dto/create-deposit.dto';
@@ -29,6 +38,21 @@ export class DepositsController {
   async getMyDeposits(@Req() req: Request) {
     const user = req.user as any;
     return this.depositsService.getMyDeposits(user.userId);
+  }
+
+  @Get(':orderCode/sync-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Sync payment status directly from PayOS (useful for local/dev when webhook is unreachable)',
+  })
+  async syncDepositStatus(
+    @Req() req: Request,
+    @Param('orderCode', ParseIntPipe) orderCode: number,
+  ) {
+    const user = req.user as any;
+    return this.depositsService.syncPaymentStatusForUser(user.userId, orderCode);
   }
 
   @Post('payos-webhook')
