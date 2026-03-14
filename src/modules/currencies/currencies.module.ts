@@ -11,6 +11,7 @@ import { MarketsModule } from '@/modules/markets/markets.module';
  * Module Pattern: Encapsulate currencies feature
  * Dependency Injection: Register providers and exports
  */
+@Module({
   imports: [
     TypeOrmModule.forFeature([Currency]),
     forwardRef(() => MarketsModule),

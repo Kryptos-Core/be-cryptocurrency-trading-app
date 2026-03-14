@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketsService } from './markets.service';
 import { MarketsController } from './markets.controller';
@@ -15,7 +15,7 @@ import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([MarketPair]),
-    CurrenciesModule,
+    forwardRef(() => CurrenciesModule),
     PriceOracleModule,
   ],
   providers: [MarketsService, MarketRepository],

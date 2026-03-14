@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { CurrencyRepository } from './repositories';
 import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
 import { Currency } from '@/entities/currency.entity';
@@ -21,6 +21,7 @@ export class CurrenciesService {
   constructor(
     private readonly currencyRepository: CurrencyRepository,
     private readonly cacheService: CacheService,
+    @Inject(forwardRef(() => MarketsService))
     private readonly marketsService: MarketsService,
   ) {}
 
@@ -29,27 +30,36 @@ export class CurrenciesService {
     if (!currencies || currencies.length === 0) return currencies;
 
     try {
-      const tickers = await this.marketsService.getAllTickers();
-      
-      return currencies.map((currency) => {
-        // Find best ticker matching Base Currency = current Currency (e.g. BTC in BTC/USDT)
-        // Prefer pair ending with USDT to get best pricing base logic
-        const matchedTickers = tickers.filter(t => t.symbol.startsWith(`${currency.symbol}/`));
-        let bestTicker = matchedTickers.find(t => t.symbol.endsWith('/USDT'));
-        if (!bestTicker && matchedTickers.length > 0) {
-          bestTicker = matchedTickers[0]; // fallback to any matched trading pair
+      const baseSymbols = Array.from(
+        new Set(
+          currencies
+            .map((currency) => currency.symbol?.trim().toUpperCase())
+            .filter((symbol): symbol is string => Boolean(symbol)),
+        ),
+      );
+      const tickers = await this.marketsService.getTickersForBaseSymbols(baseSymbols);
+      const tickerByBase = new Map<string, (typeof tickers)[number]>();
+      for (const ticker of tickers) {
+        const base = ticker.symbol?.toUpperCase().split('/')[0];
+        if (base && !tickerByBase.has(base)) {
+          tickerByBase.set(base, ticker);
         }
+      }
+
+      return currencies.map((currency) => {
+        const bestTicker = tickerByBase.get(currency.symbol.toUpperCase());
 
         if (bestTicker) {
           currency.lastPrice = bestTicker.lastPrice;
           currency.priceChangePercent24h = bestTicker.change24h;
-          currency.volume24h = bestTicker.quoteVolume24h; // Or volume24h depending on FE need
+          currency.volume24h = bestTicker.volume24h;
         }
 
         return currency;
       });
-    } catch (error: any) {
-      this.logger.warn(`Failed to map Ticker Data to Currencies: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to map Ticker Data to Currencies: ${message}`);
       return currencies; // return without tickers gracefully
     }
   }
@@ -62,6 +72,7 @@ export class CurrenciesService {
     page: number = 1,
     limit: number = 10,
     includeInactive: boolean = false,
+    includeMarketData: boolean = false,
   ): Promise<{ currencies: Currency[]; total: number; page: number; limit: number }> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}`;
 
@@ -75,8 +86,10 @@ export class CurrenciesService {
       this.CACHE_TTL,
     );
 
-    // Map 'data' to 'currencies' to match return type
-    const mappedCurrencies = await this.mapTickersToCurrencies(result.data);
+    // Enrich market data only when explicitly requested to avoid N+1 ticker pressure.
+    const mappedCurrencies = includeMarketData
+      ? await this.mapTickersToCurrencies(result.data)
+      : result.data;
     
     return {
       currencies: mappedCurrencies,
@@ -151,10 +164,10 @@ export class CurrenciesService {
       const fresh = await this.currencyRepository.findActive();
       if (fresh.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
-        return await this.mapTickersToCurrencies(fresh);
+        return fresh;
       }
     }
-    return await this.mapTickersToCurrencies(cached);
+    return cached;
   }
 
   /**
@@ -178,10 +191,10 @@ export class CurrenciesService {
       const fresh = await this.currencyRepository.findTradable();
       if (fresh.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
-        return await this.mapTickersToCurrencies(fresh);
+        return fresh;
       }
     }
-    return await this.mapTickersToCurrencies(cached);
+    return cached;
   }
 
   /**

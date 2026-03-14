@@ -60,6 +60,14 @@ export class CurrenciesController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'includeInactive', required: false, type: Boolean, example: false })
+  @ApiQuery({
+    name: 'includeMarketData',
+    required: false,
+    type: Boolean,
+    example: false,
+    description:
+      'Include enriched market ticker fields for each currency (may increase response time).',
+  })
   @ApiSuccessResponse('Currencies retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findAll(
@@ -67,8 +75,15 @@ export class CurrenciesController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Query('includeInactive', new ParseBoolPipe({ optional: true }))
     includeInactive: boolean = false,
+    @Query('includeMarketData', new ParseBoolPipe({ optional: true }))
+    includeMarketData: boolean = false,
   ) {
-    return this.currenciesService.findAll(page, limit, includeInactive);
+    return this.currenciesService.findAll(
+      page,
+      limit,
+      includeInactive,
+      includeMarketData,
+    );
   }
 
   /**

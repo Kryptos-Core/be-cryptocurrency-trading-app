@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { MarketRepository } from './repositories';
 import { CreateMarketPairDto, UpdateMarketPairDto, MarketTickerDto } from './dto';
 import { MarketPair } from '@/entities/market-pair.entity';
@@ -32,6 +32,7 @@ export class MarketsService implements OnModuleInit {
   constructor(
     private readonly marketRepository: MarketRepository,
     private readonly cacheService: CacheService,
+    @Inject(forwardRef(() => CurrenciesService))
     private readonly currenciesService: CurrenciesService,
     private readonly ohlcvProviderRegistry: OHLCVProviderRegistry,
   ) {}
@@ -571,6 +572,61 @@ export class MarketsService implements OnModuleInit {
       },
       this.TICKER_CACHE_TTL,
     );
+  }
+
+  /**
+   * Get representative tickers for a set of base symbols.
+   * This avoids scanning ticker data for all active pairs when only a small page of currencies is needed.
+   */
+  async getTickersForBaseSymbols(baseSymbols: string[]): Promise<MarketTickerDto[]> {
+    if (baseSymbols.length === 0) return [];
+
+    const normalizedSymbols = new Set(
+      baseSymbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean),
+    );
+    if (normalizedSymbols.size === 0) return [];
+
+    const activePairs = await this.findActive();
+    const selectedByBase = new Map<string, MarketPair>();
+
+    for (const pair of activePairs) {
+      const base = this.extractBaseSymbol(pair.symbol);
+      if (!base || !normalizedSymbols.has(base)) {
+        continue;
+      }
+
+      const current = selectedByBase.get(base);
+      if (!current) {
+        selectedByBase.set(base, pair);
+        continue;
+      }
+
+      const currentPriority = this.quotePriority(current.symbol);
+      const nextPriority = this.quotePriority(pair.symbol);
+      if (nextPriority < currentPriority) {
+        selectedByBase.set(base, pair);
+      }
+    }
+
+    if (selectedByBase.size === 0) return [];
+    return this.getTickersForPairs(Array.from(selectedByBase.values()));
+  }
+
+  private extractBaseSymbol(pairSymbol?: string): string {
+    if (!pairSymbol) return '';
+    const [base] = pairSymbol.toUpperCase().split('/');
+    return base?.trim() ?? '';
+  }
+
+  private quotePriority(pairSymbol?: string): number {
+    if (!pairSymbol) return Number.MAX_SAFE_INTEGER;
+    const upper = pairSymbol.toUpperCase();
+    if (upper.endsWith('/USDT')) return 0;
+    if (upper.endsWith('/USDC')) return 1;
+    if (upper.endsWith('/FDUSD')) return 2;
+    if (upper.endsWith('/BUSD')) return 3;
+    if (upper.endsWith('/TRY')) return 4;
+    return 10;
   }
 
   /**
