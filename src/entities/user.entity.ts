@@ -60,4 +60,10 @@ export class User {
 
   @OneToMany('PriceAlert', 'user')
   price_alerts!: any[];
+
+  @OneToMany('LinkedWallet', 'user')
+  linked_wallets!: any[];
+
+  @OneToMany('OnchainTransaction', 'user')
+  onchain_transactions!: any[];
 }

@@ -127,3 +127,37 @@ export enum Environment {
   Production = 'production',
   Test = 'test',
 }
+
+// ============================================
+// Blockchain Module Enums
+// ============================================
+
+/** Các mạng blockchain testnet được hỗ trợ */
+export enum BlockchainNetwork {
+  TRON_NILE = 'TRON_NILE',
+  TRON_SHASTA = 'TRON_SHASTA',
+  SOLANA_DEVNET = 'SOLANA_DEVNET',
+  ETH_SEPOLIA = 'ETH_SEPOLIA',
+}
+
+/** Trạng thái liên kết ví */
+export enum LinkedWalletStatus {
+  PENDING = 'PENDING',
+  VERIFIED = 'VERIFIED',
+  REVOKED = 'REVOKED',
+}
+
+/** Loại giao dịch on-chain */
+export enum OnchainTxType {
+  DEPOSIT = 'DEPOSIT',
+  WITHDRAWAL = 'WITHDRAWAL',
+  TRANSFER = 'TRANSFER',
+}
+
+/** Trạng thái giao dịch on-chain */
+export enum OnchainTxStatus {
+  PENDING = 'PENDING',
+  CONFIRMING = 'CONFIRMING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}

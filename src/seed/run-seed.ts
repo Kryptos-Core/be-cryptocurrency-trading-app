@@ -1,6 +1,6 @@
 /**
  * Seed script: clear user-related data + users, then seed users only.
- * Currencies and market pairs: use POST /api/v1/exchange/sync-info (Binance) instead.
+ * Real currencies and market pairs are bootstrapped automatically from Binance by backend startup.
  *
  * Usage: npm run db:seed   or   npm run db:reset
  */
@@ -78,7 +78,7 @@ async function run() {
     console.log('✅ Users seeded.');
 
     console.log('\n🎉 Seed done. Users imported.');
-    console.log('   Currencies & market pairs: run POST /api/v1/exchange/sync-info (or sync from Binance).');
+    console.log('   Currencies & market pairs will sync automatically from Binance on backend startup if catalog is empty.');
     console.log('   Login e.g. admin@example.com / Admin@123!');
   } catch (err) {
     console.error('Seed failed:', err);

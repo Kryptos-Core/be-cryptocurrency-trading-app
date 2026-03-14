@@ -1,0 +1,82 @@
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  ForeignKey,
+  Index,
+} from 'typeorm';
+import { User } from './user.entity';
+import { LinkedWallet } from './linked-wallet.entity';
+
+@Entity('onchain_transactions')
+@Index('uk_onchain_tx_hash', ['chain', 'tx_hash'], { unique: true })
+@Index('idx_onchain_tx_user', ['user_id', 'type', 'status'])
+@Index('idx_onchain_tx_created', ['user_id', 'created_at'])
+export class OnchainTransaction {
+  @PrimaryColumn({ type: 'char', length: 36 })
+  tx_id!: string;
+
+  @Column({ type: 'char', length: 36 })
+  @ForeignKey(() => User)
+  user_id!: string;
+
+  @Column({ type: 'char', length: 36, nullable: true })
+  @ForeignKey(() => LinkedWallet)
+  linked_wallet_id!: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: ['TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA'],
+  })
+  chain!: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['DEPOSIT', 'WITHDRAWAL', 'TRANSFER'],
+  })
+  type!: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  tx_hash!: string | null;
+
+  @Column({ type: 'varchar', length: 255 })
+  from_address!: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  to_address!: string;
+
+  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  amount!: string;
+
+  @Column({ type: 'int', default: 0 })
+  confirmations!: number;
+
+  @Column({
+    type: 'enum',
+    enum: ['PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'],
+    default: 'PENDING',
+  })
+  status!: 'PENDING' | 'CONFIRMING' | 'COMPLETED' | 'FAILED';
+
+  @CreateDateColumn()
+  created_at!: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  confirmed_at!: Date | null;
+
+  @ManyToOne(() => User, (user) => user.onchain_transactions, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'user_id' })
+  user!: User;
+
+  @ManyToOne(() => LinkedWallet, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'linked_wallet_id' })
+  linked_wallet!: LinkedWallet | null;
+}

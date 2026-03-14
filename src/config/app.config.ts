@@ -76,6 +76,20 @@ export interface AppConfig {
     reconciliationThreshold: string;
     enableExternalSync: boolean;
   };
+  blockchain: {
+    tron: {
+      nileFullHost: string;
+      shastaFullHost: string;
+      defaultNetwork: 'TRON_NILE' | 'TRON_SHASTA';
+    };
+    solana: {
+      devnetUrl: string;
+    };
+    ethereum: {
+      sepoliaRpcUrl: string;
+      chainId: number;
+    };
+  };
   /** Price oracle: on-demand OHLCV. App uses Binance only (no DB persist). UNISWAP_* env not used. */
   priceOracle?: {
     uniswap: {
@@ -195,6 +209,31 @@ export class AppConfigBuilder {
     return this;
   }
 
+  setBlockchain(
+    tronNileFullHost: string,
+    tronShastaFullHost: string,
+    tronDefaultNetwork: string,
+    solanaDevnetUrl: string,
+    ethSepoliaRpcUrl: string,
+    ethSepoliaChainId: number,
+  ): this {
+    this.config.blockchain = {
+      tron: {
+        nileFullHost: tronNileFullHost,
+        shastaFullHost: tronShastaFullHost,
+        defaultNetwork: tronDefaultNetwork as 'TRON_NILE' | 'TRON_SHASTA',
+      },
+      solana: {
+        devnetUrl: solanaDevnetUrl,
+      },
+      ethereum: {
+        sepoliaRpcUrl: ethSepoliaRpcUrl,
+        chainId: ethSepoliaChainId,
+      },
+    };
+    return this;
+  }
+
   setPriceOracle(
     uniswapSubgraphUrl: string,
     uniswapSymbolToPoolId: Record<string, string>,
@@ -281,6 +320,14 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.WALLET_SYNC_INTERVAL || 30000,
       env.WALLET_RECONCILIATION_THRESHOLD || '0.00000001',
       env.EXCHANGE_MODE === 'binance',
+    )
+    .setBlockchain(
+      (env as any).TRON_NILE_FULL_HOST || 'https://nile.trongrid.io',
+      (env as any).TRON_SHASTA_FULL_HOST || 'https://api.shasta.trongrid.io',
+      (env as any).TRON_DEFAULT_NETWORK || 'TRON_NILE',
+      (env as any).SOLANA_DEVNET_URL || 'https://api.devnet.solana.com',
+      (env as any).ETH_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+      parseInt((env as any).ETH_SEPOLIA_CHAIN_ID, 10) || 11155111,
     )
     .setPriceOracle(
       (env as any).UNISWAP_SUBGRAPH_URL ||

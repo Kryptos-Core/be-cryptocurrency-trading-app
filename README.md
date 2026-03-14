@@ -54,11 +54,18 @@ Swagger: `http://localhost:3000/api`
 
 ## Seed DB & tài khoản test
 
-Chạy seed để nạp dữ liệu mẫu (currencies, users, market pairs, wallets):
+Chạy seed để nạp dữ liệu mẫu người dùng:
 
 ```bash
 npm run db:seed
 ```
+
+Sau đó khởi động backend. Nếu DB đang rỗng ở phần market catalog, backend sẽ tự:
+
+1. Sync dữ liệu thật từ Binance vào `currencies` và `market_pairs`.
+2. Giữ `POST /exchange/sync-info` như một admin refresh action, không phải bước bắt buộc để app usable.
+
+**Fail-fast:** nếu DB catalog rỗng và không sync được Binance khi startup, backend sẽ dừng khởi động để tránh chạy trong trạng thái không có thị trường giao dịch.
 
 **Tài khoản test (đăng nhập ngay sau khi seed):**
 
