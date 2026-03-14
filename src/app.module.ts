@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { MarketsModule } from './modules/markets/markets.module';
 import { RedisModule } from './modules/redis/redis.module';
@@ -13,6 +14,7 @@ import { MatchingModule } from './modules/matching/matching.module';
 import { TradingModule } from './modules/trading/trading.module';
 import { ExchangeModule } from './modules/exchange/exchange.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
+import { DepositsModule } from './modules/deposits/deposits.module';
 import { HealthModule } from './health/health.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
@@ -45,6 +47,7 @@ import appConfig from './config/app.config';
     TradingModule,
     ExchangeModule,
     BlockchainModule,
+    DepositsModule,
     HealthModule,
   ],
 })

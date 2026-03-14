@@ -66,7 +66,13 @@ export enum Permission {
   EXCHANGE_SYNC = 'exchange:sync',
   ORDERS_PLACE = 'orders:place',
   ORDERS_CANCEL = 'orders:cancel',
+  // WALLETS
+  WALLETS_READ = 'wallets:read',
+  WALLETS_MANAGE = 'wallets:manage',
   WALLETS_WITHDRAW = 'wallets:withdraw',
+  // ORDERS
+  ORDERS_READ = 'orders:read',
+  ORDERS_MANAGE = 'orders:manage',
   RISK_REVIEW = 'risk:review',
   SUPPORT_CASES = 'support:cases',
 }
