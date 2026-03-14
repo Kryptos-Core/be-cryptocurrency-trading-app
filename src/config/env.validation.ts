@@ -204,6 +204,19 @@ export class EnvironmentVariables {
   @IsBoolean()
   @IsOptional()
   BLOCKCHAIN_ALLOW_TEST_SIGNATURE?: boolean = false;
+
+  // PayOS Configuration
+  @IsString()
+  @IsOptional()
+  PAYOS_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  PAYOS_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  PAYOS_CHECKSUM_KEY?: string;
 }
 
 /**
@@ -255,6 +268,9 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'ETH_HOT_WALLET_PRIVATE_KEY',
     'TRON_HOT_WALLET_PRIVATE_KEY',
     'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
+    'PAYOS_CLIENT_ID',
+    'PAYOS_API_KEY',
+    'PAYOS_CHECKSUM_KEY',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

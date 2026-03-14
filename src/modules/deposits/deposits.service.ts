@@ -5,7 +5,7 @@ import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 import { ConfigService } from '@nestjs/config';
 import { uuidv7 } from 'uuidv7';
 // @ts-ignore
-const PayOS = require('@payos/node');
+const { PayOS } = require('@payos/node');
 
 @Injectable()
 export class DepositsService {

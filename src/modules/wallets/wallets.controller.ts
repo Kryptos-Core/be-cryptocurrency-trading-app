@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Query,
-  Body,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -11,10 +10,8 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
-  ApiBody,
 } from '@nestjs/swagger';
 import { WalletsService } from './wallets.service';
-import { WalletTransactionDto } from './dto/wallet-transaction.dto';
 import { JwtAuthGuard } from '@/common/guards';
 import { CurrentUser } from '@/common/decorators';
 import {
@@ -93,26 +90,6 @@ export class WalletsController {
   }
 
   /**
-   * Apply wallet transaction
-   * POST /wallets/transactions
-   */
-  @Post('transactions')
-  @ApiOperation({
-    summary: 'Apply wallet transaction',
-    description: 'Credit, debit, freeze, unfreeze, or transfer wallet balance',
-  })
-  @ApiBody({ type: WalletTransactionDto })
-  @ApiSuccessResponse('Wallet transaction applied successfully')
-  @ApiBadRequestResponse('Invalid input data')
-  @ApiUnauthorizedResponse('Unauthorized')
-  async applyTransaction(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: WalletTransactionDto,
-  ) {
-    return this.walletsService.applyTransaction(userId, dto);
-  }
-
-  /**
    * Sync wallet balance with Binance exchange
    * POST /wallets/sync?currencyId=1
    */
@@ -172,73 +149,4 @@ export class WalletsController {
     return this.walletsService.reconcileBalance(userId, currencyId);
   }
 
-  /**
-   * Process external deposit from Binance
-   * POST /wallets/process-deposit
-   */
-  @Post('process-deposit')
-  @ApiOperation({
-    summary: 'Process external deposit',
-    description: 'Record a deposit received from Binance testnet',
-  })
-  @ApiBody({
-    schema: {
-      properties: {
-        currencyId: { type: 'string', example: '018e9a7b-1234-7abc-8000-000000000002' },
-        txId: { type: 'string', example: 'tx_123456789' },
-        amount: { type: 'string', example: '10.5' },
-      },
-    },
-  })
-  @ApiSuccessResponse('Deposit processed successfully')
-  @ApiBadRequestResponse('Invalid deposit data')
-  @ApiUnauthorizedResponse('Unauthorized')
-  async processExternalDeposit(
-    @CurrentUser('userId') userId: string,
-    @Body()
-    body: {
-      currencyId: string;
-      txId: string;
-      amount: string;
-    },
-  ) {
-    await this.walletsService.processExternalDeposit(
-      userId,
-      body.currencyId,
-      body.txId,
-      body.amount,
-    );
-    return { success: true, message: 'Deposit processed' };
-  }
-
-  /**
-   * Create withdrawal request to Binance
-   * POST /wallets/create-withdrawal
-   */
-  @Post('create-withdrawal')
-  @ApiOperation({
-    summary: 'Create withdrawal request',
-    description: 'Create a withdrawal request to send funds to Binance testnet',
-  })
-  @ApiBody({
-    schema: {
-      properties: {
-        currencyId: { type: 'string', example: '018e9a7b-1234-7abc-8000-000000000002' },
-        amount: { type: 'string', example: '5.25' },
-      },
-    },
-  })
-  @ApiSuccessResponse('Withdrawal request created')
-  @ApiBadRequestResponse('Invalid withdrawal request')
-  @ApiUnauthorizedResponse('Unauthorized')
-  async createWithdrawalRequest(
-    @CurrentUser('userId') userId: string,
-    @Body() body: { currencyId: string; amount: string },
-  ) {
-    return this.walletsService.createWithdrawalRequest(
-      userId,
-      body.currencyId,
-      body.amount,
-    );
-  }
 }
