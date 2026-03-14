@@ -217,6 +217,14 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   PAYOS_CHECKSUM_KEY?: string;
+
+  @IsUrl()
+  @IsOptional()
+  PAYOS_RETURN_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  PAYOS_CANCEL_URL?: string;
 }
 
 /**
@@ -271,6 +279,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'PAYOS_CLIENT_ID',
     'PAYOS_API_KEY',
     'PAYOS_CHECKSUM_KEY',
+    'PAYOS_RETURN_URL',
+    'PAYOS_CANCEL_URL',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm
@@ -302,6 +312,27 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
       .join('\n');
 
     throw new Error(`Environment validation failed:\n${errorMessages}`);
+  }
+
+  if (validatedConfig.NODE_ENV === Environment.Production) {
+    const requiredPayosKeys: Array<keyof EnvironmentVariables> = [
+      'PAYOS_CLIENT_ID',
+      'PAYOS_API_KEY',
+      'PAYOS_CHECKSUM_KEY',
+      'PAYOS_RETURN_URL',
+      'PAYOS_CANCEL_URL',
+    ];
+
+    const missingPayosKeys = requiredPayosKeys.filter((key) => {
+      const value = validatedConfig[key];
+      return typeof value !== 'string' || value.trim().length === 0;
+    });
+
+    if (missingPayosKeys.length > 0) {
+      throw new Error(
+        `Environment validation failed:\nMissing required PayOS env vars in production: ${missingPayosKeys.join(', ')}`,
+      );
+    }
   }
 
   return validatedConfig;

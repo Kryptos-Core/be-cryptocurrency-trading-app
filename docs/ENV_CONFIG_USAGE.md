@@ -1,258 +1,92 @@
-# Environment Configuration - Hướng Dẫn Sử Dụng
+# Environment Configuration - Cap Nhat Theo Code Hien Tai
 
-## Tổng Quan
+## Tong quan
 
-Environment configuration đã được setup với:
-- **Type-safe**: Full TypeScript support với IntelliSense
-- **Validation**: Tự động validate environment variables khi app start
-- **Builder Pattern**: Config builder để tạo config linh hoạt
-- **Singleton Pattern**: Config service được quản lý bởi NestJS
+Backend su dung:
+- src/config/env.validation.ts de validate bien moi truong
+- src/config/app.config.ts de map env sang app config
 
-## Cấu Trúc
+App se fail startup neu validation loi.
 
-### Files
-
-1. **`src/config/env.validation.ts`**
-   - Environment variables schema
-   - Validation với class-validator
-   - Type-safe environment variables
-
-2. **`src/config/app.config.ts`**
-   - App configuration interface
-   - Config builder pattern
-   - Factory function để tạo config
-
-3. **`.env.example`**
-   - Template cho environment variables
-   - Copy thành `.env` và điền giá trị
-
-## Setup
-
-### 1. Tạo file .env
+## Setup nhanh
 
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
-### 2. Điền các giá trị cần thiết
+Sau do dien thong tin va chay app.
 
-Mở file `.env` và điền các giá trị:
+## Nhom bien quan trong
 
-```env
-# Required
-DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=your_password
-DB_NAME=crypto_trading_db
-JWT_SECRET=your-super-secret-jwt-key
+### Core bat buoc
 
-# Optional (có default values)
-PORT=3000
-REDIS_HOST=localhost
-REDIS_PORT=6379
-```
+| Variable | Mo ta |
+|---|---|
+| DB_HOST | Host MySQL |
+| DB_PORT | Port MySQL |
+| DB_USERNAME | User MySQL |
+| DB_PASSWORD | Password MySQL |
+| DB_NAME | Ten DB |
+| JWT_SECRET | JWT secret |
 
-### 3. Validation
+### Trading va exchange
 
-Khi app start, environment variables sẽ được tự động validate:
-- Nếu thiếu required fields → App sẽ không start
-- Nếu format sai → App sẽ không start
-- Tất cả errors sẽ được hiển thị rõ ràng
+| Variable | Gia tri thong dung |
+|---|---|
+| TRADING_ENVIRONMENT | testnet hoac mainnet |
+| EXCHANGE_MODE | binance hoac mock |
+| BINANCE_TESTNET_ENABLED | true/false |
+| BINANCE_TESTNET_API_KEY | API key testnet |
+| BINANCE_TESTNET_API_SECRET | API secret testnet |
+| BINANCE_TESTNET_BASE_URL | Spot testnet: https://testnet.binance.vision |
+| BINANCE_MAINNET_API_KEY | API key mainnet |
+| BINANCE_MAINNET_API_SECRET | API secret mainnet |
+| BINANCE_MAINNET_BASE_URL | https://fapi.binance.com |
 
-## Sử Dụng Config trong Code
+### Wallet sync
 
-### 1. Inject ConfigService
+| Variable | Mo ta |
+|---|---|
+| WALLET_SYNC_INTERVAL | Chu ky sync wallet (ms) |
+| WALLET_RECONCILIATION_THRESHOLD | Nguong lech cho reconcile |
 
-```typescript
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '@/config';
+### Blockchain testnet
 
-@Injectable()
-export class YourService {
-  constructor(private readonly configService: ConfigService) {}
+| Variable | Mo ta |
+|---|---|
+| TRON_NILE_FULL_HOST | RPC TRON Nile |
+| TRON_SHASTA_FULL_HOST | RPC TRON Shasta |
+| TRON_DEFAULT_NETWORK | TRON_NILE hoac TRON_SHASTA |
+| SOLANA_DEVNET_URL | RPC Solana devnet |
+| ETH_SEPOLIA_RPC_URL | RPC Sepolia |
+| ETH_SEPOLIA_CHAIN_ID | Chain id Sepolia |
+| ETH_HOT_WALLET_PRIVATE_KEY | Private key hot wallet Ethereum |
+| TRON_HOT_WALLET_PRIVATE_KEY | Private key hot wallet Tron |
+| BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chi dung dev, mac dinh false |
 
-  example() {
-    // Access app config namespace
-    const appConfig = this.configService.get<AppConfig['app']>('app.app');
-    console.log(appConfig.name); // Type-safe!
-    console.log(appConfig.port);
-    console.log(appConfig.env);
+### PayOS
 
-    // Access database config
-    const dbConfig = this.configService.get<AppConfig['database']>('app.database');
-    console.log(dbConfig.host);
+| Variable | Mo ta |
+|---|---|
+| PAYOS_CLIENT_ID | Merchant client id |
+| PAYOS_API_KEY | API key |
+| PAYOS_CHECKSUM_KEY | Key verify signature/webhook |
+| PAYOS_RETURN_URL | URL redirect khi thanh toan xong |
+| PAYOS_CANCEL_URL | URL redirect khi huy thanh toan |
 
-    // Access JWT config
-    const jwtConfig = this.configService.get<AppConfig['jwt']>('app.jwt');
-    console.log(jwtConfig.secret);
-  }
-}
-```
+## Quy tac production cho PayOS
 
-### 2. Type-safe Access
+Khi NODE_ENV=production, backend bat buoc co day du 5 bien PayOS:
+- PAYOS_CLIENT_ID
+- PAYOS_API_KEY
+- PAYOS_CHECKSUM_KEY
+- PAYOS_RETURN_URL
+- PAYOS_CANCEL_URL
 
-```typescript
-// ✅ Type-safe với IntelliSense
-const port = this.configService.get<number>('app.app.port');
+Neu thieu, app fail startup ngay.
 
-// ✅ Hoặc với type assertion
-const appConfig = this.configService.get<AppConfig['app']>('app.app');
-```
+## Luu y thuc te
 
-### 3. Direct Environment Access (không khuyến khích)
-
-```typescript
-// ❌ Không khuyến khích - không type-safe
-const port = process.env.PORT;
-
-// ✅ Nên dùng ConfigService
-const port = this.configService.get<number>('app.app.port');
-```
-
-## Environment Variables
-
-### Required Variables
-
-| Variable | Type | Description | Example |
-|----------|------|-------------|---------|
-| `DB_HOST` | string | Database host | `localhost` |
-| `DB_PORT` | string | Database port | `3306` |
-| `DB_USERNAME` | string | Database username | `root` |
-| `DB_PASSWORD` | string | Database password | `your_password` |
-| `DB_NAME` | string | Database name | `crypto_trading_db` |
-| `JWT_SECRET` | string | JWT secret key | `your-secret-key` |
-
-### Optional Variables (có defaults)
-
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `NODE_ENV` | enum | `development` | Environment: `development`, `production`, `test` |
-| `PORT` | number | `3000` | Application port |
-| `APP_NAME` | string | `Cryptocurrency Trading API` | Application name |
-| `REDIS_HOST` | string | `localhost` | Redis host |
-| `REDIS_PORT` | number | `6379` | Redis port |
-| `REDIS_PASSWORD` | string | - | Redis password (optional) |
-| `REDIS_DB` | number | `0` | Redis database number (0-15) |
-| `JWT_EXPIRATION` | string | `24h` | JWT token expiration |
-| `JWT_REFRESH_SECRET` | string | - | JWT refresh secret (optional) |
-| `JWT_REFRESH_EXPIRATION` | string | `7d` | Refresh token expiration |
-| `CORS_ORIGIN` | string | `*` | CORS allowed origins (comma-separated) |
-| `CORS_CREDENTIALS` | boolean | `true` | CORS credentials |
-| `LOG_ENABLED` | boolean | `true` | Enable logging |
-| `LOG_LEVEL` | enum | `info` | Log level: `error`, `warn`, `info`, `debug`, `verbose` |
-| `RATE_LIMIT_TTL` | number | `60` | Rate limit time window (seconds) |
-| `RATE_LIMIT_MAX` | number | `100` | Max requests per time window |
-| `BCRYPT_ROUNDS` | number | `10` | Bcrypt salt rounds |
-| `API_KEY` | string | - | API key (optional) |
-
-## Validation Rules
-
-### Database
-- `DB_PORT`: Must be a valid port number (1-65535)
-- `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`: Required, non-empty strings
-
-### Redis
-- `REDIS_PORT`: Must be a valid port number (1-65535)
-- `REDIS_DB`: Must be between 0-15
-
-### JWT
-- `JWT_SECRET`: Required, non-empty string
-- `JWT_EXPIRATION`: String format (e.g., "24h", "7d", "30m")
-
-### CORS
-- `CORS_ORIGIN`: String or comma-separated list
-- `CORS_CREDENTIALS`: Boolean
-
-### Logging
-- `LOG_LEVEL`: Must be one of: `error`, `warn`, `info`, `debug`, `verbose`
-
-## Error Handling
-
-Nếu validation fails, app sẽ không start và hiển thị lỗi:
-
-```
-Environment validation failed:
-DB_HOST: should not be empty
-DB_PORT: must be a port
-JWT_SECRET: should not be empty
-```
-
-Sửa các lỗi trong file `.env` và restart app.
-
-## Best Practices
-
-### 1. Không commit .env file
-
-```gitignore
-.env
-.env.local
-.env.*.local
-```
-
-### 2. Sử dụng .env.example
-
-- Commit `.env.example` với template
-- Không commit giá trị thực tế
-
-### 3. Production
-
-- Sử dụng environment variables từ hosting platform
-- Không hardcode secrets trong code
-- Rotate secrets định kỳ
-
-### 4. Type Safety
-
-Luôn sử dụng ConfigService thay vì `process.env` trực tiếp:
-
-```typescript
-// ❌ Bad
-const port = process.env.PORT;
-
-// ✅ Good
-const port = this.configService.get<number>('app.app.port');
-```
-
-## Testing
-
-Trong test files, có thể override config:
-
-```typescript
-const module = await Test.createTestingModule({
-  imports: [AppModule],
-})
-  .overrideProvider(ConfigService)
-  .useValue({
-    get: (key: string) => {
-      const testConfig = {
-        'app.app.port': 3001,
-        'app.database.host': 'localhost',
-        // ...
-      };
-      return testConfig[key];
-    },
-  })
-  .compile();
-```
-
-## Troubleshooting
-
-### App không start với validation error
-
-1. Kiểm tra file `.env` có tồn tại không
-2. Kiểm tra tất cả required variables đã được set
-3. Kiểm tra format của các values (port phải là number, etc.)
-4. Xem error message để biết variable nào sai
-
-### Config không được load
-
-1. Kiểm tra `ConfigModule.forRoot()` đã được import trong AppModule
-2. Kiểm tra `envFilePath: '.env'` đúng không
-3. Kiểm tra file `.env` ở root directory
-
-### Type không đúng
-
-1. Đảm bảo sử dụng type assertion: `get<Type>('key')`
-2. Kiểm tra AppConfig interface có đúng không
-3. Sử dụng IntelliSense để verify types
+- Khong commit file .env that.
+- Neu doi env, phai restart backend.
+- Trong logs, uu tien kiem tra thong bao Environment validation failed neu app khong len.

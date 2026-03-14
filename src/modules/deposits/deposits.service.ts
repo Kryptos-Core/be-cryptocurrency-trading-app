@@ -22,7 +22,11 @@ export class DepositsService {
     const checksumKey = this.configService.get<string>('PAYOS_CHECKSUM_KEY');
     
     if (clientId && apiKey && checksumKey) {
-      this.payOS = new PayOS(clientId, apiKey, checksumKey);
+      this.payOS = new PayOS({
+        clientId,
+        apiKey,
+        checksumKey,
+      });
       this.logger.log('PayOS SDK initialized successfully');
     } else {
       this.logger.warn('PayOS config missing (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY). Deposit API will fail if called.');
@@ -35,8 +39,12 @@ export class DepositsService {
     // Generate orderCode: numeric ID that must be unique and <= 9007199254740991
     const orderCode = Number(String(Date.now()).slice(-6) + Math.floor(Math.random() * 10000));
     const depositId = uuidv7();
-    const returnUrl = 'http://localhost:3000/success'; // in a real app this would be a deep link
-    const cancelUrl = 'http://localhost:3000/cancel'; // or back to app
+    const returnUrl = this.configService.get<string>('PAYOS_RETURN_URL');
+    const cancelUrl = this.configService.get<string>('PAYOS_CANCEL_URL');
+
+    if (!returnUrl || !cancelUrl) {
+      throw new Error('PayOS callback URLs are not configured (PAYOS_RETURN_URL, PAYOS_CANCEL_URL)');
+    }
 
     const body = {
       orderCode,
@@ -47,7 +55,7 @@ export class DepositsService {
     };
 
     try {
-      const paymentLinkRes = await this.payOS.createPaymentLink(body);
+      const paymentLinkRes = await this.payOS.paymentRequests.create(body);
       
       const deposit = await this.fiatDepositRepo.createDeposit(
         depositId,
@@ -73,7 +81,7 @@ export class DepositsService {
 
     try {
       // Veryify signature
-      const verifiedData = this.payOS.verifyPaymentWebhookData(webhookData);
+      const verifiedData = await this.payOS.webhooks.verify(webhookData);
       
       this.logger.log(`Received valid webhook data for Order ${verifiedData.orderCode} with status ${verifiedData.code}`);
       
