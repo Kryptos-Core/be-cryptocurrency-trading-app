@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UnauthorizedException } from '@/common/exceptions';
+import { Permission, UserRole } from '@/common/enums';
 
 /**
  * JWT Strategy - Xác thực token và inject user vào request
@@ -11,6 +12,8 @@ import { UnauthorizedException } from '@/common/exceptions';
 export interface JwtPayload {
   sub: string; // user_id (UUID v7)
   email: string;
+  role?: UserRole;
+  permissions?: Permission[];
   iat?: number;
   exp?: number;
 }
@@ -38,6 +41,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       userId: payload.sub,
       email: payload.email,
+      role: payload.role,
+      roles: payload.role ? [payload.role] : [],
+      permissions: payload.permissions || [],
     };
   }
 }

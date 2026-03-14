@@ -19,14 +19,17 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { CurrentUser } from '@/common/decorators';
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import {
   ApiSuccessResponse,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
 } from '@/common/decorators';
+import { Permission, UserRole } from '@/common/enums';
 
 /**
  * Users Controller
@@ -50,6 +53,9 @@ export class UsersController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('Users retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findAll(
@@ -68,6 +74,9 @@ export class UsersController {
     summary: 'Get user statistics',
     description: 'Retrieve statistics about users in the system',
   })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('Statistics retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async getStatistics() {
@@ -99,6 +108,9 @@ export class UsersController {
     description: 'Retrieve a specific user by their ID',
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('User retrieved successfully')
   @ApiNotFoundResponse('User not found')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -137,6 +149,9 @@ export class UsersController {
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @ApiBody({ type: UpdateUserDto })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
+  @RequirePermissions(Permission.USERS_MANAGE)
   @ApiSuccessResponse('User updated successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiNotFoundResponse('User not found')
@@ -155,6 +170,9 @@ export class UsersController {
     description: 'Delete a specific user by their ID (Admin only)',
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
+  @RequirePermissions(Permission.USERS_MANAGE)
   @ApiSuccessResponse('User deleted successfully')
   @ApiNotFoundResponse('User not found')
   @ApiUnauthorizedResponse('Unauthorized')

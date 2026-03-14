@@ -191,6 +191,15 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   WALLET_RECONCILIATION_THRESHOLD?: string = '0.00000001';
+
+  // Hot Wallet Configuration
+  @IsString()
+  @IsOptional()
+  ETH_HOT_WALLET_PRIVATE_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  TRON_HOT_WALLET_PRIVATE_KEY?: string;
 }
 
 /**
@@ -239,6 +248,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'BINANCE_MAINNET_BASE_URL',
     'WALLET_SYNC_INTERVAL',
     'WALLET_RECONCILIATION_THRESHOLD',
+    'ETH_HOT_WALLET_PRIVATE_KEY',
+    'TRON_HOT_WALLET_PRIVATE_KEY',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

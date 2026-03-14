@@ -37,6 +37,28 @@ export class User {
   })
   status!: 'ACTIVE' | 'BANNED' | 'PENDING';
 
+  @Column({
+    type: 'enum',
+    enum: [
+      'GUEST',
+      'TRADER',
+      'VERIFIED_USER',
+      'ADMIN',
+      'RISK_OFFICER',
+      'SUPPORT_AGENT',
+      'MARKET_MAKER',
+    ],
+    default: 'TRADER',
+  })
+  role!:
+    | 'GUEST'
+    | 'TRADER'
+    | 'VERIFIED_USER'
+    | 'ADMIN'
+    | 'RISK_OFFICER'
+    | 'SUPPORT_AGENT'
+    | 'MARKET_MAKER';
+
   @CreateDateColumn()
   created_at!: Date;
 

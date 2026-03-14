@@ -23,7 +23,10 @@ import {
 } from '@nestjs/swagger';
 import { MarketsService } from './markets.service';
 import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { RequireRoles } from '@/common/decorators/require-roles.decorator';
+import { Permission, UserRole } from '@/common/enums';
 import {
   ApiSuccessResponse,
   ApiCreatedResponse,
@@ -338,11 +341,14 @@ export class MarketsController {
    * POST /markets
    */
   @Post()
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Create new market pair',
     description: 'Create a new trading pair (e.g., BTC/USDT)',
   })
   @ApiBody({ type: CreateMarketPairDto })
+  @RequirePermissions(Permission.MARKETS_MANAGE)
   @ApiCreatedResponse('Market pair created successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiConflictResponse('Market pair already exists')
@@ -356,12 +362,15 @@ export class MarketsController {
    * PATCH /markets/:id
    */
   @Patch(':id')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Update market pair',
     description: 'Update a specific market pair by its ID',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiBody({ type: UpdateMarketPairDto })
+  @RequirePermissions(Permission.MARKETS_MANAGE)
   @ApiSuccessResponse('Market pair updated successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiNotFoundResponse('Market pair not found')
@@ -379,12 +388,15 @@ export class MarketsController {
    * DELETE /markets/:id
    */
   @Delete(':id')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete market pair',
     description: 'Soft delete a market pair by setting is_active to false',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
+  @RequirePermissions(Permission.MARKETS_MANAGE)
   @ApiSuccessResponse('Market pair deleted successfully', {
     schema: { example: null },
   })

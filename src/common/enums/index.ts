@@ -46,6 +46,31 @@ export enum UserStatus {
   PENDING = 'PENDING',
 }
 
+/** User role model for RBAC */
+export enum UserRole {
+  GUEST = 'GUEST',
+  TRADER = 'TRADER',
+  VERIFIED_USER = 'VERIFIED_USER',
+  ADMIN = 'ADMIN',
+  RISK_OFFICER = 'RISK_OFFICER',
+  SUPPORT_AGENT = 'SUPPORT_AGENT',
+  MARKET_MAKER = 'MARKET_MAKER',
+}
+
+/** Permission key format: resource:action */
+export enum Permission {
+  USERS_READ = 'users:read',
+  USERS_MANAGE = 'users:manage',
+  CURRENCIES_MANAGE = 'currencies:manage',
+  MARKETS_MANAGE = 'markets:manage',
+  EXCHANGE_SYNC = 'exchange:sync',
+  ORDERS_PLACE = 'orders:place',
+  ORDERS_CANCEL = 'orders:cancel',
+  WALLETS_WITHDRAW = 'wallets:withdraw',
+  RISK_REVIEW = 'risk:review',
+  SUPPORT_CASES = 'support:cases',
+}
+
 // ============================================
 // Deposit Module Enums
 // ============================================

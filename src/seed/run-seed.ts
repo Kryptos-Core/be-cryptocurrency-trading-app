@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { newUuid } from '@/common/utils/uuid.util';
+import { UserRole } from '@/common/enums';
 
 dotenv.config();
 
@@ -56,15 +57,18 @@ async function run() {
       first_name?: string;
       last_name?: string;
       status: 'ACTIVE' | 'BANNED' | 'PENDING';
+      role?: UserRole;
     }> = JSON.parse(fs.readFileSync(usersPath, 'utf-8'));
 
     console.log(`📥 Seeding ${usersData.length} users...`);
     for (const u of usersData) {
       const userId = newUuid();
       const passwordHash = await bcrypt.hash(u.password, SALT_ROUNDS);
+      const role = u.role ?? (u.email.toLowerCase() === 'admin@example.com' ? UserRole.ADMIN : UserRole.TRADER);
+
       await q.query(
-        `INSERT INTO users (user_id, email, password_hash, first_name, last_name, status)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (user_id, email, password_hash, first_name, last_name, status, role)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
           u.email.toLowerCase(),
@@ -72,6 +76,7 @@ async function run() {
           u.first_name ?? null,
           u.last_name ?? null,
           u.status ?? 'ACTIVE',
+          role,
         ],
       );
     }

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
+import { UserRole } from '@/common/enums';
 
 /**
  * Users Repository - Data Access Layer
@@ -90,8 +91,8 @@ export class UsersRepository {
     try {
       const userId = newUuid();
       await this.dataSource.query(
-        'CALL sp_user_create(?, ?, ?, ?, ?)',
-        [userId, email.toLowerCase(), passwordHash, null, null],
+        'CALL sp_user_create(?, ?, ?, ?, ?, ?)',
+        [userId, email.toLowerCase(), passwordHash, null, null, UserRole.TRADER],
       );
       return this.findById(userId) as Promise<User>;
     } catch (error) {
@@ -105,15 +106,16 @@ export class UsersRepository {
    */
   async update(
     userId: string,
-    updates: { email?: string; status?: string },
+    updates: { email?: string; status?: string; role?: UserRole },
   ): Promise<void> {
     try {
       await this.dataSource.query(
-        'CALL sp_user_update(?, ?, ?)',
+        'CALL sp_user_update(?, ?, ?, ?)',
         [
           userId,
           updates.email ? updates.email.toLowerCase() : null,
           updates.status || null,
+          updates.role || null,
         ],
       );
 

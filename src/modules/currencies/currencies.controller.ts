@@ -23,7 +23,10 @@ import {
 } from '@nestjs/swagger';
 import { CurrenciesService } from './currencies.service';
 import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { RequireRoles } from '@/common/decorators/require-roles.decorator';
+import { Permission, UserRole } from '@/common/enums';
 import {
   ApiSuccessResponse,
   ApiCreatedResponse,
@@ -137,11 +140,14 @@ export class CurrenciesController {
    * POST /currencies
    */
   @Post()
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Create new currency',
     description: 'Create a new cryptocurrency entry',
   })
   @ApiBody({ type: CreateCurrencyDto })
+  @RequirePermissions(Permission.CURRENCIES_MANAGE)
   @ApiCreatedResponse('Currency created successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiConflictResponse('Currency symbol already exists')
@@ -155,12 +161,15 @@ export class CurrenciesController {
    * PATCH /currencies/:id
    */
   @Patch(':id')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Update currency',
     description: 'Update a specific currency by its ID',
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
   @ApiBody({ type: UpdateCurrencyDto })
+  @RequirePermissions(Permission.CURRENCIES_MANAGE)
   @ApiSuccessResponse('Currency updated successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiNotFoundResponse('Currency not found')
@@ -178,12 +187,15 @@ export class CurrenciesController {
    * DELETE /currencies/:id
    */
   @Delete(':id')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete currency',
     description: 'Soft delete a currency by setting is_active to false',
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @RequirePermissions(Permission.CURRENCIES_MANAGE)
   @ApiSuccessResponse('Currency deleted successfully', {
     schema: { example: null },
   })

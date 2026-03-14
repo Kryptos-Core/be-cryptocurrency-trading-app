@@ -1,7 +1,10 @@
 import { Controller, Post, Query, UseGuards, ParseBoolPipe } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/common/guards';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { ExchangeInfoSyncService } from './exchange-info-sync.service';
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { RequireRoles } from '@/common/decorators/require-roles.decorator';
+import { Permission, UserRole } from '@/common/enums';
 
 @ApiTags('Exchange')
 @Controller('exchange')
@@ -14,7 +17,9 @@ export class ExchangeController {
    * ExchangeInfo is cached 1h to avoid Binance 418 (IP ban). Use ?forceRefresh=true sparingly.
    */
   @Post('sync-info')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN)
+  @RequirePermissions(Permission.EXCHANGE_SYNC)
   @ApiOperation({
     summary: 'Sync from Binance',
     description:

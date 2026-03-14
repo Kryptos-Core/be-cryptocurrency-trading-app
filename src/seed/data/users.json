@@ -4,27 +4,31 @@
     "password": "Admin@123!",
     "first_name": "Admin",
     "last_name": "User",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "role": "ADMIN"
   },
   {
     "email": "trader1@example.com",
     "password": "Trader@123!",
     "first_name": "Trader",
     "last_name": "One",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "role": "TRADER"
   },
   {
     "email": "trader2@example.com",
     "password": "Trader@123!",
     "first_name": "Trader",
     "last_name": "Two",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "role": "TRADER"
   },
   {
     "email": "trader3@example.com",
     "password": "Trader@123!",
     "first_name": "Trader",
     "last_name": "Three",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "role": "TRADER"
   }
 ]

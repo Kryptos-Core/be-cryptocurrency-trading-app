@@ -218,28 +218,46 @@ export class OnchainTransferService {
     // Set lock
     await this.cacheService.set(lockKey, '1', OnchainTransferService.WITHDRAWAL_LOCK_TTL);
 
+    // Lấy thông tin Hot Wallet và gửi giao dịch thật
+    const provider = this.providerFactory.getProvider(dto.chain);
+    const hotWalletAddress = provider.getHotWalletAddress();
+
+    let txHash: string | null = null;
+    let status = OnchainTxStatus.PENDING;
+
+    try {
+      txHash = await provider.sendTransaction(linkedWallet.address, amount.toString());
+      status = OnchainTxStatus.CONFIRMING;
+    } catch (error) {
+      this.logger.error(`[Withdrawal] Gửi on-chain thất bại cho userId=${userId}:`, error);
+      status = OnchainTxStatus.FAILED;
+      // Trong thực tế, có thể cần cơ chế bù tiền hoặc thông báo cho admin ở đây
+    }
+
     // Tạo bản ghi withdrawal
     const txId = uuidv7();
 
     await this.dataSource.query(
       `INSERT INTO onchain_transactions
-       (tx_id, user_id, linked_wallet_id, chain, type, from_address, to_address, amount, status)
-       VALUES (?, ?, ?, ?, 'WITHDRAWAL', ?, ?, ?, 'PENDING')`,
+       (tx_id, user_id, linked_wallet_id, chain, type, tx_hash, from_address, to_address, amount, status)
+       VALUES (?, ?, ?, ?, 'WITHDRAWAL', ?, ?, ?, ?, ?)`,
       [
         txId,
         userId,
         dto.linkedWalletId,
         dto.chain,
-        'platform', // from = platform hot wallet (placeholder)
+        txHash,
+        hotWalletAddress,
         linkedWallet.address,
         amount.toString(),
+        status,
       ],
     );
 
     // Cache trạng thái để FE poll nhanh
     await this.cacheService.set(
       `withdrawal:status:${txId}`,
-      { txId, status: OnchainTxStatus.PENDING, amount: amount.toString() },
+      { txId, status, amount: amount.toString(), txHash },
       3600,
     );
 

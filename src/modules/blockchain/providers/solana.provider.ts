@@ -1,6 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import {
+  Connection,
+  PublicKey,
+  LAMPORTS_PER_SOL,
+  Keypair,
+  SystemProgram,
+  Transaction,
+  sendAndConfirmTransaction,
+} from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
 import { BlockchainNetwork } from '@/common/enums';
 import {
@@ -17,6 +25,7 @@ import {
 export class SolanaProvider implements IBlockchainProvider {
   private readonly logger = new Logger(SolanaProvider.name);
   private readonly connection: Connection;
+  private readonly hotWallet: Keypair;
 
   constructor(private readonly configService: ConfigService) {
     const rpcUrl =
@@ -24,6 +33,21 @@ export class SolanaProvider implements IBlockchainProvider {
       'https://api.devnet.solana.com';
 
     this.connection = new Connection(rpcUrl, 'confirmed');
+
+    const privateKeyRaw =
+      this.configService.get<string>('app.blockchain.solana.hotWalletPrivateKey') ?? '';
+
+    if (privateKeyRaw) {
+      const secretKey = Buffer.from(privateKeyRaw, 'base64');
+      this.hotWallet = Keypair.fromSecretKey(secretKey);
+    } else {
+      // Devnet: generate ephemeral keypair when no hot-wallet key is configured
+      this.hotWallet = Keypair.generate();
+      this.logger.warn(
+        'SOLANA_HOT_WALLET_PRIVATE_KEY not set — using ephemeral keypair (devnet only)',
+      );
+    }
+
     this.logger.log(`SolanaProvider khởi tạo: devnet → ${rpcUrl}`);
   }
 
@@ -121,6 +145,37 @@ export class SolanaProvider implements IBlockchainProvider {
     } catch {
       return false;
     }
+  }
+
+  async sendTransaction(to: string, amount: string): Promise<string> {
+    try {
+      const toPubkey = new PublicKey(to);
+      const lamports = Math.round(parseFloat(amount) * LAMPORTS_PER_SOL);
+
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: this.hotWallet.publicKey,
+          toPubkey,
+          lamports,
+        }),
+      );
+
+      const txHash = await sendAndConfirmTransaction(
+        this.connection,
+        transaction,
+        [this.hotWallet],
+      );
+
+      this.logger.log(`Solana sendTransaction OK: ${txHash}`);
+      return txHash;
+    } catch (error) {
+      this.logger.error(`Solana sendTransaction thất bại: to=${to} amount=${amount}`, error);
+      throw error;
+    }
+  }
+
+  getHotWalletAddress(): string {
+    return this.hotWallet.publicKey.toBase58();
   }
 
   private buildNotFound(txHash: string): BlockchainTxStatusDto {

@@ -52,4 +52,10 @@ export interface IBlockchainProvider {
 
   /** Kiểm tra address có hợp lệ trên chain này không */
   isValidAddress(address: string): boolean;
+
+  /** Gửi giao dịch từ Hot Wallet sàn */
+  sendTransaction(to: string, amount: string): Promise<string>;
+
+  /** Lấy địa chỉ ví nóng của sàn */
+  getHotWalletAddress(): string;
 }

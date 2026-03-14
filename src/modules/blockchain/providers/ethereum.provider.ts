@@ -16,6 +16,7 @@ import {
 export class EthereumProvider implements IBlockchainProvider {
   private readonly logger = new Logger(EthereumProvider.name);
   private readonly provider: JsonRpcProvider;
+  private readonly wallet: ethers.Wallet | null = null;
 
   constructor(private readonly configService: ConfigService) {
     const rpcUrl =
@@ -23,7 +24,20 @@ export class EthereumProvider implements IBlockchainProvider {
       'https://rpc.sepolia.org';
 
     this.provider = new JsonRpcProvider(rpcUrl);
-    this.logger.log(`EthereumProvider khởi tạo: Sepolia → ${rpcUrl}`);
+
+    const privateKey = this.configService.get<string>(
+      'app.blockchain.ethereum.hotWalletPrivateKey',
+    );
+    if (privateKey) {
+      this.wallet = new ethers.Wallet(privateKey, this.provider);
+      this.logger.log(
+        `EthereumProvider khởi tạo: Sepolia → ${rpcUrl}, HotWallet: ${this.wallet.address}`,
+      );
+    } else {
+      this.logger.warn(
+        `EthereumProvider khởi tạo không có Hot Wallet Private Key!`,
+      );
+    }
   }
 
   getNetwork(): BlockchainNetwork {
@@ -129,5 +143,32 @@ export class EthereumProvider implements IBlockchainProvider {
       to: '',
       value: '0',
     };
+  }
+
+  async sendTransaction(to: string, amount: string): Promise<string> {
+    if (!this.wallet) {
+      throw new Error('Ethereum hot wallet not configured (missing private key)');
+    }
+
+    try {
+      this.logger.log(`Gửi ${amount} ETH tới ${to}...`);
+      const tx = await this.wallet.sendTransaction({
+        to,
+        value: ethers.parseEther(amount),
+      });
+
+      this.logger.log(`Giao dịch ETH đã gửi: ${tx.hash}`);
+      return tx.hash;
+    } catch (error) {
+      this.logger.error(`Lỗi gửi ETH tới ${to}:`, error);
+      throw error;
+    }
+  }
+
+  getHotWalletAddress(): string {
+    if (!this.wallet) {
+      throw new Error('Ethereum hot wallet not configured');
+    }
+    return this.wallet.address;
   }
 }

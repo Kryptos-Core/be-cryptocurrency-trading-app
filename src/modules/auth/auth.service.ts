@@ -11,6 +11,8 @@ import {
   BusinessException,
 } from '@/common/exceptions';
 import { formatName } from '@/utils/helpers';
+import { Permission, UserRole } from '@/common/enums';
+import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 
 /**
  * Auth Service - Business Logic Layer
@@ -131,9 +133,15 @@ export class AuthService {
    * Generate JWT access token
    */
   private generateAccessToken(user: User): string {
+    const isValidRole = (Object.values(UserRole) as string[]).includes(user.role as string);
+    const role = isValidRole ? (user.role as UserRole) : UserRole.TRADER;
+    const permissions = getPermissionsForRole(role) as Permission[];
+
     const payload = {
       userId: user.user_id,
       email: user.email,
+      role,
+      permissions,
       sub: user.user_id, // Keep for compatibility
     };
 

@@ -39,8 +39,24 @@ export class TronProvider implements IBlockchainProvider {
         : this.configService.get<string>('app.blockchain.tron.nileFullHost') ??
           'https://nile.trongrid.io';
 
-    this.tronWeb = new TronWeb({ fullHost });
-    this.logger.log(`TronProvider khởi tạo: ${this.network} → ${fullHost}`);
+    const privateKey = this.configService.get<string>(
+      'app.blockchain.tron.hotWalletPrivateKey',
+    );
+
+    this.tronWeb = new TronWeb({
+      fullHost,
+      privateKey: privateKey || undefined,
+    });
+
+    if (privateKey) {
+      this.logger.log(
+        `TronProvider khởi tạo: ${this.network} → ${fullHost}, HotWallet: ${this.tronWeb.defaultAddress.base58}`,
+      );
+    } else {
+      this.logger.warn(
+        `TronProvider khởi tạo: ${this.network} → ${fullHost} (không có Private Key)`,
+      );
+    }
   }
 
   getNetwork(): BlockchainNetwork {
@@ -142,5 +158,34 @@ export class TronProvider implements IBlockchainProvider {
       to: '',
       value: '0',
     };
+  }
+
+  async sendTransaction(to: string, amount: string): Promise<string> {
+    if (!this.tronWeb.defaultPrivateKey) {
+      throw new Error('TRON hot wallet not configured (missing private key)');
+    }
+
+    try {
+      this.logger.log(`Gửi ${amount} TRX tới ${to}...`);
+      const sunAmount = Math.floor(parseFloat(amount) * 1_000_000);
+      const tx = await this.tronWeb.trx.sendTransaction(to, sunAmount);
+
+      if (tx.result) {
+        this.logger.log(`Giao dịch TRX đã gửi: ${tx.txid}`);
+        return tx.txid;
+      } else {
+        throw new Error(`TRON sendTransaction failed: ${JSON.stringify(tx)}`);
+      }
+    } catch (error) {
+      this.logger.error(`Lỗi gửi TRX tới ${to}:`, error);
+      throw error;
+    }
+  }
+
+  getHotWalletAddress(): string {
+    if (!this.tronWeb.defaultAddress.base58) {
+      throw new Error('TRON hot wallet not configured');
+    }
+    return this.tronWeb.defaultAddress.base58;
   }
 }

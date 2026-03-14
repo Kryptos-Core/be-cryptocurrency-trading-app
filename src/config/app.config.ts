@@ -81,6 +81,7 @@ export interface AppConfig {
       nileFullHost: string;
       shastaFullHost: string;
       defaultNetwork: 'TRON_NILE' | 'TRON_SHASTA';
+      hotWalletPrivateKey?: string;
     };
     solana: {
       devnetUrl: string;
@@ -88,6 +89,7 @@ export interface AppConfig {
     ethereum: {
       sepoliaRpcUrl: string;
       chainId: number;
+      hotWalletPrivateKey?: string;
     };
   };
   /** Price oracle: on-demand OHLCV. App uses Binance only (no DB persist). UNISWAP_* env not used. */
@@ -216,12 +218,15 @@ export class AppConfigBuilder {
     solanaDevnetUrl: string,
     ethSepoliaRpcUrl: string,
     ethSepoliaChainId: number,
+    tronHotWalletPrivateKey?: string,
+    ethHotWalletPrivateKey?: string,
   ): this {
     this.config.blockchain = {
       tron: {
         nileFullHost: tronNileFullHost,
         shastaFullHost: tronShastaFullHost,
         defaultNetwork: tronDefaultNetwork as 'TRON_NILE' | 'TRON_SHASTA',
+        hotWalletPrivateKey: tronHotWalletPrivateKey,
       },
       solana: {
         devnetUrl: solanaDevnetUrl,
@@ -229,6 +234,7 @@ export class AppConfigBuilder {
       ethereum: {
         sepoliaRpcUrl: ethSepoliaRpcUrl,
         chainId: ethSepoliaChainId,
+        hotWalletPrivateKey: ethHotWalletPrivateKey,
       },
     };
     return this;
@@ -328,6 +334,8 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       (env as any).SOLANA_DEVNET_URL || 'https://api.devnet.solana.com',
       (env as any).ETH_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
       parseInt((env as any).ETH_SEPOLIA_CHAIN_ID, 10) || 11155111,
+      (env as any).TRON_HOT_WALLET_PRIVATE_KEY,
+      (env as any).ETH_HOT_WALLET_PRIVATE_KEY,
     )
     .setPriceOracle(
       (env as any).UNISWAP_SUBGRAPH_URL ||

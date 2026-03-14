@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
+import { UserRole } from '@/common/enums';
 
 /**
  * Auth Repository - Data Access Layer for Authentication
@@ -35,16 +36,17 @@ export class AuthRepository {
    * Procedure returns the newly created user_id
    */
   async createUser(
-    email: string, 
+    email: string,
     passwordHash: string,
     firstName?: string,
-    lastName?: string
+    lastName?: string,
+    role: UserRole = UserRole.TRADER,
   ): Promise<User> {
     try {
       const userId = newUuid();
       await this.dataSource.query(
-        'CALL sp_user_create(?, ?, ?, ?, ?)',
-        [userId, email.toLowerCase(), passwordHash, firstName || null, lastName || null],
+        'CALL sp_user_create(?, ?, ?, ?, ?, ?)',
+        [userId, email.toLowerCase(), passwordHash, firstName || null, lastName || null, role],
       );
 
       // Fetch and return created user
