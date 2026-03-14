@@ -86,6 +86,31 @@ export class MarketsController {
     type: String,
     description: 'Filter by quote currency symbol (e.g. USDT)',
   })
+  @ApiQuery({
+    name: 'quoteSymbols',
+    required: false,
+    type: String,
+    description: 'Filter by multiple quote symbols (comma-separated, e.g. USDT,USDC)',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['symbol', 'base', 'quote', 'createdAt'],
+    description: 'Sort field for market list',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort direction',
+  })
+  @ApiQuery({
+    name: 'fuzzySearch',
+    required: false,
+    type: Boolean,
+    example: false,
+    description: 'When true, search also matches base/quote currency names',
+  })
   @ApiSuccessResponse('Market pairs retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findAll(
@@ -98,6 +123,10 @@ export class MarketsController {
     @Query('search') search?: string,
     @Query('baseSymbol') baseSymbol?: string,
     @Query('quoteSymbol') quoteSymbol?: string,
+    @Query('quoteSymbols') quoteSymbols?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('fuzzySearch', new ParseBoolPipe({ optional: true })) fuzzySearch: boolean = false,
   ) {
     return this.marketsService.findAll(
       page,
@@ -107,6 +136,10 @@ export class MarketsController {
       search,
       baseSymbol,
       quoteSymbol,
+      quoteSymbols,
+      sortBy,
+      sortOrder,
+      fuzzySearch,
     );
   }
 

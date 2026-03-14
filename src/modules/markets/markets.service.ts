@@ -15,6 +15,9 @@ const CHANGE_PERCENT_DECIMALS = 2;
 /** Decimal places for price/amount strings (e.g. changeAmount24h). */
 const PRICE_AMOUNT_DECIMALS = 18;
 
+type MarketsSortBy = 'symbol' | 'base' | 'quote' | 'createdAt';
+type MarketsSortOrder = 'asc' | 'desc';
+
 /**
  * Markets Service - Business Logic Layer
  * Service Layer Pattern: Business logic tập trung
@@ -54,6 +57,10 @@ export class MarketsService implements OnModuleInit {
     search?: string | null,
     baseSymbol?: string | null,
     quoteSymbol?: string | null,
+    quoteSymbols?: string | null,
+    sortBy?: string | null,
+    sortOrder?: string | null,
+    fuzzySearch: boolean = false,
   ): Promise<{
     pairs: MarketPair[];
     total: number;
@@ -64,7 +71,10 @@ export class MarketsService implements OnModuleInit {
     const searchNorm = search?.trim() ?? '';
     const baseNorm = baseSymbol?.trim() ?? '';
     const quoteNorm = quoteSymbol?.trim() ?? '';
-    const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}:${searchNorm}:${baseNorm}:${quoteNorm}`;
+    const quoteSymbolsNorm = this.normalizeQuoteSymbols(quoteSymbols);
+    const sortByNorm = this.normalizeSortBy(sortBy);
+    const sortOrderNorm = this.normalizeSortOrder(sortOrder);
+    const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}:${searchNorm}:${baseNorm}:${quoteNorm}:${quoteSymbolsNorm.join('|')}:${sortByNorm}:${sortOrderNorm}:${fuzzySearch}`;
 
     const result = await this.cacheService.getOrSet(
       cacheKey,
@@ -74,6 +84,10 @@ export class MarketsService implements OnModuleInit {
           search: searchNorm || undefined,
           baseSymbol: baseNorm || undefined,
           quoteSymbol: quoteNorm || undefined,
+          quoteSymbols: quoteSymbolsNorm,
+          sortBy: sortByNorm,
+          sortOrder: sortOrderNorm,
+          fuzzySearch,
         });
       },
       this.CACHE_TTL,
@@ -87,6 +101,10 @@ export class MarketsService implements OnModuleInit {
         search: searchNorm || undefined,
         baseSymbol: baseNorm || undefined,
         quoteSymbol: quoteNorm || undefined,
+        quoteSymbols: quoteSymbolsNorm,
+        sortBy: sortByNorm,
+        sortOrder: sortOrderNorm,
+        fuzzySearch,
       });
       if (fresh.data.length > 0) {
         await this.cacheService.set(cacheKey, fresh, this.CACHE_TTL);
@@ -110,6 +128,30 @@ export class MarketsService implements OnModuleInit {
       limit: result.limit,
       ...(tickers != null && { tickers }),
     };
+  }
+
+  private normalizeQuoteSymbols(raw?: string | null): string[] {
+    if (!raw) return [];
+    return Array.from(
+      new Set(
+        raw
+          .split(',')
+          .map((item) => item.trim().toUpperCase())
+          .filter((item) => item.length > 0),
+      ),
+    );
+  }
+
+  private normalizeSortBy(raw?: string | null): MarketsSortBy {
+    const value = (raw ?? '').trim();
+    if (value === 'base' || value === 'quote' || value === 'createdAt') return value;
+    return 'symbol';
+  }
+
+  private normalizeSortOrder(raw?: string | null): MarketsSortOrder {
+    const value = (raw ?? '').trim().toLowerCase();
+    if (value === 'desc') return 'desc';
+    return 'asc';
   }
 
   /**

@@ -200,6 +200,25 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     limit: number = 10,
     options?: any,
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
+    const hasAdvancedOptions =
+      (Array.isArray(options?.quoteSymbols) && options.quoteSymbols.length > 0) ||
+      options?.sortBy != null ||
+      options?.sortOrder != null ||
+      options?.fuzzySearch === true;
+
+    if (hasAdvancedOptions) {
+      return this.findAllWithAdvancedQuery(page, limit, {
+        includeInactive: options?.includeInactive ?? false,
+        search: options?.search ?? null,
+        baseSymbol: options?.baseSymbol ?? null,
+        quoteSymbol: options?.quoteSymbol ?? null,
+        quoteSymbols: Array.isArray(options?.quoteSymbols) ? options.quoteSymbols : [],
+        sortBy: options?.sortBy ?? 'symbol',
+        sortOrder: options?.sortOrder ?? 'asc',
+        fuzzySearch: options?.fuzzySearch === true,
+      });
+    }
+
     const hasFilter =
       (options?.search != null && String(options.search).trim() !== '') ||
       (options?.baseSymbol != null && String(options.baseSymbol).trim() !== '') ||
@@ -214,6 +233,74 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       });
     }
     return this.findAll(page, limit, options?.includeInactive ?? false);
+  }
+
+  private async findAllWithAdvancedQuery(
+    page: number,
+    limit: number,
+    options: {
+      includeInactive?: boolean;
+      search?: string | null;
+      baseSymbol?: string | null;
+      quoteSymbol?: string | null;
+      quoteSymbols?: string[];
+      sortBy?: 'symbol' | 'base' | 'quote' | 'createdAt';
+      sortOrder?: 'asc' | 'desc';
+      fuzzySearch?: boolean;
+    },
+  ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
+    try {
+      const skip = (page - 1) * limit;
+      const includeInactive = options.includeInactive ?? false;
+      const search = options.search?.trim() ? options.search.trim().toUpperCase() : null;
+      const baseSymbol = options.baseSymbol?.trim() ? options.baseSymbol.trim().toUpperCase() : null;
+      const quoteSymbol = options.quoteSymbol?.trim()
+        ? options.quoteSymbol.trim().toUpperCase()
+        : null;
+      const quoteSymbols = (options.quoteSymbols ?? [])
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean);
+      const quoteSymbolsCsv = quoteSymbols.length > 0 ? quoteSymbols.join(',') : null;
+
+      const sortByParam =
+        options.sortBy === 'createdAt' ? 'createdat' : (options.sortBy ?? 'symbol').toLowerCase();
+      const sortOrder = options.sortOrder === 'desc' ? 'desc' : 'asc';
+      const fuzzySearch = options.fuzzySearch === true;
+
+      const result = await this.dataSource.query(
+        'CALL sp_market_find_all_advanced(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          skip,
+          limit,
+          includeInactive,
+          search,
+          baseSymbol,
+          quoteSymbol,
+          quoteSymbolsCsv,
+          sortByParam,
+          sortOrder,
+          fuzzySearch,
+        ],
+      );
+
+      await this.dataSource.query('CALL sp_market_count_advanced(?, ?, ?, ?, ?, ?, @total)', [
+        includeInactive,
+        search,
+        baseSymbol,
+        quoteSymbol,
+        quoteSymbolsCsv,
+        fuzzySearch,
+      ]);
+      const totalResult = await this.dataSource.query('SELECT @total as total');
+      const total = Number(totalResult[0]?.total ?? 0);
+      const rows = result?.[0] || [];
+      const data = rows.map((row: any) => this.mapProcedureResultToEntity(row));
+
+      return { data, total, page, limit };
+    } catch (error) {
+      this.logger.error('Error finding market pairs with advanced query', error);
+      throw error;
+    }
   }
 
   /**
