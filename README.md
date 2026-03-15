@@ -75,6 +75,33 @@ Swagger (non-production): http://localhost:3000/api/docs
 	- POST /api/v1/deposits/payos-webhook
 - Trong production, app bat buoc co day du cac bien env PayOS.
 
+## Daily Treasury Hardening (Development)
+
+- Run E2E nap/rut + health check:
+
+```bash
+npm run treasury:daily
+```
+
+- Runbook chi tiet: `docs/TREASURY_DAILY_RUNBOOK.md`
+
+- Dang ky Windows Task Scheduler:
+
+```bash
+npm run treasury:schedule:register
+```
+
+- Optional env template cho full treasury E2E:
+	- `scripts/treasury-e2e.env.example`
+
+- Dev defaults trong scheduler runner:
+	- `TREASURY_E2E_ALLOW_SKIP=true`
+	- `TREASURY_HEALTH_FAIL_ON_CRITICAL=false`
+
+- Export reconcile history JSON (RBAC: ADMIN/RISK_OFFICER):
+	- `POST /api/v1/wallets/reconciliation-report/export?limit=100`
+	- output: `reports/reconciliation/YYYY-MM-DD.json`
+
 ## Tai khoan test sau khi seed
 
 | Email | Password | Role |

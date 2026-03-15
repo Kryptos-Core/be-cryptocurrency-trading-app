@@ -1,0 +1,63 @@
+[
+  {
+    "reportAt": "2026-03-15T19:15:06.829Z",
+    "actorUserId": "019cedd2-3f47-7a3a-9fc3-49679b18ea5c",
+    "limit": 20,
+    "summary": {
+      "checked": 6,
+      "balanced": 0,
+      "discrepancyDetected": 6,
+      "failed": 0
+    },
+    "items": [
+      {
+        "userId": "019cef17-45d7-7bed-9873-4876b935ee2a",
+        "currencyId": "019cef17-45d7-7bed-9873-4871eacc336e",
+        "status": "DISCREPANCY_DETECTED",
+        "internalBalance": "1.349999999999999991",
+        "externalBalance": "10000",
+        "discrepancy": "9998.65"
+      },
+      {
+        "userId": "019cef17-45d7-7bed-9873-4876b935ee2a",
+        "currencyId": "019cef17-45d7-7bed-9873-48724b1b6cb6",
+        "status": "DISCREPANCY_DETECTED",
+        "internalBalance": "850.000000000000000000",
+        "externalBalance": "10000",
+        "discrepancy": "9150"
+      },
+      {
+        "userId": "019cef17-45d7-7bed-9873-4874fd96724a",
+        "currencyId": "019cef17-45d7-7bed-9873-48724b1b6cb6",
+        "status": "DISCREPANCY_DETECTED",
+        "internalBalance": "149.849999999999999991",
+        "externalBalance": "10000",
+        "discrepancy": "9850.15"
+      },
+      {
+        "userId": "019cef17-45d7-7bed-9873-4874fd96724a",
+        "currencyId": "019cef17-45d7-7bed-9873-4871eacc336e",
+        "status": "DISCREPANCY_DETECTED",
+        "internalBalance": "9.000000000000000000",
+        "externalBalance": "10000",
+        "discrepancy": "9991"
+      },
+      {
+        "userId": "019cef17-45d7-7bed-9873-4875bfeda781",
+        "currencyId": "019cef17-45d7-7bed-9873-48724b1b6cb6",
+        "status": "DISCREPANCY_DETECTED",
+        "internalBalance": "1000.000000000000000000",
+        "externalBalance": "10000",
+        "discrepancy": "9000"
+      },
+      {
+        "userId": "019cef17-45d7-7bed-9873-4875bfeda781",
+        "currencyId": "019cef17-45d7-7bed-9873-4871eacc336e",
+        "status": "DISCREPANCY_DETECTED",
+        "internalBalance": "0.000000000000000000",
+        "externalBalance": "10000",
+        "discrepancy": "10000"
+      }
+    ]
+  }
+]

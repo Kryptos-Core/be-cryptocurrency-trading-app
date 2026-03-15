@@ -1,5 +1,5 @@
-import { IsEnum, IsNotEmpty, IsString, Matches } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BlockchainNetwork } from '@/common/enums';
 
 /** Yêu cầu rút tiền — gửi coin từ platform về ví liên kết */
@@ -30,4 +30,14 @@ export class RequestWithdrawalDto {
     message: 'amount phải là số decimal hợp lệ',
   })
   amount!: string;
+
+  @ApiPropertyOptional({
+    description: 'Idempotency key do client gửi để chống submit trùng',
+    example: 'withdraw-20260316-0001',
+    maxLength: 64,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  idempotencyKey?: string;
 }

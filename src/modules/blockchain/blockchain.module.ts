@@ -9,6 +9,8 @@ import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { WalletLinkingService } from './wallet-linking.service';
 import { OnchainTransferService } from './onchain-transfer.service';
 import { BlockchainController } from './blockchain.controller';
+import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 
 /**
  * Blockchain Module
@@ -19,7 +21,11 @@ import { BlockchainController } from './blockchain.controller';
  * - On-chain Transfer (Nạp/Rút/Chuyển)
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction])],
+  imports: [
+    TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction]),
+    WalletsModule,
+    CurrenciesModule,
+  ],
   controllers: [BlockchainController],
   providers: [
     // Blockchain providers (Strategy Pattern)

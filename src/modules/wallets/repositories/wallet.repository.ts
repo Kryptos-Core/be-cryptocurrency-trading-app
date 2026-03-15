@@ -148,4 +148,24 @@ export class WalletRepository extends BaseRepository<Wallet> {
 
     return this.mapRowToWallet(updated);
   }
+
+  /**
+   * Fetch wallet user/currency pairs for reconciliation batch jobs.
+   */
+  async findWalletPairs(limit: number = 100): Promise<Array<{ userId: string; currencyId: string }>> {
+    const safeLimit = Math.min(Math.max(limit, 1), 1000);
+    const rows = await this.dataSource.query(
+      `SELECT user_id, currency_id
+       FROM wallets
+       GROUP BY user_id, currency_id
+       ORDER BY MAX(updated_at) DESC
+       LIMIT ?`,
+      [safeLimit],
+    );
+
+    return (rows || []).map((row: any) => ({
+      userId: String(row.user_id),
+      currencyId: String(row.currency_id),
+    }));
+  }
 }

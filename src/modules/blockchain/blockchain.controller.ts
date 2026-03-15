@@ -15,15 +15,15 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/common/guards';
-import { CurrentUser } from '@/common/decorators';
+import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
+import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
 import {
   ApiSuccessResponse,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
 } from '@/common/decorators';
 import { BadRequestException } from '@/common/exceptions';
-import { BlockchainNetwork } from '@/common/enums';
+import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
 import { WalletLinkingService } from './wallet-linking.service';
 import { OnchainTransferService } from './onchain-transfer.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
@@ -32,6 +32,7 @@ import {
   VerifyLinkDto,
   SubmitDepositDto,
   RequestWithdrawalDto,
+  ManualWithdrawalActionDto,
 } from './dto';
 
 /**
@@ -238,6 +239,27 @@ export class BlockchainController {
   }
 
   /**
+   * Settle nạp tiền theo txId (dùng cho tx đang CONFIRMING)
+   * POST /blockchain/deposit/:txId/settle
+   */
+  @Post('deposit/:txId/settle')
+  @ApiOperation({
+    summary: 'Settle nạp tiền on-chain',
+    description:
+      'Re-check trạng thái on-chain và credit wallet ledger khi giao dịch đã CONFIRMED.',
+  })
+  @ApiParam({ name: 'txId', description: 'ID giao dịch nạp on-chain' })
+  @ApiSuccessResponse('Settle nạp tiền thành công')
+  @ApiBadRequestResponse('Giao dịch nạp không hợp lệ hoặc chưa confirm')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  async settleDeposit(
+    @CurrentUser('userId') userId: string,
+    @Param('txId') txId: string,
+  ) {
+    return this.onchainTransferService.settleDepositByTxId(userId, txId);
+  }
+
+  /**
    * Yêu cầu rút tiền
    * POST /blockchain/withdraw/request
    */
@@ -255,6 +277,87 @@ export class BlockchainController {
     @Body() dto: RequestWithdrawalDto,
   ) {
     return this.onchainTransferService.requestWithdrawal(userId, dto);
+  }
+
+  /**
+   * Duyệt yêu cầu rút tiền manual
+   * POST /blockchain/withdraw/manual/:txId/approve
+   */
+  @Post('withdraw/manual/:txId/approve')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.RISK_REVIEW)
+  @ApiOperation({
+    summary: 'Approve manual withdrawal',
+    description:
+      'Dùng cho luồng hybrid khi amount vượt ngưỡng auto-send. Sẽ gửi on-chain và settle ledger.',
+  })
+  @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền pending manual' })
+  @ApiSuccessResponse('Approve manual withdrawal thành công')
+  @ApiBadRequestResponse('Giao dịch không hợp lệ hoặc không còn trạng thái pending review')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  async approveManualWithdrawal(
+    @CurrentUser('userId') actorUserId: string,
+    @Param('txId') txId: string,
+    @Body() _dto: ManualWithdrawalActionDto,
+  ) {
+    return this.onchainTransferService.approveManualWithdrawal(actorUserId, txId);
+  }
+
+  /**
+   * Từ chối yêu cầu rút tiền manual
+   * POST /blockchain/withdraw/manual/:txId/reject
+   */
+  @Post('withdraw/manual/:txId/reject')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.RISK_REVIEW)
+  @ApiOperation({
+    summary: 'Reject manual withdrawal',
+    description:
+      'Từ chối yêu cầu manual review và hoàn frozen balance về available.',
+  })
+  @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền pending manual' })
+  @ApiSuccessResponse('Reject manual withdrawal thành công')
+  @ApiBadRequestResponse('Giao dịch không hợp lệ hoặc không còn trạng thái pending review')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  async rejectManualWithdrawal(
+    @CurrentUser('userId') actorUserId: string,
+    @Param('txId') txId: string,
+    @Body() dto: ManualWithdrawalActionDto,
+  ) {
+    return this.onchainTransferService.rejectManualWithdrawal(
+      actorUserId,
+      txId,
+      dto.reason,
+    );
+  }
+
+  /**
+   * Worker endpoint để xử lý hàng chờ manual withdrawal
+   * POST /blockchain/withdraw/manual/process-pending?limit=20
+   */
+  @Post('withdraw/manual/process-pending')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.RISK_REVIEW)
+  @ApiOperation({
+    summary: 'Process pending manual withdrawals',
+    description:
+      'Worker/job gọi endpoint này để xử lý batch các withdrawal đang pending manual review.',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiSuccessResponse('Xử lý batch pending manual withdrawal thành công')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  async processPendingManualWithdrawals(
+    @CurrentUser('userId') actorUserId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.onchainTransferService.processPendingManualWithdrawals(
+      actorUserId,
+      parsedLimit,
+    );
   }
 
   // ============ LỊCH SỬ GIAO DỊCH ============

@@ -12,13 +12,14 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { WalletsService } from './wallets.service';
-import { JwtAuthGuard } from '@/common/guards';
-import { CurrentUser } from '@/common/decorators';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
 import {
   ApiSuccessResponse,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
 } from '@/common/decorators';
+import { Permission, UserRole } from '@/common/enums';
 
 /**
  * Wallets Controller
@@ -147,6 +148,33 @@ export class WalletsController {
     @Query('currencyId') currencyId: string,
   ) {
     return this.walletsService.reconcileBalance(userId, currencyId);
+  }
+
+  /**
+   * Export reconciliation report to daily JSON file.
+   * POST /wallets/reconciliation-report/export?limit=100
+   */
+  @Post('reconciliation-report/export')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.RISK_REVIEW)
+  @ApiOperation({
+    summary: 'Export daily reconciliation report',
+    description:
+      'Runs reconciliation batch and appends a JSON entry to reports/reconciliation/YYYY-MM-DD.json',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
+  @ApiSuccessResponse('Reconciliation report exported successfully')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async exportReconciliationReport(
+    @CurrentUser('userId') actorUserId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 100;
+    return this.walletsService.exportDailyReconciliationReport(
+      actorUserId,
+      parsedLimit,
+    );
   }
 
 }

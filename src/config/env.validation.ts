@@ -205,6 +205,38 @@ export class EnvironmentVariables {
   @IsOptional()
   BLOCKCHAIN_ALLOW_TEST_SIGNATURE?: boolean = false;
 
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX?: string = '0';
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_ETH_SYMBOL?: string = 'ETH';
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_SOL_SYMBOL?: string = 'SOL';
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_TRON_SYMBOL?: string = 'TRX';
+
   // PayOS Configuration
   @IsString()
   @IsOptional()
@@ -292,6 +324,14 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'ETH_HOT_WALLET_PRIVATE_KEY',
     'TRON_HOT_WALLET_PRIVATE_KEY',
     'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA',
+    'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL',
+    'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL',
+    'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL',
     'PAYOS_CLIENT_ID',
     'PAYOS_API_KEY',
     'PAYOS_CHECKSUM_KEY',

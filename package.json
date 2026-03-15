@@ -22,6 +22,11 @@
     "migration:show": "npm run typeorm -- migration:show -d src/config/data-source.ts",
     "db:seed": "ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
     "db:reset": "npm run db:seed",
+    "treasury:e2e": "ts-node -r tsconfig-paths/register scripts/daily-testnet-deposit-withdraw-e2e.ts",
+    "treasury:health": "ts-node -r tsconfig-paths/register scripts/daily-treasury-health-check.ts",
+    "treasury:daily": "npm run treasury:e2e && npm run treasury:health",
+    "treasury:schedule:register": "powershell -ExecutionPolicy Bypass -File scripts/register-treasury-daily-task.ps1",
+    "treasury:schedule:unregister": "powershell -ExecutionPolicy Bypass -File scripts/unregister-treasury-daily-task.ps1",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
