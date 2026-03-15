@@ -8,6 +8,7 @@ export interface OrderBookOrder {
   user_id: string;
   side: 'BUY' | 'SELL';
   type: 'LIMIT' | 'MARKET';
+  time_in_force?: 'GTC' | 'IOC' | 'FOK' | string;
   price: string | null;
   amount: string;
   filled_amount: string;

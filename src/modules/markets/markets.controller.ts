@@ -297,7 +297,7 @@ export class MarketsController {
 
   /**
    * Get OHLCV by pair ID
-   * GET /markets/:id/ohlcv?interval=1h&limit=100&range=1d
+    * GET /markets/:id/ohlcv?limit=100&range=1d
    * range: 1d | 1M | 3M | 1y | 5y (filter by last 1 day, 1 month, 3 months, 1 year, 5 years)
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
@@ -307,7 +307,6 @@ export class MarketsController {
     description: 'Get candlestick data for a market pair. Use range to filter by time: 1d, 1M, 3M, 1y, 5y',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiQuery({ name: 'interval', required: false, type: String, example: '1h' })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
   @ApiQuery({
     name: 'range',
@@ -318,15 +317,14 @@ export class MarketsController {
   })
   @ApiSuccessResponse('OHLCV retrieved successfully')
   @ApiNotFoundResponse('Market pair not found')
-  @ApiBadRequestResponse('Invalid interval')
+  @ApiBadRequestResponse('Invalid range')
   @ApiUnauthorizedResponse('Unauthorized')
   async getOHLCV(
     @Param('id') id: string,
-    @Query('interval') interval: string = '1h',
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
     @Query('range') range?: string,
   ) {
-    return this.marketsService.getOHLCV(id, interval, limit, range);
+    return this.marketsService.getOHLCV(id, limit, range);
   }
 
   /**

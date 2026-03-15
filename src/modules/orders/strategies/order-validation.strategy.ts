@@ -12,6 +12,8 @@ export interface OrderValidationContext {
   timeInForce?: string;
   minOrderAmount: string;
   availableBalance: string;
+  amountScale?: number;
+  priceScale?: number;
 }
 
 /**
@@ -26,7 +28,46 @@ export class OrderValidationStrategy implements IOrderValidationStrategy {
   validate(context: OrderValidationContext): void {
     this.validateAmount(context);
     this.validatePrice(context);
+    this.validatePrecision(context);
     this.validateBalance(context);
+  }
+
+  private validatePrecision(context: OrderValidationContext): void {
+    const amountScale = Number.isInteger(context.amountScale)
+      ? (context.amountScale as number)
+      : 18;
+    const amountDecimals = this.countDecimals(context.amount);
+    if (amountDecimals > amountScale) {
+      throw new ValidationException(
+        `Amount supports up to ${amountScale} decimal places`,
+        {
+          amount: context.amount,
+          amountScale,
+        },
+      );
+    }
+
+    if (context.type === 'MARKET') return;
+
+    const priceScale = Number.isInteger(context.priceScale)
+      ? (context.priceScale as number)
+      : 18;
+    const priceDecimals = this.countDecimals(context.price ?? '0');
+    if (priceDecimals > priceScale) {
+      throw new ValidationException(
+        `Price supports up to ${priceScale} decimal places`,
+        {
+          price: context.price,
+          priceScale,
+        },
+      );
+    }
+  }
+
+  private countDecimals(value: string): number {
+    const normalized = value.trim();
+    if (!normalized.includes('.')) return 0;
+    return normalized.split('.')[1]?.length ?? 0;
   }
 
   private validateAmount(context: OrderValidationContext): void {

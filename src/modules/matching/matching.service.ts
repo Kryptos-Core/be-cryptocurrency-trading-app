@@ -53,6 +53,18 @@ export class MatchingService {
 
     try {
       await this.ensureBookLoaded(pairId);
+
+      const tif = (takerOrder.time_in_force ?? 'GTC').toUpperCase();
+      if (tif === 'FOK') {
+        const canFullyFill = await this.canFullyFillOrder({ pairId, takerOrder });
+        if (!canFullyFill) {
+          this.logger.log(
+            `FOK order ${takerOrder.order_id} cannot be fully filled now; skip execution`,
+          );
+          return [];
+        }
+      }
+
       const context: MatchingContext = {
         pairId,
         takerOrder,
@@ -109,7 +121,11 @@ export class MatchingService {
       const takerRemaining =
         parseFloat(takerOrder.remaining) -
         results.reduce((sum, r) => sum + parseFloat(r.amount), 0);
-      if (takerRemaining > 0 && ['OPEN', 'PARTIAL'].includes(takerOrder.status)) {
+      if (
+        takerRemaining > 0 &&
+        ['OPEN', 'PARTIAL'].includes(takerOrder.status) &&
+        (takerOrder.time_in_force ?? 'GTC').toUpperCase() === 'GTC'
+      ) {
         this.orderBookService.addOrder({
           ...takerOrder,
           remaining: String(takerRemaining),
@@ -124,6 +140,43 @@ export class MatchingService {
     } finally {
       await this.redisService.del(lockKey);
     }
+  }
+
+  private async canFullyFillOrder(params: {
+    pairId: string;
+    takerOrder: OrderBookOrder;
+  }): Promise<boolean> {
+    const { pairId, takerOrder } = params;
+    const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
+    const makers = await this.matchingRepository.getOpenOrdersForPair(
+      pairId,
+      oppositeSide,
+    );
+
+    const takerPrice = takerOrder.price ? parseFloat(takerOrder.price) : null;
+    let remaining = parseFloat(takerOrder.remaining);
+
+    for (const maker of makers) {
+      if (remaining <= 0) break;
+
+      const makerRemaining = parseFloat(maker.remaining);
+      if (!Number.isFinite(makerRemaining) || makerRemaining <= 0) continue;
+
+      if (takerOrder.type === 'LIMIT') {
+        const makerPrice = maker.price ? parseFloat(maker.price) : NaN;
+        if (!Number.isFinite(makerPrice)) continue;
+
+        const priceCrosses =
+          takerOrder.side === 'BUY'
+            ? (takerPrice === null || makerPrice <= takerPrice)
+            : (takerPrice === null || makerPrice >= takerPrice);
+        if (!priceCrosses) continue;
+      }
+
+      remaining -= Math.min(remaining, makerRemaining);
+    }
+
+    return remaining <= 0;
   }
 
   /** Load OPEN/PARTIAL orders from DB into in-memory book (Database Procedure Pattern). */

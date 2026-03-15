@@ -747,17 +747,26 @@ export class MarketsService implements OnModuleInit {
     '5y': 5 * 365 * 24 * 60 * 60 * 1000,
   };
 
+  /** Range → interval policy (single source for OHLCV endpoint). */
+  private static readonly RANGE_INTERVAL: Record<string, string> = {
+    '1d': '1m',
+    '1M': '1h',
+    '3M': '4h',
+    '1y': '1d',
+    '5y': '1d',
+  };
+
   /**
    * Get OHLCV data for a market pair (on-demand from Price Oracle; no DB).
    * @param range Optional: 1d | 1M | 3M | 1y | 5y — filter candles to this time range
    */
   async getOHLCV(
     pairId: string,
-    interval: string = '1h',
     limit: number = 100,
     range?: string,
   ) {
     const pair = await this.findOne(pairId);
+    const interval = this.resolveIntervalByRange(range);
     const intervalSec = this.resolveIntervalSeconds(interval);
     const rangeMs = range ? MarketsService.RANGE_MS[range] : 7 * 24 * 60 * 60 * 1000;
     const fromDate = new Date(Date.now() - rangeMs);
@@ -789,6 +798,21 @@ export class MarketsService implements OnModuleInit {
         volume: c.volume,
       })),
     };
+  }
+
+  private resolveIntervalByRange(range?: string): string {
+    if (!range) {
+      return '1h';
+    }
+
+    const interval = MarketsService.RANGE_INTERVAL[range];
+    if (!interval) {
+      throw new BadRequestException(
+        `Invalid range. Supported: ${Object.keys(MarketsService.RANGE_INTERVAL).join(', ')}`,
+      );
+    }
+
+    return interval;
   }
 
   /**

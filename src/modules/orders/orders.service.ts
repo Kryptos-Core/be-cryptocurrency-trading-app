@@ -80,6 +80,8 @@ export class OrdersService {
       timeInForce: dto.timeInForce,
       minOrderAmount: pair.min_order_amount ?? '0.0001',
       availableBalance: dto.side === 'BUY' ? availableQuote : availableBase,
+      amountScale: Number(pair.amount_scale ?? 18),
+      priceScale: Number(pair.price_scale ?? 18),
     });
 
     const price = dto.type === 'LIMIT' ? dto.price! : null;
@@ -126,6 +128,18 @@ export class OrdersService {
             takerFeeRate: pair.taker_fee_rate ?? '0.001',
           });
           order = (await this.orderRepository.findById(result.order_id)) ?? order;
+
+          const tif = (order.time_in_force ?? 'GTC').toUpperCase();
+          const updatedRemaining =
+            parseFloat(order.amount) - parseFloat(order.filled_amount ?? '0');
+          if (
+            updatedRemaining > 0 &&
+            (tif === 'IOC' || tif === 'FOK') &&
+            ['OPEN', 'PARTIAL'].includes(order.status)
+          ) {
+            await this.orderRepository.cancelOrderViaProcedure(order.order_id, userId);
+            order = (await this.orderRepository.findById(result.order_id)) ?? order;
+          }
         } catch (e) {
           // Don't fail create if matching fails (e.g. lock, DB)
         }
@@ -263,6 +277,7 @@ export class OrdersService {
     user_id: string;
     side: 'BUY' | 'SELL';
     type: 'LIMIT' | 'MARKET';
+    time_in_force: 'GTC' | 'IOC' | 'FOK' | string;
     price: string | null;
     amount: string;
     filled_amount: string;
@@ -278,6 +293,7 @@ export class OrdersService {
       user_id: o.user_id,
       side: o.side,
       type: o.type,
+      time_in_force: o.time_in_force ?? 'GTC',
       price: o.price ?? null,
       amount: o.amount,
       filled_amount: o.filled_amount ?? '0',

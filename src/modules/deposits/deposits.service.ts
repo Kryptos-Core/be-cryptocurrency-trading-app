@@ -4,6 +4,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import Decimal from 'decimal.js';
 import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
@@ -18,7 +19,10 @@ const { PayOS } = require('@payos/node');
 export class DepositsService {
   private readonly logger = new Logger(DepositsService.name);
   private payOS: any;
-  private readonly depositCurrencySymbol: string;
+  private readonly payosFiatSymbol: string;
+  private readonly payosQuoteCurrencySymbol: string;
+  private readonly payosFiatToQuoteRate: Decimal;
+  private readonly payosFxSpreadBps: Decimal;
 
   constructor(
     private readonly fiatDepositRepo: FiatDepositRepository,
@@ -41,20 +45,33 @@ export class DepositsService {
       this.logger.warn('PayOS config missing (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY). Deposit API will fail if called.');
     }
 
-    this.depositCurrencySymbol =
+    this.payosFiatSymbol =
+      this.configService
+        .get<string>('PAYOS_FIAT_SYMBOL')
+        ?.trim()
+        .toUpperCase() || 'VND';
+
+    this.payosQuoteCurrencySymbol =
       this.configService
         .get<string>('PAYOS_DEPOSIT_CURRENCY_SYMBOL')
         ?.trim()
         .toUpperCase() || 'USDT';
+
+    this.payosFiatToQuoteRate = new Decimal(
+      this.configService.get<string>('PAYOS_FIAT_TO_QUOTE_RATE') || '1',
+    );
+    this.payosFxSpreadBps = new Decimal(
+      this.configService.get<string>('PAYOS_FX_SPREAD_BPS') || '0',
+    );
   }
 
-  private async resolveDepositCurrencyId(): Promise<number> {
+  private async resolveCurrencyIdBySymbol(symbol: string): Promise<number> {
     const currency = await this.currencyRepository.findBySymbol(
-      this.depositCurrencySymbol,
+      symbol,
     );
     if (!currency?.currency_id) {
       throw new Error(
-        `Deposit currency symbol ${this.depositCurrencySymbol} not found. Configure PAYOS_DEPOSIT_CURRENCY_SYMBOL to a valid currency symbol.`,
+        `Currency symbol ${symbol} not found. Configure symbols to valid currencies.`,
       );
     }
     const parsedCurrencyId = Number(currency.currency_id);
@@ -66,11 +83,55 @@ export class DepositsService {
     return parsedCurrencyId;
   }
 
+  private async resolveConvertedCredit(amount: string): Promise<{
+    currencyId: number;
+    creditAmount: string;
+    effectiveRate: string;
+  }> {
+    if (this.payosQuoteCurrencySymbol === this.payosFiatSymbol) {
+      const currencyId = await this.resolveCurrencyIdBySymbol(
+        this.payosQuoteCurrencySymbol,
+      );
+      return {
+        currencyId,
+        creditAmount: amount,
+        effectiveRate: '1',
+      };
+    }
+
+    if (!this.payosFiatToQuoteRate.isFinite() || this.payosFiatToQuoteRate.lte(0)) {
+      throw new Error('PAYOS_FIAT_TO_QUOTE_RATE must be a positive number');
+    }
+
+    if (!this.payosFxSpreadBps.isFinite() || this.payosFxSpreadBps.lt(0)) {
+      throw new Error('PAYOS_FX_SPREAD_BPS must be >= 0');
+    }
+
+    const fiatAmount = new Decimal(amount);
+    const grossQuote = fiatAmount.mul(this.payosFiatToQuoteRate);
+    const spreadFactor = new Decimal(1).minus(this.payosFxSpreadBps.div(10000));
+    const netQuote = grossQuote.mul(spreadFactor);
+
+    if (!netQuote.isFinite() || netQuote.lte(0)) {
+      throw new Error('Converted quote amount must be > 0');
+    }
+
+    const currencyId = await this.resolveCurrencyIdBySymbol(
+      this.payosQuoteCurrencySymbol,
+    );
+
+    return {
+      currencyId,
+      creditAmount: netQuote.toFixed(8, Decimal.ROUND_DOWN),
+      effectiveRate: this.payosFiatToQuoteRate.mul(spreadFactor).toString(),
+    };
+  }
+
   private async markDepositPaid(
     deposit: FiatDeposit,
     source: 'webhook' | 'manual_sync',
   ): Promise<void> {
-    const depositCurrencyId = await this.resolveDepositCurrencyId();
+    const conversion = await this.resolveConvertedCredit(deposit.amount);
 
     await this.fiatDepositRepo.transaction(async (manager) => {
       const updatedDeposit = await this.fiatDepositRepo.updateStatus(
@@ -80,16 +141,16 @@ export class DepositsService {
       );
 
       await this.walletsService.applyTransaction(deposit.user_id, {
-        currencyId: depositCurrencyId,
+        currencyId: conversion.currencyId,
         action: WalletTransactionAction.CREDIT,
-        amount: updatedDeposit.amount,
+        amount: conversion.creditAmount,
         refType: WalletReferenceType.EXTERNAL_DEPOSIT,
         refId: Number(updatedDeposit.order_code),
       });
     });
 
     this.logger.log(
-      `Deposit ${deposit.deposit_id} marked PAID via ${source} and credited to ${this.depositCurrencySymbol} wallet`,
+      `Deposit ${deposit.deposit_id} marked PAID via ${source}; credited ${conversion.creditAmount} ${this.payosQuoteCurrencySymbol} (fiat=${this.payosFiatSymbol}, rate=${conversion.effectiveRate})`,
     );
   }
 

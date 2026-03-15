@@ -46,7 +46,13 @@ export class MarketOrderStrategy implements IMatchingStrategy {
       if (!popped || popped.order_id !== maker.order_id) continue;
 
       const tradeResult = await executeTrade(popped, fillAmountStr, priceStr);
-      if (tradeResult) results.push(tradeResult);
+      if (!tradeResult) {
+        // Execution rejected by DB (e.g. stale in-memory snapshot). Restore maker and stop this run.
+        orderBook.addOrder(popped);
+        break;
+      }
+
+      results.push(tradeResult);
 
       takerRemaining -= fillAmount;
 

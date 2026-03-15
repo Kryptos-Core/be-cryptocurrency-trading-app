@@ -31,6 +31,9 @@ export class OrderBookService {
 
   addOrder(order: OrderBookOrder): void {
     const book = this.getBook(order.pair_id);
+    // Upsert semantics by order_id: remove any stale snapshot before adding the new one.
+    book.buy.remove(order.order_id);
+    book.sell.remove(order.order_id);
     if (order.side === 'BUY') book.buy.add(order);
     else book.sell.add(order);
   }

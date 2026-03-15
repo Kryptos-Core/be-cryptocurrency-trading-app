@@ -229,6 +229,18 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   PAYOS_DEPOSIT_CURRENCY_SYMBOL?: string = 'USDT';
+
+  @IsString()
+  @IsOptional()
+  PAYOS_FIAT_SYMBOL?: string = 'VND';
+
+  @IsString()
+  @IsOptional()
+  PAYOS_FIAT_TO_QUOTE_RATE?: string = '1';
+
+  @IsString()
+  @IsOptional()
+  PAYOS_FX_SPREAD_BPS?: string = '0';
 }
 
 /**
@@ -286,6 +298,9 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'PAYOS_RETURN_URL',
     'PAYOS_CANCEL_URL',
     'PAYOS_DEPOSIT_CURRENCY_SYMBOL',
+    'PAYOS_FIAT_SYMBOL',
+    'PAYOS_FIAT_TO_QUOTE_RATE',
+    'PAYOS_FX_SPREAD_BPS',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

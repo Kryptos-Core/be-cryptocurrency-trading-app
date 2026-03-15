@@ -70,6 +70,7 @@ export class MatchingRepository {
       user_id: String(r.user_id ?? ''),
       side: r.side,
       type: r.type,
+      time_in_force: r.time_in_force ?? 'GTC',
       price: r.price != null ? String(r.price) : null,
       amount: String(r.amount ?? '0'),
       filled_amount: String(r.filled_amount ?? '0'),
