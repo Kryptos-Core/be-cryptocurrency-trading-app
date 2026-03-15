@@ -1,15 +1,15 @@
-# Markets API Purpose
+# Mục đích của Markets API
 
-Markets module manages trading pairs and market data endpoints (ticker, order book, trades, OHLCV).
+Module Markets quản lý các cặp giao dịch và các endpoint dữ liệu thị trường (ticker, sổ lệnh, giao dịch, OHLCV).
 
-## Key responsibilities
+## Trách nhiệm chính
 
-- Manage market pair metadata
-- Serve pair lookup by ID and symbol
-- Serve ticker and chart data
-- Support admin CRUD with RBAC/permissions
+- Quản lý metadata của các cặp thị trường
+- Cung cấp tính năng tra cứu cặp giao dịch theo ID và ký hiệu (symbol)
+- Cung cấp dữ liệu ticker và dữ liệu biểu đồ
+- Hỗ trợ các thao tác CRUD cho quản trị viên với phân quyền RBAC
 
-## Main routes (with global prefix)
+## Các route chính (có tiền tố global)
 
 - GET /api/v1/markets
 - GET /api/v1/markets/active
@@ -27,6 +27,6 @@ Markets module manages trading pairs and market data endpoints (ticker, order bo
 - PATCH /api/v1/markets/:id (admin)
 - DELETE /api/v1/markets/:id (admin)
 
-## Data source note
+## Lưu ý về nguồn dữ liệu
 
-Ticker/OHLCV are fetched on-demand from Binance integration path in current project.
+Ticker/OHLCV được lấy theo yêu cầu (on-demand) từ việc tích hợp với Binance trong dự án hiện tại.

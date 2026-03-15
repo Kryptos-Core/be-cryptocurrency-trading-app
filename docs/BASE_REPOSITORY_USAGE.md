@@ -1,11 +1,11 @@
-# Base Repository Pattern - Current Usage
+# Mẫu Base Repository - Cách sử dụng hiện tại
 
-## Overview
+## Tổng quan
 
-Project uses a shared BaseRepository in src/common/repositories/base.repository.ts.
-It provides generic CRUD, pagination, transaction helpers, and raw query support.
+Dự án sử dụng một BaseRepository dùng chung tại `src/common/repositories/base.repository.ts`.
+Nó cung cấp các hàm generic cho CRUD, phân trang, hỗ trợ transaction và truy vấn thô (raw query).
 
-## Main methods available
+## Các phương thức chính có sẵn
 
 - findById
 - findOne
@@ -25,7 +25,7 @@ It provides generic CRUD, pagination, transaction helpers, and raw query support
 - transaction
 - query
 
-## Minimal example
+## Ví dụ cơ bản
 
 ```typescript
 @Injectable()
@@ -40,8 +40,8 @@ export class CurrencyRepository extends BaseRepository<Currency> {
 }
 ```
 
-## Notes
+## Lưu ý
 
-- BaseRepository auto-resolves primary key from entity metadata.
-- Use transaction(...) when updating multiple tables in one business flow.
-- query(...) is available for stored procedures and SQL that is not convenient in QueryBuilder.
+- BaseRepository tự động xác định khóa chính (primary key) từ metadata của entity.
+- Sử dụng `transaction(...)` khi cập nhật nhiều bảng trong cùng một luồng nghiệp vụ.
+- `query(...)` được dùng cho các stored procedure và các câu lệnh SQL không thuận tiện khi sử dụng QueryBuilder.

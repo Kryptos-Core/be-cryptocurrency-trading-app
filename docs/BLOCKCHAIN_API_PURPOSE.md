@@ -1,8 +1,8 @@
-# Blockchain API Purpose
+# Mục đích của Blockchain API
 
-Blockchain module provides wallet linking and on-chain deposit/withdraw support for testnet networks.
+Module Blockchain cung cấp tính năng liên kết ví và hỗ trợ nạp/rút tiền on-chain cho các mạng thử nghiệm (testnet).
 
-## Wallet linking routes
+## Các route liên kết ví (Wallet linking)
 
 - POST /api/v1/blockchain/wallets/request-link
 - POST /api/v1/blockchain/wallets/verify-link
@@ -10,7 +10,7 @@ Blockchain module provides wallet linking and on-chain deposit/withdraw support 
 - GET /api/v1/blockchain/wallets/:linkId/balance
 - DELETE /api/v1/blockchain/wallets/:linkId
 
-## On-chain transfer routes
+## Các route chuyển khoản on-chain (On-chain transfer)
 
 - GET /api/v1/blockchain/deposit/address
 - GET /api/v1/blockchain/deposit/preview
@@ -20,7 +20,7 @@ Blockchain module provides wallet linking and on-chain deposit/withdraw support 
 - GET /api/v1/blockchain/transactions/:txId
 - GET /api/v1/blockchain/networks
 
-## Config dependencies
+## Các phụ thuộc cấu hình (Config dependencies)
 
 - TRON_NILE_FULL_HOST
 - TRON_SHASTA_FULL_HOST
@@ -30,4 +30,4 @@ Blockchain module provides wallet linking and on-chain deposit/withdraw support 
 - ETH_SEPOLIA_CHAIN_ID
 - TRON_HOT_WALLET_PRIVATE_KEY
 - ETH_HOT_WALLET_PRIVATE_KEY
-- BLOCKCHAIN_ALLOW_TEST_SIGNATURE (dev-only helper)
+- BLOCKCHAIN_ALLOW_TEST_SIGNATURE (hỗ trợ chỉ dành cho phát triển)

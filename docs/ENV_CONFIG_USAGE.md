@@ -1,92 +1,92 @@
-# Environment Configuration - Cap Nhat Theo Code Hien Tai
+# Cấu hình môi trường - Cập nhật theo mã nguồn hiện tại
 
-## Tong quan
+## Tổng quan
 
-Backend su dung:
-- src/config/env.validation.ts de validate bien moi truong
-- src/config/app.config.ts de map env sang app config
+Backend sử dụng:
+- `src/config/env.validation.ts` để xác thực các biến môi trường.
+- `src/config/app.config.ts` để ánh xạ biến môi trường sang cấu hình ứng dụng.
 
-App se fail startup neu validation loi.
+Ứng dụng sẽ thất bại khi khởi động nếu có lỗi xác thực (validation).
 
-## Setup nhanh
+## Thiết lập nhanh
 
 ```bash
 cp env.example .env
 ```
 
-Sau do dien thong tin va chay app.
+Sau đó điền thông tin và chạy ứng dụng.
 
-## Nhom bien quan trong
+## Nhóm biến quan trọng
 
-### Core bat buoc
+### Các biến cốt lõi bắt buộc (Core)
 
-| Variable | Mo ta |
+| Biến | Mô tả |
 |---|---|
 | DB_HOST | Host MySQL |
 | DB_PORT | Port MySQL |
-| DB_USERNAME | User MySQL |
-| DB_PASSWORD | Password MySQL |
-| DB_NAME | Ten DB |
-| JWT_SECRET | JWT secret |
+| DB_USERNAME | Tên người dùng MySQL |
+| DB_PASSWORD | Mật khẩu MySQL |
+| DB_NAME | Tên cơ sở dữ liệu |
+| JWT_SECRET | Mã bí mật JWT |
 
-### Trading va exchange
+### Giao dịch và Sàn giao dịch (Trading và Exchange)
 
-| Variable | Gia tri thong dung |
+| Biến | Giá trị thông dụng |
 |---|---|
-| TRADING_ENVIRONMENT | testnet hoac mainnet |
-| EXCHANGE_MODE | binance hoac mock |
-| BINANCE_TESTNET_ENABLED | true/false |
-| BINANCE_TESTNET_API_KEY | API key testnet |
-| BINANCE_TESTNET_API_SECRET | API secret testnet |
+| TRADING_ENVIRONMENT | `testnet` hoặc `mainnet` |
+| EXCHANGE_MODE | `binance` hoặc `mock` |
+| BINANCE_TESTNET_ENABLED | `true`/`false` |
+| BINANCE_TESTNET_API_KEY | API key bản thử nghiệm |
+| BINANCE_TESTNET_API_SECRET | API secret bản thử nghiệm |
 | BINANCE_TESTNET_BASE_URL | Spot testnet: https://testnet.binance.vision |
-| BINANCE_MAINNET_API_KEY | API key mainnet |
-| BINANCE_MAINNET_API_SECRET | API secret mainnet |
+| BINANCE_MAINNET_API_KEY | API key bản chính thức |
+| BINANCE_MAINNET_API_SECRET | API secret bản chính thức |
 | BINANCE_MAINNET_BASE_URL | https://fapi.binance.com |
 
-### Wallet sync
+### Đồng bộ hóa ví (Wallet sync)
 
-| Variable | Mo ta |
+| Biến | Mô tả |
 |---|---|
-| WALLET_SYNC_INTERVAL | Chu ky sync wallet (ms) |
-| WALLET_RECONCILIATION_THRESHOLD | Nguong lech cho reconcile |
+| WALLET_SYNC_INTERVAL | Chu kỳ đồng bộ ví (ms) |
+| WALLET_RECONCILIATION_THRESHOLD | Ngưỡng lệch cho việc đối soát (reconcile) |
 
 ### Blockchain testnet
 
-| Variable | Mo ta |
+| Biến | Mô tả |
 |---|---|
 | TRON_NILE_FULL_HOST | RPC TRON Nile |
 | TRON_SHASTA_FULL_HOST | RPC TRON Shasta |
-| TRON_DEFAULT_NETWORK | TRON_NILE hoac TRON_SHASTA |
+| TRON_DEFAULT_NETWORK | `TRON_NILE` hoặc `TRON_SHASTA` |
 | SOLANA_DEVNET_URL | RPC Solana devnet |
 | ETH_SEPOLIA_RPC_URL | RPC Sepolia |
-| ETH_SEPOLIA_CHAIN_ID | Chain id Sepolia |
-| ETH_HOT_WALLET_PRIVATE_KEY | Private key hot wallet Ethereum |
-| TRON_HOT_WALLET_PRIVATE_KEY | Private key hot wallet Tron |
-| BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chi dung dev, mac dinh false |
+| ETH_SEPOLIA_CHAIN_ID | ID chuỗi Sepolia |
+| ETH_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Ethereum |
+| TRON_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Tron |
+| BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chỉ dùng cho phát triển, mặc định là false |
 
 ### PayOS
 
-| Variable | Mo ta |
+| Biến | Mô tả |
 |---|---|
-| PAYOS_CLIENT_ID | Merchant client id |
+| PAYOS_CLIENT_ID | ID khách hàng của Merchant |
 | PAYOS_API_KEY | API key |
-| PAYOS_CHECKSUM_KEY | Key verify signature/webhook |
-| PAYOS_RETURN_URL | URL redirect khi thanh toan xong |
-| PAYOS_CANCEL_URL | URL redirect khi huy thanh toan |
+| PAYOS_CHECKSUM_KEY | Khóa xác thực chữ ký/webhook |
+| PAYOS_RETURN_URL | URL chuyển hướng khi thanh toán xong |
+| PAYOS_CANCEL_URL | URL chuyển hướng khi hủy thanh toán |
 
-## Quy tac production cho PayOS
+## Quy tắc cho môi trường Production với PayOS
 
-Khi NODE_ENV=production, backend bat buoc co day du 5 bien PayOS:
+Khi `NODE_ENV=production`, backend bắt buộc phải có đầy đủ 5 biến PayOS:
 - PAYOS_CLIENT_ID
 - PAYOS_API_KEY
 - PAYOS_CHECKSUM_KEY
 - PAYOS_RETURN_URL
 - PAYOS_CANCEL_URL
 
-Neu thieu, app fail startup ngay.
+Nếu thiếu, ứng dụng sẽ dừng khởi động ngay lập tức.
 
-## Luu y thuc te
+## Lưu ý thực tế
 
-- Khong commit file .env that.
-- Neu doi env, phai restart backend.
-- Trong logs, uu tien kiem tra thong bao Environment validation failed neu app khong len.
+- Không lưu (commit) file `.env` thực tế lên kho mã nguồn.
+- Nếu thay đổi biến môi trường, phải khởi động lại backend.
+- Trong nhật ký (logs), hãy ưu tiên kiểm tra thông báo "Environment validation failed" nếu ứng dụng không khởi động được.

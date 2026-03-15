@@ -1,16 +1,16 @@
-# CRYPTOCURRENCY TRADING APP (Backend)
+# ỨNG DỤNG GIAO DỊCH TIỀN ĐIỆN TỬ (Backend)
 
-Backend API duoc xay dung bang NestJS, cung cap:
-- Auth va users
-- Currencies, markets, orders, matching
-- Wallets va Binance sync
-- Deposits fiat qua PayOS
-- Blockchain wallet linking va on-chain transfer
-- Trading websocket va price data
+Backend API được xây dựng bằng NestJS, cung cấp:
+- Xác thực (Auth) và người dùng (users)
+- Tiền tệ (Currencies), thị trường (markets), lệnh (orders), khớp lệnh (matching)
+- Ví (Wallets) và đồng bộ hóa với Binance
+- Nạp tiền fiat qua PayOS
+- Liên kết ví Blockchain và chuyển khoản on-chain
+- Websocket giao dịch và dữ liệu giá
 
-OHLCV va ticker duoc lay on-demand tu Binance public API.
+OHLCV và ticker được lấy trực tiếp (on-demand) từ Binance public API.
 
-## Cau truc thu muc
+## Cấu trúc thư mục
 
 ```
 be-cryptocurrency-trading-app/
@@ -42,10 +42,10 @@ be-cryptocurrency-trading-app/
 |-- scripts/
 |-- env.example
 |-- package.json
-`-- docker-compose.infrastructure.yml
+|-- docker-compose.infrastructure.yml
 ```
 
-## Chay nhanh
+## Chạy nhanh
 
 ```bash
 npm install
@@ -55,63 +55,63 @@ npm run db:seed
 npm run start:dev
 ```
 
-API base: http://127.0.0.1:3000/api/v1
+API gốc: http://127.0.0.1:3000/api/v1
 
-Swagger (non-production): http://localhost:3000/api/docs
+Swagger (không dùng cho production): http://localhost:3000/api/docs
 
-## Startup flow hien tai
+## Luồng khởi chạy hiện tại
 
-1. App khoi tao modules va middleware global.
-2. Market catalog bootstrap se tu dong sync currencies/markets tu Binance neu DB catalog dang rong.
-3. Neu sync that bai khi catalog rong, app fail-fast de tranh van hanh trong trang thai thieu du lieu thi truong.
-4. Endpoint POST /api/v1/exchange/sync-info van duoc giu cho admin refresh thu cong.
+1. Ứng dụng khởi tạo các modules và middleware global.
+2. Market catalog bootstrap sẽ tự động đồng bộ hóa currencies/markets từ Binance nếu catalog trong DB đang trống.
+3. Nếu đồng bộ hóa thất bại khi catalog trống, ứng dụng sẽ dừng ngay (fail-fast) để tránh vận hành trong trạng thái thiếu dữ liệu thị trường.
+4. Endpoint POST /api/v1/exchange/sync-info vẫn được giữ để admin làm mới thủ công.
 
-## Luu y ve PayOS
+## Lưu ý về PayOS
 
-- Luong nap fiat nam o module deposits.
-- Cac endpoint chinh:
+- Luồng nạp tiền fiat nằm ở module deposits.
+- Các endpoint chính:
 	- POST /api/v1/deposits
 	- GET /api/v1/deposits
 	- POST /api/v1/deposits/payos-webhook
-- Trong production, app bat buoc co day du cac bien env PayOS.
+- Trong môi trường production, ứng dụng bắt buộc phải có đầy đủ các biến môi trường (env) của PayOS.
 
-## Daily Treasury Hardening (Development)
+## Kiểm tra kho bạc hàng ngày (Daily Treasury Hardening - Phát triển)
 
-- Run E2E nap/rut + health check:
+- Chạy E2E nạp/rút + kiểm tra sức khỏe (health check):
 
 ```bash
 npm run treasury:daily
 ```
 
-- Runbook chi tiet: `docs/TREASURY_DAILY_RUNBOOK.md`
+- Hướng dẫn chi tiết (Runbook): `docs/TREASURY_DAILY_RUNBOOK.md`
 
-- Dang ky Windows Task Scheduler:
+- Đăng ký Windows Task Scheduler:
 
 ```bash
 npm run treasury:schedule:register
 ```
 
-- Optional env template cho full treasury E2E:
+- Mẫu env tùy chọn cho full treasury E2E:
 	- `scripts/treasury-e2e.env.example`
 
-- Dev defaults trong scheduler runner:
+- Các giá trị mặc định cho môi trường dev trong scheduler runner:
 	- `TREASURY_E2E_ALLOW_SKIP=true`
 	- `TREASURY_HEALTH_FAIL_ON_CRITICAL=false`
 
-- Export reconcile history JSON (RBAC: ADMIN/RISK_OFFICER):
+- Xuất lịch sử đối soát định dạng JSON (RBAC: ADMIN/RISK_OFFICER):
 	- `POST /api/v1/wallets/reconciliation-report/export?limit=100`
-	- output: `reports/reconciliation/YYYY-MM-DD.json`
+	- đầu ra: `reports/reconciliation/YYYY-MM-DD.json`
 
-## Tai khoan test sau khi seed
+## Tài khoản thử nghiệm sau khi seed
 
-| Email | Password | Role |
+| Email | Mật khẩu | Vai trò |
 |---|---|---|
-| admin@example.com | Admin@123! | Admin |
-| trader1@example.com | Trader@123! | Trader |
-| trader2@example.com | Trader@123! | Trader |
-| trader3@example.com | Trader@123! | Trader |
-| guest@example.com | Guest@123! | Guest |
-| verified@example.com | Verified@123! | Verified User |
-| risk@example.com | Risk@123! | Risk Officer |
-| support@example.com | Support@123! | Support Agent |
-| maker@example.com | Maker@123! | Market Maker |
+| admin@example.com | Admin@123! | Quản trị viên (Admin) |
+| trader1@example.com | Trader@123! | Nhà giao dịch (Trader) |
+| trader2@example.com | Trader@123! | Nhà giao dịch (Trader) |
+| trader3@example.com | Trader@123! | Nhà giao dịch (Trader) |
+| guest@example.com | Guest@123! | Khách (Guest) |
+| verified@example.com | Verified@123! | Người dùng đã xác minh |
+| risk@example.com | Risk@123! | Cán bộ rủi ro (Risk Officer) |
+| support@example.com | Support@123! | Nhân viên hỗ trợ |
+| maker@example.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |

@@ -1,23 +1,23 @@
-# Deposits API Purpose (PayOS)
+# Mục đích của Deposits API (PayOS)
 
-Deposits module handles fiat top-up flow through PayOS.
+Module Deposits xử lý luồng nạp tiền fiat thông qua PayOS.
 
-## Routes
+## Các route
 
 - POST /api/v1/deposits
-  - create PayOS checkout context for current user
+  - Tạo ngữ cảnh thanh toán PayOS cho người dùng hiện tại
 - GET /api/v1/deposits
-  - list current user fiat deposits
+  - Liệt kê các lệnh nạp tiền fiat của người dùng hiện tại
 - POST /api/v1/deposits/payos-webhook
-  - receive webhook and update deposit status
+  - Nhận webhook và cập nhật trạng thái nạp tiền
 
-## Current behavior
+## Hành vi hiện tại
 
-- Service calls PayOS SDK v2 resource API: paymentRequests.create(...)
-- Webhook verification uses payOS.webhooks.verify(...)
-- On successful payment, backend marks fiat deposit as paid and credits wallet flow in service layer
+- Service gọi API tài nguyên PayOS SDK v2: `paymentRequests.create(...)`
+- Việc xác thực Webhook sử dụng `payOS.webhooks.verify(...)`
+- Khi thanh toán thành công, backend đánh giá lệnh nạp tiền fiat là đã thanh toán và cộng tiền vào ví trong tầng service.
 
-## Required PayOS env
+## Các biến môi trường PayOS cần thiết
 
 - PAYOS_CLIENT_ID
 - PAYOS_API_KEY
@@ -25,4 +25,4 @@ Deposits module handles fiat top-up flow through PayOS.
 - PAYOS_RETURN_URL
 - PAYOS_CANCEL_URL
 
-Production requires all variables above.
+Môi trường Production yêu cầu tất cả các biến trên.

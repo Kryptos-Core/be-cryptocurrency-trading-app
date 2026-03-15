@@ -1,8 +1,8 @@
-# Redis Usage - Current Project
+# Cách sử dụng Redis - Dự án hiện tại
 
-Redis is used for cache and operational support in backend modules.
+Redis được sử dụng để làm bộ nhớ đệm (cache) và hỗ trợ vận hành trong các module backend.
 
-## Required env
+## Các biến môi trường cần thiết
 
 ```env
 REDIS_HOST=127.0.0.1
@@ -11,19 +11,19 @@ REDIS_PASSWORD=
 REDIS_DB=0
 ```
 
-## Start local Redis
+## Khởi động Redis tại địa phương
 
 ```bash
 docker compose -f docker-compose.infrastructure.yml up -d redis
 ```
 
-## Typical usage
+## Các cách sử dụng phổ biến
 
-- cache hot query data
-- get-or-set pattern for expensive reads
-- publish/subscribe internal events when needed
+- Lưu bộ nhớ đệm cho các dữ liệu truy vấn thường xuyên (hot data)
+- Áp dụng mẫu "get-or-set" cho các tác vụ đọc dữ liệu tốn kém
+- Cơ chế publish/subscribe cho các sự kiện nội bộ khi cần thiết
 
-## Notes
+## Lưu ý
 
-- Always set TTL for transient cache keys.
-- Invalidate cache on write paths that affect cached read models.
+- Luôn đặt thời gian tồn tại (TTL) cho các khóa bộ nhớ đệm tạm thời.
+- Xóa bỏ bộ nhớ đệm (invalidate cache) trên các luồng ghi dữ liệu có ảnh hưởng đến các mô hình đọc đã được lưu đệm.

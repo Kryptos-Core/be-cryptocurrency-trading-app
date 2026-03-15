@@ -1,22 +1,22 @@
-# Swagger Usage - Current Project
+# Cách sử dụng Swagger - Dự án hiện tại
 
-Swagger is enabled when NODE_ENV is not production.
+Swagger được kích hoạt khi `NODE_ENV` không phải là production.
 
-## URLs
+## Các đường dẫn (URLs)
 
-- UI: http://localhost:3000/api/docs
-- JSON: http://localhost:3000/api/docs-json
+- Giao diện người dùng (UI): http://localhost:3000/api/docs
+- Dữ liệu JSON: http://localhost:3000/api/docs-json
 
-## API base prefix
+## Tiền tố gốc của API (API base prefix)
 
-All REST routes are under:
+Tất cả các route REST đều nằm dưới tiền tố:
 
 - /api/v1
 
-## Auth in Swagger
+## Xác thực trong Swagger
 
-Protected endpoints require JWT bearer token via Authorize button.
+Các endpoint được bảo vệ yêu cầu JWT bearer token thông qua nút "Authorize".
 
-## Recommendation
+## Khuyến nghị
 
-Use Swagger as the source of truth for request/response shapes and RBAC-protected endpoints.
+Sử dụng Swagger như một nguồn thông tin chính xác duy nhất cho cấu trúc yêu cầu/phản hồi (request/response shapes) và các endpoint được bảo vệ bởi RBAC.

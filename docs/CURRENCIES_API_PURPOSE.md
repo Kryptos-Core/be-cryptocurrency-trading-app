@@ -1,15 +1,15 @@
-# Currencies API Purpose
+# Mục đích của Currencies API
 
-Currencies module is the master catalog of tradable assets.
-Other modules (markets, wallets, orders) reference currency IDs from here.
+Module Currencies là danh mục chính của các tài sản có thể giao dịch.
+Các module khác (thị trường, ví, lệnh) tham chiếu ID tiền tệ từ đây.
 
-## Key responsibilities
+## Trách nhiệm chính
 
-- Manage currency metadata (symbol, name, precision, flags)
-- Expose active and tradable lists for UI and validation
-- Support admin CRUD with RBAC/permissions
+- Quản lý metadata của tiền tệ (ký hiệu, tên, độ chính xác - precision, các cờ trạng thái)
+- Cung cấp danh sách các tiền tệ đang hoạt động và có thể giao dịch cho UI và việc xác thực
+- Hỗ trợ các thao tác CRUD cho quản trị viên với phân quyền RBAC
 
-## Main routes (with global prefix)
+## Các route chính (có tiền tố global)
 
 - GET /api/v1/currencies
 - GET /api/v1/currencies/active
@@ -20,8 +20,8 @@ Other modules (markets, wallets, orders) reference currency IDs from here.
 - PATCH /api/v1/currencies/:id (admin)
 - DELETE /api/v1/currencies/:id (admin)
 
-## Why this module matters
+## Tại sao module này lại quan trọng
 
-- Markets uses base/quote currency from this catalog.
-- Wallets and ledger map balances by currency ID.
-- Trading validation depends on currency activity/tradability flags.
+- Module Markets sử dụng tiền tệ cơ sở (base) và tiền tệ định giá (quote) từ danh mục này.
+- Wallets và ledger (sổ cái) ánh xạ số dư theo ID tiền tệ.
+- Việc xác thực giao dịch phụ thuộc vào các cờ hoạt động/có thể giao dịch của tiền tệ.
