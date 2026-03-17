@@ -86,20 +86,32 @@ export class TronProvider implements IBlockchainProvider {
     message: string,
     signature: string,
   ): Promise<boolean> {
+    // Chuẩn hoá address về hex để so sánh
+    const normalizedAddress = this.tronWeb.address.toHex(address).toLowerCase();
+
+    // Thử V2 trước (signMessageV2 / tron_signMessageV2) — plain string, không toHex
+    try {
+      const recoveredV2 = await this.tronWeb.trx.verifyMessageV2(message, signature);
+      if (recoveredV2 && this.tronWeb.address.toHex(recoveredV2).toLowerCase() === normalizedAddress) {
+        return true;
+      }
+    } catch {
+      // Không phải V2 signature, thử V1 tiếp
+    }
+
+    // Fallback V1 (tron_signMessage / sign) — cần toHex
     try {
       const hexMsg = this.tronWeb.toHex(message);
-      const recovered = await this.tronWeb.trx.verifyMessageV2(
-        hexMsg,
-        signature,
-      );
-      return (
-        recovered.toLowerCase() ===
-        this.tronWeb.address.toHex(address).toLowerCase()
-      );
-    } catch (error) {
-      this.logger.warn(`Xác minh chữ ký Tron thất bại: ${address}`, error);
-      return false;
+      const recoveredV1 = await this.tronWeb.trx.verifyMessageV2(hexMsg, signature);
+      if (recoveredV1 && this.tronWeb.address.toHex(recoveredV1).toLowerCase() === normalizedAddress) {
+        return true;
+      }
+    } catch {
+      // Không khớp
     }
+
+    this.logger.warn(`Xác minh chữ ký Tron thất bại: ${address}`);
+    return false;
   }
 
   async getTransactionStatus(txHash: string): Promise<BlockchainTxStatusDto> {
@@ -141,11 +153,18 @@ export class TronProvider implements IBlockchainProvider {
   }
 
   isValidAddress(address: string): boolean {
+    if (!address || typeof address !== 'string') return false;
     try {
-      return this.tronWeb.isAddress(address);
+      if (this.tronWeb.isAddress(address)) return true;
     } catch {
-      return false;
+      // fall through to format-based check
     }
+    // Fallback: regex kiểm tra format TRON address khi TronWeb SDK có vấn đề
+    // Base58: bắt đầu với 'T', 34 ký tự
+    if (/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) return true;
+    // Hex: bắt đầu với '41', 42 ký tự hex
+    if (/^41[0-9a-fA-F]{40}$/.test(address)) return true;
+    return false;
   }
 
   private buildNotFound(txHash: string): BlockchainTxStatusDto {

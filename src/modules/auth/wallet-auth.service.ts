@@ -42,7 +42,9 @@ export class WalletAuthService {
   async requestNonce(chain: BlockchainNetwork, address: string): Promise<{ message: string; expiresIn: number }> {
     const provider = this.providerFactory.getProvider(chain);
 
-    if (!provider.isValidAddress(address)) {
+    const isValid = provider.isValidAddress(address);
+    this.logger.debug(`[WalletAuth] requestNonce: chain=${chain}, address="${address}" (len=${address?.length}), isValid=${isValid}`);
+    if (!isValid) {
       throw new BadRequestException(
         `Địa chỉ ví không hợp lệ trên mạng ${chain}`,
         'INVALID_ADDRESS',
