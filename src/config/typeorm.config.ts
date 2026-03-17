@@ -21,6 +21,8 @@ import { UserSession } from '../entities/user-session.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
+import { Notification } from '../entities/notification.entity';
+import { UserNotification } from '../entities/user-notification.entity';
 
 const ALL_ENTITIES = [
   AppSetting,
@@ -40,6 +42,8 @@ const ALL_ENTITIES = [
   Wallet,
   WalletLedger,
   Withdrawal,
+  Notification,
+  UserNotification,
 ];
 
 export const getTypeOrmConfig = (

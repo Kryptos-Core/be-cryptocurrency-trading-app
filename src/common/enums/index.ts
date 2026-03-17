@@ -76,6 +76,7 @@ export enum Permission {
   ORDERS_MANAGE = 'orders:manage',
   RISK_REVIEW = 'risk:review',
   SUPPORT_CASES = 'support:cases',
+  NOTIFICATIONS_BROADCAST = 'notifications:broadcast',
 }
 
 // ============================================

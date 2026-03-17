@@ -66,6 +66,9 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true })
   avatar_public_id!: string | null;
 
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  fcm_token!: string | null;
+
   @Column({ type: 'tinyint', width: 1, default: 0 })
   two_fa_enabled!: number;
 

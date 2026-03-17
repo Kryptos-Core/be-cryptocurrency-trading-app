@@ -294,4 +294,11 @@ export class UsersService {
     this.logger.log(`Avatar updated for user ${userId}`);
     return this.findOne(userId);
   }
+
+  /**
+   * Register or clear FCM device token for push notifications
+   */
+  async saveFcmToken(userId: string, fcmToken: string | null): Promise<void> {
+    await this.usersRepository.saveFcmToken(userId, fcmToken);
+  }
 }

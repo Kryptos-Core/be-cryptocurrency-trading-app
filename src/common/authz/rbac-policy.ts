@@ -41,6 +41,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.WALLETS_WITHDRAW,
     Permission.RISK_REVIEW,
     Permission.SUPPORT_CASES,
+    Permission.NOTIFICATIONS_BROADCAST,
   ],
 };
 

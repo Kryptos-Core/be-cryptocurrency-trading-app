@@ -294,4 +294,19 @@ export class UsersRepository {
       throw error;
     }
   }
+
+  /**
+   * Save / clear FCM device token for push notifications
+   */
+  async saveFcmToken(userId: string, fcmToken: string | null): Promise<void> {
+    try {
+      await this.dataSource.query(
+        'UPDATE users SET fcm_token = ? WHERE user_id = ?',
+        [fcmToken, userId],
+      );
+    } catch (error) {
+      this.logger.error(`Error saving FCM token for user: ${userId}`, error);
+      throw error;
+    }
+  }
 }

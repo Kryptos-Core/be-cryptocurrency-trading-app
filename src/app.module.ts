@@ -18,6 +18,7 @@ import { DepositsModule } from './modules/deposits/deposits.module';
 import { ManagedWalletsModule } from './modules/managed-wallets/managed-wallets.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
@@ -53,6 +54,7 @@ import appConfig from './config/app.config';
     ManagedWalletsModule,
     DashboardModule,
     HealthModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

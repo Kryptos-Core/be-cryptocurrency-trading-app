@@ -12,6 +12,8 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -316,6 +318,31 @@ export class UsersController {
   @ApiUnauthorizedResponse('Unauthorized')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
+  }
+
+  /**
+   * Register / clear FCM device token for push notifications
+   * PATCH /users/me/fcm-token
+   */
+  @Patch('me/fcm-token')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Register FCM device token',
+    description: 'Save or clear the FCM token for push notifications on the current device',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { fcm_token: { type: 'string', nullable: true, example: 'dYour_FCM_token...' } },
+    },
+  })
+  @ApiSuccessResponse('FCM token saved')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async saveFcmToken(
+    @CurrentUser('userId') userId: string,
+    @Body('fcm_token') fcmToken: string | null,
+  ) {
+    await this.usersService.saveFcmToken(userId, fcmToken ?? null);
   }
 
   /**
