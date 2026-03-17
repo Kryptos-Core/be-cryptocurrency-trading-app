@@ -24,6 +24,7 @@ import {
 import { MarketsService } from './markets.service';
 import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { Public } from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
@@ -53,6 +54,7 @@ export class MarketsController {
    * GET /markets?page=1&limit=10&includeInactive=false&search=BTC&baseSymbol=BTC&quoteSymbol=USDT
    */
   @Get()
+  @Public()
   @ApiOperation({
     summary: 'Get all market pairs',
     description:
@@ -149,6 +151,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get('active')
+  @Public()
   @ApiOperation({
     summary: 'Get all active market pairs',
     description: 'Retrieve all active market pairs (cached)',
@@ -165,6 +168,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get('tickers/all')
+  @Public()
   @ApiOperation({
     summary: 'Get all market tickers',
     description: 'Get 24h statistics for all active market pairs',
@@ -181,6 +185,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get('symbol/:symbol')
+  @Public()
   @ApiOperation({
     summary: 'Get market pair by symbol',
     description: 'Retrieve a specific market pair by its symbol (e.g., BTC/USDT)',
@@ -199,6 +204,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get('symbol/:symbol/ticker')
+  @Public()
   @ApiOperation({
     summary: 'Get market ticker by symbol',
     description: 'Get 24h market statistics for a trading pair by symbol',
@@ -217,6 +223,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get('symbol/:symbol/orderbook')
+  @Public()
   @ApiOperation({
     summary: 'Get order book by symbol',
     description: 'Get order book (bids and asks) for a market pair by symbol',
@@ -239,6 +246,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get('symbol/:symbol/trades')
+  @Public()
   @ApiOperation({
     summary: 'Get recent trades by symbol',
     description: 'Get recent trades for a market pair by symbol',
@@ -261,6 +269,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get(':id/ticker')
+  @Public()
   @ApiOperation({
     summary: 'Get market ticker',
     description: 'Get 24h market statistics for a trading pair',
@@ -279,6 +288,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get(':id/orderbook')
+  @Public()
   @ApiOperation({
     summary: 'Get order book',
     description: 'Get order book (bids and asks) for a market pair',
@@ -302,6 +312,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get(':id/ohlcv')
+  @Public()
   @ApiOperation({
     summary: 'Get OHLCV data',
     description: 'Get candlestick data for a market pair. Use range to filter by time: 1d, 1M, 3M, 1y, 5y',
@@ -333,6 +344,7 @@ export class MarketsController {
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get(':id/trades')
+  @Public()
   @ApiOperation({
     summary: 'Get recent trades',
     description: 'Get recent trades for a market pair',
@@ -355,6 +367,7 @@ export class MarketsController {
    * IMPORTANT: Must be LAST to avoid route conflicts with specific routes
    */
   @Get(':id')
+  @Public()
   @ApiOperation({
     summary: 'Get market pair by ID',
     description: 'Retrieve a specific market pair by its ID',

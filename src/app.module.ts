@@ -15,6 +15,7 @@ import { TradingModule } from './modules/trading/trading.module';
 import { ExchangeModule } from './modules/exchange/exchange.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
 import { DepositsModule } from './modules/deposits/deposits.module';
+import { ManagedWalletsModule } from './modules/managed-wallets/managed-wallets.module';
 import { HealthModule } from './health/health.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
@@ -48,6 +49,7 @@ import appConfig from './config/app.config';
     ExchangeModule,
     BlockchainModule,
     DepositsModule,
+    ManagedWalletsModule,
     HealthModule,
   ],
 })

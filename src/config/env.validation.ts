@@ -192,6 +192,10 @@ export class EnvironmentVariables {
   @IsOptional()
   WALLET_RECONCILIATION_THRESHOLD?: string = '0.00000001';
 
+  @IsString()
+  @IsOptional()
+  WALLET_ENCRYPTION_KEY?: string;
+
   // Hot Wallet Configuration
   @IsString()
   @IsOptional()
@@ -359,6 +363,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'BINANCE_MAINNET_BASE_URL',
     'WALLET_SYNC_INTERVAL',
     'WALLET_RECONCILIATION_THRESHOLD',
+    'WALLET_ENCRYPTION_KEY',
     'ETH_HOT_WALLET_PRIVATE_KEY',
     'TRON_HOT_WALLET_PRIVATE_KEY',
     'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',

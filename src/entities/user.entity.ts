@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { UserSession } from './user-session.entity';
 import { Withdrawal } from './withdrawal.entity';
+import { ManagedWallet } from './managed-wallet.entity';
 
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
@@ -97,4 +98,7 @@ export class User {
 
   @OneToMany('OnchainTransaction', 'user')
   onchain_transactions!: any[];
+
+  @OneToMany(() => ManagedWallet, (managedWallet) => managedWallet.user)
+  managed_wallets!: ManagedWallet[];
 }

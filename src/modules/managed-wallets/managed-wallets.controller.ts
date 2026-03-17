@@ -1,0 +1,143 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ManagedWalletsService } from './managed-wallets.service';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
+import { Permission, UserRole } from '@/common/enums';
+import {
+  CreateManagedWalletDto,
+  SendManagedTransactionDto,
+  UpdateRecommendedChainDto,
+} from './dto';
+
+@ApiTags('managed-wallets')
+@ApiBearerAuth('JWT-auth')
+@Controller('managed-wallets')
+@UseGuards(JwtAuthGuard)
+export class ManagedWalletsController {
+  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
+
+  @Post()
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiOperation({ summary: 'Create a new managed treasury wallet' })
+  async createWallet(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateManagedWalletDto,
+  ) {
+    return this.managedWalletsService.createWallet(userId, dto);
+  }
+
+  @Get()
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_READ)
+  @ApiOperation({ summary: 'List managed wallets owned by the current finance manager' })
+  async listWallets(@CurrentUser('userId') userId: string) {
+    return this.managedWalletsService.listWallets(userId);
+  }
+
+  @Get('deposit-defaults')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_READ)
+  @ApiOperation({ summary: 'Get current default deposit wallets and recommended chain' })
+  async getDepositDefaults() {
+    return this.managedWalletsService.getDepositDefaults();
+  }
+
+  @Patch('settings/recommended-chain')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiOperation({ summary: 'Set the recommended deposit chain shown to users' })
+  async setRecommendedChain(@Body() dto: UpdateRecommendedChainDto) {
+    return this.managedWalletsService.setRecommendedChain(dto);
+  }
+
+  @Get(':walletId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_READ)
+  @ApiOperation({ summary: 'Get managed wallet details and live on-chain balance' })
+  @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
+  async getWalletDetail(
+    @CurrentUser('userId') userId: string,
+    @Param('walletId') walletId: string,
+  ) {
+    return this.managedWalletsService.getWalletDetail(userId, walletId);
+  }
+
+  @Get(':walletId/transactions')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_READ)
+  @ApiOperation({ summary: 'Get recent on-chain transactions for a managed wallet' })
+  @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
+  async getWalletTransactions(
+    @CurrentUser('userId') userId: string,
+    @Param('walletId') walletId: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
+  ) {
+    return this.managedWalletsService.getWalletTransactions(userId, walletId, limit);
+  }
+
+  @Post(':walletId/send')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_WITHDRAW)
+  @ApiOperation({ summary: 'Send TRX from a managed wallet' })
+  @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
+  async sendTransaction(
+    @CurrentUser('userId') userId: string,
+    @Param('walletId') walletId: string,
+    @Body() dto: SendManagedTransactionDto,
+  ) {
+    return this.managedWalletsService.sendTransaction(userId, walletId, dto);
+  }
+
+  @Patch(':walletId/set-deposit-default')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiOperation({ summary: 'Set a managed wallet as the default deposit wallet for its chain' })
+  @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
+  async setDepositDefault(
+    @CurrentUser('userId') userId: string,
+    @Param('walletId') walletId: string,
+  ) {
+    return this.managedWalletsService.setDepositDefault(userId, walletId);
+  }
+
+  @Delete(':walletId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiOperation({ summary: 'Deactivate a managed wallet' })
+  @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
+  async deactivateWallet(
+    @CurrentUser('userId') userId: string,
+    @Param('walletId') walletId: string,
+  ) {
+    return this.managedWalletsService.deactivateWallet(userId, walletId);
+  }
+}

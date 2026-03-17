@@ -25,6 +25,9 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.USERS_READ,
     Permission.RISK_REVIEW,
     Permission.USERS_SECURITY_REVIEW,
+    Permission.WALLETS_READ,
+    Permission.WALLETS_MANAGE,
+    Permission.WALLETS_WITHDRAW,
   ],
   [UserRole.ADMIN]: [
     Permission.USERS_READ,

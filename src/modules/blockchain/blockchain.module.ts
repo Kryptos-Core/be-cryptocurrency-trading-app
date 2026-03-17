@@ -11,6 +11,7 @@ import { OnchainTransferService } from './onchain-transfer.service';
 import { BlockchainController } from './blockchain.controller';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
+import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
 
 /**
  * Blockchain Module
@@ -25,6 +26,7 @@ import { CurrenciesModule } from '@/modules/currencies/currencies.module';
     TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction]),
     WalletsModule,
     CurrenciesModule,
+    ManagedWalletsModule,
   ],
   controllers: [BlockchainController],
   providers: [

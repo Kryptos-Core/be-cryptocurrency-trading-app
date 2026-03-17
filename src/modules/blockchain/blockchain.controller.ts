@@ -16,7 +16,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
-import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
+import { CurrentUser, Public, RequirePermissions, RequireRoles } from '@/common/decorators';
 import {
   ApiSuccessResponse,
   ApiBadRequestResponse,
@@ -27,6 +27,7 @@ import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
 import { WalletLinkingService } from './wallet-linking.service';
 import { OnchainTransferService } from './onchain-transfer.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import {
   RequestLinkDto,
   VerifyLinkDto,
@@ -48,6 +49,7 @@ export class BlockchainController {
     private readonly walletLinkingService: WalletLinkingService,
     private readonly onchainTransferService: OnchainTransferService,
     private readonly providerFactory: BlockchainProviderFactory,
+    private readonly managedWalletsService: ManagedWalletsService,
   ) {}
 
   // ============ WALLET LINKING ============
@@ -157,7 +159,7 @@ export class BlockchainController {
   @ApiOperation({
     summary: 'Lấy địa chỉ nạp tiền theo mạng',
     description:
-      'Trả về địa chỉ ví nhận tiền (hot wallet) của platform cho chain được chọn.',
+      'Trả về địa chỉ ví nhận tiền mặc định của platform cho chain được chọn, fallback sang hot wallet nếu chưa cấu hình ví quản lý.',
   })
   @ApiQuery({
     name: 'chain',
@@ -168,17 +170,21 @@ export class BlockchainController {
   @ApiSuccessResponse('Địa chỉ nạp tiền theo mạng')
   @ApiBadRequestResponse('Thiếu chain hoặc chain không hợp lệ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  getDepositAddress(@Query('chain') chain?: string) {
+  async getDepositAddress(@Query('chain') chain?: string) {
     if (!chain) {
       throw new BadRequestException('Thiếu query param chain', 'CHAIN_REQUIRED');
     }
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
     const provider = this.providerFactory.getProvider(normalizedChain);
+    const managedWallet = await this.managedWalletsService.getConfiguredDepositWallet(
+      normalizedChain,
+    );
 
     return {
       chain: normalizedChain,
-      depositAddress: provider.getHotWalletAddress(),
+      depositAddress: managedWallet?.address ?? provider.getHotWalletAddress(),
+      source: managedWallet ? 'managed_wallet' : 'hot_wallet',
       note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
     };
   }
@@ -409,6 +415,7 @@ export class BlockchainController {
    * GET /blockchain/networks
    */
   @Get('networks')
+  @Public()
   @ApiOperation({
     summary: 'Danh sách mạng blockchain',
     description: 'Trả về các mạng testnet được hỗ trợ',

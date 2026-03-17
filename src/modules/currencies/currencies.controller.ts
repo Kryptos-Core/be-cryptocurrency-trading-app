@@ -24,6 +24,7 @@ import {
 import { CurrenciesService } from './currencies.service';
 import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { Public } from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
@@ -53,6 +54,7 @@ export class CurrenciesController {
    * GET /currencies?page=1&limit=10&includeInactive=false
    */
   @Get()
+  @Public()
   @ApiOperation({
     summary: 'Get all currencies',
     description: 'Retrieve a paginated list of all currencies',
@@ -91,6 +93,7 @@ export class CurrenciesController {
    * GET /currencies/active
    */
   @Get('active')
+  @Public()
   @ApiOperation({
     summary: 'Get all active currencies',
     description: 'Retrieve all active currencies (cached)',
@@ -106,6 +109,7 @@ export class CurrenciesController {
    * GET /currencies/tradable
    */
   @Get('tradable')
+  @Public()
   @ApiOperation({
     summary: 'Get all tradable currencies',
     description: 'Retrieve all tradable and active currencies (cached)',
@@ -121,6 +125,7 @@ export class CurrenciesController {
    * GET /currencies/:id
    */
   @Get(':id')
+  @Public()
   @ApiOperation({
     summary: 'Get currency by ID',
     description: 'Retrieve a specific currency by its ID',
@@ -138,6 +143,7 @@ export class CurrenciesController {
    * GET /currencies/symbol/:symbol
    */
   @Get('symbol/:symbol')
+  @Public()
   @ApiOperation({
     summary: 'Get currency by symbol',
     description: 'Retrieve a specific currency by its symbol (e.g., BTC, ETH)',
