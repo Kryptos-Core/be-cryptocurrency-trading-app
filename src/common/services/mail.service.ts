@@ -44,14 +44,22 @@ export class MailService {
     const subject = 'Ma OTP xac thuc 2 buoc';
     const text = `Ma OTP cua ban la: ${otpCode}. Ma co hieu luc trong 5 phut.`;
 
-    const transporter = this.getTransporter();
-    await transporter.sendMail({
-      from,
-      to: toEmail,
-      subject,
-      text,
-    });
-
-    this.logger.log(`OTP sent to ${toEmail}`);
+    try {
+      const transporter = this.getTransporter();
+      await transporter.sendMail({ from, to: toEmail, subject, text });
+      this.logger.log(`OTP sent to ${toEmail}`);
+    } catch (err) {
+      const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+      if (isDev) {
+        // SMTP unavailable in dev → print OTP to console so manual testing works.
+        this.logger.warn(
+          `SMTP unavailable (${err instanceof Error ? err.message : String(err)}). ` +
+            `[DEV ONLY] OTP for ${toEmail}: ${otpCode}`,
+        );
+      } else {
+        // Production must have a working SMTP — propagate the error.
+        throw err;
+      }
+    }
   }
 }

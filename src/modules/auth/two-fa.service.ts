@@ -7,7 +7,8 @@ import { AuthRepository } from './repositories';
 @Injectable()
 export class TwoFaService {
   private readonly logger = new Logger(TwoFaService.name);
-  private readonly otpTtlSeconds = 300; // 5 minutes
+  private readonly otpTtlSeconds = 300;    // OTP valid for 5 minutes
+  private readonly cooldownSeconds = 30;   // Minimum gap between consecutive sends
 
   constructor(
     private readonly cacheService: CacheService,
@@ -19,14 +20,32 @@ export class TwoFaService {
     return `2fa:otp:${userId}`;
   }
 
+  private cooldownKey(userId: string): string {
+    return `2fa:cooldown:${userId}`;
+  }
+
   private createOtpCode(): string {
     return randomInt(100000, 1000000).toString();
   }
 
   async sendOtp(userId: string, email: string): Promise<{ expiresIn: number }> {
+    // Enforce resend cooldown — reject if the previous send was within 15 s
+    const cooldown = await this.cacheService.get<string>(this.cooldownKey(userId));
+    if (cooldown) {
+      const ttl = await this.cacheService.getTtl(this.cooldownKey(userId));
+      throw new BadRequestException(
+        `Vui lòng đợi ${ttl > 0 ? ttl : this.cooldownSeconds} giây trước khi gửi lại OTP.`,
+        'OTP_COOLDOWN',
+      );
+    }
+
     const code = this.createOtpCode();
     await this.cacheService.set(this.otpKey(userId), code, this.otpTtlSeconds);
     await this.mailService.sendOtp(email, code);
+
+    // Set cooldown AFTER a successful send so the timer starts from confirmed delivery
+    await this.cacheService.set(this.cooldownKey(userId), '1', this.cooldownSeconds);
+
     this.logger.log(`2FA OTP sent for user=${userId}`);
     return { expiresIn: this.otpTtlSeconds };
   }
