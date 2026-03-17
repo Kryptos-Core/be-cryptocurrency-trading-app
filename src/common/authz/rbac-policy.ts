@@ -24,10 +24,12 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
   [UserRole.RISK_OFFICER]: [
     Permission.USERS_READ,
     Permission.RISK_REVIEW,
+    Permission.USERS_SECURITY_REVIEW,
   ],
   [UserRole.ADMIN]: [
     Permission.USERS_READ,
     Permission.USERS_MANAGE,
+    Permission.USERS_SECURITY_REVIEW,
     Permission.CURRENCIES_MANAGE,
     Permission.MARKETS_MANAGE,
     Permission.EXCHANGE_SYNC,

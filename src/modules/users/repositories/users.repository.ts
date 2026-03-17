@@ -184,4 +184,114 @@ export class UsersRepository {
       throw error;
     }
   }
+
+  /**
+   * Update only first_name, last_name (profile basic)
+   */
+  async updateProfileBasic(
+    userId: string,
+    firstName: string | null,
+    lastName: string | null,
+  ): Promise<number> {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_update_profile_basic(?, ?, ?)',
+        [userId, firstName ?? null, lastName ?? null],
+      );
+      const affected = result[0]?.[0]?.affected ?? 0;
+      return Number(affected);
+    } catch (error) {
+      this.logger.error(`Error updating profile basic: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update avatar URL and public_id
+   */
+  async updateAvatar(
+    userId: string,
+    avatarUrl: string | null,
+    avatarPublicId: string | null,
+  ): Promise<number> {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_update_avatar(?, ?, ?)',
+        [userId, avatarUrl ?? null, avatarPublicId ?? null],
+      );
+      const affected = result[0]?.[0]?.affected ?? 0;
+      return Number(affected);
+    } catch (error) {
+      this.logger.error(`Error updating avatar: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a security change request (PENDING)
+   */
+  async createSecurityChangeRequest(
+    requestId: string,
+    userId: string,
+    changeType: string,
+    payload: Record<string, unknown>,
+  ): Promise<string> {
+    try {
+      await this.dataSource.query(
+        'CALL sp_user_security_change_request_create(?, ?, ?, ?)',
+        [requestId, userId, changeType, JSON.stringify(payload)],
+      );
+      return requestId;
+    } catch (error) {
+      this.logger.error(`Error creating security change request: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find all PENDING security change requests (for reviewers)
+   */
+  async findPendingSecurityChangeRequests(): Promise<
+    Array<{
+      request_id: string;
+      user_id: string;
+      change_type: string;
+      payload_json: string;
+      requested_at: Date;
+      user_email: string;
+      first_name: string | null;
+      last_name: string | null;
+    }>
+  > {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_security_change_request_find_pending()',
+      );
+      return result[0] ?? [];
+    } catch (error) {
+      this.logger.error('Error finding pending security change requests', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Review (approve/reject) a security change request
+   */
+  async reviewSecurityChangeRequest(
+    requestId: string,
+    reviewedBy: string,
+    approve: boolean,
+    reviewNote: string | null,
+  ): Promise<{ request_id: string; user_id: string; status: string } | null> {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_security_change_request_review(?, ?, ?, ?)',
+        [requestId, reviewedBy, approve ? 1 : 0, reviewNote ?? null],
+      );
+      return result[0]?.[0] ?? null;
+    } catch (error) {
+      this.logger.error(`Error reviewing security change request: ${requestId}`, error);
+      throw error;
+    }
+  }
 }

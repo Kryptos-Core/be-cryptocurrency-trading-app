@@ -61,6 +61,7 @@ export enum UserRole {
 export enum Permission {
   USERS_READ = 'users:read',
   USERS_MANAGE = 'users:manage',
+  USERS_SECURITY_REVIEW = 'users:security_review',
   CURRENCIES_MANAGE = 'currencies:manage',
   MARKETS_MANAGE = 'markets:manage',
   EXCHANGE_SYNC = 'exchange:sync',

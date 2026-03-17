@@ -4,14 +4,11 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { UsersRepository } from './repositories';
 import { User } from '@/entities/user.entity';
+import { CloudinaryService } from '@/common/services';
 
-/**
- * Users Module
- * Quản lý user operations
- */
 @Module({
   imports: [TypeOrmModule.forFeature([User])],
-  providers: [UsersService, UsersRepository],
+  providers: [UsersService, UsersRepository, CloudinaryService],
   controllers: [UsersController],
   exports: [UsersService, UsersRepository],
 })

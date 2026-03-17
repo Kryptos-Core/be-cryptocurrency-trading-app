@@ -273,6 +273,23 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   PAYOS_FX_SPREAD_BPS?: string = '0';
+
+  // Cloudinary (avatar upload)
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_CLOUD_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_API_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_AVATAR_FOLDER?: string = 'avatars';
 }
 
 /**
@@ -341,6 +358,10 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'PAYOS_FIAT_SYMBOL',
     'PAYOS_FIAT_TO_QUOTE_RATE',
     'PAYOS_FX_SPREAD_BPS',
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET',
+    'CLOUDINARY_AVATAR_FOLDER',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

@@ -59,6 +59,12 @@ export class User {
     | 'SUPPORT_AGENT'
     | 'MARKET_MAKER';
 
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  avatar_url!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  avatar_public_id!: string | null;
+
   @CreateDateColumn()
   created_at!: Date;
 
