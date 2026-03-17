@@ -114,6 +114,14 @@ export class AuthService {
     throw new UnauthorizedException('User profile endpoint should be called from users service');
   }
 
+  async getUserById(userId: string): Promise<User> {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
+
   /**
    * Hash password using bcrypt
    */

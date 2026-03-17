@@ -1,0 +1,73 @@
+import { randomInt } from 'crypto';
+import { Injectable, Logger } from '@nestjs/common';
+import { CacheService, MailService } from '@/common/services';
+import { BadRequestException, NotFoundException } from '@/common/exceptions';
+import { AuthRepository } from './repositories';
+
+@Injectable()
+export class TwoFaService {
+  private readonly logger = new Logger(TwoFaService.name);
+  private readonly otpTtlSeconds = 300; // 5 minutes
+
+  constructor(
+    private readonly cacheService: CacheService,
+    private readonly mailService: MailService,
+    private readonly authRepository: AuthRepository,
+  ) {}
+
+  private otpKey(userId: string): string {
+    return `2fa:otp:${userId}`;
+  }
+
+  private createOtpCode(): string {
+    return randomInt(100000, 1000000).toString();
+  }
+
+  async sendOtp(userId: string, email: string): Promise<{ expiresIn: number }> {
+    const code = this.createOtpCode();
+    await this.cacheService.set(this.otpKey(userId), code, this.otpTtlSeconds);
+    await this.mailService.sendOtp(email, code);
+    this.logger.log(`2FA OTP sent for user=${userId}`);
+    return { expiresIn: this.otpTtlSeconds };
+  }
+
+  async verifyOtp(userId: string, code: string): Promise<boolean> {
+    const key = this.otpKey(userId);
+    const cached = await this.cacheService.get<string>(key);
+    if (!cached || cached !== code) {
+      return false;
+    }
+    await this.cacheService.delete(key);
+    return true;
+  }
+
+  async enable(userId: string, code: string): Promise<void> {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User', userId);
+    }
+
+    const valid = await this.verifyOtp(userId, code);
+    if (!valid) {
+      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+    }
+
+    await this.authRepository.setTwoFaEnabled(userId, true);
+    this.logger.log(`2FA enabled for user=${userId}`);
+  }
+
+  async disable(userId: string, code: string): Promise<void> {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User', userId);
+    }
+
+    const valid = await this.verifyOtp(userId, code);
+    if (!valid) {
+      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+    }
+
+    await this.authRepository.setTwoFaEnabled(userId, false);
+    this.logger.log(`2FA disabled for user=${userId}`);
+  }
+}

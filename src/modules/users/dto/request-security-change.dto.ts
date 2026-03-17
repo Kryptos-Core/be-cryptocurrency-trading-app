@@ -1,5 +1,5 @@
-import { IsEnum, IsObject, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsObject, IsOptional, IsString, Length } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export const SECURITY_CHANGE_TYPES = ['EMAIL_CHANGE', 'PASSWORD_CHANGE'] as const;
 export type SecurityChangeType = (typeof SECURITY_CHANGE_TYPES)[number];
@@ -19,4 +19,13 @@ export class RequestSecurityChangeDto {
   })
   @IsObject()
   payload!: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: 'OTP code (required when 2FA is enabled)',
+    example: '123456',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(6, 6)
+  otpCode?: string;
 }

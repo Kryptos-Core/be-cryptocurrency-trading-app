@@ -5,9 +5,10 @@ import { UsersController } from './users.controller';
 import { UsersRepository } from './repositories';
 import { User } from '@/entities/user.entity';
 import { CloudinaryService } from '@/common/services';
+import { AuthModule } from '@/modules/auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [TypeOrmModule.forFeature([User]), AuthModule],
   providers: [UsersService, UsersRepository, CloudinaryService],
   controllers: [UsersController],
   exports: [UsersService, UsersRepository],

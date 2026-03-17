@@ -290,6 +290,27 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CLOUDINARY_AVATAR_FOLDER?: string = 'avatars';
+
+  // SMTP (2FA OTP email)
+  @IsString()
+  @IsOptional()
+  SMTP_HOST?: string;
+
+  @IsPort()
+  @IsOptional()
+  SMTP_PORT?: string = '587';
+
+  @IsString()
+  @IsOptional()
+  SMTP_USER?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_PASS?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_FROM?: string;
 }
 
 /**
@@ -362,6 +383,11 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
     'CLOUDINARY_AVATAR_FOLDER',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

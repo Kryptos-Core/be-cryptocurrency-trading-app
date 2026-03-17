@@ -6,10 +6,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { WalletAuthService } from './wallet-auth.service';
+import { TwoFaService } from './two-fa.service';
 import { AuthRepository } from './repositories';
 import { JwtStrategy } from './strategies';
 import { User } from '@/entities/user.entity';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
+import { MailService } from '@/common/services';
 
 /**
  * Auth Module
@@ -31,8 +33,15 @@ import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
     TypeOrmModule.forFeature([User]),
     BlockchainModule,
   ],
-  providers: [AuthService, WalletAuthService, AuthRepository, JwtStrategy],
+  providers: [
+    AuthService,
+    WalletAuthService,
+    TwoFaService,
+    AuthRepository,
+    JwtStrategy,
+    MailService,
+  ],
   controllers: [AuthController],
-  exports: [AuthService, AuthRepository, JwtModule],
+  exports: [AuthService, AuthRepository, TwoFaService, JwtModule],
 })
 export class AuthModule {}

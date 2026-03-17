@@ -8,7 +8,14 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { WalletAuthService } from './wallet-auth.service';
-import { RegisterDto, LoginDto, WalletNonceDto, WalletVerifyAuthDto } from './dto';
+import { TwoFaService } from './two-fa.service';
+import {
+  RegisterDto,
+  LoginDto,
+  WalletNonceDto,
+  WalletVerifyAuthDto,
+  TwoFaOtpDto,
+} from './dto';
 import { Public, CurrentUser } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
 import {
@@ -28,6 +35,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly walletAuthService: WalletAuthService,
+    private readonly twoFaService: TwoFaService,
   ) {}
 
   /**
@@ -143,6 +151,59 @@ export class AuthController {
       dto.address,
       dto.signature,
     );
+  }
+
+  @Post('2fa/send-otp')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Send OTP for 2FA verification',
+    description: 'Send 6-digit OTP code to authenticated user email',
+  })
+  @ApiSuccessResponse('OTP sent successfully')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async sendTwoFaOtp(@CurrentUser('userId') userId: string) {
+    const user = await this.authService.getUserById(userId);
+    return this.twoFaService.sendOtp(userId, user.email);
+  }
+
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Enable 2FA',
+    description: 'Enable 2FA after verifying OTP',
+  })
+  @ApiBody({ type: TwoFaOtpDto })
+  @ApiSuccessResponse('2FA enabled successfully')
+  @ApiBadRequestResponse('Invalid OTP')
+  async enableTwoFa(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: TwoFaOtpDto,
+  ) {
+    await this.twoFaService.enable(userId, dto.otpCode);
+    return { enabled: true };
+  }
+
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Disable 2FA',
+    description: 'Disable 2FA after verifying OTP',
+  })
+  @ApiBody({ type: TwoFaOtpDto })
+  @ApiSuccessResponse('2FA disabled successfully')
+  @ApiBadRequestResponse('Invalid OTP')
+  async disableTwoFa(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: TwoFaOtpDto,
+  ) {
+    await this.twoFaService.disable(userId, dto.otpCode);
+    return { enabled: false };
   }
 
   /**

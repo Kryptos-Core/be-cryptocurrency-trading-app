@@ -32,6 +32,22 @@ export class AuthRepository {
   }
 
   /**
+   * Find user by ID
+   */
+  async findById(userId: string): Promise<User | null> {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_find_by_id(?)',
+        [userId],
+      );
+      return result[0]?.[0] || null;
+    } catch (error) {
+      this.logger.error(`Error finding user by ID: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Create new user (for registration)
    * Procedure returns the newly created user_id
    */
@@ -118,6 +134,22 @@ export class AuthRepository {
       return userResult[0]?.[0];
     } catch (error) {
       this.logger.error(`Error creating wallet-only user: ${email}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enable/disable 2FA for user
+   */
+  async setTwoFaEnabled(userId: string, enabled: boolean): Promise<number> {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_set_two_fa(?, ?)',
+        [userId, enabled ? 1 : 0],
+      );
+      return Number(result[0]?.[0]?.affected ?? 0);
+    } catch (error) {
+      this.logger.error(`Error updating 2FA status for user ${userId}`, error);
       throw error;
     }
   }

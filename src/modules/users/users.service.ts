@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UsersRepository } from './repositories';
 import { CloudinaryService } from '@/common/services';
+import { TwoFaService } from '@/modules/auth/two-fa.service';
 import {
   UpdateUserDto,
   UpdateMyProfileBasicDto,
@@ -29,6 +30,7 @@ export class UsersService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly twoFaService: TwoFaService,
   ) {}
 
   /**
@@ -145,7 +147,23 @@ export class UsersService {
     userId: string,
     dto: RequestSecurityChangeDto,
   ): Promise<{ requestId: string; status: string }> {
-    await this.findOne(userId);
+    const user = await this.findOne(userId);
+
+    if (user.two_fa_enabled === 1) {
+      if (!dto.otpCode) {
+        throw new BadRequestException(
+          'OTP code is required when 2FA is enabled',
+          'OTP_REQUIRED',
+        );
+      }
+      const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
+      if (!otpValid) {
+        throw new BadRequestException(
+          'OTP không hợp lệ hoặc đã hết hạn',
+          'INVALID_OTP',
+        );
+      }
+    }
 
     let payload: Record<string, unknown> = { ...dto.payload };
 

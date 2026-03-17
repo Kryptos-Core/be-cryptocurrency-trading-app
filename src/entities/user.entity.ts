@@ -65,6 +65,9 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true })
   avatar_public_id!: string | null;
 
+  @Column({ type: 'tinyint', width: 1, default: 0 })
+  two_fa_enabled!: number;
+
   @CreateDateColumn()
   created_at!: Date;
 
