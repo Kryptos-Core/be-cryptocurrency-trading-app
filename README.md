@@ -102,11 +102,6 @@ npm run treasury:schedule:register
 	- `POST /api/v1/wallets/reconciliation-report/export?limit=100`
 	- đầu ra: `reports/reconciliation/YYYY-MM-DD.json`
 
-## Hồ sơ, Avatar (Cloudinary) và Duyệt bảo mật
-
-- Cập nhật tên (profile basic), upload avatar, gửi yêu cầu đổi email/mật khẩu (chờ duyệt).
-- Cấu hình Cloudinary và quyền RBAC `users:security_review`: xem **docs/PROFILE_AVATAR_SECURITY_REVIEW.md**.
-
 ## Tài khoản thử nghiệm sau khi seed
 
 | Email | Mật khẩu | Vai trò |
