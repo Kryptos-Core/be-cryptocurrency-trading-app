@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { TradingSubscriptionService } from '../services/trading-subscription.service';
 import { TradingPriceStreamService } from '../services/trading-price-stream.service';
 import { BinancePriceFeedService } from '../services/binance-price-feed.service';
+import { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
 import {
   WebSocketMessage,
   AuthMessage,
@@ -58,6 +59,7 @@ export class TradingGateway
     private readonly subscriptionService: TradingSubscriptionService,
     private readonly priceStreamService: TradingPriceStreamService,
     private readonly binancePriceFeedService: BinancePriceFeedService,
+    private readonly dashboardBroadcastService: DashboardBroadcastService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -74,6 +76,9 @@ export class TradingGateway
     this.priceStreamService.onCandleUpdate((message: OHLCMessage) => {
       this.broadcastCandleUpdate(message);
     });
+
+    // Inject server into DashboardBroadcastService for room-based broadcasting
+    this.dashboardBroadcastService.setServer(server);
   }
 
   /**
@@ -261,6 +266,32 @@ export class TradingGateway
       const errorMessage = error instanceof Error ? error.message : 'Unsubscription failed';
       return this.sendError(client, 'SERVER_ERROR', errorMessage);
     }
+  }
+
+  /**
+   * Handle dashboard room join.
+   * Client sends: { type: 'join_dashboard' }
+   * Server: joins room 'dashboard', emits immediate ticker snapshot.
+   * Auth not required — top market data is public.
+   */
+  @SubscribeMessage('join_dashboard')
+  handleJoinDashboard(@ConnectedSocket() client: Socket) {
+    client.join('dashboard');
+    const snapshot = this.dashboardBroadcastService.getSnapshot();
+    client.emit('dashboard_tickers', {
+      type: 'dashboard_tickers',
+      data: snapshot,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Handle dashboard room leave.
+   * Client sends: { type: 'leave_dashboard' }
+   */
+  @SubscribeMessage('leave_dashboard')
+  handleLeaveDashboard(@ConnectedSocket() client: Socket) {
+    client.leave('dashboard');
   }
 
   /**

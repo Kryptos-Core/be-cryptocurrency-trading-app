@@ -20,6 +20,9 @@ export type WebSocketMessageType =
   | 'unsubscribed'
   | 'ticker'
   | 'ohlc'
+  | 'dashboard_tickers'
+  | 'join_dashboard'
+  | 'leave_dashboard'
   | 'error'
   | 'ping'
   | 'pong';

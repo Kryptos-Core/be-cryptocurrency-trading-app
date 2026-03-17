@@ -5,6 +5,7 @@ import { TradingGateway } from './websocket/trading.gateway';
 import { TradingSubscriptionService } from './services/trading-subscription.service';
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
 import { BinancePriceFeedService } from './services/binance-price-feed.service';
+import { DashboardBroadcastService } from './services/dashboard-broadcast.service';
 import { MarketsModule } from '@/modules/markets/markets.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { MarketsModule } from '@/modules/markets/markets.module';
     TradingSubscriptionService,
     TradingPriceStreamService,
     BinancePriceFeedService,
+    DashboardBroadcastService,
   ],
   exports: [TradingPriceStreamService, BinancePriceFeedService],
 })
