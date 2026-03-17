@@ -79,4 +79,46 @@ export class AuthRepository {
       throw error;
     }
   }
+
+  /**
+   * Find user by linked wallet (chain + address), status = VERIFIED
+   */
+  async findByLinkedWallet(chain: string, address: string): Promise<User | null> {
+    try {
+      const result = await this.dataSource.query(
+        'CALL sp_user_find_by_linked_wallet(?, ?)',
+        [chain, address],
+      );
+      return result[0]?.[0] || null;
+    } catch (error) {
+      this.logger.error(`Error finding user by linked wallet: ${chain}/${address}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create wallet-only user and link wallet in one transaction
+   */
+  async createWalletOnlyUser(
+    userId: string,
+    email: string,
+    passwordHash: string,
+    chain: string,
+    address: string,
+  ): Promise<User> {
+    try {
+      await this.dataSource.query(
+        'CALL sp_user_create_wallet_only(?, ?, ?, ?, ?)',
+        [userId, email, passwordHash, chain, address],
+      );
+      const userResult = await this.dataSource.query(
+        'CALL sp_user_find_by_id(?)',
+        [userId],
+      );
+      return userResult[0]?.[0];
+    } catch (error) {
+      this.logger.error(`Error creating wallet-only user: ${email}`, error);
+      throw error;
+    }
+  }
 }

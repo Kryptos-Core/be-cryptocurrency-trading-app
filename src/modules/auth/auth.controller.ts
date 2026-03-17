@@ -7,7 +7,8 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto';
+import { WalletAuthService } from './wallet-auth.service';
+import { RegisterDto, LoginDto, WalletNonceDto, WalletVerifyAuthDto } from './dto';
 import { Public, CurrentUser } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
 import {
@@ -24,7 +25,10 @@ import {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly walletAuthService: WalletAuthService,
+  ) {}
 
   /**
    * Register new user
@@ -91,6 +95,54 @@ export class AuthController {
   @ApiBadRequestResponse('Invalid input data')
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  /**
+   * Request nonce for wallet auth (MetaMask / TronLink)
+   * POST /auth/wallet-nonce
+   */
+  @Public()
+  @Post('wallet-nonce')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Request wallet auth nonce',
+    description: 'Get a challenge message to sign with MetaMask or TronLink for login/register',
+  })
+  @ApiBody({ type: WalletNonceDto })
+  @ApiSuccessResponse('Nonce challenge created')
+  @ApiBadRequestResponse('Invalid chain or address')
+  async walletNonce(@Body() dto: WalletNonceDto) {
+    return this.walletAuthService.requestNonce(dto.chain, dto.address);
+  }
+
+  /**
+   * Verify wallet signature and login or register
+   * POST /auth/wallet-verify
+   */
+  @Public()
+  @Post('wallet-verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify wallet signature',
+    description: 'Verify signed message and return JWT (login if user exists, register and link wallet if new)',
+  })
+  @ApiBody({ type: WalletVerifyAuthDto })
+  @ApiSuccessResponse('Wallet auth successful', {
+    schema: {
+      example: {
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: { user_id: '...', email: '0x1234@eth_sepolia.wallet', status: 'ACTIVE' },
+        isNewUser: true,
+      },
+    },
+  })
+  @ApiBadRequestResponse('Invalid signature or expired nonce')
+  async walletVerify(@Body() dto: WalletVerifyAuthDto) {
+    return this.walletAuthService.verifyAndAuthenticate(
+      dto.chain,
+      dto.address,
+      dto.signature,
+    );
   }
 
   /**
