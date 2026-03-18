@@ -18,8 +18,9 @@ import {
 } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, CancelOrderDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards';
-import { CurrentUser } from '@/common/decorators';
+import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
+import { CurrentUser, RequireRoles, RequirePermissions } from '@/common/decorators';
+import { UserRole, Permission } from '@/common/enums';
 
 /**
  * Orders Controller
@@ -42,6 +43,29 @@ export class OrdersController {
       userId,
       dto,
     });
+  }
+
+  @Get('admin/all')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.SUPPORT_AGENT)
+  @RequirePermissions(Permission.ORDERS_MANAGE)
+  @ApiOperation({
+    summary: 'Admin: List all orders',
+    description: 'Paginated list of all orders with optional filters (userId, pairId, status).',
+  })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'pairId', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findAllAdmin(
+    @Query('userId') userId?: string,
+    @Query('pairId') pairId?: string,
+    @Query('status') status?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.ordersService.findAllForAdmin({ userId, pairId, status, page, limit });
   }
 
   @Get('book/:pairId')

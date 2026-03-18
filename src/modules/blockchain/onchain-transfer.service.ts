@@ -11,6 +11,7 @@ import {
 import { BlockchainNetwork, OnchainTxStatus } from '@/common/enums';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { WalletLinkingService } from './wallet-linking.service';
+import { DepositFxService } from './deposit-fx.service';
 import { SubmitDepositDto, RequestWithdrawalDto } from './dto';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
@@ -111,6 +112,7 @@ export class OnchainTransferService {
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly walletLinkingService: WalletLinkingService,
+    private readonly depositFxService: DepositFxService,
     private readonly walletsService: WalletsService,
     private readonly currencyRepository: CurrencyRepository,
     private readonly configService: ConfigService,
@@ -199,11 +201,15 @@ export class OnchainTransferService {
     chain: BlockchainNetwork,
     amount: string,
   ): Promise<{ settled: boolean; alreadySettled: boolean }> {
-    const currencyId = await this.resolveWithdrawalCurrencyId(chain);
+    // Quy đổi native coin → platform cash currency (USDT)
+    // Thay vì credit TRX/ETH trực tiếp, luôn credit vào ví tiền ảo (USDT)
+    const conversion = await this.depositFxService.convertToPlatformCash(chain, amount);
+    const { creditCurrencyId, creditAmount, conversionRate } = conversion;
+
     const refId = this.toLedgerRefId(`${txId}-credit`);
     const existed = await this.hasLedgerEntry(
       userId,
-      String(currencyId),
+      String(creditCurrencyId),
       WalletReferenceType.EXTERNAL_DEPOSIT,
       refId,
       'CREDIT',
@@ -214,9 +220,9 @@ export class OnchainTransferService {
 
     try {
       await this.walletsService.applyTransaction(userId, {
-        currencyId,
+        currencyId: creditCurrencyId,
         action: WalletTransactionAction.CREDIT,
-        amount,
+        amount: creditAmount,
         refType: WalletReferenceType.EXTERNAL_DEPOSIT,
         refId,
       });
@@ -226,6 +232,14 @@ export class OnchainTransferService {
       }
       throw error;
     }
+
+    // Lưu thông tin quy đổi vào onchain_transactions để audit/hiển thị FE
+    await this.dataSource.query(
+      `UPDATE onchain_transactions
+       SET credited_currency_id = ?, credited_amount = ?, conversion_rate = ?
+       WHERE tx_id = ?`,
+      [String(creditCurrencyId), creditAmount, conversionRate, txId],
+    );
 
     return { settled: true, alreadySettled: false };
   }
@@ -1001,10 +1015,15 @@ export class OnchainTransferService {
       confirmations: number;
       createdAt: string;
       confirmedAt: string | null;
+      creditedAmount: string | null;
+      creditedCurrencyId: string | null;
+      conversionRate: string | null;
     }>
   > {
     const rows = await this.dataSource.query(
-      `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status, confirmations, created_at, confirmed_at
+      `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
+              confirmations, created_at, confirmed_at,
+              credited_currency_id, credited_amount, conversion_rate
        FROM onchain_transactions
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -1030,6 +1049,9 @@ export class OnchainTransferService {
           ? r.confirmed_at.toISOString()
           : String(r.confirmed_at)
         : null,
+      creditedAmount: r.credited_amount != null ? String(r.credited_amount) : null,
+      creditedCurrencyId: r.credited_currency_id ?? null,
+      conversionRate: r.conversion_rate != null ? String(r.conversion_rate) : null,
     }));
   }
 
@@ -1041,7 +1063,9 @@ export class OnchainTransferService {
     txId: string,
   ) {
     const rows = await this.dataSource.query(
-      `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status, confirmations, created_at, confirmed_at
+      `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
+              confirmations, created_at, confirmed_at,
+              credited_currency_id, credited_amount, conversion_rate
        FROM onchain_transactions
        WHERE tx_id = ? AND user_id = ?
        LIMIT 1`,
@@ -1074,6 +1098,9 @@ export class OnchainTransferService {
           ? r.confirmed_at.toISOString()
           : String(r.confirmed_at)
         : null,
+      creditedAmount: r.credited_amount != null ? String(r.credited_amount) : null,
+      creditedCurrencyId: r.credited_currency_id ?? null,
+      conversionRate: r.conversion_rate != null ? String(r.conversion_rate) : null,
     };
   }
 }

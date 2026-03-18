@@ -1,18 +1,22 @@
 import {
-  Controller,
-  Post,
-  Body,
-  Req,
-  UseGuards,
-  Get,
-  Param,
-  ParseIntPipe,
+ Controller,
+ Post,
+ Body,
+ Req,
+ UseGuards,
+ Get,
+ Param,
+ Query,
+ ParseIntPipe,
+ DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { DepositsService } from './deposits.service';
 import { CreateFiatDepositDto } from './dto/create-deposit.dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
 import { Request } from 'express';
+import { RequireRoles, RequirePermissions } from '@/common/decorators';
+import { UserRole, Permission } from '@/common/enums';
 
 @ApiTags('Deposits')
 @Controller('deposits')
@@ -53,6 +57,25 @@ export class DepositsController {
   ) {
     const user = req.user as any;
     return this.depositsService.syncPaymentStatusForUser(user.userId, orderCode);
+  }
+
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: List all deposits', description: 'Paginated list of all fiat deposits with optional filters.' })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'PAID', 'CANCELLED'] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findAllAdmin(
+    @Query('userId') userId?: string,
+    @Query('status') status?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.depositsService.getAllDepositsForAdmin({ userId, status, page, limit });
   }
 
   @Post('payos-webhook')

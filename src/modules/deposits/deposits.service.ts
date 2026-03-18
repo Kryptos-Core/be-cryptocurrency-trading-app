@@ -232,6 +232,22 @@ export class DepositsService {
     return this.fiatDepositRepo.findByUser(userId);
   }
 
+  async getAllDepositsForAdmin(params: {
+    userId?: string;
+    status?: string;
+    page: number;
+    limit: number;
+  }) {
+    const skip = (params.page - 1) * params.limit;
+    const { items, total } = await this.fiatDepositRepo.findAllForAdmin({
+      userId: params.userId,
+      status: params.status,
+      skip,
+      limit: params.limit,
+    });
+    return { data: items, total, page: params.page, limit: params.limit };
+  }
+
   async syncPaymentStatusForUser(userId: string, orderCode: number) {
     if (!this.payOS) {
       throw new Error('PayOS is not configured on this server');

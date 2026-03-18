@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { DataSource } from 'typeorm';
 import { UsersRepository } from './repositories';
 import { CloudinaryService } from '@/common/services';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
@@ -8,10 +9,14 @@ import {
   UpdateMyProfileBasicDto,
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
+  UserFilterDto,
 } from './dto';
 import { User } from '@/entities/user.entity';
+import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
 import { newUuid } from '@/common/utils/uuid.util';
+import { WalletsService } from '@/modules/wallets/wallets.service';
+import { OrderRepository } from '@/modules/orders/repositories';
 
 /**
  * Users Service - Business Logic Layer
@@ -31,13 +36,75 @@ export class UsersService {
     private readonly usersRepository: UsersRepository,
     private readonly cloudinaryService: CloudinaryService,
     private readonly twoFaService: TwoFaService,
+    private readonly walletsService: WalletsService,
+    private readonly dataSource: DataSource,
+    private readonly orderRepository: OrderRepository,
   ) {}
 
   /**
-   * Find all users with pagination
+   * Find all users with optional search/filter/sort (admin)
    */
-  async findAll(page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> {
-    return this.usersRepository.findAll(page, limit);
+  async findAll(filters: UserFilterDto): Promise<{ users: User[]; total: number; page: number; limit: number }> {
+    return this.usersRepository.findAllWithFilters(filters);
+  }
+
+  /**
+   * Get wallet balances for a specific user (admin/risk officer)
+   */
+  async getUserWallets(userId: string) {
+    await this.findOne(userId);
+    return this.walletsService.getWallets(userId, true);
+  }
+
+  /**
+   * Get onchain transactions for a specific user (admin/risk officer)
+   */
+  async getUserOnchainTransactions(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{ items: OnchainTransaction[]; total: number; page: number; limit: number }> {
+    await this.findOne(userId);
+    const skip = (page - 1) * limit;
+    const [items, total] = await this.dataSource
+      .getRepository(OnchainTransaction)
+      .createQueryBuilder('tx')
+      .where('tx.user_id = :userId', { userId })
+      .orderBy('tx.created_at', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+    return { items, total, page, limit };
+  }
+
+  /**
+   * Get security change request history for a specific user (admin/risk officer)
+   */
+  async getUserSecurityChanges(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    await this.findOne(userId);
+    return this.usersRepository.findSecurityChangesByUserId(userId, page, limit);
+  }
+
+  /**
+   * Get order history for a specific user (admin view)
+   */
+  async getUserOrders(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ) {
+    await this.findOne(userId);
+    return this.orderRepository.findByUserForAdmin(
+      userId,
+      (page - 1) * limit,
+      limit,
+      status,
+    );
   }
 
   /**

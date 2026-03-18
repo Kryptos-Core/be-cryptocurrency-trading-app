@@ -14,6 +14,7 @@ import {
   BadRequestException,
   HttpCode,
   HttpStatus,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -31,6 +32,7 @@ import {
   UpdateMyProfileBasicDto,
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
+  UserFilterDto,
 } from './dto';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { CurrentUser } from '@/common/decorators';
@@ -56,26 +58,29 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
-   * Get all users (with pagination)
-   * GET /users?page=1&limit=10
+   * Get all users with search/filter/sort
+   * GET /users?page=1&limit=20&search=nguyen&role=TRADER&status=ACTIVE&sortBy=created_at&sortOrder=DESC
    */
   @Get()
   @ApiOperation({
     summary: 'Get all users',
-    description: 'Retrieve a paginated list of all users',
+    description: 'Retrieve a filtered, sorted, paginated list of users',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search email, first_name, last_name' })
+  @ApiQuery({ name: 'email', required: false, type: String, description: 'Exact email match' })
+  @ApiQuery({ name: 'role', required: false, enum: ['GUEST','TRADER','VERIFIED_USER','ADMIN','RISK_OFFICER','SUPPORT_AGENT','MARKET_MAKER'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'BANNED', 'PENDING'] })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['created_at', 'email', 'first_name'] })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('Users retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
-  async findAll(
-    @Query('page', ParseIntPipe) page: number = 1,
-    @Query('limit', ParseIntPipe) limit: number = 10,
-  ) {
-    return this.usersService.findAll(page, limit);
+  async findAll(@Query() filters: UserFilterDto) {
+    return this.usersService.findAll(filters);
   }
 
   /**
@@ -259,6 +264,78 @@ export class UsersController {
   }
 
   /**
+   * Get wallet balances for a specific user (Admin / Risk Officer)
+   * GET /users/:id/wallets
+   */
+  @Get(':id/wallets')
+  @ApiOperation({
+    summary: 'Get user wallets',
+    description: 'Retrieve all wallet balances for a specific user (admin view)',
+  })
+  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiSuccessResponse('User wallets retrieved successfully')
+  @ApiNotFoundResponse('User not found')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getUserWallets(@Param('id') id: string) {
+    return this.usersService.getUserWallets(id);
+  }
+
+  /**
+   * Get onchain transaction history for a specific user (Admin / Risk Officer)
+   * GET /users/:id/onchain-transactions?page=1&limit=20
+   */
+  @Get(':id/onchain-transactions')
+  @ApiOperation({
+    summary: 'Get user onchain transactions',
+    description: 'Retrieve paginated onchain transaction history for a specific user',
+  })
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.USERS_READ)
+  @ApiSuccessResponse('Onchain transactions retrieved successfully')
+  @ApiNotFoundResponse('User not found')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getUserOnchainTransactions(
+    @Param('id') id: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    return this.usersService.getUserOnchainTransactions(id, page, limit);
+  }
+
+  /**
+   * Get security change request history for a specific user (Admin / Risk Officer)
+   * GET /users/:id/security-changes?page=1&limit=20
+   */
+  @Get(':id/security-changes')
+  @ApiOperation({
+    summary: 'Get user security change history',
+    description: 'Retrieve all security change requests (email/password) for a specific user',
+  })
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.USERS_SECURITY_REVIEW)
+  @ApiSuccessResponse('Security changes retrieved successfully')
+  @ApiNotFoundResponse('User not found')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getUserSecurityChanges(
+    @Param('id') id: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    return this.usersService.getUserSecurityChanges(id, page, limit);
+  }
+
+  /**
    * Get user by ID
    * GET /users/:id
    */
@@ -343,6 +420,34 @@ export class UsersController {
     @Body('fcm_token') fcmToken: string | null,
   ) {
     await this.usersService.saveFcmToken(userId, fcmToken ?? null);
+  }
+
+  /**
+   * Get orders for a specific user (Admin/Support/Risk only)
+   * GET /users/:id/orders
+   */
+  @Get(':id/orders')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.USERS_READ)
+  @ApiOperation({
+    summary: 'Get user orders',
+    description: 'Get order history for a specific user (Admin/Support/Risk only)',
+  })
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'] })
+  @ApiSuccessResponse('User orders retrieved successfully')
+  @ApiNotFoundResponse('User not found')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getUserOrders(
+    @Param('id') id: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('status') status?: string,
+  ) {
+    return this.usersService.getUserOrders(id, page, limit, status);
   }
 
   /**

@@ -199,6 +199,39 @@ export class OrderRepository extends BaseRepository<Order> {
     }
   }
 
+  /** Admin: paginated list of all orders with optional filters */
+  async findAllForAdmin(params: {
+    userId?: string;
+    pairId?: string;
+    status?: string;
+    skip: number;
+    limit: number;
+  }): Promise<{ items: Order[]; total: number }> {
+    const repo = this.dataSource.getRepository(Order);
+    const qb = repo.createQueryBuilder('o').orderBy('o.created_at', 'DESC');
+
+    if (params.userId) qb.andWhere('o.user_id = :userId', { userId: params.userId });
+    if (params.pairId) qb.andWhere('o.pair_id = :pairId', { pairId: params.pairId });
+    if (params.status) qb.andWhere('o.status = :status', { status: params.status });
+
+    const [items, total] = await qb
+      .skip(params.skip)
+      .take(params.limit)
+      .getManyAndCount();
+
+    return { items, total };
+  }
+
+  /** Admin: orders for a specific user (used by GET /users/:id/orders) */
+  async findByUserForAdmin(
+    userId: string,
+    skip: number,
+    limit: number,
+    status?: string,
+  ): Promise<{ items: Order[]; total: number }> {
+    return this.findAllForAdmin({ userId, status, skip, limit });
+  }
+
   private mapRowToOrder(row: any): Order {
     const order = new Order();
     order.order_id = String(row.order_id ?? '');

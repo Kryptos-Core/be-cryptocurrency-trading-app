@@ -65,15 +65,39 @@ export class CurrenciesService {
   }
 
   /**
-   * Find all currencies with pagination
-   * Cache-Aside Pattern: Check cache first, then database
+   * Find all currencies with pagination.
+   * Cache-Aside Pattern: Check cache first, then database.
+   *
+   * When the caller passes `search`, `isTradable`, or `isActive` the request
+   * is forwarded to `searchCurrencies()` which uses a QueryBuilder and skips
+   * the Redis cache (results are too query-specific to be worth caching).
    */
   async findAll(
     page: number = 1,
     limit: number = 10,
     includeInactive: boolean = false,
     includeMarketData: boolean = false,
+    search?: string,
+    isTradable?: boolean,
+    isActive?: boolean,
   ): Promise<{ currencies: Currency[]; total: number; page: number; limit: number }> {
+    const hasExtraFilter =
+      (search !== undefined && search.trim() !== '') ||
+      isTradable !== undefined ||
+      isActive !== undefined;
+
+    if (hasExtraFilter) {
+      return this.searchCurrencies({
+        search,
+        isTradable,
+        isActive,
+        includeInactive,
+        includeMarketData,
+        page,
+        limit,
+      });
+    }
+
     const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}`;
 
     const result = await this.cacheService.getOrSet(
@@ -90,9 +114,51 @@ export class CurrenciesService {
     const mappedCurrencies = includeMarketData
       ? await this.mapTickersToCurrencies(result.data)
       : result.data;
-    
+
     return {
       currencies: mappedCurrencies,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
+  }
+
+  /**
+   * Search currencies by text + multi-filter (isTradable, isActive).
+   *
+   * Intentionally bypasses Redis cache so that each unique query always
+   * returns fresh results without cache-key explosion.
+   * The QueryBuilder path (findWithSearch) is used instead of stored procedures.
+   */
+  async searchCurrencies(params: {
+    search?: string;
+    isTradable?: boolean;
+    isActive?: boolean;
+    includeInactive?: boolean;
+    includeMarketData?: boolean;
+    page: number;
+    limit: number;
+  }): Promise<{ currencies: Currency[]; total: number; page: number; limit: number }> {
+    const result = await this.currencyRepository.findWithSearch({
+      search: params.search,
+      isTradable: params.isTradable,
+      isActive: params.isActive,
+      includeInactive: params.includeInactive ?? false,
+      page: params.page,
+      limit: params.limit,
+    });
+
+    const enriched = params.includeMarketData
+      ? await this.mapTickersToCurrencies(result.currencies)
+      : result.currencies;
+
+    this.logger.debug(
+      `searchCurrencies: q="${params.search ?? ''}" isTradable=${params.isTradable} ` +
+        `isActive=${params.isActive} → ${result.total} results`,
+    );
+
+    return {
+      currencies: enriched,
       total: result.total,
       page: result.page,
       limit: result.limit,

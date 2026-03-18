@@ -203,6 +203,62 @@ export class CurrencyRepository extends BaseRepository<Currency> {
   }
 
   /**
+   * Full-text search + multi-filter via QueryBuilder.
+   *
+   * This path is used only when the caller supplies at least one of
+   * `search`, `isTradable`, or `isActive`.  Stored procedures are not
+   * modified; this method runs a lightweight inline query instead.
+   *
+   * Strategy Pattern: alternative data-access strategy alongside the SP path.
+   */
+  async findWithSearch(params: {
+    search?: string;
+    isTradable?: boolean;
+    isActive?: boolean;
+    includeInactive?: boolean;
+    page: number;
+    limit: number;
+  }): Promise<{ currencies: Currency[]; total: number; page: number; limit: number }> {
+    try {
+      const skip = (params.page - 1) * params.limit;
+      const qb = this.dataSource
+        .getRepository(Currency)
+        .createQueryBuilder('c')
+        .orderBy('c.symbol', 'ASC');
+
+      if (params.search?.trim()) {
+        const q = `%${params.search.trim().toUpperCase()}%`;
+        qb.andWhere('(UPPER(c.symbol) LIKE :q OR UPPER(c.name) LIKE :q)', { q });
+      }
+
+      if (params.isTradable !== undefined) {
+        qb.andWhere('c.is_tradable = :isTradable', { isTradable: params.isTradable });
+      }
+
+      if (params.isActive !== undefined) {
+        qb.andWhere('c.is_active = :isActive', { isActive: params.isActive });
+      } else if (!params.includeInactive) {
+        // Honour the same semantics as sp_currency_find_all:
+        // if includeInactive=false (default) and no explicit isActive filter,
+        // only return active currencies.
+        qb.andWhere('c.is_active = :isActive', { isActive: true });
+      }
+
+      const [rows, total] = await qb.skip(skip).take(params.limit).getManyAndCount();
+
+      return {
+        currencies: rows.map((row) => this.mapProcedureResultToEntity(row)!),
+        total,
+        page: params.page,
+        limit: params.limit,
+      };
+    } catch (error) {
+      this.logger.error('Error in findWithSearch', error);
+      throw error;
+    }
+  }
+
+  /**
    * Map stored procedure result to Currency entity
    * Converts MySQL types to proper TypeScript types
    * - TINYINT(1) boolean fields: 1/0 → true/false

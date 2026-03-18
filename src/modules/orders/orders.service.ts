@@ -222,6 +222,42 @@ export class OrdersService {
     return { data, total, page, limit };
   }
 
+  /** Admin: list all orders with filters */
+  async findAllForAdmin(params: {
+    userId?: string;
+    pairId?: string;
+    status?: string;
+    page: number;
+    limit: number;
+  }) {
+    const skip = (params.page - 1) * params.limit;
+    const { items, total } = await this.orderRepository.findAllForAdmin({
+      userId: params.userId,
+      pairId: params.pairId,
+      status: params.status,
+      skip,
+      limit: params.limit,
+    });
+    return { data: items, total, page: params.page, limit: params.limit };
+  }
+
+  /** Admin: orders for a specific user */
+  async findOrdersByUser(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ) {
+    const skip = (page - 1) * limit;
+    const { items, total } = await this.orderRepository.findByUserForAdmin(
+      userId,
+      skip,
+      limit,
+      status,
+    );
+    return { data: items, total, page, limit };
+  }
+
   private throwFromProcedureError(code: string, message?: string): void {
     const msg = message ?? code;
     switch (code) {

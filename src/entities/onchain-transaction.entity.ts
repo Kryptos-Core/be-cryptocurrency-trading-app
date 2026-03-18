@@ -67,6 +67,18 @@ export class OnchainTransaction {
   @Column({ type: 'datetime', nullable: true })
   confirmed_at!: Date | null;
 
+  /** ID của currency được credit vào ví sau quy đổi (thường là USDT) */
+  @Column({ type: 'char', length: 36, nullable: true })
+  credited_currency_id!: string | null;
+
+  /** Số lượng cash currency (USDT) thực tế được credit sau khi quy đổi */
+  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  credited_amount!: string | null;
+
+  /** Tỷ giá quy đổi: 1 native coin = X USDT tại thời điểm giao dịch */
+  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  conversion_rate!: string | null;
+
   @ManyToOne(() => User, (user) => user.onchain_transactions, {
     onDelete: 'CASCADE',
   })

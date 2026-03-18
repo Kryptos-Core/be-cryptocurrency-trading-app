@@ -50,14 +50,20 @@ export class CurrenciesController {
   constructor(private readonly currenciesService: CurrenciesService) {}
 
   /**
-   * Get all currencies with pagination
-   * GET /currencies?page=1&limit=10&includeInactive=false
+   * Get all currencies with pagination + optional smart search and filters.
+   * GET /currencies?page=1&limit=10&includeInactive=false&search=BTC&isTradable=true&isActive=true
+   *
+   * When `search`, `isTradable`, or `isActive` are provided the request is
+   * forwarded to the QueryBuilder-based search path (no Redis cache).
+   * Without extra filters the cached stored-procedure path is used.
    */
   @Get()
   @Public()
   @ApiOperation({
     summary: 'Get all currencies',
-    description: 'Retrieve a paginated list of all currencies',
+    description:
+      'Paginated currency list. Supply `search`, `isTradable` or `isActive` for smart filtering; ' +
+      'those requests bypass the Redis cache and use a full-text QueryBuilder query instead.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
@@ -67,8 +73,25 @@ export class CurrenciesController {
     required: false,
     type: Boolean,
     example: false,
-    description:
-      'Include enriched market ticker fields for each currency (may increase response time).',
+    description: 'Include enriched market ticker fields (may increase response time).',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Text search on symbol or name (case-insensitive, partial match).',
+  })
+  @ApiQuery({
+    name: 'isTradable',
+    required: false,
+    type: Boolean,
+    description: 'Filter by tradable status.',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: 'Filter by active status.',
   })
   @ApiSuccessResponse('Currencies retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -79,12 +102,18 @@ export class CurrenciesController {
     includeInactive: boolean = false,
     @Query('includeMarketData', new ParseBoolPipe({ optional: true }))
     includeMarketData: boolean = false,
+    @Query('search') search?: string,
+    @Query('isTradable', new ParseBoolPipe({ optional: true })) isTradable?: boolean,
+    @Query('isActive', new ParseBoolPipe({ optional: true })) isActive?: boolean,
   ) {
     return this.currenciesService.findAll(
       page,
       limit,
       includeInactive,
       includeMarketData,
+      search,
+      isTradable,
+      isActive,
     );
   }
 

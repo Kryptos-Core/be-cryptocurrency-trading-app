@@ -58,6 +58,22 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
     return (rows?.[0] || []).map(this.mapRow);
   }
 
+  async findAllForAdmin(params: {
+    userId?: string;
+    status?: string;
+    skip: number;
+    limit: number;
+  }): Promise<{ items: FiatDeposit[]; total: number }> {
+    const repo = this.dataSource.getRepository(FiatDeposit);
+    const qb = repo.createQueryBuilder('d').orderBy('d.created_at', 'DESC');
+
+    if (params.userId) qb.andWhere('d.user_id = :userId', { userId: params.userId });
+    if (params.status) qb.andWhere('d.status = :status', { status: params.status });
+
+    const [items, total] = await qb.skip(params.skip).take(params.limit).getManyAndCount();
+    return { items, total };
+  }
+
   private mapRow(row: any): FiatDeposit {
     const deposit = new FiatDeposit();
     deposit.deposit_id = row.deposit_id;

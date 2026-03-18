@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
 import { UserRole } from '@/common/enums';
+import { UserFilterDto } from '../dto/user-filter.dto';
 
 /**
  * Users Repository - Data Access Layer
@@ -56,30 +57,111 @@ export class UsersRepository {
   }
 
   /**
-   * Get all users with pagination
+   * Get all users with pagination (legacy, no filters)
    */
   async findAll(
     page: number = 1,
     limit: number = 10,
   ): Promise<{ users: User[]; total: number }> {
+    return this.findAllWithFilters({ page, limit });
+  }
+
+  /**
+   * Get users with search/filter/sort — uses TypeORM QueryBuilder for dynamic conditions
+   */
+  async findAllWithFilters(
+    filters: UserFilterDto,
+  ): Promise<{ users: User[]; total: number; page: number; limit: number }> {
     try {
+      const page = filters.page ?? 1;
+      const limit = filters.limit ?? 20;
       const skip = (page - 1) * limit;
 
-      // Get users
-      const usersResult = await this.dataSource.query(
-        'CALL sp_user_find_all(?, ?)',
-        [skip, limit],
-      );
+      const qb = this.dataSource
+        .getRepository(User)
+        .createQueryBuilder('u')
+        .select([
+          'u.user_id',
+          'u.email',
+          'u.first_name',
+          'u.last_name',
+          'u.role',
+          'u.status',
+          'u.avatar_url',
+          'u.two_fa_enabled',
+          'u.created_at',
+        ]);
 
-      // Get total count
-      const countResult = await this.dataSource.query('CALL sp_user_count()');
+      if (filters.search) {
+        const s = `%${filters.search.trim()}%`;
+        qb.andWhere(
+          '(u.email LIKE :s OR u.first_name LIKE :s OR u.last_name LIKE :s)',
+          { s },
+        );
+      }
 
-      const users = usersResult[0] || [];
-      const total = countResult[0]?.[0]?.total || 0;
+      if (filters.email) {
+        qb.andWhere('u.email = :email', { email: filters.email.toLowerCase().trim() });
+      }
 
-      return { users, total };
+      if (filters.role) {
+        qb.andWhere('u.role = :role', { role: filters.role });
+      }
+
+      if (filters.status) {
+        qb.andWhere('u.status = :status', { status: filters.status });
+      }
+
+      const sortColumn = filters.sortBy ?? 'created_at';
+      const sortDir = filters.sortOrder ?? 'DESC';
+      qb.orderBy(`u.${sortColumn}`, sortDir);
+
+      const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
+
+      return { users, total, page, limit };
     } catch (error) {
-      this.logger.error('Error finding all users', error);
+      this.logger.error('Error finding users with filters', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find all security change requests for a specific user (all statuses, paginated)
+   */
+  async findSecurityChangesByUserId(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    items: Array<{
+      request_id: string;
+      change_type: string;
+      status: string;
+      requested_at: Date;
+      reviewed_at: Date | null;
+      reviewed_by: string | null;
+      review_note: string | null;
+    }>;
+    total: number;
+  }> {
+    try {
+      const skip = (page - 1) * limit;
+      const rows = await this.dataSource.query(
+        `SELECT request_id, change_type, status, requested_at, reviewed_at, reviewed_by, review_note
+         FROM user_security_change_requests
+         WHERE user_id = ?
+         ORDER BY requested_at DESC
+         LIMIT ? OFFSET ?`,
+        [userId, limit, skip],
+      );
+      const countResult = await this.dataSource.query(
+        'SELECT COUNT(*) AS total FROM user_security_change_requests WHERE user_id = ?',
+        [userId],
+      );
+      const total = Number(countResult[0]?.total ?? 0);
+      return { items: rows ?? [], total };
+    } catch (error) {
+      this.logger.error(`Error finding security changes for user: ${userId}`, error);
       throw error;
     }
   }

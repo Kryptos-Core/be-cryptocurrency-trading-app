@@ -7,6 +7,8 @@ import {
   Param,
   Query,
   UseGuards,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,6 +17,8 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { DataSource } from 'typeorm';
+import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
 import { CurrentUser, Public, RequirePermissions, RequireRoles } from '@/common/decorators';
 import {
@@ -50,6 +54,7 @@ export class BlockchainController {
     private readonly onchainTransferService: OnchainTransferService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly managedWalletsService: ManagedWalletsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   // ============ WALLET LINKING ============
@@ -406,6 +411,47 @@ export class BlockchainController {
     @Param('txId') txId: string,
   ) {
     return this.onchainTransferService.getTransactionById(userId, txId);
+  }
+
+  // ============ ADMIN ============
+
+  /**
+   * Admin: Danh sách tất cả giao dịch rút tiền on-chain
+   * GET /blockchain/admin/withdrawals
+   */
+  @Get('admin/withdrawals')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.RISK_REVIEW)
+  @ApiOperation({
+    summary: 'Admin: List all withdrawal transactions',
+    description: 'Paginated list of all onchain withdrawal transactions across all users.',
+  })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'] })
+  @ApiQuery({ name: 'chain', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async listAdminWithdrawals(
+    @Query('userId') userId?: string,
+    @Query('status') status?: string,
+    @Query('chain') chain?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    const qb = this.dataSource
+      .getRepository(OnchainTransaction)
+      .createQueryBuilder('tx')
+      .where('tx.type = :type', { type: 'WITHDRAWAL' })
+      .orderBy('tx.created_at', 'DESC');
+
+    if (userId) qb.andWhere('tx.user_id = :userId', { userId });
+    if (status) qb.andWhere('tx.status = :status', { status });
+    if (chain) qb.andWhere('tx.chain = :chain', { chain });
+
+    const skip = (page - 1) * limit;
+    const [items, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    return { data: items, total, page, limit };
   }
 
   // ============ UTILITIES ============
