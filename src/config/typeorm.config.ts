@@ -24,6 +24,7 @@ import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
 import { Notification } from '../entities/notification.entity';
 import { UserNotification } from '../entities/user-notification.entity';
+import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
@@ -46,6 +47,7 @@ const ALL_ENTITIES = [
   Withdrawal,
   Notification,
   UserNotification,
+  PaymentMethodConfig,
 ];
 
 export const getTypeOrmConfig = (

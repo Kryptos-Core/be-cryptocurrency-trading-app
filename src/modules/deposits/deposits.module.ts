@@ -4,9 +4,10 @@ import { DepositsService } from './deposits.service';
 import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
+import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 
 @Module({
-  imports: [WalletsModule, CurrenciesModule],
+  imports: [WalletsModule, CurrenciesModule, PaymentConfigModule],
   controllers: [DepositsController],
   providers: [DepositsService, FiatDepositRepository],
   exports: [DepositsService],

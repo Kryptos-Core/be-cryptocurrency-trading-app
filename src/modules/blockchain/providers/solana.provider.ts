@@ -16,81 +16,89 @@ import {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
 } from '../interfaces';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 
 /**
  * Solana Blockchain Provider
- * Kết nối Solana devnet qua @solana/web3.js
+ * Connects to Solana devnet / mainnet via @solana/web3.js.
+ *
+ * Hot wallet key resolution (Cache-Aside):
+ *  1. PaymentConfigService.getActiveConfig('SOL', 'DEVNET' | 'MAINNET') — DB/Redis
+ *  2. Fallback: SOLANA_HOT_WALLET_PRIVATE_KEY from .env (base64 encoded secret key)
  */
 @Injectable()
 export class SolanaProvider implements IBlockchainProvider {
   private readonly logger = new Logger(SolanaProvider.name);
   private readonly connection: Connection;
-  private readonly hotWallet: Keypair;
+  private readonly networkKey: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly paymentConfigService: PaymentConfigService,
+  ) {
     const rpcUrl =
       this.configService.get<string>('app.blockchain.solana.devnetUrl') ??
       'https://api.devnet.solana.com';
 
     this.connection = new Connection(rpcUrl, 'confirmed');
+    this.networkKey = 'DEVNET';
 
-    const privateKeyRaw =
-      this.configService.get<string>('app.blockchain.solana.hotWalletPrivateKey') ?? '';
-
-    if (privateKeyRaw) {
-      const secretKey = Buffer.from(privateKeyRaw, 'base64');
-      this.hotWallet = Keypair.fromSecretKey(secretKey);
-    } else {
-      // Devnet: generate ephemeral keypair when no hot-wallet key is configured
-      this.hotWallet = Keypair.generate();
-      this.logger.warn(
-        'SOLANA_HOT_WALLET_PRIVATE_KEY not set — using ephemeral keypair (devnet only)',
-      );
-    }
-
-    this.logger.log(`SolanaProvider khởi tạo: devnet → ${rpcUrl}`);
+    this.logger.log(`SolanaProvider initialized: devnet → ${rpcUrl}`);
   }
 
   getNetwork(): BlockchainNetwork {
     return BlockchainNetwork.SOLANA_DEVNET;
   }
 
+  // ── Hot wallet key resolution ────────────────────────────────────────────
+
+  private async resolveHotWallet(): Promise<Keypair> {
+    const dbConfig = await this.paymentConfigService.getActiveConfig('SOL', this.networkKey);
+    if (dbConfig) {
+      const blockchainConfig = dbConfig as BlockchainGatewayConfig;
+      if (blockchainConfig.hotWalletPrivateKey) {
+        const secretKey = Buffer.from(blockchainConfig.hotWalletPrivateKey, 'base64');
+        return Keypair.fromSecretKey(secretKey);
+      }
+    }
+
+    const envKey = this.configService.get<string>('app.blockchain.solana.hotWalletPrivateKey') ?? '';
+    if (!envKey) {
+      // Devnet: ephemeral keypair when no key is configured
+      this.logger.warn('SOL hot wallet key not configured — using ephemeral keypair (devnet only)');
+      return Keypair.generate();
+    }
+    return Keypair.fromSecretKey(Buffer.from(envKey, 'base64'));
+  }
+
+  // ── IBlockchainProvider ──────────────────────────────────────────────────
+
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
     try {
       const pubkey = new PublicKey(address);
       const lamports = await this.connection.getBalance(pubkey);
-      const solBalance = (lamports / LAMPORTS_PER_SOL).toString();
-
       return {
         address,
         network: BlockchainNetwork.SOLANA_DEVNET,
-        balance: solBalance,
+        balance: (lamports / LAMPORTS_PER_SOL).toString(),
         symbol: 'SOL',
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`Lỗi lấy balance Solana: ${address}`, error);
+      this.logger.error(`Error getting Solana balance: ${address}`, error);
       throw error;
     }
   }
 
-  async verifySignature(
-    address: string,
-    message: string,
-    signature: string,
-  ): Promise<boolean> {
+  async verifySignature(address: string, message: string, signature: string): Promise<boolean> {
     try {
       const pubkey = new PublicKey(address);
       const messageBytes = new TextEncoder().encode(message);
       const signatureBytes = Buffer.from(signature, 'base64');
-
-      return nacl.sign.detached.verify(
-        messageBytes,
-        signatureBytes,
-        pubkey.toBytes(),
-      );
+      return nacl.sign.detached.verify(messageBytes, signatureBytes, pubkey.toBytes());
     } catch (error) {
-      this.logger.warn(`Xác minh chữ ký Solana thất bại: ${address}`, error);
+      this.logger.warn(`Solana signature verification failed: ${address}`, error);
       return false;
     }
   }
@@ -101,15 +109,11 @@ export class SolanaProvider implements IBlockchainProvider {
         maxSupportedTransactionVersion: 0,
       });
 
-      if (!tx) {
-        return this.buildNotFound(txHash);
-      }
+      if (!tx) return this.buildNotFound(txHash);
 
       const meta = tx.meta;
       const failed = meta?.err !== null;
       const message = tx.transaction.message;
-
-      // Lấy account keys tùy version
       const accountKeys =
         'staticAccountKeys' in message
           ? (message as any).staticAccountKeys
@@ -133,7 +137,7 @@ export class SolanaProvider implements IBlockchainProvider {
         timestamp: tx.blockTime ? new Date(tx.blockTime * 1000) : undefined,
       };
     } catch (error) {
-      this.logger.error(`Lỗi lấy tx Solana: ${txHash}`, error);
+      this.logger.error(`Error getting Solana tx: ${txHash}`, error);
       return this.buildNotFound(txHash);
     }
   }
@@ -148,34 +152,26 @@ export class SolanaProvider implements IBlockchainProvider {
   }
 
   async sendTransaction(to: string, amount: string): Promise<string> {
-    try {
-      const toPubkey = new PublicKey(to);
-      const lamports = Math.round(parseFloat(amount) * LAMPORTS_PER_SOL);
+    const hotWallet = await this.resolveHotWallet();
+    const toPubkey = new PublicKey(to);
+    const lamports = Math.round(parseFloat(amount) * LAMPORTS_PER_SOL);
 
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: this.hotWallet.publicKey,
-          toPubkey,
-          lamports,
-        }),
-      );
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: hotWallet.publicKey,
+        toPubkey,
+        lamports,
+      }),
+    );
 
-      const txHash = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [this.hotWallet],
-      );
-
-      this.logger.log(`Solana sendTransaction OK: ${txHash}`);
-      return txHash;
-    } catch (error) {
-      this.logger.error(`Solana sendTransaction thất bại: to=${to} amount=${amount}`, error);
-      throw error;
-    }
+    const txHash = await sendAndConfirmTransaction(this.connection, transaction, [hotWallet]);
+    this.logger.log(`Solana sendTransaction OK: ${txHash}`);
+    return txHash;
   }
 
-  getHotWalletAddress(): string {
-    return this.hotWallet.publicKey.toBase58();
+  async getHotWalletAddress(): Promise<string> {
+    const hotWallet = await this.resolveHotWallet();
+    return hotWallet.publicKey.toBase58();
   }
 
   private buildNotFound(txHash: string): BlockchainTxStatusDto {

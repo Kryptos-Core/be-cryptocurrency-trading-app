@@ -529,7 +529,7 @@ export class OnchainTransferService {
 
     if (!shouldAutoSend) {
       const provider = this.providerFactory.getProvider(dto.chain);
-      const hotWalletAddress = provider.getHotWalletAddress();
+      const hotWalletAddress = await provider.getHotWalletAddress();
 
       await this.dataSource.query(
         `INSERT INTO onchain_transactions
@@ -581,7 +581,7 @@ export class OnchainTransferService {
 
     // Lấy thông tin Hot Wallet và gửi giao dịch thật
     const provider = this.providerFactory.getProvider(dto.chain);
-    const hotWalletAddress = provider.getHotWalletAddress();
+    const hotWalletAddress = await provider.getHotWalletAddress();
 
     let txHash: string | null = null;
     let status = OnchainTxStatus.PENDING;
@@ -752,7 +752,7 @@ export class OnchainTransferService {
        WHERE tx_id = ?`,
       [
         txHash,
-        provider.getHotWalletAddress(),
+        await provider.getHotWalletAddress(),
         status,
         status === OnchainTxStatus.CONFIRMING ? 0 : 0,
         null,

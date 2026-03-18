@@ -55,6 +55,8 @@ export enum UserRole {
   RISK_OFFICER = 'RISK_OFFICER',
   SUPPORT_AGENT = 'SUPPORT_AGENT',
   MARKET_MAKER = 'MARKET_MAKER',
+  /** Manages payment gateway credentials, hot wallet keys, and network settings via UI */
+  FINANCE_MANAGER = 'FINANCE_MANAGER',
 }
 
 /** Permission key format: resource:action */
@@ -77,6 +79,8 @@ export enum Permission {
   RISK_REVIEW = 'risk:review',
   SUPPORT_CASES = 'support:cases',
   NOTIFICATIONS_BROADCAST = 'notifications:broadcast',
+  /** Manage payment gateway configs: PayOS credentials, blockchain hot wallet keys, network settings */
+  PAYMENT_CONFIGS_MANAGE = 'payment_configs:manage',
 }
 
 // ============================================
@@ -165,12 +169,17 @@ export enum Environment {
 // Blockchain Module Enums
 // ============================================
 
-/** Các mạng blockchain testnet được hỗ trợ */
+/** Các mạng blockchain được hỗ trợ (testnet và mainnet) */
 export enum BlockchainNetwork {
+  // Testnets
   TRON_NILE = 'TRON_NILE',
   TRON_SHASTA = 'TRON_SHASTA',
   SOLANA_DEVNET = 'SOLANA_DEVNET',
   ETH_SEPOLIA = 'ETH_SEPOLIA',
+  // Mainnets
+  TRON_MAINNET = 'TRON_MAINNET',
+  ETH_MAINNET = 'ETH_MAINNET',
+  SOLANA_MAINNET = 'SOLANA_MAINNET',
 }
 
 /** Trạng thái liên kết ví */

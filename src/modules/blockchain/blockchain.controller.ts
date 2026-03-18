@@ -188,7 +188,7 @@ export class BlockchainController {
 
     return {
       chain: normalizedChain,
-      depositAddress: managedWallet?.address ?? provider.getHotWalletAddress(),
+      depositAddress: managedWallet?.address ?? await provider.getHotWalletAddress(),
       source: managedWallet ? 'managed_wallet' : 'hot_wallet',
       note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
     };

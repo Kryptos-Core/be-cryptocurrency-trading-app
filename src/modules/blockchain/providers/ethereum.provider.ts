@@ -7,75 +7,83 @@ import {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
 } from '../interfaces';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 
 /**
- * Ethereum Blockchain Provider (Sepolia testnet)
- * Tương thích MetaMask — dùng EIP-191 personal_sign
+ * Ethereum Blockchain Provider (Sepolia testnet / ETH Mainnet)
+ * Compatible with MetaMask — uses EIP-191 personal_sign.
+ *
+ * Hot wallet key resolution (Cache-Aside):
+ *  1. PaymentConfigService.getActiveConfig('ETH', 'SEPOLIA' | 'MAINNET') — DB/Redis
+ *  2. Fallback: ETH_HOT_WALLET_PRIVATE_KEY from .env
  */
 @Injectable()
 export class EthereumProvider implements IBlockchainProvider {
   private readonly logger = new Logger(EthereumProvider.name);
-  private readonly provider: JsonRpcProvider;
-  private readonly wallet: ethers.Wallet | null = null;
 
-  constructor(private readonly configService: ConfigService) {
+  /** Read-only JsonRpcProvider — no signer, used for balance/tx queries */
+  private readonly provider: JsonRpcProvider;
+  private readonly networkKey: string;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly paymentConfigService: PaymentConfigService,
+  ) {
     const rpcUrl =
       this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ??
       'https://rpc.sepolia.org';
 
     this.provider = new JsonRpcProvider(rpcUrl);
+    this.networkKey = 'SEPOLIA';
 
-    const privateKey = this.configService.get<string>(
-      'app.blockchain.ethereum.hotWalletPrivateKey',
-    );
-    if (privateKey) {
-      this.wallet = new ethers.Wallet(privateKey, this.provider);
-      this.logger.log(
-        `EthereumProvider khởi tạo: Sepolia → ${rpcUrl}, HotWallet: ${this.wallet.address}`,
-      );
-    } else {
-      this.logger.warn(
-        `EthereumProvider khởi tạo không có Hot Wallet Private Key!`,
-      );
-    }
+    this.logger.log(`EthereumProvider initialized: Sepolia → ${rpcUrl}`);
   }
 
   getNetwork(): BlockchainNetwork {
     return BlockchainNetwork.ETH_SEPOLIA;
   }
 
+  // ── Hot wallet key resolution ────────────────────────────────────────────
+
+  private async resolveHotWalletKey(): Promise<string> {
+    const dbConfig = await this.paymentConfigService.getActiveConfig('ETH', this.networkKey);
+    if (dbConfig) {
+      const blockchainConfig = dbConfig as BlockchainGatewayConfig;
+      if (blockchainConfig.hotWalletPrivateKey) return blockchainConfig.hotWalletPrivateKey;
+    }
+
+    const envKey = this.configService.get<string>('app.blockchain.ethereum.hotWalletPrivateKey');
+    if (!envKey) {
+      throw new Error('ETH hot wallet private key not configured (DB or ETH_HOT_WALLET_PRIVATE_KEY)');
+    }
+    return envKey;
+  }
+
+  // ── IBlockchainProvider ──────────────────────────────────────────────────
+
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
     try {
       const weiBalance = await this.provider.getBalance(address);
-      const ethBalance = ethers.formatEther(weiBalance);
-
       return {
         address,
         network: BlockchainNetwork.ETH_SEPOLIA,
-        balance: ethBalance,
+        balance: ethers.formatEther(weiBalance),
         symbol: 'ETH',
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`Lỗi lấy balance ETH Sepolia: ${address}`, error);
+      this.logger.error(`Error getting ETH balance: ${address}`, error);
       throw error;
     }
   }
 
-  async verifySignature(
-    address: string,
-    message: string,
-    signature: string,
-  ): Promise<boolean> {
+  async verifySignature(address: string, message: string, signature: string): Promise<boolean> {
     try {
-      // EIP-191 personal_sign — chuẩn MetaMask
       const recovered = ethers.verifyMessage(message, signature);
       return recovered.toLowerCase() === address.toLowerCase();
     } catch (error) {
-      this.logger.warn(
-        `Xác minh chữ ký ETH Sepolia thất bại: ${address}`,
-        error,
-      );
+      this.logger.warn(`ETH signature verification failed: ${address}`, error);
       return false;
     }
   }
@@ -85,9 +93,7 @@ export class EthereumProvider implements IBlockchainProvider {
       const receipt = await this.provider.getTransactionReceipt(txHash);
       const tx = await this.provider.getTransaction(txHash);
 
-      if (!tx) {
-        return this.buildNotFound(txHash);
-      }
+      if (!tx) return this.buildNotFound(txHash);
 
       if (!receipt) {
         return {
@@ -102,9 +108,7 @@ export class EthereumProvider implements IBlockchainProvider {
       }
 
       const currentBlock = await this.provider.getBlockNumber();
-      const confirmations = receipt.blockNumber
-        ? currentBlock - receipt.blockNumber + 1
-        : 0;
+      const confirmations = receipt.blockNumber ? currentBlock - receipt.blockNumber + 1 : 0;
 
       return {
         txHash,
@@ -117,20 +121,38 @@ export class EthereumProvider implements IBlockchainProvider {
         blockNumber: receipt.blockNumber,
         timestamp: receipt.blockNumber
           ? new Date(
-              (
-                await this.provider.getBlock(receipt.blockNumber)
-              )?.timestamp ?? 0 * 1000,
+              ((await this.provider.getBlock(receipt.blockNumber))?.timestamp ?? 0) * 1000,
             )
           : undefined,
       };
     } catch (error) {
-      this.logger.error(`Lỗi lấy tx ETH Sepolia: ${txHash}`, error);
+      this.logger.error(`Error getting ETH tx: ${txHash}`, error);
       return this.buildNotFound(txHash);
     }
   }
 
   isValidAddress(address: string): boolean {
     return ethers.isAddress(address);
+  }
+
+  async sendTransaction(to: string, amount: string): Promise<string> {
+    const privateKey = await this.resolveHotWalletKey();
+    const wallet = new ethers.Wallet(privateKey, this.provider);
+
+    this.logger.log(`Sending ${amount} ETH to ${to}...`);
+    const tx = await wallet.sendTransaction({
+      to,
+      value: ethers.parseEther(amount),
+    });
+
+    this.logger.log(`ETH transaction sent: ${tx.hash}`);
+    return tx.hash;
+  }
+
+  async getHotWalletAddress(): Promise<string> {
+    const privateKey = await this.resolveHotWalletKey();
+    const wallet = new ethers.Wallet(privateKey);
+    return wallet.address;
   }
 
   private buildNotFound(txHash: string): BlockchainTxStatusDto {
@@ -143,32 +165,5 @@ export class EthereumProvider implements IBlockchainProvider {
       to: '',
       value: '0',
     };
-  }
-
-  async sendTransaction(to: string, amount: string): Promise<string> {
-    if (!this.wallet) {
-      throw new Error('Ethereum hot wallet not configured (missing private key)');
-    }
-
-    try {
-      this.logger.log(`Gửi ${amount} ETH tới ${to}...`);
-      const tx = await this.wallet.sendTransaction({
-        to,
-        value: ethers.parseEther(amount),
-      });
-
-      this.logger.log(`Giao dịch ETH đã gửi: ${tx.hash}`);
-      return tx.hash;
-    } catch (error) {
-      this.logger.error(`Lỗi gửi ETH tới ${to}:`, error);
-      throw error;
-    }
-  }
-
-  getHotWalletAddress(): string {
-    if (!this.wallet) {
-      throw new Error('Ethereum hot wallet not configured');
-    }
-    return this.wallet.address;
   }
 }

@@ -70,5 +70,13 @@
     "last_name": "Maker",
     "status": "ACTIVE",
     "role": "MARKET_MAKER"
+  },
+  {
+    "email": "finance@circle-vn.com",
+    "password": "Finance@123!",
+    "first_name": "Finance",
+    "last_name": "Manager",
+    "status": "ACTIVE",
+    "role": "FINANCE_MANAGER"
   }
 ]

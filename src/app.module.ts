@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullModule } from '@nestjs/bull';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { PaymentConfigModule } from './modules/payment-config/payment-config.module';
 
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { MarketsModule } from './modules/markets/markets.module';
@@ -41,6 +43,18 @@ import appConfig from './config/app.config';
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
     }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        redis: {
+          host: config.get<string>('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+          password: config.get<string>('REDIS_PASSWORD'),
+          db: config.get<number>('REDIS_DB', 0),
+        },
+      }),
+    }),
     RedisModule,
     AuthModule,
     UsersModule,
@@ -57,6 +71,7 @@ import appConfig from './config/app.config';
     DashboardModule,
     HealthModule,
     NotificationsModule,
+    PaymentConfigModule,
   ],
 })
 export class AppModule {}

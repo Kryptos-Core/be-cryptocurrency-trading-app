@@ -48,6 +48,7 @@ export class User {
       'RISK_OFFICER',
       'SUPPORT_AGENT',
       'MARKET_MAKER',
+      'FINANCE_MANAGER',
     ],
     default: 'TRADER',
   })
@@ -58,7 +59,8 @@ export class User {
     | 'ADMIN'
     | 'RISK_OFFICER'
     | 'SUPPORT_AGENT'
-    | 'MARKET_MAKER';
+    | 'MARKET_MAKER'
+    | 'FINANCE_MANAGER';
 
   @Column({ type: 'varchar', length: 512, nullable: true })
   avatar_url!: string | null;

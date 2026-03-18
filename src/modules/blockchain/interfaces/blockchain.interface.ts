@@ -56,6 +56,6 @@ export interface IBlockchainProvider {
   /** Gửi giao dịch từ Hot Wallet sàn */
   sendTransaction(to: string, amount: string): Promise<string>;
 
-  /** Lấy địa chỉ ví nóng của sàn */
-  getHotWalletAddress(): string;
+  /** Lấy địa chỉ ví nóng của sàn (async vì key có thể được load từ DB) */
+  getHotWalletAddress(): Promise<string>;
 }

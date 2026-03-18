@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '@/common/services/redis.service';
 import { NOTIFICATIONS_CHANNEL } from './notifications.service';
+import { PAYMENT_CONFIG_EVENTS_CHANNEL } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
 
 const NOTIFICATIONS_ROOM = 'notifications';
@@ -75,7 +76,24 @@ export class NotificationsGateway
         this.logger.error('Failed to parse/broadcast notification', error);
       }
     });
-    this.logger.log('NotificationsGateway subscribed to Redis channel');
+
+    await this.redisService.subscribe(PAYMENT_CONFIG_EVENTS_CHANNEL, (message) => {
+      try {
+        const payload = JSON.parse(message);
+        this.server.to(NOTIFICATIONS_ROOM).emit('payment_config:event', {
+          type: 'payment_config:event',
+          data: payload,
+          timestamp: Date.now(),
+        });
+        this.logger.debug(
+          `Broadcast payment config event: ${payload.event} for ${payload.type}/${payload.network}`,
+        );
+      } catch (error) {
+        this.logger.error('Failed to parse/broadcast payment config event', error);
+      }
+    });
+
+    this.logger.log('NotificationsGateway subscribed to Redis channels (notifications + payment_config)');
   }
 
   handleConnection(client: Socket) {

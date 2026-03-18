@@ -115,3 +115,4 @@ npm run treasury:schedule:register
 | hsondz1910@gmail.com | Risk@123! | Cán bộ rủi ro (Risk Officer) |
 | support@example.com | Support@123! | Nhân viên hỗ trợ |
 | maxnoah901@gmail.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |
+| finance@circle-vn.com | Finance@123! | Quản lý tài chính (Finance Manager) |

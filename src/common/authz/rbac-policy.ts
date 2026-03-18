@@ -29,6 +29,10 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,
   ],
+  [UserRole.FINANCE_MANAGER]: [
+    Permission.WALLETS_READ,
+    Permission.PAYMENT_CONFIGS_MANAGE,
+  ],
   [UserRole.ADMIN]: [
     Permission.USERS_READ,
     Permission.USERS_MANAGE,
@@ -44,6 +48,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.RISK_REVIEW,
     Permission.SUPPORT_CASES,
     Permission.NOTIFICATIONS_BROADCAST,
+    Permission.PAYMENT_CONFIGS_MANAGE,
   ],
 };
 

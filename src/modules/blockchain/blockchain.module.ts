@@ -13,6 +13,7 @@ import { BlockchainController } from './blockchain.controller';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
+import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 
 /**
  * Blockchain Module
@@ -28,6 +29,7 @@ import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.
     WalletsModule,
     CurrenciesModule,
     ManagedWalletsModule,
+    PaymentConfigModule,
   ],
   controllers: [BlockchainController],
   providers: [
