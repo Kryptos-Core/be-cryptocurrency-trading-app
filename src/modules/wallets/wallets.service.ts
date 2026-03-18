@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { WalletRepository } from './repositories/wallet.repository';
 import { WalletLedgerRepository } from './repositories/wallet-ledger.repository';
+import { AdminWalletAdjustmentRepository } from './repositories/admin-wallet-adjustment.repository';
 import {
   BadRequestException,
   BusinessException,
@@ -13,8 +14,10 @@ import { WalletBalanceDto } from './dto/wallet-balance.dto';
 import { WalletListItemDto } from './dto/wallet-list-item.dto';
 import { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
 import { WalletTransactionDto } from './dto/wallet-transaction.dto';
+import { AdminAdjustWalletDto, AdminAdjustWalletResponseDto } from './dto/admin-adjust-wallet.dto';
 import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 import { ExchangeService } from '@/modules/exchange/exchange.service';
+import { newUuid } from '@/common/utils/uuid.util';
 
 /**
  * Wallets Service - Business Logic Layer
@@ -29,6 +32,7 @@ export class WalletsService {
   constructor(
     private readonly walletRepository: WalletRepository,
     private readonly walletLedgerRepository: WalletLedgerRepository,
+    private readonly adminAdjustmentRepository: AdminWalletAdjustmentRepository,
     private readonly exchangeService: ExchangeService,
   ) {}
 
@@ -663,6 +667,94 @@ export class WalletsService {
         failed,
       },
     };
+  }
+
+  /**
+   * Điều chỉnh số dư ví thủ công bởi admin/risk officer.
+   * Tạo bản ghi audit trong admin_wallet_adjustments, sau đó CREDIT hoặc DEBIT
+   * ví của người dùng với refType=ADJUST và refId=adjustmentId.
+   * Toàn bộ hoạt động được bọc trong một DB transaction để đảm bảo atomicity.
+   */
+  async adminAdjustBalance(
+    actorUserId: string,
+    dto: AdminAdjustWalletDto,
+  ): Promise<AdminAdjustWalletResponseDto> {
+    const adjustmentId = newUuid();
+    const amount = this.parseAmount(dto.amount);
+
+    try {
+      return await this.walletRepository.transaction(async (manager) => {
+        const adjustment = await this.adminAdjustmentRepository.createAdjustment(
+          {
+            adjustmentId,
+            actorUserId,
+            targetUserId: dto.userId,
+            currencyId: dto.currencyId,
+            amount: amount.toString(),
+            type: dto.type,
+            note: dto.note,
+          },
+          manager,
+        );
+
+        const action =
+          dto.type === 'DEPOSIT'
+            ? WalletTransactionAction.CREDIT
+            : WalletTransactionAction.DEBIT;
+
+        const wallet = await this.walletRepository.getOrCreateForUpdate(
+          dto.userId,
+          dto.currencyId,
+          manager,
+        );
+
+        const updated = await this.applyDelta(
+          wallet.wallet_id,
+          action === WalletTransactionAction.CREDIT ? amount : amount.negated(),
+          new Decimal(0),
+          manager,
+        );
+
+        await this.walletLedgerRepository.createEntry(
+          {
+            userId: dto.userId,
+            currencyId: dto.currencyId,
+            refType: WalletReferenceType.ADJUST,
+            refId: adjustmentId,
+            direction: action === WalletTransactionAction.CREDIT ? 'CREDIT' : 'DEBIT',
+            amount: amount.toString(),
+            balanceAfter: this.calculateTotal(updated.available, updated.frozen),
+          },
+          manager,
+        );
+
+        this.logger.log(
+          `[AdminAdjust] actor=${actorUserId} type=${dto.type} amount=${dto.amount} target=${dto.userId} currency=${dto.currencyId} adjustmentId=${adjustmentId}`,
+        );
+
+        return adjustment;
+      });
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+        throw new ConflictException(
+          'Duplicate transaction reference. Please try again.',
+          'DUPLICATE_LEDGER_ENTRY',
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Lấy lịch sử điều chỉnh số dư thủ công cho một người dùng (phân trang).
+   */
+  async getAdminAdjustmentHistory(
+    targetUserId: string,
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<AdminAdjustWalletResponseDto[]> {
+    return this.adminAdjustmentRepository.findByTarget(targetUserId, limit, offset);
   }
 
 }

@@ -4,6 +4,7 @@ import * as path from 'path';
 
 // Explicit entity imports — required when webpack bundles everything into dist/main.js
 // because filesystem globs resolve to empty arrays in bundled environments.
+import { AdminWalletAdjustment } from '../entities/admin-wallet-adjustment.entity';
 import { AppSetting } from '../entities/app-setting.entity';
 import { Currency } from '../entities/currency.entity';
 import { CurrencyNetwork } from '../entities/currency-network.entity';
@@ -25,6 +26,7 @@ import { Notification } from '../entities/notification.entity';
 import { UserNotification } from '../entities/user-notification.entity';
 
 const ALL_ENTITIES = [
+  AdminWalletAdjustment,
   AppSetting,
   Currency,
   CurrencyNetwork,

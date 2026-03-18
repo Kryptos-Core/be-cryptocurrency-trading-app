@@ -38,6 +38,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.EXCHANGE_SYNC,
     Permission.ORDERS_PLACE,
     Permission.ORDERS_CANCEL,
+    Permission.WALLETS_READ,
+    Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,
     Permission.RISK_REVIEW,
     Permission.SUPPORT_CASES,

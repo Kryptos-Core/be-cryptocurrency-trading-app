@@ -1,6 +1,8 @@
 import {
+  Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -9,6 +11,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
+  ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
 import { WalletsService } from './wallets.service';
@@ -20,6 +23,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
+import { AdminAdjustWalletDto } from './dto/admin-adjust-wallet.dto';
 
 /**
  * Wallets Controller
@@ -175,6 +179,56 @@ export class WalletsController {
       actorUserId,
       parsedLimit,
     );
+  }
+
+  /**
+   * Điều chỉnh số dư ví thủ công cho người dùng bất kỳ.
+   * POST /wallets/admin/adjust
+   * Yêu cầu quyền WALLETS_MANAGE (ADMIN hoặc RISK_OFFICER).
+   */
+  @Post('admin/adjust')
+  @UseGuards(PermissionGuard)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiOperation({
+    summary: 'Điều chỉnh số dư ví thủ công',
+    description:
+      'Admin/Risk Officer nạp hoặc rút số dư ảo vào ví của người dùng bất kỳ. Tạo bản ghi audit đầy đủ.',
+  })
+  @ApiSuccessResponse('Điều chỉnh số dư thành công')
+  @ApiBadRequestResponse('Dữ liệu không hợp lệ hoặc số dư không đủ')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async adminAdjustWallet(
+    @CurrentUser('userId') actorUserId: string,
+    @Body() dto: AdminAdjustWalletDto,
+  ) {
+    return this.walletsService.adminAdjustBalance(actorUserId, dto);
+  }
+
+  /**
+   * Lịch sử điều chỉnh số dư thủ công theo người dùng.
+   * GET /wallets/admin/adjustments/:userId
+   * Yêu cầu quyền WALLETS_MANAGE (ADMIN hoặc RISK_OFFICER).
+   */
+  @Get('admin/adjustments/:userId')
+  @UseGuards(PermissionGuard)
+  @RequirePermissions(Permission.WALLETS_MANAGE)
+  @ApiOperation({
+    summary: 'Lịch sử điều chỉnh ví của người dùng',
+    description: 'Xem toàn bộ lịch sử nạp/rút thủ công cho một người dùng (có phân trang).',
+  })
+  @ApiParam({ name: 'userId', description: 'UUID của người dùng', type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
+  @ApiQuery({ name: 'offset', required: false, type: Number, example: 0 })
+  @ApiSuccessResponse('Lịch sử điều chỉnh')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getAdminAdjustmentHistory(
+    @Param('userId') userId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    const parsedOffset = offset ? parseInt(offset, 10) : 0;
+    return this.walletsService.getAdminAdjustmentHistory(userId, parsedLimit, parsedOffset);
   }
 
 }
