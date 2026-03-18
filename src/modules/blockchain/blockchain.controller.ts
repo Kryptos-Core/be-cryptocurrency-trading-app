@@ -18,7 +18,6 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
 import { CurrentUser, Public, RequirePermissions, RequireRoles } from '@/common/decorators';
 import {
@@ -296,8 +295,8 @@ export class BlockchainController {
    */
   @Post('withdraw/manual/:txId/approve')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.RISK_REVIEW)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Approve manual withdrawal',
     description:
@@ -321,8 +320,8 @@ export class BlockchainController {
    */
   @Post('withdraw/manual/:txId/reject')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.RISK_REVIEW)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Reject manual withdrawal',
     description:
@@ -350,8 +349,8 @@ export class BlockchainController {
    */
   @Post('withdraw/manual/process-pending')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.RISK_REVIEW)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Process pending manual withdrawals',
     description:
@@ -416,13 +415,46 @@ export class BlockchainController {
   // ============ ADMIN ============
 
   /**
+   * Admin: Thống kê yêu cầu rút tiền chờ duyệt
+   * GET /blockchain/admin/withdrawals/stats
+   */
+  @Get('admin/withdrawals/stats')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
+  @ApiOperation({
+    summary: 'Admin: Withdrawal stats',
+    description: 'Pending count and total amount by chain.',
+  })
+  async getAdminWithdrawalStats() {
+    return this.onchainTransferService.getAdminWithdrawalStats();
+  }
+
+  /**
+   * Admin: Chi tiết 1 giao dịch rút tiền
+   * GET /blockchain/admin/withdrawals/:txId
+   */
+  @Get('admin/withdrawals/:txId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
+  @ApiOperation({
+    summary: 'Admin: Withdrawal detail',
+    description: 'Single withdrawal with user info and wallet balance.',
+  })
+  @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền' })
+  async getAdminWithdrawalDetail(@Param('txId') txId: string) {
+    return this.onchainTransferService.getAdminWithdrawalById(txId);
+  }
+
+  /**
    * Admin: Danh sách tất cả giao dịch rút tiền on-chain
    * GET /blockchain/admin/withdrawals
    */
   @Get('admin/withdrawals')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.RISK_REVIEW)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Admin: List all withdrawal transactions',
     description: 'Paginated list of all onchain withdrawal transactions across all users.',
@@ -430,28 +462,31 @@ export class BlockchainController {
   @ApiQuery({ name: 'userId', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'] })
   @ApiQuery({ name: 'chain', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search email, name, address, txId' })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'dateTo', required: false, type: String, description: 'YYYY-MM-DD' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async listAdminWithdrawals(
     @Query('userId') userId?: string,
     @Query('status') status?: string,
     @Query('chain') chain?: string,
+    @Query('search') search?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
-    const qb = this.dataSource
-      .getRepository(OnchainTransaction)
-      .createQueryBuilder('tx')
-      .where('tx.type = :type', { type: 'WITHDRAWAL' })
-      .orderBy('tx.created_at', 'DESC');
-
-    if (userId) qb.andWhere('tx.user_id = :userId', { userId });
-    if (status) qb.andWhere('tx.status = :status', { status });
-    if (chain) qb.andWhere('tx.chain = :chain', { chain });
-
-    const skip = (page - 1) * limit;
-    const [items, total] = await qb.skip(skip).take(limit).getManyAndCount();
-    return { data: items, total, page, limit };
+    return this.onchainTransferService.getAdminWithdrawals({
+      userId,
+      status,
+      chain,
+      search,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    });
   }
 
   // ============ UTILITIES ============

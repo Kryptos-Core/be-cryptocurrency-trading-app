@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LinkedWallet } from '@/entities/linked-wallet.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
@@ -14,6 +14,7 @@ import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
+import { NotificationsModule } from '@/modules/notifications/notifications.module';
 
 /**
  * Blockchain Module
@@ -30,6 +31,7 @@ import { PaymentConfigModule } from '@/modules/payment-config/payment-config.mod
     CurrenciesModule,
     ManagedWalletsModule,
     PaymentConfigModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [BlockchainController],
   providers: [

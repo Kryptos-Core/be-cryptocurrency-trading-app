@@ -12,7 +12,7 @@ import { UseFilters, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '@/common/services/redis.service';
-import { NOTIFICATIONS_CHANNEL } from './notifications.service';
+import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from './notifications.service';
 import { PAYMENT_CONFIG_EVENTS_CHANNEL } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
 
@@ -77,6 +77,23 @@ export class NotificationsGateway
       }
     });
 
+    await this.redisService.subscribe(NOTIFICATIONS_TARGETED_CHANNEL, (message) => {
+      try {
+        const payload = JSON.parse(message);
+        const targetUserId = payload.targetUserId;
+        if (targetUserId) {
+          this.server.to(`user:${targetUserId}`).emit('notification:new', {
+            type: 'notification:new',
+            data: payload,
+            timestamp: Date.now(),
+          });
+          this.logger.debug(`Targeted notification to user ${targetUserId}`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to parse/broadcast targeted notification', error);
+      }
+    });
+
     await this.redisService.subscribe(PAYMENT_CONFIG_EVENTS_CHANNEL, (message) => {
       try {
         const payload = JSON.parse(message);
@@ -93,7 +110,9 @@ export class NotificationsGateway
       }
     });
 
-    this.logger.log('NotificationsGateway subscribed to Redis channels (notifications + payment_config)');
+    this.logger.log(
+      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config)',
+    );
   }
 
   handleConnection(client: Socket) {

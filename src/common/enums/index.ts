@@ -81,6 +81,8 @@ export enum Permission {
   NOTIFICATIONS_BROADCAST = 'notifications:broadcast',
   /** Manage payment gateway configs: PayOS credentials, blockchain hot wallet keys, network settings */
   PAYMENT_CONFIGS_MANAGE = 'payment_configs:manage',
+  /** Approve or reject withdrawal requests (manual review queue) */
+  WITHDRAWALS_APPROVE = 'withdrawals:approve',
 }
 
 // ============================================

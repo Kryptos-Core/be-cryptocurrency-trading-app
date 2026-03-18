@@ -120,4 +120,51 @@ export class NotificationRepository extends BaseRepository<Notification> {
       throw error;
     }
   }
+
+  async getFcmTokenByUserId(userId: string): Promise<string | null> {
+    try {
+      const result = await this.dataSource.query(
+        `SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token IS NOT NULL AND status = 'ACTIVE' LIMIT 1`,
+        [userId],
+      );
+      const token = (result as { fcm_token: string }[])?.[0]?.fcm_token;
+      return token?.trim() || null;
+    } catch (error) {
+      this.logger.error(`Error fetching FCM token for user ${userId}`, error);
+      return null;
+    }
+  }
+
+  async createForUser(params: {
+    notificationId: string;
+    title: string;
+    body: string;
+    type: string;
+    createdBy: string;
+    targetUserId: string;
+    data: Record<string, unknown> | null;
+  }): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `INSERT INTO notifications (notification_id, title, body, type, created_by, data)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          params.notificationId,
+          params.title,
+          params.body,
+          params.type,
+          params.createdBy,
+          params.data ? JSON.stringify(params.data) : null,
+        ],
+      );
+      await this.dataSource.query(
+        `INSERT INTO user_notifications (id, user_id, notification_id)
+         VALUES (UUID(), ?, ?)`,
+        [params.targetUserId, params.notificationId],
+      );
+    } catch (error) {
+      this.logger.error('Error creating notification for user', error);
+      throw error;
+    }
+  }
 }

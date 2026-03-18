@@ -7,6 +7,7 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationQueryDto } from './dto/notification-query.dto';
 
 export const NOTIFICATIONS_CHANNEL = 'notifications:broadcast';
+export const NOTIFICATIONS_TARGETED_CHANNEL = 'notifications:targeted';
 
 /**
  * Notification Service
@@ -22,6 +23,55 @@ export class NotificationsService {
     private readonly redisService: RedisService,
     private readonly fcmService: FcmService,
   ) {}
+
+  /**
+   * Send notification to a specific user (withdrawal status, etc.)
+   */
+  async sendToUser(
+    targetUserId: string,
+    dto: CreateNotificationDto,
+    actorUserId: string,
+  ): Promise<void> {
+    const notificationId = uuidv4();
+
+    await this.notificationRepo.createForUser({
+      notificationId,
+      title: dto.title,
+      body: dto.body,
+      type: dto.type ?? 'system',
+      createdBy: actorUserId,
+      targetUserId,
+      data: dto.data ?? null,
+    });
+
+    const payload = {
+      targetUserId,
+      notification_id: notificationId,
+      title: dto.title,
+      body: dto.body,
+      type: dto.type ?? 'system',
+      data: dto.data ?? null,
+      created_at: new Date().toISOString(),
+    };
+
+    await this.redisService.publish(
+      NOTIFICATIONS_TARGETED_CHANNEL,
+      JSON.stringify(payload),
+    );
+
+    try {
+      const token = await this.notificationRepo.getFcmTokenByUserId(targetUserId);
+      if (token) {
+        await this.fcmService.sendToTokens([token], dto.title, dto.body, {
+          notification_id: notificationId,
+          type: dto.type ?? 'system',
+          ...dto.data,
+        });
+      }
+    } catch (error) {
+      this.logger.error('FCM push to user failed (non-critical)', error);
+    }
+  }
 
   async broadcast(dto: CreateNotificationDto, adminId: string) {
     const notificationId = uuidv4();

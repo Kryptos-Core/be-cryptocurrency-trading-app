@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
@@ -31,7 +31,7 @@ import { MailService } from '@/common/services';
       }),
     }),
     TypeOrmModule.forFeature([User]),
-    BlockchainModule,
+    forwardRef(() => BlockchainModule),
   ],
   providers: [
     AuthService,
