@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DepositsController } from './deposits.controller';
+import { PayosRedirectController } from './payos-redirect.controller';
 import { DepositsService } from './deposits.service';
 import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
@@ -8,7 +9,7 @@ import { PaymentConfigModule } from '@/modules/payment-config/payment-config.mod
 
 @Module({
   imports: [WalletsModule, CurrenciesModule, PaymentConfigModule],
-  controllers: [DepositsController],
+  controllers: [DepositsController, PayosRedirectController],
   providers: [DepositsService, FiatDepositRepository],
   exports: [DepositsService],
 })

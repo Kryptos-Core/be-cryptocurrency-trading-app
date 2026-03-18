@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
+import { newUuid } from '@/common/utils/uuid.util';
 import { Wallet } from '@/entities/wallet.entity';
 
 /**
@@ -86,9 +87,10 @@ export class WalletRepository extends BaseRepository<Wallet> {
 
     let row = rows?.[0];
     if (!row) {
+      const walletId = newUuid();
       await manager.query(
-        `INSERT INTO wallets (user_id, currency_id, available, frozen) VALUES (?, ?, '0', '0')`,
-        [userId, currencyId],
+        `INSERT INTO wallets (wallet_id, user_id, currency_id, available, frozen) VALUES (?, ?, ?, '0', '0')`,
+        [walletId, userId, currencyId],
       );
       const after = await manager.query(
         `SELECT wallet_id, user_id, currency_id, available, frozen, updated_at

@@ -15,11 +15,10 @@ import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
  * Request model for wallet operations
  */
 export class WalletTransactionDto {
-  @ApiProperty({ description: 'Currency ID', example: 1 })
-  @IsInt()
-  @Min(1)
+  @ApiProperty({ description: 'Currency ID (UUID)', example: '019cedcf-f90f-7917-9a45-000a1fd77709' })
+  @IsString()
   @IsNotEmpty({ message: 'currencyId is required' })
-  currencyId!: number;
+  currencyId!: string;
 
   @ApiProperty({
     description: 'Transaction amount (positive decimal, up to 18 decimals)',

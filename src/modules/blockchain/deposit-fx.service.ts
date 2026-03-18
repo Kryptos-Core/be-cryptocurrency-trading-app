@@ -6,8 +6,8 @@ import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { BlockchainNetwork } from '@/common/enums';
 
 export interface DepositConversionResult {
-  /** ID của currency platform cash (USDT) sẽ được credit vào ví user */
-  creditCurrencyId: number;
+  /** ID của currency platform cash (USDT) sẽ được credit vào ví user (UUID) */
+  creditCurrencyId: string;
   /** Số lượng USDT sẽ được credit */
   creditAmount: string;
   /** Tỷ giá quy đổi: 1 native coin = X USDT */
@@ -167,7 +167,7 @@ export class DepositFxService {
     }
   }
 
-  private async resolveCashCurrencyId(): Promise<number> {
+  private async resolveCashCurrencyId(): Promise<string> {
     const currency = await this.currencyRepository.findBySymbol(this.cashCurrencySymbol);
     if (!currency?.currency_id) {
       throw new Error(
@@ -175,10 +175,6 @@ export class DepositFxService {
         `Ensure PLATFORM_CASH_CURRENCY_SYMBOL is set to a valid currency symbol.`,
       );
     }
-    const id = Number(currency.currency_id);
-    if (!Number.isInteger(id) || id <= 0) {
-      throw new Error(`Invalid currency_id for ${this.cashCurrencySymbol}: ${currency.currency_id}`);
-    }
-    return id;
+    return String(currency.currency_id);
   }
 }

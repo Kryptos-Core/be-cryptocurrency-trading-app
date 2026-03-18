@@ -112,27 +112,21 @@ export class DepositsService {
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
-  private async resolveCurrencyIdBySymbol(symbol: string): Promise<number> {
+  private async resolveCurrencyIdBySymbol(symbol: string): Promise<string> {
     const currency = await this.currencyRepository.findBySymbol(symbol);
     if (!currency?.currency_id) {
       throw new Error(
         `Currency symbol ${symbol} not found. Configure symbols to valid currencies.`,
       );
     }
-    const parsedCurrencyId = Number(currency.currency_id);
-    if (!Number.isInteger(parsedCurrencyId) || parsedCurrencyId <= 0) {
-      throw new Error(
-        `Deposit currency ID must be a positive integer, got: ${currency.currency_id}`,
-      );
-    }
-    return parsedCurrencyId;
+    return String(currency.currency_id);
   }
 
   private async resolveConvertedCredit(
     amount: string,
     config: PayosGatewayConfig,
   ): Promise<{
-    currencyId: number;
+    currencyId: string;
     creditAmount: string;
     effectiveRate: string;
   }> {

@@ -153,7 +153,7 @@ export class OnchainTransferService {
     }
   }
 
-  private async resolveWithdrawalCurrencyId(chain: BlockchainNetwork): Promise<number> {
+  private async resolveWithdrawalCurrencyId(chain: BlockchainNetwork): Promise<string> {
     const symbol = this.getChainAssetSymbol(chain);
     const currency = await this.currencyRepository.findBySymbol(symbol);
     if (!currency?.currency_id) {
@@ -162,14 +162,7 @@ export class OnchainTransferService {
         'WITHDRAWAL_CURRENCY_NOT_FOUND',
       );
     }
-    const parsed = Number(currency.currency_id);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new BadRequestException(
-        `currency_id của ${symbol} không hợp lệ: ${currency.currency_id}`,
-        'WITHDRAWAL_CURRENCY_INVALID',
-      );
-    }
-    return parsed;
+    return String(currency.currency_id);
   }
 
   private toLedgerRefId(seed: string): number {
@@ -211,7 +204,7 @@ export class OnchainTransferService {
     const refId = this.toLedgerRefId(`${txId}-credit`);
     const existed = await this.hasLedgerEntry(
       userId,
-      String(creditCurrencyId),
+      creditCurrencyId,
       WalletReferenceType.EXTERNAL_DEPOSIT,
       refId,
       'CREDIT',
@@ -249,7 +242,7 @@ export class OnchainTransferService {
   private async settleWithdrawalLedger(
     txId: string,
     userId: string,
-    currencyId: number,
+    currencyId: string,
     amount: Decimal,
     success: boolean,
   ): Promise<void> {

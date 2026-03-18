@@ -1,6 +1,7 @@
 # ỨNG DỤNG GIAO DỊCH TIỀN ĐIỆN TỬ (Backend)
 
 Backend API được xây dựng bằng NestJS, cung cấp:
+
 - Xác thực (Auth) và người dùng (users)
 - Tiền tệ (Currencies), thị trường (markets), lệnh (orders), khớp lệnh (matching)
 - Ví (Wallets) và đồng bộ hóa với Binance
@@ -55,9 +56,9 @@ npm run db:seed
 npm run start:dev
 ```
 
-API gốc: http://127.0.0.1:3000/api/v1
+API gốc: [http://127.0.0.1:3000/api/v1](http://127.0.0.1:3000/api/v1)
 
-Swagger (không dùng cho production): http://localhost:3000/api/docs
+Swagger (không dùng cho production): [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
 
 ## Luồng khởi chạy hiện tại
 
@@ -70,9 +71,9 @@ Swagger (không dùng cho production): http://localhost:3000/api/docs
 
 - Luồng nạp tiền fiat nằm ở module deposits.
 - Các endpoint chính:
-	- POST /api/v1/deposits
-	- GET /api/v1/deposits
-	- POST /api/v1/deposits/payos-webhook
+  - POST /api/v1/deposits
+  - GET /api/v1/deposits
+  - POST /api/v1/deposits/payos-webhook
 - Trong môi trường production, ứng dụng bắt buộc phải có đầy đủ các biến môi trường (env) của PayOS.
 
 ## Kiểm tra kho bạc hàng ngày (Daily Treasury Hardening - Phát triển)
@@ -84,7 +85,6 @@ npm run treasury:daily
 ```
 
 - Hướng dẫn chi tiết (Runbook): `docs/TREASURY_DAILY_RUNBOOK.md`
-
 - Đăng ký Windows Task Scheduler:
 
 ```bash
@@ -92,27 +92,28 @@ npm run treasury:schedule:register
 ```
 
 - Mẫu env tùy chọn cho full treasury E2E:
-	- `scripts/treasury-e2e.env.example`
-
+  - `scripts/treasury-e2e.env.example`
 - Các giá trị mặc định cho môi trường dev trong scheduler runner:
-	- `TREASURY_E2E_ALLOW_SKIP=true`
-	- `TREASURY_HEALTH_FAIL_ON_CRITICAL=false`
-
+  - `TREASURY_E2E_ALLOW_SKIP=true`
+  - `TREASURY_HEALTH_FAIL_ON_CRITICAL=false`
 - Xuất lịch sử đối soát định dạng JSON (RBAC: ADMIN/RISK_OFFICER):
-	- `POST /api/v1/wallets/reconciliation-report/export?limit=100`
-	- đầu ra: `reports/reconciliation/YYYY-MM-DD.json`
+  - `POST /api/v1/wallets/reconciliation-report/export?limit=100`
+  - đầu ra: `reports/reconciliation/YYYY-MM-DD.json`
 
 ## Tài khoản thử nghiệm sau khi seed
 
-| Email | Mật khẩu | Vai trò |
-|---|---|---|
-| max@circle-vn.com | Admin@123! | Quản trị viên (Admin) |
-| hoangsondz1910@gmail.com | Trader@123! | Nhà giao dịch (Trader) |
-| trader2@example.com | Trader@123! | Nhà giao dịch (Trader) |
-| trader3@example.com | Trader@123! | Nhà giao dịch (Trader) |
-| guest@example.com | Guest@123! | Khách (Guest) |
-| verified@example.com | Verified@123! | Người dùng đã xác minh |
-| hsondz1910@gmail.com | Risk@123! | Cán bộ rủi ro (Risk Officer) |
-| support@example.com | Support@123! | Nhân viên hỗ trợ |
-| maxnoah901@gmail.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |
-| finance@circle-vn.com | Finance@123! | Quản lý tài chính (Finance Manager) |
+
+| Email                                                       | Mật khẩu      | Vai trò                               |
+| ----------------------------------------------------------- | ------------- | ------------------------------------- |
+| [max@circle-vn.com](mailto:max@circle-vn.com)               | Admin@123!    | Quản trị viên (Admin)                 |
+| [hoangsondz1910@gmail.com](mailto:hoangsondz1910@gmail.com) | Trader@123!   | Nhà giao dịch (Trader)                |
+| [trader2@example.com](mailto:trader2@example.com)           | Trader@123!   | Nhà giao dịch (Trader)                |
+| [trader3@example.com](mailto:trader3@example.com)           | Trader@123!   | Nhà giao dịch (Trader)                |
+| [guest@example.com](mailto:guest@example.com)               | Guest@123!    | Khách (Guest)                         |
+| [verified@example.com](mailto:verified@example.com)         | Verified@123! | Người dùng đã xác minh                |
+| [hsondz1910@gmail.com](mailto:hsondz1910@gmail.com)         | Risk@123!     | Cán bộ rủi ro (Risk Officer)          |
+| [support@example.com](mailto:support@example.com)           | Support@123!  | Nhân viên hỗ trợ                      |
+| [maxnoah901@gmail.com](mailto:maxnoah901@gmail.com)         | Maker@123!    | Nhà tạo lập thị trường (Market Maker) |
+| [finance@circle-vn.com](mailto:finance@circle-vn.com)       | Finance@123!  | Quản lý tài chính (Finance Manager)   |
+
+

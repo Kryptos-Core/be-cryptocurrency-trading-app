@@ -275,11 +275,20 @@ export class ManagedWalletsService {
     return { success: true };
   }
 
+  /**
+   * Returns configured managed wallet for Tron chains, or null for ETH/Solana
+   * (those use hot wallet from blockchain provider).
+   */
   async getConfiguredDepositWallet(chain: string): Promise<ManagedWallet | null> {
-    const supportedChain = this.assertSupportedChain(chain);
+    if (
+      chain !== BlockchainNetwork.TRON_NILE &&
+      chain !== BlockchainNetwork.TRON_SHASTA
+    ) {
+      return null;
+    }
     return this.dataSource.getRepository(ManagedWallet).findOne({
       where: {
-        chain: supportedChain,
+        chain: chain as SupportedManagedWalletChain,
         is_default_deposit: true,
         is_active: true,
       },

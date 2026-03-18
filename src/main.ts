@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters';
@@ -28,8 +29,13 @@ async function bootstrap() {
   // Enable WebSocket with Socket.io
   app.useWebSocketAdapter(new IoAdapter(app));
 
-  // Set global prefix for all routes
-  app.setGlobalPrefix('api/v1');
+  // Set global prefix for all routes (exclude PayOS redirect pages)
+  app.setGlobalPrefix('api/v1', {
+    exclude: [
+      { path: 'success', method: RequestMethod.GET },
+      { path: 'cancel', method: RequestMethod.GET },
+    ],
+  });
 
   // Enable CORS
   app.enableCors();
