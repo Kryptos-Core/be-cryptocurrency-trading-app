@@ -3,9 +3,11 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { User } from '@/entities/user.entity';
-import { RegisterDto, LoginDto } from './dto';
+import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
 import { AuthRepository } from './repositories';
+import { TwoFaService } from './two-fa.service';
 import {
+  BadRequestException,
   ConflictException,
   UnauthorizedException,
   BusinessException,
@@ -30,6 +32,7 @@ export class AuthService {
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly twoFaService: TwoFaService,
   ) {}
 
   /**
@@ -120,6 +123,34 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
     return user;
+  }
+
+  /**
+   * Change password directly (no admin approval).
+   * Requires 2FA OTP verification.
+   */
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<{ success: boolean }> {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (user.two_fa_enabled !== 1) {
+      throw new BadRequestException(
+        'Vui lòng bật xác thực hai bước trong Cài đặt trước khi đổi mật khẩu.',
+        'TWO_FA_REQUIRED',
+      );
+    }
+
+    const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
+    if (!otpValid) {
+      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+    }
+
+    const passwordHash = await this.hashPassword(dto.newPassword);
+    await this.authRepository.updatePassword(userId, passwordHash);
+
+    this.logger.log(`Password changed for user=${userId}`);
+    return { success: true };
   }
 
   /**

@@ -29,21 +29,32 @@ export class TwoFaService {
   }
 
   async sendOtp(userId: string, email: string): Promise<{ expiresIn: number }> {
-    // Enforce resend cooldown — reject if the previous send was within 15 s
+    const otpKey = this.otpKey(userId);
+
+    // Nếu OTP trước đó còn hạn → không gửi lại, cho nhập tiếp với mã cũ
+    const existingOtp = await this.cacheService.get<string | number>(otpKey);
+    if (existingOtp != null) {
+      const ttl = await this.cacheService.getTtl(otpKey);
+      if (ttl > 0) {
+        this.logger.log(`2FA OTP still valid for user=${userId}, expiresIn=${ttl}s`);
+        return { expiresIn: ttl };
+      }
+    }
+
+    // OTP hết hạn hoặc chưa có → kiểm tra cooldown rồi gửi OTP mới
     const cooldown = await this.cacheService.get<string>(this.cooldownKey(userId));
     if (cooldown) {
-      const ttl = await this.cacheService.getTtl(this.cooldownKey(userId));
+      const cooldownTtl = await this.cacheService.getTtl(this.cooldownKey(userId));
       throw new BadRequestException(
-        `Vui lòng đợi ${ttl > 0 ? ttl : this.cooldownSeconds} giây trước khi gửi lại OTP.`,
+        `Vui lòng đợi ${cooldownTtl > 0 ? cooldownTtl : this.cooldownSeconds} giây trước khi gửi lại OTP.`,
         'OTP_COOLDOWN',
       );
     }
 
     const code = this.createOtpCode();
-    await this.cacheService.set(this.otpKey(userId), code, this.otpTtlSeconds);
+    await this.cacheService.set(otpKey, code, this.otpTtlSeconds);
     await this.mailService.sendOtp(email, code);
 
-    // Set cooldown AFTER a successful send so the timer starts from confirmed delivery
     await this.cacheService.set(this.cooldownKey(userId), '1', this.cooldownSeconds);
 
     this.logger.log(`2FA OTP sent for user=${userId}`);
@@ -52,8 +63,14 @@ export class TwoFaService {
 
   async verifyOtp(userId: string, code: string): Promise<boolean> {
     const key = this.otpKey(userId);
-    const cached = await this.cacheService.get<string>(key);
-    if (!cached || cached !== code) {
+    const cached = await this.cacheService.get<string | number>(key);
+    if (cached == null) {
+      return false;
+    }
+    // Normalize to string: cache may return number (JSON.parse parses "123456" as number)
+    const cachedStr = String(cached).trim();
+    const codeStr = String(code).trim();
+    if (cachedStr !== codeStr) {
       return false;
     }
     await this.cacheService.delete(key);

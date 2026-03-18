@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 import { UsersService } from './users.service';
 import { UsersRepository } from './repositories';
 import { CloudinaryService } from '@/common/services';
+import { TwoFaService } from '@/modules/auth/two-fa.service';
+import { WalletsService } from '@/modules/wallets/wallets.service';
+import { OrderRepository } from '@/modules/orders/repositories';
 import { User } from '@/entities/user.entity';
 import { UpdateMyProfileBasicDto, RequestSecurityChangeDto, ReviewSecurityChangeDto } from './dto';
 import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
@@ -10,6 +14,7 @@ describe('UsersService', () => {
   let service: UsersService;
   let usersRepository: jest.Mocked<UsersRepository>;
   let cloudinaryService: jest.Mocked<CloudinaryService>;
+  let twoFaService: jest.Mocked<TwoFaService>;
 
   const mockUser: User = {
     user_id: 'user-1',
@@ -21,6 +26,7 @@ describe('UsersService', () => {
     role: 'TRADER',
     avatar_url: null,
     avatar_public_id: null,
+    two_fa_enabled: 1,
     created_at: new Date(),
   } as User;
 
@@ -39,18 +45,26 @@ describe('UsersService', () => {
       upload: jest.fn().mockResolvedValue({ url: 'https://cdn.example/av.jpg', publicId: 'avatars/av1' }),
       destroy: jest.fn().mockResolvedValue(undefined),
     };
+    const mockTwoFa = {
+      verifyOtp: jest.fn().mockResolvedValue(true),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: UsersRepository, useValue: mockRepo },
         { provide: CloudinaryService, useValue: mockCloudinary },
+        { provide: TwoFaService, useValue: mockTwoFa },
+        { provide: WalletsService, useValue: {} },
+        { provide: DataSource, useValue: {} },
+        { provide: OrderRepository, useValue: {} },
       ],
     }).compile();
 
     service = module.get(UsersService);
     usersRepository = module.get(UsersRepository);
     cloudinaryService = module.get(CloudinaryService);
+    twoFaService = module.get(TwoFaService);
 
     (usersRepository.findById as jest.Mock).mockResolvedValue(mockUser);
   });
@@ -72,6 +86,7 @@ describe('UsersService', () => {
       const dto: RequestSecurityChangeDto = {
         changeType: 'EMAIL_CHANGE',
         payload: { email: '  NEW@Test.COM  ' },
+        otpCode: '123456',
       };
       const result = await service.requestSecurityChange('user-1', dto);
       expect(result.requestId).toBeDefined();
@@ -89,27 +104,35 @@ describe('UsersService', () => {
       const dto: RequestSecurityChangeDto = {
         changeType: 'EMAIL_CHANGE',
         payload: { email: 'existing@test.com' },
+        otpCode: '123456',
       };
       await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(ConflictException);
     });
 
-    it('should create PASSWORD_CHANGE with hashed password in payload', async () => {
-      (usersRepository.createSecurityChangeRequest as jest.Mock).mockResolvedValue('req-2');
+    it('should reject PASSWORD_CHANGE (use change-password endpoint instead)', async () => {
       const dto: RequestSecurityChangeDto = {
         changeType: 'PASSWORD_CHANGE',
         payload: { password: 'newpass123' },
+        otpCode: '123456',
       };
-      const result = await service.requestSecurityChange('user-1', dto);
-      expect(result.status).toBe('PENDING');
-      const call = (usersRepository.createSecurityChangeRequest as jest.Mock).mock.calls[0];
-      expect(call[2]).toBe('PASSWORD_CHANGE');
-      expect(call[3].password_hash).toBeDefined();
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
     });
 
     it('should reject PASSWORD_CHANGE if password too short', async () => {
       const dto: RequestSecurityChangeDto = {
         changeType: 'PASSWORD_CHANGE',
         payload: { password: 'short' },
+        otpCode: '123456',
+      };
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject if 2FA not enabled', async () => {
+      (usersRepository.findById as jest.Mock).mockResolvedValueOnce({ ...mockUser, two_fa_enabled: 0 });
+      const dto: RequestSecurityChangeDto = {
+        changeType: 'EMAIL_CHANGE',
+        payload: { email: 'new@test.com' },
+        otpCode: '123456',
       };
       await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
     });

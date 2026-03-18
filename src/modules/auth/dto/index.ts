@@ -4,3 +4,4 @@ export * from './refresh-token.dto';
 export * from './wallet-nonce.dto';
 export * from './wallet-verify-auth.dto';
 export * from './two-fa-otp.dto';
+export * from './change-password.dto';

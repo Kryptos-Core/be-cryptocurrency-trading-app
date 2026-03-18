@@ -139,6 +139,21 @@ export class AuthRepository {
   }
 
   /**
+   * Update user password (direct change, no approval)
+   */
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        'UPDATE users SET password_hash = ? WHERE user_id = ?',
+        [passwordHash, userId],
+      );
+    } catch (error) {
+      this.logger.error(`Error updating password for user ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Enable/disable 2FA for user
    */
   async setTwoFaEnabled(userId: string, enabled: boolean): Promise<number> {

@@ -15,6 +15,7 @@ import {
   WalletNonceDto,
   WalletVerifyAuthDto,
   TwoFaOtpDto,
+  ChangePasswordDto,
 } from './dto';
 import { Public, CurrentUser } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
@@ -204,6 +205,29 @@ export class AuthController {
   ) {
     await this.twoFaService.disable(userId, dto.otpCode);
     return { enabled: false };
+  }
+
+  /**
+   * Change password directly (no admin approval).
+   * Requires 2FA OTP verification.
+   * POST /auth/change-password
+   */
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Change password',
+    description: 'Change password with OTP verification (2FA required). No admin approval.',
+  })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiSuccessResponse('Password changed successfully')
+  @ApiBadRequestResponse('Invalid OTP or 2FA not enabled')
+  async changePassword(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
   }
 
   /**

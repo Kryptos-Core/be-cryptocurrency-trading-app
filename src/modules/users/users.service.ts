@@ -216,20 +216,26 @@ export class UsersService {
   ): Promise<{ requestId: string; status: string }> {
     const user = await this.findOne(userId);
 
-    if (user.two_fa_enabled === 1) {
-      if (!dto.otpCode) {
-        throw new BadRequestException(
-          'OTP code is required when 2FA is enabled',
-          'OTP_REQUIRED',
-        );
-      }
-      const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
-      if (!otpValid) {
-        throw new BadRequestException(
-          'OTP không hợp lệ hoặc đã hết hạn',
-          'INVALID_OTP',
-        );
-      }
+    // Chỉ cho phép gửi yêu cầu thay đổi thông tin nhạy cảm khi đã bật 2FA
+    if (user.two_fa_enabled !== 1) {
+      throw new BadRequestException(
+        'Vui lòng bật xác thực hai bước trong Cài đặt trước khi thay đổi email hoặc mật khẩu.',
+        'TWO_FA_REQUIRED',
+      );
+    }
+
+    if (!dto.otpCode) {
+      throw new BadRequestException(
+        'OTP code is required when 2FA is enabled',
+        'OTP_REQUIRED',
+      );
+    }
+    const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
+    if (!otpValid) {
+      throw new BadRequestException(
+        'OTP không hợp lệ hoặc đã hết hạn',
+        'INVALID_OTP',
+      );
     }
 
     let payload: Record<string, unknown> = { ...dto.payload };
@@ -246,15 +252,10 @@ export class UsersService {
       }
       payload = { email: emailLower };
     } else if (dto.changeType === 'PASSWORD_CHANGE') {
-      const password = payload.password as string | undefined;
-      if (!password || typeof password !== 'string' || password.length < 8) {
-        throw new BadRequestException(
-          'Payload must contain password (min 8 characters)',
-          'INVALID_PAYLOAD',
-        );
-      }
-      const passwordHash = await bcrypt.hash(password, 10);
-      payload = { password_hash: passwordHash };
+      throw new BadRequestException(
+        'Đổi mật khẩu không cần xét duyệt. Vui lòng dùng chức năng Đổi mật khẩu trong Cài đặt.',
+        'USE_CHANGE_PASSWORD_ENDPOINT',
+      );
     } else {
       throw new BadRequestException('Unsupported change type', 'INVALID_CHANGE_TYPE');
     }
