@@ -1,6 +1,6 @@
 [
   {
-    "email": "admin@example.com",
+    "email": "max@circle-vn.com",
     "password": "Admin@123!",
     "first_name": "Admin",
     "last_name": "User",
@@ -8,7 +8,7 @@
     "role": "ADMIN"
   },
   {
-    "email": "trader1@example.com",
+    "email": "hoangsondz1910@gmail.com",
     "password": "Trader@123!",
     "first_name": "Trader",
     "last_name": "One",
@@ -48,7 +48,7 @@
     "role": "VERIFIED_USER"
   },
   {
-    "email": "risk@example.com",
+    "email": "hsondz1910@gmail.com",
     "password": "Risk@123!",
     "first_name": "Risk",
     "last_name": "Officer",
@@ -64,7 +64,7 @@
     "role": "SUPPORT_AGENT"
   },
   {
-    "email": "maker@example.com",
+    "email": "maxnoah901@example.com",
     "password": "Maker@123!",
     "first_name": "Market",
     "last_name": "Maker",

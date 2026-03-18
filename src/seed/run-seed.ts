@@ -64,7 +64,7 @@ async function run() {
     for (const u of usersData) {
       const userId = newUuid();
       const passwordHash = await bcrypt.hash(u.password, SALT_ROUNDS);
-      const role = u.role ?? (u.email.toLowerCase() === 'admin@example.com' ? UserRole.ADMIN : UserRole.TRADER);
+      const role = u.role ?? (u.email.toLowerCase() === 'max@circle-vn.com' ? UserRole.ADMIN : UserRole.TRADER);
 
       await q.query(
         `INSERT INTO users (user_id, email, password_hash, first_name, last_name, status, role)
@@ -84,7 +84,7 @@ async function run() {
 
     console.log('\n🎉 Seed done. Users imported.');
     console.log('   Currencies & market pairs will sync automatically from Binance on backend startup if catalog is empty.');
-    console.log('   Login e.g. admin@example.com / Admin@123!');
+    console.log('   Login e.g. max@circle-vn.com / Admin@123!');
   } catch (err) {
     console.error('Seed failed:', err);
     process.exit(1);

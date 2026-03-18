@@ -107,11 +107,11 @@ npm run treasury:schedule:register
 | Email | Mật khẩu | Vai trò |
 |---|---|---|
 | max@circle-vn.com | Admin@123! | Quản trị viên (Admin) |
-| maxnoah901@gmail.com | Trader@123! | Nhà giao dịch (Trader) |
+| hoangsondz1910@gmail.com | Trader@123! | Nhà giao dịch (Trader) |
 | trader2@example.com | Trader@123! | Nhà giao dịch (Trader) |
 | trader3@example.com | Trader@123! | Nhà giao dịch (Trader) |
 | guest@example.com | Guest@123! | Khách (Guest) |
 | verified@example.com | Verified@123! | Người dùng đã xác minh |
-| weden10116@soco7.com | Risk@123! | Cán bộ rủi ro (Risk Officer) |
+| hsondz1910@gmail.com | Risk@123! | Cán bộ rủi ro (Risk Officer) |
 | support@example.com | Support@123! | Nhân viên hỗ trợ |
-| maker@example.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |
+| maxnoah901@example.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |
