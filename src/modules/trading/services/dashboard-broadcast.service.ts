@@ -4,9 +4,9 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Server } from 'socket.io';
-import { TradingPriceStreamService } from './trading-price-stream.service';
-import { TickerMessage } from '../interfaces/websocket.interface';
+import { TickerMessage, MARKET_EVENTS } from '../interfaces/websocket.interface';
 
 const BROADCAST_INTERVAL_MS = 5_000; // broadcast to dashboard room every 5 seconds
 const DASHBOARD_ROOM = 'dashboard';
@@ -14,13 +14,9 @@ const DASHBOARD_ROOM = 'dashboard';
 /**
  * Dashboard Broadcast Service
  *
- * Observer Pattern implementation:
- *   - Registers itself as a listener on TradingPriceStreamService (Observable)
- *   - Buffers incoming ticker updates in an in-memory Map (latest price per symbol)
- *   - Every BROADCAST_INTERVAL_MS, emits the buffered batch to Socket.IO room 'dashboard'
- *
- * This decouples the high-frequency Binance price feed from dashboard clients:
- * thousands of ticker updates per second are throttled to one broadcast every 5 seconds.
+ * Observer Pattern — listens to market.price.updated events via EventEmitter2 bus
+ * (no direct coupling to TradingPriceStreamService). Buffers latest ticker per
+ * symbol and throttles Socket.IO 'dashboard' room broadcasts to every 5 seconds.
  */
 @Injectable()
 export class DashboardBroadcastService implements OnModuleInit, OnModuleDestroy {
@@ -34,15 +30,7 @@ export class DashboardBroadcastService implements OnModuleInit, OnModuleDestroy 
 
   private broadcastTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly priceStreamService: TradingPriceStreamService) {}
-
   onModuleInit(): void {
-    // Register as Observer on TradingPriceStreamService
-    this.priceStreamService.onPriceUpdate((ticker: TickerMessage) => {
-      this.tickerBuffer.set(ticker.symbol, ticker);
-    });
-
-    // Throttled broadcast loop
     this.broadcastTimer = setInterval(() => this.flush(), BROADCAST_INTERVAL_MS);
   }
 
@@ -52,6 +40,14 @@ export class DashboardBroadcastService implements OnModuleInit, OnModuleDestroy 
       this.broadcastTimer = null;
     }
     this.tickerBuffer.clear();
+  }
+
+  /**
+   * Observer: receives ticker from EventEmitter2 bus — decoupled from source service.
+   */
+  @OnEvent(MARKET_EVENTS.PRICE_UPDATED)
+  onPriceUpdated(ticker: TickerMessage): void {
+    this.tickerBuffer.set(ticker.symbol, ticker);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RedisService } from '@/common/services';
 import {
   PriceUpdateEvent,
@@ -7,6 +8,7 @@ import {
   TickerMessage,
   OHLCMessage,
   CandleInterval,
+  MARKET_EVENTS,
 } from '../interfaces/websocket.interface';
 
 const RATE_LIMIT_LOG_MS = 60_000;
@@ -41,10 +43,10 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   private lastBinanceCandleAt: Map<string, number> = new Map();
   private static readonly BINANCE_CANDLE_PRIORITY_MS = 90_000;
 
-  private priceUpdateListeners: ((ticker: TickerMessage) => void)[] = [];
-  private candleUpdateListeners: ((candle: OHLCMessage) => void)[] = [];
-
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async onModuleInit() {
     await this.initializeRedisSubscriber();
@@ -89,36 +91,25 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * Handle price update from Redis
+   * Handle price update from Redis — emit to EventEmitter2 Observer bus.
    */
   private handlePriceUpdate(event: PriceUpdateEvent) {
     this.aggregateCandle(event);
-    
-    // Notify all listeners
-    for (const listener of this.priceUpdateListeners) {
-      try {
-        listener(event.ticker);
-      } catch {
-        // Listener error (silent)
-      }
-    }
+    this.eventEmitter.emit(MARKET_EVENTS.PRICE_UPDATED, event.ticker);
   }
 
   /**
-   * Handle candle update from Redis
+   * Handle candle update from Redis — emit to EventEmitter2 Observer bus.
+   * Distinguishes between an in-progress candle update and a closed candle.
    */
   private handleCandleUpdate(event: CandleUpdateEvent) {
     if (event.source === 'binance_kline' && event.candle) {
       const key = `${event.candle.pair_id}:${event.candle.interval}`;
       this.lastBinanceCandleAt.set(key, Date.now());
     }
-    // Notify all listeners
-    for (const listener of this.candleUpdateListeners) {
-      try {
-        listener(event.candle);
-      } catch {
-        // Listener error (silent)
-      }
+    this.eventEmitter.emit(MARKET_EVENTS.CANDLE_UPDATED, event.candle);
+    if (event.candle.is_closed) {
+      this.eventEmitter.emit(MARKET_EVENTS.CANDLE_CLOSED, event.candle);
     }
   }
 
@@ -210,20 +201,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       return false;
     }
     return true;
-  }
-
-  /**
-   * Register listener for price updates
-   */
-  onPriceUpdate(listener: (ticker: TickerMessage) => void) {
-    this.priceUpdateListeners.push(listener);
-  }
-
-  /**
-   * Register listener for candle updates
-   */
-  onCandleUpdate(listener: (candle: OHLCMessage) => void) {
-    this.candleUpdateListeners.push(listener);
   }
 
   private shouldLog(key: string, windowMs: number = RATE_LIMIT_LOG_MS): boolean {
@@ -322,7 +299,8 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   }
 
   async onModuleDestroy() {
-    this.priceUpdateListeners = [];
-    this.candleUpdateListeners = [];
+    this.candleCache.clear();
+    this.candleKeyByPairInterval.clear();
+    this.lastBinanceCandleAt.clear();
   }
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -24,6 +25,7 @@ import appConfig from './config/app.config';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',

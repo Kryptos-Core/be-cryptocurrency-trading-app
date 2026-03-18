@@ -6,6 +6,7 @@ import { TradingSubscriptionService } from './services/trading-subscription.serv
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
 import { BinancePriceFeedService } from './services/binance-price-feed.service';
 import { DashboardBroadcastService } from './services/dashboard-broadcast.service';
+import { WorkspaceService } from './services/workspace.service';
 import { MarketsModule } from '@/modules/markets/markets.module';
 
 @Module({
@@ -26,6 +27,7 @@ import { MarketsModule } from '@/modules/markets/markets.module';
     TradingPriceStreamService,
     BinancePriceFeedService,
     DashboardBroadcastService,
+    WorkspaceService,
   ],
   exports: [TradingPriceStreamService, BinancePriceFeedService],
 })

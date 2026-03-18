@@ -8,12 +8,13 @@ import {
   MessageBody,
   OnGatewayInit,
 } from '@nestjs/websockets';
-import { UseFilters } from '@nestjs/common';
+import { UseFilters, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { TradingSubscriptionService } from '../services/trading-subscription.service';
-import { TradingPriceStreamService } from '../services/trading-price-stream.service';
 import { BinancePriceFeedService } from '../services/binance-price-feed.service';
 import { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
+import { WorkspaceService } from '../services/workspace.service';
 import {
   WebSocketMessage,
   AuthMessage,
@@ -22,6 +23,8 @@ import {
   TickerMessage,
   OHLCMessage,
   WebSocketErrorCode,
+  WorkspaceSubscription,
+  MARKET_EVENTS,
 } from '../interfaces/websocket.interface';
 import { JwtService } from '@nestjs/jwt';
 import { WebSocketExceptionFilter } from './filters/websocket-exception.filter';
@@ -55,30 +58,37 @@ export class TradingGateway
   @WebSocketServer()
   server!: Server;
 
+  private readonly logger = new Logger(TradingGateway.name);
+
   constructor(
     private readonly subscriptionService: TradingSubscriptionService,
-    private readonly priceStreamService: TradingPriceStreamService,
     private readonly binancePriceFeedService: BinancePriceFeedService,
     private readonly dashboardBroadcastService: DashboardBroadcastService,
+    private readonly workspaceService: WorkspaceService,
     private readonly jwtService: JwtService,
   ) {}
 
   /**
-   * Initialize gateway and start listening to Redis Pub/Sub
+   * Inject Socket.IO server into DashboardBroadcastService after init.
    */
   afterInit(server: Server) {
-    // Listen to price updates from Redis Pub/Sub
-    this.priceStreamService.onPriceUpdate((message: TickerMessage) => {
-      this.broadcastPriceUpdate(message);
-    });
-
-    // Listen to OHLC updates from Redis Pub/Sub
-    this.priceStreamService.onCandleUpdate((message: OHLCMessage) => {
-      this.broadcastCandleUpdate(message);
-    });
-
-    // Inject server into DashboardBroadcastService for room-based broadcasting
     this.dashboardBroadcastService.setServer(server);
+  }
+
+  /**
+   * Observer: react to price update events emitted by TradingPriceStreamService.
+   */
+  @OnEvent(MARKET_EVENTS.PRICE_UPDATED)
+  handlePriceUpdatedEvent(ticker: TickerMessage) {
+    this.broadcastPriceUpdate(ticker);
+  }
+
+  /**
+   * Observer: react to candle update events emitted by TradingPriceStreamService.
+   */
+  @OnEvent(MARKET_EVENTS.CANDLE_UPDATED)
+  handleCandleUpdatedEvent(candle: OHLCMessage) {
+    this.broadcastCandleUpdate(candle);
   }
 
   /**
@@ -142,10 +152,48 @@ export class TradingGateway
         timestamp: Date.now(),
       } as WebSocketMessage);
 
+      // Restore workspace rooms from Redis (fire-and-forget; errors are logged)
+      this.restoreWorkspace(client).catch((err) => {
+        this.logger.warn(`restoreWorkspace error: ${err instanceof Error ? err.message : String(err)}`);
+      });
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Invalid token';
       return this.sendError(client, 'AUTH_FAILED', errorMessage);
     }
+  }
+
+  /**
+   * Restore workspace rooms for a reconnected client from Redis state.
+   * Joins Socket.IO rooms silently; emits workspace_restored to client.
+   */
+  private async restoreWorkspace(client: Socket): Promise<void> {
+    const userId = client.data.user_id as string;
+    const workspace = await this.workspaceService.getWorkspace(userId);
+    if (!workspace || workspace.pairs.length === 0) return;
+
+    for (const sub of workspace.pairs) {
+      for (const channel of sub.channels) {
+        if (channel === 'ticker') {
+          client.join(`pair:${sub.pair_id}:ticker`);
+        } else if (channel === 'ohlc' && sub.interval) {
+          client.join(`pair:${sub.pair_id}:ohlc:${sub.interval}`);
+          // Register in subscription service so demand-based kline stays active
+          const symbol = this.binancePriceFeedService.getSymbolForPair(sub.pair_id);
+          await this.subscriptionService.subscribe(
+            client.id, userId, sub.pair_id, sub.channels, sub.interval, symbol,
+          ).catch(() => { /* already subscribed or limit reached */ });
+        }
+      }
+    }
+
+    await this.binancePriceFeedService.requestSymbolsForSubscriptions();
+
+    client.emit('workspace_restored', {
+      type: 'workspace_restored',
+      data: workspace,
+      timestamp: Date.now(),
+    } as WebSocketMessage);
   }
 
   /**
@@ -174,6 +222,9 @@ export class TradingGateway
         return this.sendError(client, 'INVALID_MESSAGE', 'interval is required for ohlc channel');
       }
 
+      // Resolve Binance symbol for demand-based kline subscription tracking
+      const symbol = this.binancePriceFeedService.getSymbolForPair(pair_id);
+
       // Subscribe client to pair
       await this.subscriptionService.subscribe(
         client.id,
@@ -181,6 +232,7 @@ export class TradingGateway
         pair_id,
         channels,
         interval,
+        symbol,
       );
       await this.binancePriceFeedService.requestSymbolsForSubscriptions();
 
@@ -195,6 +247,11 @@ export class TradingGateway
         
         if (room) client.join(room);
       }
+
+      // Persist subscription to workspace (fire-and-forget)
+      const sub: WorkspaceSubscription = { pair_id, channels, interval };
+      this.workspaceService.upsertPairSubscription(client.data.user_id, sub).catch(() => {});
+
       // Send subscription confirmation
       client.emit('subscribed', {
         type: 'subscribed',
@@ -235,6 +292,9 @@ export class TradingGateway
       // Unsubscribe client from pair
       await this.subscriptionService.unsubscribe(client.id, pair_id, channels);
       await this.binancePriceFeedService.requestSymbolsForSubscriptions();
+
+      // Remove from workspace persistence (fire-and-forget)
+      this.workspaceService.removePairSubscription(client.data.user_id, pair_id).catch(() => {});
 
       // Leave Socket.IO rooms for each channel
       for (const channel of channels) {

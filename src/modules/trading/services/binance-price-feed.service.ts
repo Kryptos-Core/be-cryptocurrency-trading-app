@@ -1,17 +1,22 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
 import { RedisService } from '@/common/services';
 import { TradingPriceStreamService } from './trading-price-stream.service';
 import { TradingSubscriptionService } from './trading-subscription.service';
 import { MarketRepository } from '@/modules/markets/repositories';
-import { TickerMessage, OHLCMessage } from '../interfaces/websocket.interface';
+import {
+  TickerMessage,
+  OHLCMessage,
+  OhlcSubscriptionEvent,
+  MARKET_EVENTS,
+} from '../interfaces/websocket.interface';
 import { BinanceWebSocketPriceFeedClient } from '../clients/binance-websocket-price-feed.client';
 import { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
 
 const RATE_LIMIT_LOG_MS = 60_000;
 const DEBOUNCE_RECONNECT_MS = 4000;
 const MAX_TICKER_SYMBOLS = 80;
-const MAX_KLINE_SYMBOLS = 2;
 const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
 const EXCHANGE_INFO_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -32,6 +37,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   private readonly priceFeedClient: BinanceWebSocketPriceFeedClient;
   private binanceSymbolsCache: Set<string> = new Set();
   private binanceSymbolsCacheExpiry = 0;
+
+  /** Demand-based kline symbols: pair_id -> symbol. Populated via EventEmitter2 OHLC events. */
+  private readonly activeKlineSymbols = new Map<string, string>(); // pair_id -> symbol
 
   constructor(
     private readonly configService: ConfigService,
@@ -148,7 +156,34 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Observer: first client subscribes to ohlc for a pair → add kline symbol.
+   */
+  @OnEvent(MARKET_EVENTS.OHLC_SUBSCRIPTION_ADDED)
+  onOhlcSubscriptionAdded(event: OhlcSubscriptionEvent): void {
+    const normalized = String(event.symbol).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!normalized) return;
+    const had = this.activeKlineSymbols.has(event.pair_id);
+    this.activeKlineSymbols.set(event.pair_id, normalized);
+    if (!had) {
+      this.logger.log(`Kline subscription added: ${normalized} (pair ${event.pair_id})`);
+      void this.requestSymbolsForSubscriptions();
+    }
+  }
+
+  /**
+   * Observer: last client unsubscribes from ohlc for a pair → remove kline symbol.
+   */
+  @OnEvent(MARKET_EVENTS.OHLC_SUBSCRIPTION_REMOVED)
+  onOhlcSubscriptionRemoved(event: OhlcSubscriptionEvent): void {
+    if (!this.activeKlineSymbols.has(event.pair_id)) return;
+    this.activeKlineSymbols.delete(event.pair_id);
+    this.logger.log(`Kline subscription removed: ${event.symbol} (pair ${event.pair_id})`);
+    void this.requestSymbolsForSubscriptions();
+  }
+
+  /**
    * Start price feed via Binance WebSocket (combined ticker stream).
+   * klineSymbols are demand-driven via EventEmitter2 OHLC events — no hardcoded limit.
    * @param forceReconnect when true, reconnects even if already running (e.g. after symbol set change).
    */
   private async startPriceFeed(forceReconnect = false): Promise<void> {
@@ -183,11 +218,10 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
-    const ohlcPairIds = this.tradingSubscriptionService.getPairIdsWithOhlcSubscription(MAX_KLINE_SYMBOLS);
+    // Demand-based kline symbols — populated by @OnEvent handlers above
     const klineSymbols: string[] = [];
-    for (const pairId of ohlcPairIds) {
-      const sym = this.pairSymbolMap.get(String(pairId));
-      if (sym && (this.binanceSymbolsCache.size === 0 || this.binanceSymbolsCache.has(sym))) {
+    for (const sym of this.activeKlineSymbols.values()) {
+      if (this.binanceSymbolsCache.size === 0 || this.binanceSymbolsCache.has(sym)) {
         klineSymbols.push(sym);
       }
     }
@@ -235,6 +269,14 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     return this.requestedTickerSymbols.length > 0
       ? [...this.requestedTickerSymbols]
       : [];
+  }
+
+  /**
+   * Resolve Binance symbol for a pair_id (from in-memory map loaded at startup).
+   * Used by gateway to pass symbol to subscription service for demand-based kline events.
+   */
+  getSymbolForPair(pairId: string): string | undefined {
+    return this.pairSymbolMap.get(String(pairId));
   }
 
   getStats(): {

@@ -3,6 +3,15 @@
  * Defines all message types for trading WebSocket protocol
  */
 
+// ============ Internal Event Names (EventEmitter2 / Observer bus) ============
+export const MARKET_EVENTS = {
+  PRICE_UPDATED: 'market.price.updated',
+  CANDLE_UPDATED: 'market.candle.updated',
+  CANDLE_CLOSED: 'market.candle.closed',
+  OHLC_SUBSCRIPTION_ADDED: 'market.ohlc.subscription.added',
+  OHLC_SUBSCRIPTION_REMOVED: 'market.ohlc.subscription.removed',
+} as const;
+
 // ============ Message Base ============
 export interface WebSocketMessage<T = any> {
   type: WebSocketMessageType;
@@ -23,6 +32,7 @@ export type WebSocketMessageType =
   | 'dashboard_tickers'
   | 'join_dashboard'
   | 'leave_dashboard'
+  | 'workspace_restored'
   | 'error'
   | 'ping'
   | 'pong';
@@ -150,4 +160,24 @@ export interface RedisPubSubMessage {
   event: 'price_update' | 'candle_update';
   data: PriceUpdateEvent | CandleUpdateEvent;
   timestamp: number;
+}
+
+// ============ Workspace (session restore) ============
+export interface WorkspaceSubscription {
+  pair_id: string;
+  channels: SubscriptionChannel[];
+  interval?: CandleInterval;
+}
+
+export interface WorkspaceState {
+  user_id: string;
+  pairs: WorkspaceSubscription[];
+  updated_at: number;
+}
+
+// ============ OHLC Subscription Events (EventEmitter2) ============
+export interface OhlcSubscriptionEvent {
+  symbol: string;
+  pair_id: string;
+  interval: CandleInterval;
 }
