@@ -114,4 +114,4 @@ npm run treasury:schedule:register
 | verified@example.com | Verified@123! | Người dùng đã xác minh |
 | hsondz1910@gmail.com | Risk@123! | Cán bộ rủi ro (Risk Officer) |
 | support@example.com | Support@123! | Nhân viên hỗ trợ |
-| maxnoah901@example.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |
+| maxnoah901@gmail.com | Maker@123! | Nhà tạo lập thị trường (Market Maker) |
