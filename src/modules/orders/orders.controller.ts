@@ -62,7 +62,8 @@ export class OrdersController {
   @Get('admin/all')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.SUPPORT_AGENT)
-  @RequirePermissions(Permission.ORDERS_MANAGE)
+  /** Read-only surveillance; use orders:read (orders:manage is not granted to these roles in RBAC). */
+  @RequirePermissions(Permission.ORDERS_READ)
   @ApiOperation({
     summary: 'Admin: List all orders',
     description: 'Paginated list of all orders with optional filters (userId, pairId, status).',

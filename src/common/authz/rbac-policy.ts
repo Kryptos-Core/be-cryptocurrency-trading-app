@@ -24,6 +24,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
   [UserRole.SUPPORT_AGENT]: [
     Permission.USERS_READ,
     Permission.SUPPORT_CASES,
+    /** Giám sát lệnh toàn sàn (GET /orders/admin/all) */
+    Permission.ORDERS_READ,
   ],
   [UserRole.RISK_OFFICER]: [
     Permission.USERS_READ,
@@ -33,6 +35,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,
     Permission.WITHDRAWALS_APPROVE,
+    /** Giám sát lệnh / phát hiện bất thường */
+    Permission.ORDERS_READ,
   ],
   [UserRole.FINANCE_MANAGER]: [
     Permission.WALLETS_READ,
@@ -49,6 +53,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.ORDERS_PLACE,
     Permission.ORDERS_CANCEL,
     Permission.ORDERS_BATCH_PLACE,
+    Permission.ORDERS_READ,
+    Permission.ORDERS_MANAGE,
     Permission.WALLETS_READ,
     Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,
