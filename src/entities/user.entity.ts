@@ -9,6 +9,7 @@ import {
 import { UserSession } from './user-session.entity';
 import { Withdrawal } from './withdrawal.entity';
 import { ManagedWallet } from './managed-wallet.entity';
+import { TreasuryOperation } from './treasury-operation.entity';
 
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
@@ -106,4 +107,7 @@ export class User {
 
   @OneToMany(() => ManagedWallet, (managedWallet) => managedWallet.user)
   managed_wallets!: ManagedWallet[];
+
+  @OneToMany(() => TreasuryOperation, (operation) => operation.actor_user)
+  treasury_operations!: TreasuryOperation[];
 }

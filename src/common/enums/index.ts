@@ -199,6 +199,8 @@ export enum OnchainTxType {
   DEPOSIT = 'DEPOSIT',
   WITHDRAWAL = 'WITHDRAWAL',
   TRANSFER = 'TRANSFER',
+  SWEEP = 'SWEEP',
+  FUND = 'FUND',
 }
 
 /** Trạng thái giao dịch on-chain */

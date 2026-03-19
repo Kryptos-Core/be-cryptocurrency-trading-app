@@ -23,6 +23,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { MarketMakerModule } from './modules/market-maker/market-maker.module';
+import { TreasuryModule } from './modules/treasury/treasury.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
@@ -74,6 +75,7 @@ import appConfig from './config/app.config';
     NotificationsModule,
     MarketMakerModule,
     PaymentConfigModule,
+    TreasuryModule,
   ],
 })
 export class AppModule {}

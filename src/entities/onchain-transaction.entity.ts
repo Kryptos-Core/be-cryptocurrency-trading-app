@@ -15,6 +15,7 @@ import { LinkedWallet } from './linked-wallet.entity';
 @Index('uk_onchain_tx_hash', ['chain', 'tx_hash'], { unique: true })
 @Index('idx_onchain_tx_user', ['user_id', 'type', 'status'])
 @Index('idx_onchain_tx_created', ['user_id', 'created_at'])
+@Index('idx_onchain_tx_treasury_operation', ['treasury_operation_id'])
 export class OnchainTransaction {
   @PrimaryColumn({ type: 'char', length: 36 })
   tx_id!: string;
@@ -27,6 +28,9 @@ export class OnchainTransaction {
   @ForeignKey(() => LinkedWallet)
   linked_wallet_id!: string | null;
 
+  @Column({ type: 'char', length: 36, nullable: true })
+  treasury_operation_id!: string | null;
+
   @Column({
     type: 'enum',
     enum: ['TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA'],
@@ -35,9 +39,9 @@ export class OnchainTransaction {
 
   @Column({
     type: 'enum',
-    enum: ['DEPOSIT', 'WITHDRAWAL', 'TRANSFER'],
+    enum: ['DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'SWEEP', 'FUND'],
   })
-  type!: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  type!: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'SWEEP' | 'FUND';
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   tx_hash!: string | null;
