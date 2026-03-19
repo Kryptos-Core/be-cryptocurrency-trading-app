@@ -161,17 +161,26 @@ export class DashboardService {
         if (STABLECOINS.has(symbol)) {
           usdValue = totalNum.toFixed(2);
         } else if (totalNum > 0 && symbol) {
+          let price = 0;
           const priceRaw = await this.redisService.get(`price:${symbol}USDT:latest`);
           if (priceRaw) {
             try {
               const priceData = JSON.parse(priceRaw) as { last_price?: string };
-              const price = parseFloat(priceData.last_price ?? '0');
-              if (price > 0) {
-                usdValue = (totalNum * price).toFixed(2);
-              }
+              price = parseFloat(priceData.last_price ?? '0');
             } catch {
               this.logger.warn(`Failed to parse Redis price for ${symbol}`);
             }
+          }
+          if (price <= 0) {
+            try {
+              const ticker = await this.marketsService.getTickerBySymbol(`${symbol}/USDT`);
+              price = parseFloat(ticker?.lastPrice ?? '0') || 0;
+            } catch {
+              /* Pair may not exist — keep usdValue 0 */
+            }
+          }
+          if (price > 0) {
+            usdValue = (totalNum * price).toFixed(2);
           }
         }
 

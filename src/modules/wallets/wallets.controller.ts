@@ -27,7 +27,8 @@ import { AdminAdjustWalletDto } from './dto/admin-adjust-wallet.dto';
 
 /**
  * Wallets Controller
- * API endpoints for wallet operations
+ * API endpoints for wallet operations.
+ * List/balance/ledger endpoints: available to ALL authenticated roles (no RoleGuard).
  */
 @ApiTags('wallets')
 @ApiBearerAuth('JWT-auth')
@@ -39,6 +40,7 @@ export class WalletsController {
   /**
    * Get current user's wallets (all or exclude zero balances).
    * GET /wallets?include_zero=false
+   * Available to ALL authenticated roles (trader, admin, support, risk, finance, market maker).
    */
   @Get()
   @ApiOperation({

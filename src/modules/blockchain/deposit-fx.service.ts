@@ -42,6 +42,12 @@ export class DepositFxService {
       this.configService.get<string>('PLATFORM_CASH_CURRENCY_SYMBOL')?.trim().toUpperCase() ||
       this.configService.get<string>('PAYOS_DEPOSIT_CURRENCY_SYMBOL')?.trim().toUpperCase() ||
       'USDT';
+    if (this.cashCurrencySymbol !== 'USDT') {
+      this.logger.warn(
+        `Platform cash is "${this.cashCurrencySymbol}" — on-chain deposits will credit that wallet. ` +
+          'Expected USDT. Set PLATFORM_CASH_CURRENCY_SYMBOL=USDT in .env.',
+      );
+    }
   }
 
   /**

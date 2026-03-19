@@ -61,6 +61,21 @@ export class TwoFaService {
     return { expiresIn: this.otpTtlSeconds };
   }
 
+  /**
+   * Check OTP matches Redis value without consuming it.
+   * Use before sensitive UI steps; final action still calls verifyOtp() to consume.
+   */
+  async validateOtpOnly(userId: string, code: string): Promise<boolean> {
+    const key = this.otpKey(userId);
+    const cached = await this.cacheService.get<string | number>(key);
+    if (cached == null) {
+      return false;
+    }
+    const cachedStr = String(cached).trim();
+    const codeStr = String(code).trim();
+    return cachedStr === codeStr;
+  }
+
   async verifyOtp(userId: string, code: string): Promise<boolean> {
     const key = this.otpKey(userId);
     const cached = await this.cacheService.get<string | number>(key);

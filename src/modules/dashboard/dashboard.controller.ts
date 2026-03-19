@@ -8,6 +8,7 @@ import { CurrentUser } from '@/common/decorators';
  * Dashboard Controller
  * Single aggregated endpoint: replaces 3 separate calls (markets + tickers + wallets).
  * JWT required — returns user's wallet summary + portfolio total alongside top markets.
+ * Available to ALL authenticated roles (trader, admin, support, risk, finance, market maker).
  */
 @ApiTags('dashboard')
 @ApiBearerAuth('JWT-auth')

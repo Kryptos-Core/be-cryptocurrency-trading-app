@@ -19,6 +19,7 @@ import {
 } from './dto';
 import { Public, CurrentUser } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
+import { BadRequestException } from '@/common/exceptions';
 import {
   ApiSuccessResponse,
   ApiBadRequestResponse,
@@ -167,6 +168,37 @@ export class AuthController {
   async sendTwoFaOtp(@CurrentUser('userId') userId: string) {
     const user = await this.authService.getUserById(userId);
     return this.twoFaService.sendOtp(userId, user.email);
+  }
+
+  /**
+   * Check OTP is correct (does not consume). Use so the client can gate UI before
+   * change-password / enable / disable / security-change which call verifyOtp().
+   */
+  @Post('2fa/validate-otp')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Validate 2FA OTP (no consume)',
+    description:
+      'Returns success if the code matches the active OTP. Does not invalidate the code.',
+  })
+  @ApiBody({ type: TwoFaOtpDto })
+  @ApiSuccessResponse('OTP is valid')
+  @ApiBadRequestResponse('Invalid or expired OTP')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async validateTwoFaOtp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: TwoFaOtpDto,
+  ) {
+    const ok = await this.twoFaService.validateOtpOnly(userId, dto.otpCode);
+    if (!ok) {
+      throw new BadRequestException(
+        'OTP không hợp lệ hoặc đã hết hạn',
+        'INVALID_OTP',
+      );
+    }
+    return { valid: true };
   }
 
   @Post('2fa/enable')
