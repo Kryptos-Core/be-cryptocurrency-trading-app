@@ -14,6 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '@/common/services/redis.service';
 import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from './notifications.service';
 import { PAYMENT_CONFIG_EVENTS_CHANNEL } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { TREASURY_EVENTS_CHANNEL } from '@/modules/treasury/constants';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
 
 const NOTIFICATIONS_ROOM = 'notifications';
@@ -110,8 +111,22 @@ export class NotificationsGateway
       }
     });
 
+    await this.redisService.subscribe(TREASURY_EVENTS_CHANNEL, (message) => {
+      try {
+        const payload = JSON.parse(message);
+        this.server.to(NOTIFICATIONS_ROOM).emit('treasury:event', {
+          type: 'treasury:event',
+          data: payload,
+          timestamp: Date.now(),
+        });
+        this.logger.debug(`Broadcast treasury event: ${payload.event}`);
+      } catch (error) {
+        this.logger.error('Failed to parse/broadcast treasury event', error);
+      }
+    });
+
     this.logger.log(
-      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config)',
+      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config + treasury)',
     );
   }
 

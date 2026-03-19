@@ -241,6 +241,18 @@ export class EnvironmentVariables {
   @IsOptional()
   BLOCKCHAIN_WITHDRAW_TRON_SYMBOL?: string = 'TRX';
 
+  @IsUrl()
+  @IsOptional()
+  TRON_MAINNET_FULL_HOST?: string;
+
+  @IsUrl()
+  @IsOptional()
+  ETH_MAINNET_RPC_URL?: string;
+
+  @IsInt()
+  @IsOptional()
+  ETH_MAINNET_CHAIN_ID?: number;
+
   // PayOS Configuration
   @IsString()
   @IsOptional()
@@ -375,6 +387,9 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL',
     'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL',
     'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL',
+    'TRON_MAINNET_FULL_HOST',
+    'ETH_MAINNET_RPC_URL',
+    'ETH_MAINNET_CHAIN_ID',
     'PAYOS_CLIENT_ID',
     'PAYOS_API_KEY',
     'PAYOS_CHECKSUM_KEY',

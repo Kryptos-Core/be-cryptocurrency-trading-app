@@ -26,6 +26,9 @@ import { Withdrawal } from '../entities/withdrawal.entity';
 import { Notification } from '../entities/notification.entity';
 import { UserNotification } from '../entities/user-notification.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
+import { TransactionWallet } from '../entities/transaction-wallet.entity';
+import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
+import { TreasuryOperation } from '../entities/treasury-operation.entity';
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
@@ -50,6 +53,9 @@ const ALL_ENTITIES = [
   Notification,
   UserNotification,
   PaymentMethodConfig,
+  TransactionWallet,
+  TreasuryMainWallet,
+  TreasuryOperation,
 ];
 
 export const getTypeOrmConfig = (

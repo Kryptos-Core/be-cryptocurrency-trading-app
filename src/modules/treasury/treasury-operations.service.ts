@@ -28,12 +28,19 @@ import {
   TREASURY_SWEEP_JOB,
 } from './constants';
 import { TransactionWalletService } from './transaction-wallet.service';
+import { TreasuryMainWalletService } from './treasury-main-wallet.service';
 
-type SupportedTreasuryChain = 'ETH_SEPOLIA' | 'TRON_NILE' | 'TRON_SHASTA';
+type SupportedTreasuryChain =
+  | 'ETH_SEPOLIA'
+  | 'ETH_MAINNET'
+  | 'TRON_NILE'
+  | 'TRON_SHASTA'
+  | 'TRON_MAINNET';
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
 interface TreasuryJobData {
   operationId: string;
+  mainWalletId?: string;
 }
 
 @Injectable()
@@ -44,11 +51,16 @@ export class TreasuryOperationsService {
     private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     private readonly transactionWalletService: TransactionWalletService,
+    private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly configService: ConfigService,
     @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: Queue,
   ) {}
 
-  async enqueueSweep(walletId: string, actorUserId: string): Promise<{ operationId: string; status: string }> {
+  async enqueueSweep(
+    walletId: string,
+    actorUserId: string,
+    mainWalletId?: string,
+  ): Promise<{ operationId: string; status: string }> {
     const wallet = await this.transactionWalletService.getWalletById(walletId);
     if (!wallet.is_active) {
       throw new BadRequestException('Transaction wallet is inactive', 'TREASURY_WALLET_INACTIVE');
@@ -65,7 +77,7 @@ export class TreasuryOperationsService {
 
     await this.treasuryQueue.add(
       TREASURY_SWEEP_JOB,
-      { operationId: operation.operation_id } satisfies TreasuryJobData,
+      { operationId: operation.operation_id, mainWalletId } satisfies TreasuryJobData,
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5_000 },
@@ -120,7 +132,10 @@ export class TreasuryOperationsService {
     await this.withWalletLock(lockKey, async () => {
       await this.markProcessing(operation.operation_id);
       const wallet = await this.transactionWalletService.getWalletById(operation.from_wallet_id!);
-      const mainAddress = await this.transactionWalletService.getMainWalletAddress(wallet.chain);
+      const mainAddress = await this.treasuryMainWalletService.getMainWalletAddress(
+        wallet.chain as SupportedTreasuryChain,
+        data.mainWalletId,
+      );
 
       const result = await this.sendSweepFromWallet(wallet, mainAddress);
       await this.finalizeSuccess(operation, wallet.address, mainAddress, result.txHash, result.amount);
@@ -362,6 +377,17 @@ export class TreasuryOperationsService {
     this.logger.log(
       `Treasury ${operation.type} completed: operation=${operation.operation_id}, txHash=${txHash}`,
     );
+
+    await Promise.all([
+      this.transactionWalletService.invalidateBalanceCache(
+        operation.chain as SupportedTreasuryChain,
+        fromAddress,
+      ),
+      this.transactionWalletService.invalidateBalanceCache(
+        operation.chain as SupportedTreasuryChain,
+        toAddress,
+      ),
+    ]);
   }
 
   private async sendSweepFromWallet(
@@ -370,8 +396,8 @@ export class TreasuryOperationsService {
   ): Promise<{ txHash: string; amount: string }> {
     const privateKey = this.transactionWalletService.decryptWalletPrivateKey(wallet);
 
-    if (wallet.chain === 'ETH_SEPOLIA') {
-      const provider = this.buildEthereumProvider();
+    if (wallet.chain === 'ETH_SEPOLIA' || wallet.chain === 'ETH_MAINNET') {
+      const provider = this.buildEthereumProvider(wallet.chain);
       const signer = new ethers.Wallet(privateKey, provider);
       const balanceWei = await provider.getBalance(wallet.address);
       const feeData = await provider.getFeeData();
@@ -390,7 +416,7 @@ export class TreasuryOperationsService {
       };
     }
 
-    const tronWeb = this.buildTronSigner(wallet.chain, privateKey);
+    const tronWeb = this.buildTronSigner(wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
     const balanceSun = await tronWeb.trx.getBalance(wallet.address);
     const reserveSun = 100_000; // Keep 0.1 TRX for fees/bandwidth.
     const transferSun = Math.max(0, balanceSun - reserveSun);
@@ -416,8 +442,8 @@ export class TreasuryOperationsService {
   ): Promise<string> {
     const privateKey = await this.transactionWalletService.resolveMainWalletPrivateKey(chain);
 
-    if (chain === 'ETH_SEPOLIA') {
-      const provider = this.buildEthereumProvider();
+    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+      const provider = this.buildEthereumProvider(chain);
       const signer = new ethers.Wallet(privateKey, provider);
       const tx = await signer.sendTransaction({
         to: toAddress,
@@ -426,7 +452,7 @@ export class TreasuryOperationsService {
       return tx.hash;
     }
 
-    const tronWeb = this.buildTronSigner(chain, privateKey);
+    const tronWeb = this.buildTronSigner(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
     const sun = Math.floor(new Decimal(amount).mul(1_000_000).toNumber());
     const tx = await tronWeb.trx.sendTransaction(toAddress, sun);
     if (!tx?.result || !tx?.txid) {
@@ -469,20 +495,24 @@ export class TreasuryOperationsService {
     return value.toFixed();
   }
 
-  private buildEthereumProvider(): JsonRpcProvider {
+  private buildEthereumProvider(chain: 'ETH_SEPOLIA' | 'ETH_MAINNET'): JsonRpcProvider {
     const rpcUrl =
-      this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ??
-      'https://rpc.sepolia.org';
+      chain === 'ETH_MAINNET'
+        ? (this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com')
+        : (this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org');
     return new JsonRpcProvider(rpcUrl);
   }
 
-  private buildTronSigner(chain: 'TRON_NILE' | 'TRON_SHASTA', privateKey: string): TronWeb {
+  private buildTronSigner(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    privateKey: string,
+  ): TronWeb {
     const fullHost =
       chain === 'TRON_SHASTA'
-        ? this.configService.get<string>('app.blockchain.tron.shastaFullHost') ??
-          'https://api.shasta.trongrid.io'
-        : this.configService.get<string>('app.blockchain.tron.nileFullHost') ??
-          'https://nile.trongrid.io';
+        ? (this.configService.get<string>('app.blockchain.tron.shastaFullHost') ?? 'https://api.shasta.trongrid.io')
+        : chain === 'TRON_MAINNET'
+          ? (this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io')
+          : (this.configService.get<string>('app.blockchain.tron.nileFullHost') ?? 'https://nile.trongrid.io');
 
     return new TronWeb({ fullHost, privateKey });
   }

@@ -80,6 +80,7 @@ export interface AppConfig {
     tron: {
       nileFullHost: string;
       shastaFullHost: string;
+      mainnetFullHost: string;
       defaultNetwork: 'TRON_NILE' | 'TRON_SHASTA';
       hotWalletPrivateKey?: string;
     };
@@ -89,6 +90,8 @@ export interface AppConfig {
     ethereum: {
       sepoliaRpcUrl: string;
       chainId: number;
+      mainnetRpcUrl: string;
+      mainnetChainId: number;
       hotWalletPrivateKey?: string;
     };
   };
@@ -214,10 +217,13 @@ export class AppConfigBuilder {
   setBlockchain(
     tronNileFullHost: string,
     tronShastaFullHost: string,
+    tronMainnetFullHost: string,
     tronDefaultNetwork: string,
     solanaDevnetUrl: string,
     ethSepoliaRpcUrl: string,
     ethSepoliaChainId: number,
+    ethMainnetRpcUrl: string,
+    ethMainnetChainId: number,
     tronHotWalletPrivateKey?: string,
     ethHotWalletPrivateKey?: string,
   ): this {
@@ -225,6 +231,7 @@ export class AppConfigBuilder {
       tron: {
         nileFullHost: tronNileFullHost,
         shastaFullHost: tronShastaFullHost,
+        mainnetFullHost: tronMainnetFullHost,
         defaultNetwork: tronDefaultNetwork as 'TRON_NILE' | 'TRON_SHASTA',
         hotWalletPrivateKey: tronHotWalletPrivateKey,
       },
@@ -234,6 +241,8 @@ export class AppConfigBuilder {
       ethereum: {
         sepoliaRpcUrl: ethSepoliaRpcUrl,
         chainId: ethSepoliaChainId,
+        mainnetRpcUrl: ethMainnetRpcUrl,
+        mainnetChainId: ethMainnetChainId,
         hotWalletPrivateKey: ethHotWalletPrivateKey,
       },
     };
@@ -330,10 +339,13 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
     .setBlockchain(
       (env as any).TRON_NILE_FULL_HOST || 'https://nile.trongrid.io',
       (env as any).TRON_SHASTA_FULL_HOST || 'https://api.shasta.trongrid.io',
+      (env as any).TRON_MAINNET_FULL_HOST || 'https://api.trongrid.io',
       (env as any).TRON_DEFAULT_NETWORK || 'TRON_NILE',
       (env as any).SOLANA_DEVNET_URL || 'https://api.devnet.solana.com',
       (env as any).ETH_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
       parseInt((env as any).ETH_SEPOLIA_CHAIN_ID, 10) || 11155111,
+      (env as any).ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com',
+      parseInt((env as any).ETH_MAINNET_CHAIN_ID, 10) || 1,
       (env as any).TRON_HOT_WALLET_PRIVATE_KEY,
       (env as any).ETH_HOT_WALLET_PRIVATE_KEY,
     )

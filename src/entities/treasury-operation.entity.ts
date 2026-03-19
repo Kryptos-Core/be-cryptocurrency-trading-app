@@ -26,9 +26,14 @@ export class TreasuryOperation {
 
   @Column({
     type: 'enum',
-    enum: ['ETH_SEPOLIA', 'TRON_NILE', 'TRON_SHASTA'],
+    enum: ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'],
   })
-  chain!: 'ETH_SEPOLIA' | 'TRON_NILE' | 'TRON_SHASTA';
+  chain!:
+    | 'ETH_SEPOLIA'
+    | 'ETH_MAINNET'
+    | 'TRON_NILE'
+    | 'TRON_SHASTA'
+    | 'TRON_MAINNET';
 
   @Column({ type: 'char', length: 36, nullable: true })
   @ForeignKey(() => TransactionWallet)

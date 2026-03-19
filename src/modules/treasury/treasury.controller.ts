@@ -17,8 +17,10 @@ import {
   ListTreasuryOperationsDto,
   ListTreasuryTransactionsDto,
   ListTreasuryWalletsDto,
+  SweepWalletDto,
 } from './dto';
 import { TransactionWalletService } from './transaction-wallet.service';
+import { TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
 
 @ApiTags('treasury')
@@ -30,6 +32,7 @@ import { TreasuryOperationsService } from './treasury-operations.service';
 export class TreasuryController {
   constructor(
     private readonly transactionWalletService: TransactionWalletService,
+    private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly treasuryOperationsService: TreasuryOperationsService,
   ) {}
 
@@ -51,13 +54,26 @@ export class TreasuryController {
     return this.transactionWalletService.getWalletDetail(walletId);
   }
 
+  @Get('main-wallets')
+  @ApiOperation({ summary: 'List main wallets for a chain (sweep targets)' })
+  async listMainWallets(@Query('chain') chain: string) {
+    return this.treasuryMainWalletService.listByChain(
+      chain as 'ETH_SEPOLIA' | 'ETH_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    );
+  }
+
   @Post('wallets/:walletId/sweep')
   @ApiOperation({ summary: 'Sweep transaction wallet balance back to main wallet via queue' })
   async sweepWallet(
     @Param('walletId') walletId: string,
+    @Body() dto: SweepWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryOperationsService.enqueueSweep(walletId, actorUserId);
+    return this.treasuryOperationsService.enqueueSweep(
+      walletId,
+      actorUserId,
+      dto.mainWalletId,
+    );
   }
 
   @Post('wallets/:walletId/fund')
