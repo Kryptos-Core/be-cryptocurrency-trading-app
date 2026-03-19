@@ -15,6 +15,10 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
   [UserRole.MARKET_MAKER]: [
     Permission.ORDERS_PLACE,
     Permission.ORDERS_CANCEL,
+    Permission.ORDERS_BATCH_PLACE,
+    Permission.ORDERS_READ,
+    Permission.MARKET_MAKER_CONFIG,
+    Permission.MARKET_MAKER_DASHBOARD,
     Permission.WALLETS_WITHDRAW,
   ],
   [UserRole.SUPPORT_AGENT]: [
@@ -44,6 +48,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.EXCHANGE_SYNC,
     Permission.ORDERS_PLACE,
     Permission.ORDERS_CANCEL,
+    Permission.ORDERS_BATCH_PLACE,
     Permission.WALLETS_READ,
     Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,

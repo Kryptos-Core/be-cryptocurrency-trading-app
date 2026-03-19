@@ -76,6 +76,9 @@ export enum Permission {
   // ORDERS
   ORDERS_READ = 'orders:read',
   ORDERS_MANAGE = 'orders:manage',
+  ORDERS_BATCH_PLACE = 'orders:batch_place',
+  MARKET_MAKER_CONFIG = 'market_maker:config',
+  MARKET_MAKER_DASHBOARD = 'market_maker:dashboard',
   RISK_REVIEW = 'risk:review',
   SUPPORT_CASES = 'support:cases',
   NOTIFICATIONS_BROADCAST = 'notifications:broadcast',

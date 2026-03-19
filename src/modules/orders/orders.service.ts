@@ -4,6 +4,7 @@ import { OrderRepository } from './repositories';
 import { OrderValidationStrategy } from './strategies';
 import { CreateOrderCommand } from './commands/create-order.command';
 import { CancelOrderCommand } from './commands/cancel-order.command';
+import { CreateBatchOrderDto, CancelBatchOrderDto } from './dto';
 import { canCancelOrder } from './states';
 import { CacheService } from '@/common/services';
 import {
@@ -18,6 +19,7 @@ import { MatchingService } from '@/modules/matching/matching.service';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400; // 24h
+const MAX_BATCH_ORDERS = 20;
 
 /**
  * Orders Service
@@ -187,6 +189,62 @@ export class OrdersService {
       throw new BusinessException('Order cancelled but not found', 'ORDER_NOT_FOUND');
     }
     return updated;
+  }
+
+  async createBatch(command: {
+    userId: string;
+    dto: CreateBatchOrderDto;
+  }): Promise<{
+    created: Order[];
+    count: number;
+  }> {
+    const { userId, dto } = command;
+    if (dto.orders.length > MAX_BATCH_ORDERS) {
+      throw new BusinessException(
+        `Batch size exceeds ${MAX_BATCH_ORDERS} orders`,
+        'BATCH_SIZE_EXCEEDED',
+      );
+    }
+
+    const created = await Promise.all(
+      dto.orders.map((orderDto) => this.create({ userId, dto: orderDto })),
+    );
+
+    return {
+      created,
+      count: created.length,
+    };
+  }
+
+  async cancelBatch(command: {
+    userId: string;
+    dto: CancelBatchOrderDto;
+  }): Promise<{
+    cancelled: Order[];
+    count: number;
+  }> {
+    const { userId, dto } = command;
+    if (dto.orderIds.length > MAX_BATCH_ORDERS) {
+      throw new BusinessException(
+        `Batch size exceeds ${MAX_BATCH_ORDERS} orders`,
+        'BATCH_SIZE_EXCEEDED',
+      );
+    }
+
+    const cancelled = await Promise.all(
+      dto.orderIds.map((orderId) =>
+        this.cancel({
+          userId,
+          orderId,
+          idempotencyKey: dto.idempotencyKey,
+        }),
+      ),
+    );
+
+    return {
+      cancelled,
+      count: cancelled.length,
+    };
   }
 
   async findOne(orderId: string, userId: string): Promise<Order> {

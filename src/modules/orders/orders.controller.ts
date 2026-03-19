@@ -17,7 +17,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, CancelOrderDto } from './dto';
+import { CreateOrderDto, CancelOrderDto, CreateBatchOrderDto, CancelBatchOrderDto } from './dto';
 import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
 import { CurrentUser, RequireRoles, RequirePermissions } from '@/common/decorators';
 import { UserRole, Permission } from '@/common/enums';
@@ -43,6 +43,20 @@ export class OrdersController {
       userId,
       dto,
     });
+  }
+
+  @Post('batch')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequirePermissions(Permission.ORDERS_BATCH_PLACE)
+  @ApiOperation({
+    summary: 'Market Maker: Place multiple orders at once',
+    description: 'Place a bounded batch of orders in one request.',
+  })
+  async createBatch(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateBatchOrderDto,
+  ) {
+    return this.ordersService.createBatch({ userId, dto });
   }
 
   @Get('admin/all')
@@ -118,5 +132,19 @@ export class OrdersController {
       orderId,
       idempotencyKey: dto.idempotencyKey,
     });
+  }
+
+  @Post('batch-cancel')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequirePermissions(Permission.ORDERS_CANCEL)
+  @ApiOperation({
+    summary: 'Cancel multiple orders at once',
+    description: 'Cancel a bounded list of open/partial orders owned by current user.',
+  })
+  async cancelBatch(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CancelBatchOrderDto,
+  ) {
+    return this.ordersService.cancelBatch({ userId, dto });
   }
 }
