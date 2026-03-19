@@ -247,6 +247,28 @@ export class OrdersService {
     };
   }
 
+  async listOpenOrdersForPair(userId: string, pairId: string): Promise<Order[]> {
+    return this.orderRepository.findOpenByUserPair(userId, pairId);
+  }
+
+  async cancelOpenOrdersForPair(userId: string, pairId: string): Promise<Order[]> {
+    const openOrders = await this.orderRepository.findOpenByUserPair(userId, pairId);
+    if (openOrders.length === 0) {
+      return [];
+    }
+
+    const cancelled = await Promise.all(
+      openOrders.map((order) =>
+        this.cancel({
+          userId,
+          orderId: order.order_id,
+        }),
+      ),
+    );
+
+    return cancelled;
+  }
+
   async findOne(orderId: string, userId: string): Promise<Order> {
     const order = await this.orderRepository.findById(orderId);
     if (!order) {

@@ -12,6 +12,7 @@ import { Deposit } from '../entities/deposit.entity';
 import { FiatDeposit } from '../entities/fiat-deposit.entity';
 import { LinkedWallet } from '../entities/linked-wallet.entity';
 import { ManagedWallet } from '../entities/managed-wallet.entity';
+import { MarketMakerConfig } from '../entities/market-maker-config.entity';
 import { MarketPair } from '../entities/market-pair.entity';
 import { OnchainTransaction } from '../entities/onchain-transaction.entity';
 import { Order } from '../entities/order.entity';
@@ -35,6 +36,7 @@ const ALL_ENTITIES = [
   FiatDeposit,
   LinkedWallet,
   ManagedWallet,
+  MarketMakerConfig,
   MarketPair,
   OnchainTransaction,
   Order,

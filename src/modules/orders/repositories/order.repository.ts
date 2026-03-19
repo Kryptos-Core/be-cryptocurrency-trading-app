@@ -232,6 +232,17 @@ export class OrderRepository extends BaseRepository<Order> {
     return this.findAllForAdmin({ userId, status, skip, limit });
   }
 
+  async findOpenByUserPair(userId: string, pairId: string): Promise<Order[]> {
+    return this.dataSource
+      .getRepository(Order)
+      .createQueryBuilder('o')
+      .where('o.user_id = :userId', { userId })
+      .andWhere('o.pair_id = :pairId', { pairId })
+      .andWhere('o.status IN (:...statuses)', { statuses: ['OPEN', 'PARTIAL'] })
+      .orderBy('o.created_at', 'ASC')
+      .getMany();
+  }
+
   private mapRowToOrder(row: any): Order {
     const order = new Order();
     order.order_id = String(row.order_id ?? '');
