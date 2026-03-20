@@ -11,6 +11,11 @@ Backend API được xây dựng bằng NestJS, cung cấp:
 
 OHLCV và ticker được lấy trực tiếp (on-demand) từ Binance public API.
 
+## Tài liệu kiến trúc
+
+- [Redis Usage](docs/REDIS_USAGE.md) — Chi tiết các tác vụ Redis (cache, pub/sub, lock).
+- [Base Repository Usage](docs/BASE_REPOSITORY_USAGE.md) — Template Method pattern cho data access.
+
 ## Cấu trúc thư mục
 
 ```

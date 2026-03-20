@@ -74,6 +74,15 @@ export interface IMatchingStrategy {
 }
 
 /**
+ * Visitor Pattern: operation on TradeExecutionResult without modifying its structure.
+ * Each visitor encapsulates one cross-cutting concern (audit, dashboard broadcast, metrics).
+ * Register via MatchingService.onTradeExecuted(visitor.visit.bind(visitor)).
+ */
+export interface ITradeResultVisitor {
+  visit(trade: TradeExecutionResult): void | Promise<void>;
+}
+
+/**
  * Queue Pattern: order queue contract (price-time priority).
  */
 export interface IOrderQueue {

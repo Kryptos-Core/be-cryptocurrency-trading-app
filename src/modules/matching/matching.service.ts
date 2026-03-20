@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { OrderBookService } from './orderbook';
 import { MatchingRepository } from './repositories';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
@@ -9,6 +9,7 @@ import {
   TradeExecutionResult,
   TradeExecutor,
 } from './interfaces';
+import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 import { RedisService } from '@/common/services';
 
 const LOCK_PREFIX = 'matching:lock:';
@@ -17,9 +18,10 @@ const LOCK_TTL_MS = 10000;
 /**
  * Matching Engine Service
  * Orchestrates order matching (price-time priority), trade execution (atomic DB), lock (Redis), observer (trade events).
+ * Visitor Pattern: AuditTradeVisitor + MetricsTradeVisitor registered on init as trade observers.
  */
 @Injectable()
-export class MatchingService {
+export class MatchingService implements OnModuleInit {
   private readonly logger = new Logger(MatchingService.name);
   private readonly observers: Array<(trade: TradeExecutionResult) => void> = [];
 
@@ -29,7 +31,14 @@ export class MatchingService {
     private readonly priceTimeStrategy: PriceTimePriorityStrategy,
     private readonly marketOrderStrategy: MarketOrderStrategy,
     private readonly redisService: RedisService,
+    private readonly auditVisitor: AuditTradeVisitor,
+    private readonly metricsVisitor: MetricsTradeVisitor,
   ) {}
+
+  onModuleInit(): void {
+    this.onTradeExecuted((t) => this.auditVisitor.visit(t));
+    this.onTradeExecuted((t) => this.metricsVisitor.visit(t));
+  }
 
   /**
    * Run matching for one taker order. Lock Pattern: Redis lock per pair.
