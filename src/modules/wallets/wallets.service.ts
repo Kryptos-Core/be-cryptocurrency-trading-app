@@ -155,9 +155,9 @@ export class WalletsService {
       await this.publishBalanceChange(userId, currencyId, symbol, result.available, result.frozen);
 
       if (dto.action === WalletTransactionAction.TRANSFER && dto.targetUserId) {
-        const targetBalance = await this.getBalance(dto.targetUserId, currencyId);
+        const targetBalance = await this.getBalance(String(dto.targetUserId), currencyId);
         await this.publishBalanceChange(
-          dto.targetUserId,
+          String(dto.targetUserId),
           currencyId,
           symbol,
           targetBalance.available,
@@ -804,14 +804,18 @@ export class WalletsService {
         return adjustment;
       });
 
-      if (updatedBalance) {
+      // updatedBalance is assigned inside the transaction closure; TypeScript's
+      // control-flow analysis narrows it to never after the closure, so we cast explicitly.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const balanceSnapshot = updatedBalance as any as ({ available: string; frozen: string } | null);
+      if (balanceSnapshot !== null) {
         const symbol = await this.getCurrencySymbol(dto.currencyId);
         await this.publishBalanceChange(
           dto.userId,
           dto.currencyId,
           symbol,
-          updatedBalance.available,
-          updatedBalance.frozen,
+          balanceSnapshot.available,
+          balanceSnapshot.frozen,
         );
       }
 

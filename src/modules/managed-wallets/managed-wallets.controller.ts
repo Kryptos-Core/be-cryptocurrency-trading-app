@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
@@ -96,7 +97,7 @@ export class ManagedWalletsController {
   async getWalletTransactions(
     @CurrentUser('userId') userId: string,
     @Param('walletId') walletId: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
     return this.managedWalletsService.getWalletTransactions(userId, walletId, limit);
   }
