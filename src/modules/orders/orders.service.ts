@@ -318,7 +318,12 @@ export class OrdersService {
       skip,
       limit: params.limit,
     });
-    return { data: items, total, page: params.page, limit: params.limit };
+    return {
+      data: items.map((o) => this.orderToAdminPlain(o)),
+      total,
+      page: params.page,
+      limit: params.limit,
+    };
   }
 
   /** Admin: orders for a specific user */
@@ -335,7 +340,12 @@ export class OrdersService {
       limit,
       status,
     );
-    return { data: items, total, page, limit };
+    return {
+      data: items.map((o) => this.orderToAdminPlain(o)),
+      total,
+      page,
+      limit,
+    };
   }
 
   private throwFromProcedureError(code: string, message?: string): void {
@@ -378,6 +388,14 @@ export class OrdersService {
       idempotency_key: o.idempotency_key,
       created_at: o.created_at,
       updated_at: o.updated_at,
+    };
+  }
+
+  /** Admin list/detail JSON: flat pair_symbol for clients (pair relation loaded in findAllForAdmin). */
+  private orderToAdminPlain(o: Order): Record<string, any> {
+    return {
+      ...this.orderToPlain(o),
+      pair_symbol: o.pair?.symbol ?? '',
     };
   }
 

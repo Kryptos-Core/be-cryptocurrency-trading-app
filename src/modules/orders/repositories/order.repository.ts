@@ -208,7 +208,10 @@ export class OrderRepository extends BaseRepository<Order> {
     limit: number;
   }): Promise<{ items: Order[]; total: number }> {
     const repo = this.dataSource.getRepository(Order);
-    const qb = repo.createQueryBuilder('o').orderBy('o.created_at', 'DESC');
+    const qb = repo
+      .createQueryBuilder('o')
+      .leftJoinAndSelect('o.pair', 'pair')
+      .orderBy('o.created_at', 'DESC');
 
     if (params.userId) qb.andWhere('o.user_id = :userId', { userId: params.userId });
     if (params.pairId) qb.andWhere('o.pair_id = :pairId', { pairId: params.pairId });
