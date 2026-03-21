@@ -1,124 +1,150 @@
-# ỨNG DỤNG GIAO DỊCH TIỀN ĐIỆN TỬ (Backend)
+# Kryptos Core — Backend API
 
-Backend API được xây dựng bằng NestJS, cung cấp:
+API backend cho nền tảng giao dịch tiền mã hóa, xây dựng bằng **NestJS**. Toàn bộ route REST nằm dưới prefix **`/api/v1`**.
 
-- Xác thực (Auth) và người dùng (users)
-- Tiền tệ (Currencies), thị trường (markets), lệnh (orders), khớp lệnh (matching)
-- Ví (Wallets) và đồng bộ hóa với Binance
-- Nạp tiền fiat qua PayOS
-- Liên kết ví Blockchain và chuyển khoản on-chain
-- Websocket giao dịch và dữ liệu giá
+## Tính năng chính
 
-OHLCV và ticker được lấy trực tiếp (on-demand) từ Binance public API.
+| Nhóm | Mô tả |
+|------|--------|
+| **Auth & người dùng** | JWT, đăng ký/đăng nhập, RBAC, 2FA (email OTP) |
+| **Thị trường** | Cặp giao dịch, đồng bộ catalog từ Binance (testnet/mainnet theo cấu hình) |
+| **Lệnh & sổ lệnh** | Đặt/hủy lệnh, order book, market maker batch |
+| **Khớp lệnh** | Engine price–time priority, Redis lock, thực thi giao dịch |
+| **Ví** | Số dư nội bộ, đối soát, đồng bộ ví ngoài (Binance) theo cấu hình |
+| **Nạp/rút** | Nạp fiat qua **PayOS**, nạp/rút on-chain (TRON, Ethereum, Solana testnet) |
+| **Kho bạc (Treasury)** | Ví giao dịch, sweep, thao tác vận hành (RBAC) |
+| **Realtime** | WebSocket (Socket.IO) — giá, trading |
+| **Thông báo** | Firebase Admin (FCM) |
 
-## Tài liệu kiến trúc
+OHLCV/ticker có thể lấy từ Binance public API theo cấu hình (`EXCHANGE_MODE`, testnet, v.v.).
 
-- [Redis Usage](docs/REDIS_USAGE.md) — Chi tiết các tác vụ Redis (cache, pub/sub, lock).
-- [Base Repository Usage](docs/BASE_REPOSITORY_USAGE.md) — Template Method pattern cho data access.
+## Công nghệ
 
-## Cấu trúc thư mục
+- **Runtime:** Node.js (khuyến nghị LTS 20+)
+- **Framework:** NestJS 10
+- **ORM:** TypeORM 0.3 + **MySQL 8**
+- **Cache / lock / queue:** Redis 7, **Bull** (hàng đợi)
+- **Realtime:** `@nestjs/websockets`, Socket.IO
+- **Khác:** JWT, PayOS, Ethers, TronWeb, Solana web3, Cloudinary, Nodemailer, Firebase Admin
 
-```
-be-cryptocurrency-trading-app/
-|-- src/
-|   |-- main.ts
-|   |-- app.module.ts
-|   |-- common/
-|   |-- config/
-|   |-- entities/
-|   |-- migrations/
-|   |-- modules/
-|   |   |-- auth/
-|   |   |-- users/
-|   |   |-- currencies/
-|   |   |-- markets/
-|   |   |-- wallets/
-|   |   |-- orders/
-|   |   |-- matching/
-|   |   |-- exchange/
-|   |   |-- deposits/
-|   |   |-- blockchain/
-|   |   |-- price-oracle/
-|   |   |-- trading/
-|   |   `-- redis/
-|   |-- seed/
-|   `-- utils/
-|-- docs/
-|-- postman/
-|-- scripts/
-|-- env.example
-|-- package.json
-|-- docker-compose.infrastructure.yml
+## Yêu cầu
+
+- Node.js + npm
+- MySQL 8 và Redis 7 (có thể chạy bằng Docker — xem bên dưới)
+
+## Chạy nhanh (local)
+
+### 1. Hạ tầng (MySQL + Redis)
+
+Từ thư mục backend, tạo `.env` từ `env.example` và chỉnh `DB_*`, `REDIS_*` cho khớp với Docker (hoặc instance local của bạn).
+
+```bash
+docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
 ```
 
-## Chạy nhanh
+Compose khởi chạy **mysql:8.0** và **redis:7-alpine** (mật khẩu Redis qua `REDIS_PASSWORD` trong `.env`).
+
+### 2. Cài đặt & database
 
 ```bash
 npm install
 cp env.example .env
+# Chỉnh .env (DB, Redis, JWT, Binance, PayOS, blockchain, …)
+
 npm run migration:run
 npm run db:seed
 npm run start:dev
 ```
 
-API gốc: [http://127.0.0.1:3000/api/v1](http://127.0.0.1:3000/api/v1)
+### 3. Kiểm tra
 
-Swagger (không dùng cho production): [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+- **API:** `http://127.0.0.1:3000/api/v1`
+- **Health:** `GET http://127.0.0.1:3000/api/v1/health`
+- **Swagger (không bật khi `NODE_ENV=production`):** `http://127.0.0.1:3000/api/docs`
 
-## Luồng khởi chạy hiện tại
+## Biến môi trường
 
-1. Ứng dụng khởi tạo các modules và middleware global.
-2. Market catalog bootstrap sẽ tự động đồng bộ hóa currencies/markets từ Binance nếu catalog trong DB đang trống.
-3. Nếu đồng bộ hóa thất bại khi catalog trống, ứng dụng sẽ dừng ngay (fail-fast) để tránh vận hành trong trạng thái thiếu dữ liệu thị trường.
-4. Endpoint POST /api/v1/exchange/sync-info vẫn được giữ để admin làm mới thủ công.
+- Mẫu đầy đủ: [`env.example`](env.example)
+- **Không** commit file `.env` hoặc khóa thật lên git.
 
-## Lưu ý về PayOS
+Các nhóm quan trọng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `FIREBASE_*` (push), SMTP (2FA).
 
-- Luồng nạp tiền fiat nằm ở module deposits.
-- Các endpoint chính:
-  - POST /api/v1/deposits
-  - GET /api/v1/deposits
-  - POST /api/v1/deposits/payos-webhook
-- Trong môi trường production, ứng dụng bắt buộc phải có đầy đủ các biến môi trường (env) của PayOS.
+## Scripts npm
 
-## Kiểm tra kho bạc hàng ngày (Daily Treasury Hardening - Phát triển)
+| Lệnh | Mô tả |
+|------|--------|
+| `npm run start:dev` | Dev watch mode |
+| `npm run build` / `npm run start:prod` | Build & chạy production |
+| `npm run migration:run` / `migration:revert` | TypeORM migrations |
+| `npm run db:seed` | Seed dữ liệu + tài khoản thử |
+| `npm test` | Jest |
+| `npm run treasury:daily` | E2E treasury + health (dev/hardening) |
 
-- Chạy E2E nạp/rút + kiểm tra sức khỏe (health check):
+Đăng ký Windows Task Scheduler (treasury): `npm run treasury:schedule:register` — chi tiết trong `docs/TREASURY_DAILY_RUNBOOK.md`.
 
-```bash
-npm run treasury:daily
+## Luồng khởi động ứng dụng
+
+1. Load modules, middleware, CORS, validation pipe, interceptor.
+2. **Market catalog:** nếu DB trống, bootstrap đồng bộ currencies/markets từ Binance; thất bại có thể **fail-fast** để không chạy thiếu dữ liệu thị trường.
+3. `POST /api/v1/exchange/sync-info` vẫn dùng để admin làm mới catalog thủ công.
+
+## Cấu trúc thư mục
+
+```
+be-cryptocurrency-trading-app/
+├── src/
+│   ├── main.ts
+│   ├── app.module.ts
+│   ├── common/          # guards, filters, interceptors, RBAC, …
+│   ├── config/
+│   ├── entities/
+│   ├── migrations/
+│   ├── modules/         # auth, users, currencies, markets, exchange,
+│   │                    # orders, matching, wallets, deposits, blockchain,
+│   │                    # trading, redis, price-oracle, dashboard,
+│   │                    # notifications, treasury, market-maker,
+│   │                    # managed-wallets, payment-config, …
+│   ├── seed/
+│   └── utils/
+├── docs/
+├── postman/
+├── scripts/
+├── env.example
+├── docker-compose.infrastructure.yml
+└── package.json
 ```
 
-- Hướng dẫn chi tiết (Runbook): `docs/TREASURY_DAILY_RUNBOOK.md`
-- Đăng ký Windows Task Scheduler:
+## Tài liệu thêm
 
-```bash
-npm run treasury:schedule:register
-```
+- [Redis Usage](docs/REDIS_USAGE.md)
+- [Swagger](docs/SWAGGER_USAGE.md) · [Env / biến môi trường](docs/ENV_CONFIG_USAGE.md)
+- [Base Repository Usage](docs/BASE_REPOSITORY_USAGE.md)
+- [Treasury daily runbook](docs/TREASURY_DAILY_RUNBOOK.md)
+- Mẫu env E2E treasury: `scripts/treasury-e2e.env.example`
 
-- Mẫu env tùy chọn cho full treasury E2E:
-  - `scripts/treasury-e2e.env.example`
-- Các giá trị mặc định cho môi trường dev trong scheduler runner:
-  - `TREASURY_E2E_ALLOW_SKIP=true`
-  - `TREASURY_HEALTH_FAIL_ON_CRITICAL=false`
-- Xuất lịch sử đối soát định dạng JSON (RBAC: ADMIN/RISK_OFFICER):
-  - `POST /api/v1/wallets/reconciliation-report/export?limit=100`
-  - đầu ra: `reports/reconciliation/YYYY-MM-DD.json`
+## PayOS (nạp fiat)
 
-## Tài khoản thử nghiệm sau khi seed
+Luồng nằm trong module **deposits**. Production bắt buộc cấu hình đủ biến PayOS. Webhook: `POST /api/v1/deposits/payos-webhook` (xem Swagger).
 
+## Đối soát / báo cáo
 
-| Email                                                       | Mật khẩu      | Vai trò                               |
-| ----------------------------------------------------------- | ------------- | ------------------------------------- |
-| [max@circle-vn.com](mailto:max@circle-vn.com)               | Admin@123!    | Quản trị viên (Admin)                 |
-| [hoangsondz1910@gmail.com](mailto:hoangsondz1910@gmail.com) | Trader@123!   | Nhà giao dịch (Trader)                |
-| [trader2@example.com](mailto:trader2@example.com)           | Trader@123!   | Nhà giao dịch (Trader)                |
-| [trader3@example.com](mailto:trader3@example.com)           | Trader@123!   | Nhà giao dịch (Trader)                |
-| [guest@example.com](mailto:guest@example.com)               | Guest@123!    | Khách (Guest)                         |
-| [verified@example.com](mailto:verified@example.com)         | Verified@123! | Người dùng đã xác minh                |
-| [hsondz1910@gmail.com](mailto:hsondz1910@gmail.com)         | Risk@123!     | Cán bộ rủi ro (Risk Officer)          |
-| [support@example.com](mailto:support@example.com)           | Support@123!  | Nhân viên hỗ trợ                      |
-| [maxnoah901@gmail.com](mailto:maxnoah901@gmail.com)         | Maker@123!    | Nhà tạo lập thị trường (Market Maker) |
-| [finance@circle-vn.com](mailto:finance@circle-vn.com)       | Finance@123!  | Quản lý tài chính (Finance Manager)   |
+- Export JSON (RBAC ADMIN / RISK_OFFICER): `POST /api/v1/wallets/reconciliation-report/export?limit=100` → `reports/reconciliation/YYYY-MM-DD.json`
 
+## Tài khoản sau seed
 
+| Email | Mật khẩu | Vai trò |
+|-------|----------|---------|
+| max@circle-vn.com | Admin@123! | Admin |
+| hoangsondz1910@gmail.com | Trader@123! | Trader |
+| trader2@example.com | Trader@123! | Trader |
+| trader3@example.com | Trader@123! | Trader |
+| guest@example.com | Guest@123! | Guest |
+| verified@example.com | Verified@123! | Đã xác minh |
+| hsondz1910@gmail.com | Risk@123! | Risk Officer |
+| support@example.com | Support@123! | Support |
+| maxnoah901@gmail.com | Maker@123! | Market Maker |
+| finance@circle-vn.com | Finance@123! | Finance Manager |
+
+## Frontend
+
+Ứng dụng Flutter nằm ở repo **`fe-cryptocurrency-trading-app`** (cùng solution). Cấu hình `BASE_URL` trỏ tới `http://127.0.0.1:3000/api/v1` (hoặc `http://10.0.2.2:3000/api/v1` trên Android emulator).

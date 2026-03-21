@@ -4,11 +4,13 @@ Module Deposits xử lý luồng nạp tiền fiat thông qua PayOS.
 
 ## Các route
 
-- POST /api/v1/deposits
+- POST /api/v1/deposits  
   - Tạo ngữ cảnh thanh toán PayOS cho người dùng hiện tại
-- GET /api/v1/deposits
+- GET /api/v1/deposits  
   - Liệt kê các lệnh nạp tiền fiat của người dùng hiện tại
-- POST /api/v1/deposits/payos-webhook
+- GET /api/v1/deposits/admin/all  
+  - Giám sát toàn sàn (phân trang, lọc user/status) — JWT + RBAC phù hợp
+- POST /api/v1/deposits/payos-webhook  
   - Nhận webhook và cập nhật trạng thái nạp tiền
 
 ## Hành vi hiện tại

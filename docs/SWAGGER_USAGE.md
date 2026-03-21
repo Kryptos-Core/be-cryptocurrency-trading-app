@@ -4,8 +4,8 @@ Swagger được kích hoạt khi `NODE_ENV` không phải là production.
 
 ## Các đường dẫn (URLs)
 
-- Giao diện người dùng (UI): http://localhost:3000/api/docs
-- Dữ liệu JSON: http://localhost:3000/api/docs-json
+- Giao diện (UI): `http://127.0.0.1:3000/api/docs` (hoặc `http://localhost:3000/api/docs`)
+- OpenAPI JSON: `http://127.0.0.1:3000/api/docs-json`
 
 ## Tiền tố gốc của API (API base prefix)
 

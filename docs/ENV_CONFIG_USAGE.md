@@ -28,6 +28,7 @@ Sau đó điền thông tin và chạy ứng dụng.
 | DB_PASSWORD | Mật khẩu MySQL |
 | DB_NAME | Tên cơ sở dữ liệu |
 | JWT_SECRET | Mã bí mật JWT |
+| REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB | Kết nối Redis (cache, lock khớp lệnh, pub/sub) — xem [REDIS_USAGE.md](REDIS_USAGE.md) |
 
 ### Giao dịch và Sàn giao dịch (Trading và Exchange)
 

@@ -32,14 +32,16 @@ CLOUDINARY_AVATAR_FOLDER=avatars
 
 ## API Endpoints
 
+Toàn bộ REST nằm dưới tiền tố **`/api/v1`**.
+
 | Method | Path | Mô tả | Quyền |
 |--------|------|--------|--------|
-| PATCH | /users/me/profile-basic | Cập nhật first/last name | Đăng nhập |
-| POST | /users/me/security-change-requests | Tạo yêu cầu đổi email/password | Đăng nhập |
-| POST | /users/me/avatar | Upload avatar (multipart, field: file) | Đăng nhập |
-| GET | /users/security-change-requests/pending | Danh sách yêu cầu chờ duyệt | users:security_review |
-| POST | /users/security-change-requests/:id/approve | Chấp nhận yêu cầu | users:security_review |
-| POST | /users/security-change-requests/:id/reject | Từ chối yêu cầu | users:security_review |
+| PATCH | /api/v1/users/me/profile-basic | Cập nhật first/last name | Đăng nhập |
+| POST | /api/v1/users/me/security-change-requests | Tạo yêu cầu đổi email/password | Đăng nhập |
+| POST | /api/v1/users/me/avatar | Upload avatar (multipart, field: file) | Đăng nhập |
+| GET | /api/v1/users/security-change-requests/pending | Danh sách yêu cầu chờ duyệt | users:security_review |
+| POST | /api/v1/users/security-change-requests/:id/approve | Chấp nhận yêu cầu | users:security_review |
+| POST | /api/v1/users/security-change-requests/:id/reject | Từ chối yêu cầu | users:security_review |
 
 - Avatar: file tối đa 2MB, định dạng JPEG/PNG/WebP.
 - Security change: body `{ "changeType": "EMAIL_CHANGE" | "PASSWORD_CHANGE", "payload": { "email": "..." } | { "password": "..." } }`.
@@ -50,7 +52,7 @@ CLOUDINARY_AVATAR_FOLDER=avatars
 2. User gửi đổi email/password → POST security-change-requests → tạo bản ghi PENDING.
 3. Admin/Risk Officer mở "Security requests" → GET pending → Approve/Reject từng yêu cầu.
 4. Khi Approve: backend áp dụng thay đổi (email hoặc password_hash) và đóng yêu cầu.
-5. Avatar: chọn ảnh → POST /users/me/avatar (multipart) → Cloudinary upload → lưu URL vào `users.avatar_url`.
+5. Avatar: chọn ảnh → `POST /api/v1/users/me/avatar` (multipart) → Cloudinary upload → lưu URL vào `users.avatar_url`.
 
 ## Test gợi ý
 

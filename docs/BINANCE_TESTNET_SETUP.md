@@ -16,7 +16,16 @@ BINANCE_TESTNET_BASE_URL=https://testnet.binance.vision
 
 Nếu sử dụng futures testnet trong nhánh riêng của bạn, hãy cập nhật URL cơ sở tương ứng.
 
-## 2. Khởi động backend
+## 2. Hạ tầng & khởi động backend
+
+MySQL và Redis (khuyến nghị):
+
+```bash
+cp env.example .env
+docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
+```
+
+Sau đó:
 
 ```bash
 npm install

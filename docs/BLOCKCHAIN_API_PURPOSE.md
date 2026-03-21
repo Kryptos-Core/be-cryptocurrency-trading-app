@@ -20,6 +20,12 @@ Module Blockchain cung cấp tính năng liên kết ví và hỗ trợ nạp/r�
 - GET /api/v1/blockchain/transactions/:txId
 - GET /api/v1/blockchain/networks
 
+## Giám sát rút tiền (Admin / RBAC)
+
+- GET /api/v1/blockchain/admin/withdrawals — danh sách rút (lọc, phân trang)
+- GET /api/v1/blockchain/admin/withdrawals/stats — thống kê tổng quan
+- GET /api/v1/blockchain/admin/withdrawals/:txId — chi tiết một giao dịch
+
 ## Các phụ thuộc cấu hình (Config dependencies)
 
 - TRON_NILE_FULL_HOST

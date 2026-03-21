@@ -1,5 +1,7 @@
 # Hướng dẫn vận hành kho bạc hàng ngày (Treasury Daily Runbook - Phát triển)
 
+Chạy mọi lệnh `npm run treasury:*` từ thư mục **`be-cryptocurrency-trading-app`** (backend đã cài `npm install`).
+
 Hướng dẫn này được sử dụng để củng cố quy trình nạp/rút coin trên mạng thử nghiệm (testnet), tuân theo các nguyên tắc:
 - Backend (BE) quản lý trạng thái tài chính.
 - Sổ cái ví nội bộ (Internal wallet ledger) là nguồn thông tin chính xác duy nhất (source of truth).
