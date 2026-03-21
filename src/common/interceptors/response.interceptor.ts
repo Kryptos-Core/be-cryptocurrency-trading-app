@@ -18,10 +18,24 @@ export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       map((data) => {
+        /**
+         * Paginated handlers return `{ data: T[], total, page, limit }`.
+         * Using only `data.data` would drop `total` and break clients that read pagination from the envelope.
+         */
+        const isPaginatedEnvelope = (d: any): boolean =>
+          d &&
+          typeof d === 'object' &&
+          !Array.isArray(d) &&
+          Array.isArray(d.data) &&
+          d.total !== undefined &&
+          d.total !== null;
+
+        const payload = isPaginatedEnvelope(data) ? data : data?.data !== undefined ? data.data : data;
+
         const response: IApiResponse = {
           success: true,
           message: data?.message || 'Success',
-          data: data?.data || data,
+          data: payload,
           timestamp: new Date().toISOString(),
         };
 

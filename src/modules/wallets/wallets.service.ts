@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import Decimal from 'decimal.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
@@ -17,7 +18,9 @@ import { WalletTransactionDto } from './dto/wallet-transaction.dto';
 import { AdminAdjustWalletDto, AdminAdjustWalletResponseDto } from './dto/admin-adjust-wallet.dto';
 import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
 import { ExchangeService } from '@/modules/exchange/exchange.service';
+import { RedisService } from '@/common/services/redis.service';
 import { newUuid } from '@/common/utils/uuid.util';
+import { WALLET_BALANCE_EVENTS_CHANNEL, WalletBalanceEvent } from './constants';
 
 /**
  * Wallets Service - Business Logic Layer
@@ -34,6 +37,8 @@ export class WalletsService {
     private readonly walletLedgerRepository: WalletLedgerRepository,
     private readonly adminAdjustmentRepository: AdminWalletAdjustmentRepository,
     private readonly exchangeService: ExchangeService,
+    private readonly redisService: RedisService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -126,9 +131,10 @@ export class WalletsService {
     dto: WalletTransactionDto,
   ): Promise<WalletBalanceDto> {
     const amount = this.parseAmount(dto.amount);
+    const currencyId = String(dto.currencyId);
 
     try {
-      return await this.walletRepository.transaction(async (manager) => {
+      const result = await this.walletRepository.transaction(async (manager) => {
         switch (dto.action) {
           case WalletTransactionAction.CREDIT:
             return this.credit(userId, dto, amount, manager);
@@ -144,6 +150,22 @@ export class WalletsService {
             throw new BadRequestException('Invalid wallet action', 'INVALID_ACTION');
         }
       });
+
+      const symbol = await this.getCurrencySymbol(currencyId);
+      await this.publishBalanceChange(userId, currencyId, symbol, result.available, result.frozen);
+
+      if (dto.action === WalletTransactionAction.TRANSFER && dto.targetUserId) {
+        const targetBalance = await this.getBalance(dto.targetUserId, currencyId);
+        await this.publishBalanceChange(
+          dto.targetUserId,
+          currencyId,
+          symbol,
+          targetBalance.available,
+          targetBalance.frozen,
+        );
+      }
+
+      return result;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
@@ -443,6 +465,50 @@ export class WalletsService {
   }
 
   /**
+   * Publish wallet balance change event to Redis Pub/Sub.
+   * NotificationsGateway subscribes and pushes to the user's Socket.IO room.
+   */
+  private async publishBalanceChange(
+    userId: string,
+    currencyId: string,
+    symbol: string,
+    available: string,
+    frozen: string,
+  ): Promise<void> {
+    const event: WalletBalanceEvent = {
+      userId,
+      currencyId,
+      symbol,
+      available,
+      frozen,
+      total: this.calculateTotal(available, frozen),
+      updatedAt: Date.now(),
+    };
+    try {
+      await this.redisService.publish(WALLET_BALANCE_EVENTS_CHANNEL, JSON.stringify(event));
+      this.logger.debug(`Published balance change: user=${userId}, currency=${symbol}`);
+    } catch (error) {
+      this.logger.error(`Failed to publish balance change event: ${error}`);
+    }
+  }
+
+  /**
+   * Get currency symbol by currencyId.
+   */
+  private async getCurrencySymbol(currencyId: string): Promise<string> {
+    try {
+      const rows = await this.dataSource.query(
+        'SELECT symbol FROM currencies WHERE currency_id = ? LIMIT 1',
+        [currencyId],
+      );
+      return rows?.[0]?.symbol ?? '';
+    } catch (error) {
+      this.logger.error(`Failed to get currency symbol for ${currencyId}: ${error}`);
+      return '';
+    }
+  }
+
+  /**
    * Sync wallet balance with Binance exchange
    * Fetches actual balance from Binance and updates internal wallet
    */
@@ -681,9 +747,10 @@ export class WalletsService {
   ): Promise<AdminAdjustWalletResponseDto> {
     const adjustmentId = newUuid();
     const amount = this.parseAmount(dto.amount);
+    let updatedBalance: { available: string; frozen: string } | null = null;
 
     try {
-      return await this.walletRepository.transaction(async (manager) => {
+      const result = await this.walletRepository.transaction(async (manager) => {
         const adjustment = await this.adminAdjustmentRepository.createAdjustment(
           {
             adjustmentId,
@@ -715,6 +782,8 @@ export class WalletsService {
           manager,
         );
 
+        updatedBalance = { available: updated.available, frozen: updated.frozen };
+
         await this.walletLedgerRepository.createEntry(
           {
             userId: dto.userId,
@@ -734,6 +803,19 @@ export class WalletsService {
 
         return adjustment;
       });
+
+      if (updatedBalance) {
+        const symbol = await this.getCurrencySymbol(dto.currencyId);
+        await this.publishBalanceChange(
+          dto.userId,
+          dto.currencyId,
+          symbol,
+          updatedBalance.available,
+          updatedBalance.frozen,
+        );
+      }
+
+      return result;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {

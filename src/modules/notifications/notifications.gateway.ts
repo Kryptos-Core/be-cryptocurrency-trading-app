@@ -15,6 +15,7 @@ import { RedisService } from '@/common/services/redis.service';
 import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from './notifications.service';
 import { PAYMENT_CONFIG_EVENTS_CHANNEL } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { TREASURY_EVENTS_CHANNEL } from '@/modules/treasury/constants';
+import { WALLET_BALANCE_EVENTS_CHANNEL, WalletBalanceEvent } from '@/modules/wallets/constants';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
 
 const NOTIFICATIONS_ROOM = 'notifications';
@@ -125,8 +126,34 @@ export class NotificationsGateway
       }
     });
 
+    await this.redisService.subscribe(WALLET_BALANCE_EVENTS_CHANNEL, (message) => {
+      try {
+        const payload: WalletBalanceEvent = JSON.parse(message);
+        const targetUserId = payload.userId;
+        if (targetUserId) {
+          this.server.to(`user:${targetUserId}`).emit('wallet:balance', {
+            type: 'wallet:balance',
+            data: {
+              currencyId: payload.currencyId,
+              symbol: payload.symbol,
+              available: payload.available,
+              frozen: payload.frozen,
+              total: payload.total,
+              updatedAt: payload.updatedAt,
+            },
+            timestamp: Date.now(),
+          });
+          this.logger.debug(
+            `Wallet balance update for user ${targetUserId}: ${payload.symbol}`,
+          );
+        }
+      } catch (error) {
+        this.logger.error('Failed to parse/broadcast wallet balance event', error);
+      }
+    });
+
     this.logger.log(
-      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config + treasury)',
+      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config + treasury + wallet_balance)',
     );
   }
 
@@ -165,6 +192,7 @@ export class NotificationsGateway
       clearTimeout(client.data.authTimeout);
 
       client.join(NOTIFICATIONS_ROOM);
+      client.join(`user:${client.data.user_id}`);
 
       client.emit('auth_response', {
         type: 'auth_response',
