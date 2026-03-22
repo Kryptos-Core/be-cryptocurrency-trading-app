@@ -145,6 +145,12 @@ Luồng nằm trong module **deposits**. Production bắt buộc cấu hình đ�
 | maxnoah901@gmail.com | Maker@123! | Market Maker |
 | finance@circle-vn.com | Finance@123! | Finance Manager |
 
+## Database (dev)
+
+- **Seed users** (xóa dữ liệu user-related rồi import lại từ `src/seed/data/users.json`): `npm run db:seed`
+- **Xóa toàn bộ dữ liệu** trong DB hiện tại (TRUNCATE mọi bảng, **giữ** bảng `migrations` và cấu trúc schema): `npm run db:clean`  
+  Trên **production**, lệnh bị chặn trừ khi đặt `ALLOW_DB_CLEAN=true` trong môi trường.
+
 ## Frontend
 
 Ứng dụng Flutter nằm ở repo **`fe-cryptocurrency-trading-app`** (cùng solution). Cấu hình `BASE_URL` trỏ tới `http://127.0.0.1:3000/api/v1` (hoặc `http://10.0.2.2:3000/api/v1` trên Android emulator).

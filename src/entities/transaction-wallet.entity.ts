@@ -45,6 +45,13 @@ export class TransactionWallet {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
+  /** User-facing deposit address default for this chain (at most one active per chain). */
+  @Column({ type: 'boolean', default: false })
+  is_default_user_deposit!: boolean;
+
+  @Column({ type: 'datetime', nullable: true, precision: 6 })
+  default_set_at!: Date | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

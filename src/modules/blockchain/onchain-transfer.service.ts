@@ -18,6 +18,7 @@ import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
+import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 
 /**
  * Onchain Transfer Service
@@ -118,7 +119,31 @@ export class OnchainTransferService {
     private readonly currencyRepository: CurrencyRepository,
     private readonly configService: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly transactionWalletService: TransactionWalletService,
   ) {}
+
+  /**
+   * Signs user withdrawals from an active treasury transaction wallet (WITHDRAWAL/BOTH) when configured;
+   * otherwise falls back to the chain hot wallet from payment config / env.
+   */
+  private async resolveWithdrawalPayout(chain: BlockchainNetwork): Promise<{
+    fromAddress: string;
+    send: (to: string, amount: string) => Promise<string>;
+  }> {
+    const tw = await this.transactionWalletService.getWithdrawalSourceWallet(chain as string);
+    if (tw) {
+      return {
+        fromAddress: tw.address,
+        send: (to, amount) =>
+          this.transactionWalletService.sendWithdrawalNativeTransfer(tw, to, amount),
+      };
+    }
+    const provider = this.providerFactory.getProvider(chain);
+    return {
+      fromAddress: await provider.getHotWalletAddress(),
+      send: (to, amount) => provider.sendTransaction(to, amount),
+    };
+  }
 
   private normalizeIdempotencyKey(userId: string, dto: RequestWithdrawalDto): string {
     const provided = dto.idempotencyKey?.trim();
@@ -523,8 +548,7 @@ export class OnchainTransferService {
     const shouldAutoSend = amount.lessThanOrEqualTo(autoMax);
 
     if (!shouldAutoSend) {
-      const provider = this.providerFactory.getProvider(dto.chain);
-      const hotWalletAddress = await provider.getHotWalletAddress();
+      const payout = await this.resolveWithdrawalPayout(dto.chain);
 
       await this.dataSource.query(
         `INSERT INTO onchain_transactions
@@ -535,7 +559,7 @@ export class OnchainTransferService {
           userId,
           dto.linkedWalletId,
           dto.chain,
-          hotWalletAddress,
+          payout.fromAddress,
           linkedWallet.address,
           amount.toString(),
           OnchainTxStatus.PENDING,
@@ -574,15 +598,13 @@ export class OnchainTransferService {
       return manualResult;
     }
 
-    // Lấy thông tin Hot Wallet và gửi giao dịch thật
-    const provider = this.providerFactory.getProvider(dto.chain);
-    const hotWalletAddress = await provider.getHotWalletAddress();
+    const payout = await this.resolveWithdrawalPayout(dto.chain);
 
     let txHash: string | null = null;
     let status = OnchainTxStatus.PENDING;
 
     try {
-      txHash = await provider.sendTransaction(linkedWallet.address, amount.toString());
+      txHash = await payout.send(linkedWallet.address, amount.toString());
       status = OnchainTxStatus.CONFIRMING;
     } catch (error) {
       this.logger.error(`[Withdrawal] Gửi on-chain thất bại cho userId=${userId}:`, error);
@@ -616,7 +638,7 @@ export class OnchainTransferService {
         dto.linkedWalletId,
         dto.chain,
         txHash,
-        hotWalletAddress,
+        payout.fromAddress,
         linkedWallet.address,
         amount.toString(),
         status,
@@ -631,7 +653,7 @@ export class OnchainTransferService {
     );
 
     this.logger.log(
-      `[Withdrawal] userId=${userId}, chain=${dto.chain}, amount=${amount}, toAddress=${linkedWallet.address}`,
+      `[Withdrawal] userId=${userId}, chain=${dto.chain}, from=${payout.fromAddress}, amount=${amount}, toAddress=${linkedWallet.address}`,
     );
 
     const result = {
@@ -709,13 +731,13 @@ export class OnchainTransferService {
 
     const amount = new Decimal(String(tx.amount));
     const currencyId = await this.resolveWithdrawalCurrencyId(tx.chain as BlockchainNetwork);
-    const provider = this.providerFactory.getProvider(tx.chain as BlockchainNetwork);
+    const payout = await this.resolveWithdrawalPayout(tx.chain as BlockchainNetwork);
 
     let txHash: string | null = null;
     let status = OnchainTxStatus.FAILED;
 
     try {
-      txHash = await provider.sendTransaction(tx.to_address, amount.toString());
+      txHash = await payout.send(tx.to_address, amount.toString());
       status = OnchainTxStatus.CONFIRMING;
     } catch (error) {
       this.logger.error(
@@ -747,7 +769,7 @@ export class OnchainTransferService {
        WHERE tx_id = ?`,
       [
         txHash,
-        await provider.getHotWalletAddress(),
+        payout.fromAddress,
         status,
         status === OnchainTxStatus.CONFIRMING ? 0 : 0,
         null,

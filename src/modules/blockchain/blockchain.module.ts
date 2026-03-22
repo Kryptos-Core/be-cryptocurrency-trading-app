@@ -13,6 +13,7 @@ import { BlockchainController } from './blockchain.controller';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
+import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 
@@ -30,6 +31,7 @@ import { NotificationsModule } from '@/modules/notifications/notifications.modul
     WalletsModule,
     CurrenciesModule,
     ManagedWalletsModule,
+    TreasuryModule,
     PaymentConfigModule,
     forwardRef(() => NotificationsModule),
   ],

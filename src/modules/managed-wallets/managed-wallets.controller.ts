@@ -39,7 +39,10 @@ export class ManagedWalletsController {
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
-  @ApiOperation({ summary: 'Create a new managed treasury wallet' })
+  @ApiOperation({
+    summary: 'Deprecated — use POST /treasury/wallets',
+    description: 'Returns 403. Wallet creation is only allowed via treasury transaction wallets.',
+  })
   async createWallet(
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateManagedWalletDto,
@@ -53,7 +56,7 @@ export class ManagedWalletsController {
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({
     summary:
-      'List managed wallets (all wallets for ADMIN; own wallets for RISK_OFFICER)',
+      'List Tron transaction wallets eligible for user deposit defaults (DEPOSIT/BOTH)',
   })
   async listWallets(
     @CurrentUser('userId') userId: string,
@@ -129,7 +132,9 @@ export class ManagedWalletsController {
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
-  @ApiOperation({ summary: 'Set a managed wallet as the default deposit wallet for its chain' })
+  @ApiOperation({
+    summary: 'Set a transaction wallet as the default user deposit address for its chain',
+  })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
   async setDepositDefault(
     @CurrentUser('userId') userId: string,

@@ -5,8 +5,11 @@ import { OnchainTransferService } from './onchain-transfer.service';
 import { CacheService } from '@/common/services';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { WalletLinkingService } from './wallet-linking.service';
+import { DepositFxService } from './deposit-fx.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { NotificationsService } from '@/modules/notifications/notifications.service';
+import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { BlockchainNetwork, OnchainTxStatus, WalletTransactionAction } from '@/common/enums';
 
 describe('OnchainTransferService', () => {
@@ -52,6 +55,11 @@ describe('OnchainTransferService', () => {
       get: jest.fn(),
     };
 
+    const txWalletMock = {
+      getWithdrawalSourceWallet: jest.fn().mockResolvedValue(null),
+      sendWithdrawalNativeTransfer: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OnchainTransferService,
@@ -59,9 +67,22 @@ describe('OnchainTransferService', () => {
         { provide: CacheService, useValue: cacheMock },
         { provide: BlockchainProviderFactory, useValue: providerFactoryMock },
         { provide: WalletLinkingService, useValue: walletLinkingMock },
+        {
+          provide: DepositFxService,
+          useValue: {
+            convertToPlatformCash: jest.fn().mockResolvedValue({
+              creditCurrencyId: '019cecc4-2dc1-7dd9-ac3e-630f88893875',
+              creditAmount: '2.5',
+              conversionRate: '1',
+              originalAmount: '2.5',
+            }),
+          },
+        },
         { provide: WalletsService, useValue: walletsMock },
         { provide: CurrencyRepository, useValue: currencyRepoMock },
         { provide: ConfigService, useValue: configMock },
+        { provide: NotificationsService, useValue: { sendToUser: jest.fn() } },
+        { provide: TransactionWalletService, useValue: txWalletMock },
       ],
     }).compile();
 

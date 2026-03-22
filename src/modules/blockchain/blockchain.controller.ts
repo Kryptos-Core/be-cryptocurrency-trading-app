@@ -163,7 +163,7 @@ export class BlockchainController {
   @ApiOperation({
     summary: 'Lấy địa chỉ nạp tiền theo mạng',
     description:
-      'Trả về địa chỉ ví nhận tiền mặc định của platform cho chain được chọn, fallback sang hot wallet nếu chưa cấu hình ví quản lý.',
+      'Trả về địa chỉ ví nhận tiền mặc định của platform cho chain được chọn (transaction_wallets default; nếu chưa cấu hình thì hot wallet).',
   })
   @ApiQuery({
     name: 'chain',
@@ -181,14 +181,14 @@ export class BlockchainController {
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
     const provider = this.providerFactory.getProvider(normalizedChain);
-    const managedWallet = await this.managedWalletsService.getConfiguredDepositWallet(
+    const depositWallet = await this.managedWalletsService.getConfiguredDepositWallet(
       normalizedChain,
     );
 
     return {
       chain: normalizedChain,
-      depositAddress: managedWallet?.address ?? await provider.getHotWalletAddress(),
-      source: managedWallet ? 'managed_wallet' : 'hot_wallet',
+      depositAddress: depositWallet?.address ?? (await provider.getHotWalletAddress()),
+      source: depositWallet?.source ?? 'hot_wallet',
       note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
     };
   }

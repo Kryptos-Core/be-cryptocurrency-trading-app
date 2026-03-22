@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, FindOptionsWhere } from 'typeorm';
+import { DataSource, FindOptionsWhere, In } from 'typeorm';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { TronWeb } from 'tronweb';
 import Decimal from 'decimal.js';
@@ -26,6 +26,9 @@ type SupportedTreasuryChain =
   | 'TRON_NILE'
   | 'TRON_SHASTA'
   | 'TRON_MAINNET';
+
+const TRON_DEPOSIT_UI_CHAINS = ['TRON_NILE', 'TRON_SHASTA'] as const;
+type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
 
 export interface TreasuryWalletWithBalance extends Omit<TransactionWallet, 'encrypted_private_key'> {
   balance: string;
@@ -58,6 +61,8 @@ export class TransactionWalletService {
       encrypted_private_key: this.walletEncryptionService.encrypt(account.privateKey),
       label: dto.label?.trim() || null,
       is_active: true,
+      is_default_user_deposit: false,
+      default_set_at: null,
     });
 
     try {
@@ -216,6 +221,191 @@ export class TransactionWalletService {
 
   decryptWalletPrivateKey(wallet: TransactionWallet): string {
     return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
+  }
+
+  /**
+   * Wallets that may receive user deposits (shown on deposit config UI): Tron testnets, DEPOSIT or BOTH.
+   */
+  async listWalletsForDepositConfiguration(): Promise<TransactionWallet[]> {
+    return this.dataSource.getRepository(TransactionWallet).find({
+      where: {
+        chain: In([...TRON_DEPOSIT_UI_CHAINS]),
+        purpose: In(['DEPOSIT', 'BOTH']),
+      },
+      order: {
+        is_default_user_deposit: 'DESC',
+        default_set_at: 'DESC',
+        created_at: 'DESC',
+      },
+    });
+  }
+
+  async getDefaultUserDepositWallet(
+    chain: TronDepositUiChain,
+  ): Promise<TransactionWallet | null> {
+    return this.dataSource.getRepository(TransactionWallet).findOne({
+      where: {
+        chain,
+        is_default_user_deposit: true,
+        is_active: true,
+        purpose: In(['DEPOSIT', 'BOTH']),
+      },
+      order: {
+        default_set_at: 'DESC',
+        created_at: 'DESC',
+      },
+    });
+  }
+
+  async setDefaultUserDeposit(walletId: string): Promise<TransactionWallet> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(TransactionWallet);
+      const wallet = await repo.findOne({ where: { wallet_id: walletId } });
+
+      if (!wallet) {
+        throw new NotFoundException('Transaction wallet', walletId);
+      }
+      if (!wallet.is_active) {
+        throw new BadRequestException('Inactive wallet cannot be default', 'WALLET_INACTIVE');
+      }
+      if (wallet.purpose === 'WITHDRAWAL') {
+        throw new BadRequestException(
+          'Only DEPOSIT or BOTH wallets can be the user deposit default',
+          'TX_WALLET_PURPOSE_NOT_DEPOSIT',
+        );
+      }
+      if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
+        throw new BadRequestException(
+          'User deposit default is only supported for Tron Nile/Shasta',
+          'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
+        );
+      }
+
+      await repo.update(
+        {
+          chain: wallet.chain,
+          is_default_user_deposit: true,
+        },
+        {
+          is_default_user_deposit: false,
+          default_set_at: null,
+        },
+      );
+
+      wallet.is_default_user_deposit = true;
+      wallet.default_set_at = new Date();
+      await repo.save(wallet);
+
+      await this.cacheService.invalidatePattern('treasury:wallets:list:*');
+      return wallet;
+    });
+  }
+
+  async deactivateWallet(walletId: string): Promise<void> {
+    const repo = this.dataSource.getRepository(TransactionWallet);
+    const wallet = await repo.findOne({ where: { wallet_id: walletId } });
+    if (!wallet) {
+      throw new NotFoundException('Transaction wallet', walletId);
+    }
+    if (wallet.is_default_user_deposit) {
+      throw new BadRequestException(
+        'Cannot deactivate the current default user deposit wallet',
+        'DEFAULT_USER_DEPOSIT_DEACTIVATE_FORBIDDEN',
+      );
+    }
+    wallet.is_active = false;
+    await repo.save(wallet);
+    await this.cacheService.invalidatePattern('treasury:wallets:list:*');
+  }
+
+  /**
+   * Active treasury wallet used to sign user withdrawals on this chain.
+   * Prefers purpose WITHDRAWAL over BOTH; then newest by created_at.
+   * Returns null for chains without transaction_wallets (e.g. Solana) or when none configured.
+   */
+  async getWithdrawalSourceWallet(chain: string): Promise<TransactionWallet | null> {
+    if (!this.isTreasuryChain(chain)) {
+      return null;
+    }
+    const repo = this.dataSource.getRepository(TransactionWallet);
+    const wallets = await repo.find({
+      where: {
+        chain: chain as SupportedTreasuryChain,
+        is_active: true,
+        purpose: In(['WITHDRAWAL', 'BOTH']),
+      },
+    });
+    if (!wallets.length) {
+      return null;
+    }
+    wallets.sort((a, b) => {
+      const rank = (p: string) => (p === 'WITHDRAWAL' ? 0 : 1);
+      const c = rank(a.purpose) - rank(b.purpose);
+      if (c !== 0) {
+        return c;
+      }
+      return b.created_at.getTime() - a.created_at.getTime();
+    });
+    return wallets[0] ?? null;
+  }
+
+  /**
+   * Send native coin (TRX / ETH) from a transaction wallet to a user destination.
+   */
+  async sendWithdrawalNativeTransfer(
+    wallet: TransactionWallet,
+    toAddress: string,
+    amount: string,
+  ): Promise<string> {
+    const chain = this.assertSupportedChain(wallet.chain);
+    const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
+
+    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+      if (!ethers.isAddress(toAddress)) {
+        throw new BadRequestException('Invalid ETH destination address', 'INVALID_ETH_ADDRESS');
+      }
+      const provider = this.buildEthereumProvider(chain);
+      const signer = new ethers.Wallet(pk, provider);
+      const tx = await signer.sendTransaction({
+        to: toAddress,
+        value: ethers.parseEther(amount),
+      });
+      this.logger.log(`Withdrawal ETH sent from tx wallet ${wallet.wallet_id}: ${tx.hash}`);
+      return tx.hash;
+    }
+
+    const tw = this.buildTronWebWithPrivateKey(chain, pk);
+    if (!tw.isAddress(toAddress)) {
+      throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
+    }
+    const sunAmount = Math.floor(Number(new Decimal(amount).mul(1_000_000).toString()));
+    const sent = await tw.trx.sendTransaction(toAddress, sunAmount);
+    if (!sent?.result || !sent?.txid) {
+      throw new BusinessException(
+        'Failed to submit Tron withdrawal transaction',
+        'TRON_WITHDRAWAL_SEND_FAILED',
+      );
+    }
+    this.logger.log(`Withdrawal TRX sent from tx wallet ${wallet.wallet_id}: ${sent.txid}`);
+    return sent.txid;
+  }
+
+  private isTreasuryChain(chain: string): chain is SupportedTreasuryChain {
+    return ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'].includes(chain);
+  }
+
+  private buildTronWebWithPrivateKey(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    privateKey: string,
+  ): TronWeb {
+    const fullHost =
+      chain === 'TRON_SHASTA'
+        ? (this.configService.get<string>('app.blockchain.tron.shastaFullHost') ?? 'https://api.shasta.trongrid.io')
+        : chain === 'TRON_MAINNET'
+          ? (this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io')
+          : (this.configService.get<string>('app.blockchain.tron.nileFullHost') ?? 'https://nile.trongrid.io');
+
+    return new TronWeb({ fullHost, privateKey });
   }
 
   private assertSupportedChain(chain: string): SupportedTreasuryChain {

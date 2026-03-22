@@ -26,9 +26,7 @@ import { TreasuryOperationsService } from './treasury-operations.service';
 @ApiTags('treasury')
 @ApiBearerAuth('JWT-auth')
 @Controller('treasury')
-@UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
-@RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
-@RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+@UseGuards(JwtAuthGuard)
 export class TreasuryController {
   constructor(
     private readonly transactionWalletService: TransactionWalletService,
@@ -37,24 +35,33 @@ export class TreasuryController {
   ) {}
 
   @Get('wallets')
+  @UseGuards(RoleGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'List transaction wallets with optional chain/purpose filters' })
   async listWallets(@Query() query: ListTreasuryWalletsDto) {
     return this.transactionWalletService.listWallets(query);
   }
 
   @Post('wallets')
+  @UseGuards(RoleGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'Create a new transaction wallet' })
   async createWallet(@Body() dto: CreateTransactionWalletDto) {
     return this.transactionWalletService.createWallet(dto);
   }
 
   @Get('wallets/:walletId')
+  @UseGuards(RoleGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'Get transaction wallet detail with live on-chain balance' })
   async getWalletById(@Param('walletId') walletId: string) {
     return this.transactionWalletService.getWalletDetail(walletId);
   }
 
   @Get('main-wallets')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List main wallets for a chain (sweep targets)' })
   async listMainWallets(@Query('chain') chain: string) {
     return this.treasuryMainWalletService.listByChain(
@@ -63,6 +70,9 @@ export class TreasuryController {
   }
 
   @Post('wallets/:walletId/sweep')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Sweep transaction wallet balance back to main wallet via queue' })
   async sweepWallet(
     @Param('walletId') walletId: string,
@@ -77,6 +87,9 @@ export class TreasuryController {
   }
 
   @Post('wallets/:walletId/fund')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Fund transaction wallet from main wallet via queue' })
   async fundWallet(
     @Param('walletId') walletId: string,
@@ -87,18 +100,27 @@ export class TreasuryController {
   }
 
   @Get('operations')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List treasury operations (SWEEP/FUND) with filters and pagination' })
   async listOperations(@Query() query: ListTreasuryOperationsDto) {
     return this.treasuryOperationsService.listOperations(query);
   }
 
   @Get('operations/:operationId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Get treasury operation detail' })
   async getOperation(@Param('operationId') operationId: string) {
     return this.treasuryOperationsService.getOperation(operationId);
   }
 
   @Get('transactions')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List treasury on-chain transactions (SWEEP/FUND) with filters and pagination' })
   async listTransactions(@Query() query: ListTreasuryTransactionsDto) {
     return this.treasuryOperationsService.listTreasuryTransactions(query);
