@@ -2,7 +2,6 @@ import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
-import { DataSource } from 'typeorm';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { TronWeb } from 'tronweb';
 import Decimal from 'decimal.js';
@@ -29,6 +28,8 @@ import {
 } from './constants';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { TreasuryMainWalletService } from './treasury-main-wallet.service';
+import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
+import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 
 type SupportedTreasuryChain =
   | 'ETH_SEPOLIA'
@@ -48,11 +49,12 @@ export class TreasuryOperationsService {
   private readonly logger = new Logger(TreasuryOperationsService.name);
 
   constructor(
-    private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     private readonly transactionWalletService: TransactionWalletService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly configService: ConfigService,
+    private readonly treasuryOperationRepository: TreasuryOperationRepository,
+    private readonly treasuryOnchainReadRepository: TreasuryOnchainReadRepository,
     @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: Queue,
   ) {}
 
@@ -185,14 +187,11 @@ export class TreasuryOperationsService {
   }
 
   async markFailed(operationId: string, reason: string): Promise<void> {
-    await this.dataSource.getRepository(TreasuryOperation).update(
-      { operation_id: operationId },
-      {
-        status: 'FAILED',
-        failure_reason: reason.slice(0, 512),
-        completed_at: new Date(),
-      },
-    );
+    await this.treasuryOperationRepository.updateByOperationId(operationId, {
+      status: 'FAILED',
+      failure_reason: reason.slice(0, 512),
+      completed_at: new Date(),
+    });
 
     await this.publishEvent('operation.failed', {
       operationId,
@@ -206,35 +205,11 @@ export class TreasuryOperationsService {
     page: number;
     limit: number;
   }> {
-    const page = filter.page ?? 1;
-    const limit = filter.limit ?? 20;
-    const offset = (page - 1) * limit;
-
-    const qb = this.dataSource
-      .getRepository(TreasuryOperation)
-      .createQueryBuilder('op')
-      .leftJoinAndSelect('op.from_wallet', 'from_wallet')
-      .leftJoinAndSelect('op.to_wallet', 'to_wallet')
-      .orderBy('op.created_at', 'DESC')
-      .skip(offset)
-      .take(limit);
-
-    if (filter.chain) qb.andWhere('op.chain = :chain', { chain: filter.chain });
-    if (filter.type) qb.andWhere('op.type = :type', { type: filter.type });
-    if (filter.status) qb.andWhere('op.status = :status', { status: filter.status });
-    if (filter.q) {
-      qb.andWhere('(op.tx_hash LIKE :q OR op.operation_id LIKE :q)', { q: `%${filter.q}%` });
-    }
-
-    const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    return this.treasuryOperationRepository.listWithFilters(filter);
   }
 
   async getOperation(operationId: string): Promise<TreasuryOperation> {
-    const operation = await this.dataSource.getRepository(TreasuryOperation).findOne({
-      where: { operation_id: operationId },
-      relations: ['from_wallet', 'to_wallet'],
-    });
+    const operation = await this.treasuryOperationRepository.findByOperationIdWithWallets(operationId);
 
     if (!operation) {
       throw new NotFoundException('Treasury operation', operationId);
@@ -249,29 +224,7 @@ export class TreasuryOperationsService {
     page: number;
     limit: number;
   }> {
-    const page = filter.page ?? 1;
-    const limit = filter.limit ?? 20;
-    const offset = (page - 1) * limit;
-
-    const qb = this.dataSource
-      .getRepository(OnchainTransaction)
-      .createQueryBuilder('tx')
-      .where('tx.type IN (:...types)', { types: ['SWEEP', 'FUND'] })
-      .orderBy('tx.created_at', 'DESC')
-      .skip(offset)
-      .take(limit);
-
-    if (filter.chain) qb.andWhere('tx.chain = :chain', { chain: filter.chain });
-    if (filter.type) qb.andWhere('tx.type = :type', { type: filter.type });
-    if (filter.status) qb.andWhere('tx.status = :status', { status: filter.status });
-    if (filter.q) {
-      qb.andWhere('(tx.tx_hash LIKE :q OR tx.tx_id LIKE :q OR tx.from_address LIKE :q OR tx.to_address LIKE :q)', {
-        q: `%${filter.q}%`,
-      });
-    }
-
-    const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    return this.treasuryOnchainReadRepository.listFundSweepTransactions(filter);
   }
 
   private async createOperation(params: {
@@ -282,32 +235,14 @@ export class TreasuryOperationsService {
     amount: string;
     actorUserId: string;
   }): Promise<TreasuryOperation> {
-    const repo = this.dataSource.getRepository(TreasuryOperation);
-    const operation = repo.create({
-      operation_id: uuidv7(),
-      type: params.type,
-      chain: params.chain,
-      from_wallet_id: params.fromWalletId,
-      to_wallet_id: params.toWalletId,
-      amount: params.amount,
-      tx_hash: null,
-      onchain_tx_id: null,
-      status: 'PENDING',
-      actor_user_id: params.actorUserId,
-      failure_reason: null,
-      completed_at: null,
-    });
-
-    return repo.save(operation);
+    return this.treasuryOperationRepository.createPendingOperation(params);
   }
 
   private async getOperationForProcessing(
     operationId: string,
     expectedType: TreasuryOperationType,
   ): Promise<TreasuryOperation> {
-    const operation = await this.dataSource.getRepository(TreasuryOperation).findOne({
-      where: { operation_id: operationId },
-    });
+    const operation = await this.treasuryOperationRepository.findByOperationId(operationId);
 
     if (!operation) {
       throw new NotFoundException('Treasury operation', operationId);
@@ -331,13 +266,10 @@ export class TreasuryOperationsService {
   }
 
   private async markProcessing(operationId: string): Promise<void> {
-    await this.dataSource.getRepository(TreasuryOperation).update(
-      { operation_id: operationId },
-      {
-        status: 'PROCESSING',
-        failure_reason: null,
-      },
-    );
+    await this.treasuryOperationRepository.updateByOperationId(operationId, {
+      status: 'PROCESSING',
+      failure_reason: null,
+    });
   }
 
   private async finalizeSuccess(
@@ -347,41 +279,12 @@ export class TreasuryOperationsService {
     txHash: string,
     amount: string,
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      const onchainRepo = manager.getRepository(OnchainTransaction);
-      const opRepo = manager.getRepository(TreasuryOperation);
-
-      const txId = uuidv7();
-      await onchainRepo.save({
-        tx_id: txId,
-        user_id: operation.actor_user_id,
-        linked_wallet_id: null,
-        treasury_operation_id: operation.operation_id,
-        chain: operation.chain,
-        type: operation.type,
-        tx_hash: txHash,
-        from_address: fromAddress,
-        to_address: toAddress,
-        amount,
-        confirmations: 0,
-        status: 'PENDING',
-        confirmed_at: null,
-        credited_currency_id: null,
-        credited_amount: null,
-        conversion_rate: null,
-      });
-
-      await opRepo.update(
-        { operation_id: operation.operation_id },
-        {
-          status: 'COMPLETED',
-          amount,
-          tx_hash: txHash,
-          onchain_tx_id: txId,
-          completed_at: new Date(),
-          failure_reason: null,
-        },
-      );
+    await this.treasuryOperationRepository.finalizeSuccessWithOnchainTx({
+      operation,
+      fromAddress,
+      toAddress,
+      txHash,
+      amount,
     });
 
     this.logger.log(

@@ -22,7 +22,7 @@ OHLCV/ticker có thể lấy từ Binance public API theo cấu hình (`EXCHANGE
 
 - **Runtime:** Node.js (khuyến nghị LTS 20+)
 - **Framework:** NestJS 10
-- **ORM:** TypeORM 0.3 + **MySQL 8**
+- **ORM:** TypeORM 0.3 + **MySQL 8** — hướng dẫn tầng data access (Repository / `DataSource` / stored procedure): [`docs/DATA_ACCESS_PATTERNS.md`](docs/DATA_ACCESS_PATTERNS.md)
 - **Cache / lock / queue:** Redis 7, **Bull** (hàng đợi)
 - **Realtime:** `@nestjs/websockets`, Socket.IO
 - **Khác:** JWT, PayOS, Ethers, TronWeb, Solana web3, Cloudinary, Nodemailer, Firebase Admin

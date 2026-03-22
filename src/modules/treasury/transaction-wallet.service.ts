@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, FindOptionsWhere, In } from 'typeorm';
+import { FindOptionsWhere } from 'typeorm';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { TronWeb } from 'tronweb';
 import Decimal from 'decimal.js';
@@ -16,6 +16,7 @@ import { PaymentConfigService } from '@/modules/payment-config/payment-config.se
 import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
+import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
 
 const LIST_CACHE_TTL_SECONDS = 60;
 /** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
@@ -41,7 +42,7 @@ export class TransactionWalletService {
   private readonly logger = new Logger(TransactionWalletService.name);
 
   constructor(
-    private readonly dataSource: DataSource,
+    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepository,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,
@@ -53,21 +54,18 @@ export class TransactionWalletService {
     const chain = this.assertSupportedChain(dto.chain);
     const account = await this.generateAccount(chain);
 
-    const repo = this.dataSource.getRepository(TransactionWallet);
-    const entity = repo.create({
-      wallet_id: uuidv7(),
-      chain,
-      address: account.address,
-      purpose: dto.purpose,
-      encrypted_private_key: this.walletEncryptionService.encrypt(account.privateKey),
-      label: dto.label?.trim() || null,
-      is_active: true,
-      is_default_user_deposit: false,
-      default_set_at: null,
-    });
-
     try {
-      const created = await repo.save(entity);
+      const created = await this.treasuryTransactionWalletRepository.createAndSave({
+        wallet_id: uuidv7(),
+        chain,
+        address: account.address,
+        purpose: dto.purpose,
+        encrypted_private_key: this.walletEncryptionService.encrypt(account.privateKey),
+        label: dto.label?.trim() || null,
+        is_active: true,
+        is_default_user_deposit: false,
+        default_set_at: null,
+      });
       await this.cacheService.invalidatePattern('treasury:wallets:list:*');
       await this.publishEvent('wallet.created', {
         walletId: created.wallet_id,
@@ -96,10 +94,7 @@ export class TransactionWalletService {
         if (filter.chain) where.chain = filter.chain;
         if (filter.purpose) where.purpose = filter.purpose;
 
-        return this.dataSource.getRepository(TransactionWallet).find({
-          where,
-          order: { created_at: 'DESC' },
-        });
+        return this.treasuryTransactionWalletRepository.findManyOrdered(where);
       },
       LIST_CACHE_TTL_SECONDS,
     );
@@ -161,9 +156,7 @@ export class TransactionWalletService {
   }
 
   async getWalletById(walletId: string): Promise<TransactionWallet> {
-    const wallet = await this.dataSource.getRepository(TransactionWallet).findOne({
-      where: { wallet_id: walletId },
-    });
+    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
 
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
@@ -257,83 +250,44 @@ export class TransactionWalletService {
    * Wallets that may receive user deposits (shown on deposit config UI): Tron testnets, DEPOSIT or BOTH.
    */
   async listWalletsForDepositConfiguration(): Promise<TransactionWallet[]> {
-    return this.dataSource.getRepository(TransactionWallet).find({
-      where: {
-        chain: In([...TRON_DEPOSIT_UI_CHAINS]),
-        purpose: In(['DEPOSIT', 'BOTH']),
-      },
-      order: {
-        is_default_user_deposit: 'DESC',
-        default_set_at: 'DESC',
-        created_at: 'DESC',
-      },
-    });
+    return this.treasuryTransactionWalletRepository.findForDepositConfiguration();
   }
 
   async getDefaultUserDepositWallet(
     chain: TronDepositUiChain,
   ): Promise<TransactionWallet | null> {
-    return this.dataSource.getRepository(TransactionWallet).findOne({
-      where: {
-        chain,
-        is_default_user_deposit: true,
-        is_active: true,
-        purpose: In(['DEPOSIT', 'BOTH']),
-      },
-      order: {
-        default_set_at: 'DESC',
-        created_at: 'DESC',
-      },
-    });
+    return this.treasuryTransactionWalletRepository.findDefaultUserDepositWallet(chain);
   }
 
   async setDefaultUserDeposit(walletId: string): Promise<TransactionWallet> {
-    return this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(TransactionWallet);
-      const wallet = await repo.findOne({ where: { wallet_id: walletId } });
+    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
 
-      if (!wallet) {
-        throw new NotFoundException('Transaction wallet', walletId);
-      }
-      if (!wallet.is_active) {
-        throw new BadRequestException('Inactive wallet cannot be default', 'WALLET_INACTIVE');
-      }
-      if (wallet.purpose === 'WITHDRAWAL') {
-        throw new BadRequestException(
-          'Only DEPOSIT or BOTH wallets can be the user deposit default',
-          'TX_WALLET_PURPOSE_NOT_DEPOSIT',
-        );
-      }
-      if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
-        throw new BadRequestException(
-          'User deposit default is only supported for Tron Nile/Shasta',
-          'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
-        );
-      }
-
-      await repo.update(
-        {
-          chain: wallet.chain,
-          is_default_user_deposit: true,
-        },
-        {
-          is_default_user_deposit: false,
-          default_set_at: null,
-        },
+    if (!wallet) {
+      throw new NotFoundException('Transaction wallet', walletId);
+    }
+    if (!wallet.is_active) {
+      throw new BadRequestException('Inactive wallet cannot be default', 'WALLET_INACTIVE');
+    }
+    if (wallet.purpose === 'WITHDRAWAL') {
+      throw new BadRequestException(
+        'Only DEPOSIT or BOTH wallets can be the user deposit default',
+        'TX_WALLET_PURPOSE_NOT_DEPOSIT',
       );
+    }
+    if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
+      throw new BadRequestException(
+        'User deposit default is only supported for Tron Nile/Shasta',
+        'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
+      );
+    }
 
-      wallet.is_default_user_deposit = true;
-      wallet.default_set_at = new Date();
-      await repo.save(wallet);
-
-      await this.cacheService.invalidatePattern('treasury:wallets:list:*');
-      return wallet;
-    });
+    const updated = await this.treasuryTransactionWalletRepository.setDefaultUserDepositInTransaction(wallet);
+    await this.cacheService.invalidatePattern('treasury:wallets:list:*');
+    return updated;
   }
 
   async deactivateWallet(walletId: string): Promise<void> {
-    const repo = this.dataSource.getRepository(TransactionWallet);
-    const wallet = await repo.findOne({ where: { wallet_id: walletId } });
+    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
     }
@@ -344,7 +298,7 @@ export class TransactionWalletService {
       );
     }
     wallet.is_active = false;
-    await repo.save(wallet);
+    await this.treasuryTransactionWalletRepository.save(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
   }
 
@@ -357,14 +311,9 @@ export class TransactionWalletService {
     if (!this.isTreasuryChain(chain)) {
       return null;
     }
-    const repo = this.dataSource.getRepository(TransactionWallet);
-    const wallets = await repo.find({
-      where: {
-        chain: chain as SupportedTreasuryChain,
-        is_active: true,
-        purpose: In(['WITHDRAWAL', 'BOTH']),
-      },
-    });
+    const wallets = await this.treasuryTransactionWalletRepository.findActiveWithdrawalCandidates(
+      chain as SupportedTreasuryChain,
+    );
     if (!wallets.length) {
       return null;
     }

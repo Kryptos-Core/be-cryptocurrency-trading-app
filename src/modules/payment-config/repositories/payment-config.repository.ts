@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { BaseRepository } from '@/common/repositories';
 import { PaymentMethodConfig, PaymentMethodStatus, PaymentMethodType } from '@/entities/payment-method-config.entity';
 
 @Injectable()
-export class PaymentConfigRepository {
-  constructor(private readonly dataSource: DataSource) {}
+export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig> {
+  constructor(dataSource: DataSource) {
+    super(PaymentMethodConfig, dataSource);
+  }
 
   async findActive(type: PaymentMethodType, network: string): Promise<PaymentMethodConfig | null> {
     const rows = await this.dataSource.query<PaymentMethodConfig[]>(
@@ -20,12 +23,6 @@ export class PaymentConfigRepository {
       'CALL sp_payment_config_list()',
     );
     return Array.isArray(rows[0]) ? rows[0] : rows;
-  }
-
-  async findById(configId: string): Promise<PaymentMethodConfig | null> {
-    return this.dataSource.getRepository(PaymentMethodConfig).findOne({
-      where: { config_id: configId },
-    });
   }
 
   async upsert(

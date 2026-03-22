@@ -13,6 +13,9 @@ import { TransactionWalletService } from './transaction-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
 import { TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TreasuryProcessor } from './treasury.processor';
+import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
+import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
+import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { TreasuryProcessor } from './treasury.processor';
   controllers: [TreasuryController],
   providers: [
     WalletEncryptionService,
+    TreasuryTransactionWalletRepository,
+    TreasuryOperationRepository,
+    TreasuryOnchainReadRepository,
     TransactionWalletService,
     TreasuryMainWalletService,
     TreasuryOperationsService,
