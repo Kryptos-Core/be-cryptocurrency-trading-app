@@ -138,6 +138,16 @@ export class TreasuryOperationsService {
       );
 
       const result = await this.sendSweepFromWallet(wallet, mainAddress);
+      if (
+        wallet.chain === 'TRON_NILE' ||
+        wallet.chain === 'TRON_SHASTA' ||
+        wallet.chain === 'TRON_MAINNET'
+      ) {
+        await this.transactionWalletService.waitForTronBalanceReflectSweep(
+          wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+          wallet.address,
+        );
+      }
       await this.finalizeSuccess(operation, wallet.address, mainAddress, result.txHash, result.amount);
       await this.publishEvent('operation.completed', {
         operationId: operation.operation_id,
@@ -378,16 +388,7 @@ export class TreasuryOperationsService {
       `Treasury ${operation.type} completed: operation=${operation.operation_id}, txHash=${txHash}`,
     );
 
-    await Promise.all([
-      this.transactionWalletService.invalidateBalanceCache(
-        operation.chain as SupportedTreasuryChain,
-        fromAddress,
-      ),
-      this.transactionWalletService.invalidateBalanceCache(
-        operation.chain as SupportedTreasuryChain,
-        toAddress,
-      ),
-    ]);
+    await this.transactionWalletService.invalidateAllTreasuryBalanceCaches();
   }
 
   private async sendSweepFromWallet(
@@ -410,8 +411,15 @@ export class TreasuryOperationsService {
 
       const value = balanceWei - gasFee;
       const tx = await signer.sendTransaction({ to: mainAddress, value });
+      const receipt = await tx.wait(1, 120_000);
+      if (!receipt || receipt.status !== 1) {
+        throw new BusinessException(
+          'ETH sweep transaction was not confirmed successfully',
+          'TREASURY_SWEEP_CHAIN_FAILED',
+        );
+      }
       return {
-        txHash: tx.hash,
+        txHash: receipt.hash,
         amount: ethers.formatEther(value),
       };
     }

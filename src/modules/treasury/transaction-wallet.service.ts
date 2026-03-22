@@ -18,7 +18,8 @@ import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
 
 const LIST_CACHE_TTL_SECONDS = 60;
-const BALANCE_CACHE_TTL_SECONDS = 30;
+/** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
+const BALANCE_CACHE_TTL_SECONDS = 12;
 
 type SupportedTreasuryChain =
   | 'ETH_SEPOLIA'
@@ -128,6 +129,35 @@ export class TransactionWalletService {
   invalidateBalanceCache(chain: SupportedTreasuryChain, address: string): Promise<void> {
     const cacheKey = `treasury:balance:${chain}:${address}`;
     return this.cacheService.delete(cacheKey);
+  }
+
+  /** Clears cached on-chain balances for all treasury transaction wallets (after Fund/Sweep). */
+  async invalidateAllTreasuryBalanceCaches(): Promise<void> {
+    await this.cacheService.invalidatePattern('treasury:balance:*');
+  }
+
+  /**
+   * After a TRON sweep is broadcast, public RPC often still returns the pre-tx balance briefly.
+   * Poll until balance drops near the sweep reserve (0.1 TRX) or timeout, so UI cache is not primed with stale TRX.
+   */
+  async waitForTronBalanceReflectSweep(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    address: string,
+    reserveSun: number = 100_000,
+  ): Promise<void> {
+    const maxSun = reserveSun + 250_000;
+    const deadline = Date.now() + 60_000;
+    const tronWeb = this.buildTronReadOnlyClient(chain);
+    while (Date.now() < deadline) {
+      const sun = await tronWeb.trx.getBalance(address);
+      if (sun <= maxSun) {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+    this.logger.warn(
+      `Treasury TRON sweep: balance for ${address} still > ${maxSun} sun after 60s; UI may lag until cache TTL`,
+    );
   }
 
   async getWalletById(walletId: string): Promise<TransactionWallet> {

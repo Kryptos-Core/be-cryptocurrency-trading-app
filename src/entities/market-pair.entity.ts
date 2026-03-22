@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   ManyToOne,
+  JoinColumn,
   ForeignKey,
   Index,
   OneToMany,
@@ -55,11 +56,13 @@ export class MarketPair {
   @ManyToOne(() => Currency, (currency) => currency.base_pairs, {
     onDelete: 'RESTRICT',
   })
+  @JoinColumn({ name: 'base_currency_id' })
   base_currency!: Currency;
 
   @ManyToOne(() => Currency, (currency) => currency.quote_pairs, {
     onDelete: 'RESTRICT',
   })
+  @JoinColumn({ name: 'quote_currency_id' })
   quote_currency!: Currency;
 
   @OneToMany('Order', 'pair')
