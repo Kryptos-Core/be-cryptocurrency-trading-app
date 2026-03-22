@@ -11,7 +11,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@/common/exceptions';
-import { BlockchainNetwork } from '@/common/enums';
+import { BlockchainNetwork, UserRole } from '@/common/enums';
 import { ManagedWallet } from '@/entities/managed-wallet.entity';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
@@ -84,14 +84,19 @@ export class ManagedWalletsService {
     return this.mapWallet(created);
   }
 
-  async listWallets(userId: string): Promise<ManagedWalletResponseDto[]> {
-    const wallets = await this.dataSource.getRepository(ManagedWallet).find({
-      where: { user_id: userId },
-      order: {
-        is_default_deposit: 'DESC',
-        created_at: 'DESC',
-      },
-    });
+  async listWallets(userId: string, role: UserRole): Promise<ManagedWalletResponseDto[]> {
+    const repo = this.dataSource.getRepository(ManagedWallet);
+    const order = {
+      is_default_deposit: 'DESC' as const,
+      created_at: 'DESC' as const,
+    };
+    const wallets =
+      role === UserRole.ADMIN
+        ? await repo.find({ order })
+        : await repo.find({
+            where: { user_id: userId },
+            order,
+          });
 
     return wallets.map((wallet) => this.mapWallet(wallet));
   }
@@ -115,8 +120,9 @@ export class ManagedWalletsService {
   async getWalletDetail(
     userId: string,
     walletId: string,
+    role: UserRole,
   ): Promise<ManagedWalletResponseDto & { balance: string; symbol: string }> {
-    const wallet = await this.requireWalletOwner(userId, walletId);
+    const wallet = await this.requireWalletForActor(userId, walletId, role);
     const tronWeb = this.buildTronWeb(wallet.chain);
     const sunBalance = await tronWeb.trx.getBalance(wallet.address);
 
@@ -130,9 +136,10 @@ export class ManagedWalletsService {
   async getWalletTransactions(
     userId: string,
     walletId: string,
+    role: UserRole,
     limit: number = 50,
   ): Promise<OnchainTransaction[]> {
-    const wallet = await this.requireWalletOwner(userId, walletId);
+    const wallet = await this.requireWalletForActor(userId, walletId, role);
     return this.dataSource
       .getRepository(OnchainTransaction)
       .createQueryBuilder('tx')
@@ -148,6 +155,7 @@ export class ManagedWalletsService {
   async sendTransaction(
     userId: string,
     walletId: string,
+    role: UserRole,
     dto: SendManagedTransactionDto,
   ): Promise<{
     txId: string;
@@ -158,7 +166,7 @@ export class ManagedWalletsService {
     amount: string;
     memo?: string;
   }> {
-    const wallet = await this.requireWalletOwner(userId, walletId);
+    const wallet = await this.requireWalletForActor(userId, walletId, role);
     const chain = this.assertSupportedChain(wallet.chain);
     const amount = this.normalizePositiveAmount(dto.amount);
     const tronWeb = this.buildTronWeb(
@@ -182,7 +190,7 @@ export class ManagedWalletsService {
     const txId = uuidv7();
     await this.dataSource.getRepository(OnchainTransaction).save({
       tx_id: txId,
-      user_id: userId,
+      user_id: wallet.user_id,
       linked_wallet_id: null,
       chain,
       type: 'TRANSFER',
@@ -213,13 +221,14 @@ export class ManagedWalletsService {
   async setDepositDefault(
     userId: string,
     walletId: string,
+    role: UserRole,
   ): Promise<ManagedWalletResponseDto> {
+    const walletResolved = await this.requireWalletForActor(userId, walletId, role);
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(ManagedWallet);
       const wallet = await repo.findOne({
         where: {
-          wallet_id: walletId,
-          user_id: userId,
+          wallet_id: walletResolved.wallet_id,
         },
       });
 
@@ -261,8 +270,12 @@ export class ManagedWalletsService {
     return { recommended_chain: chain };
   }
 
-  async deactivateWallet(userId: string, walletId: string): Promise<{ success: true }> {
-    const wallet = await this.requireWalletOwner(userId, walletId);
+  async deactivateWallet(
+    userId: string,
+    walletId: string,
+    role: UserRole,
+  ): Promise<{ success: true }> {
+    const wallet = await this.requireWalletForActor(userId, walletId, role);
     if (wallet.is_default_deposit) {
       throw new BadRequestException(
         'Cannot deactivate the current default deposit wallet',
@@ -364,12 +377,20 @@ export class ManagedWalletsService {
     return this.assertSupportedChain(setting?.v ?? BlockchainNetwork.TRON_NILE);
   }
 
-  private async requireWalletOwner(userId: string, walletId: string): Promise<ManagedWallet> {
+  private async requireWalletForActor(
+    userId: string,
+    walletId: string,
+    role: UserRole,
+  ): Promise<ManagedWallet> {
+    const where =
+      role === UserRole.ADMIN
+        ? { wallet_id: walletId }
+        : {
+            wallet_id: walletId,
+            user_id: userId,
+          };
     const wallet = await this.dataSource.getRepository(ManagedWallet).findOne({
-      where: {
-        wallet_id: walletId,
-        user_id: userId,
-      },
+      where,
     });
 
     if (!wallet) {

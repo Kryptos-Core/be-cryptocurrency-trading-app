@@ -37,7 +37,7 @@ export class ManagedWalletsController {
 
   @Post()
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Create a new managed treasury wallet' })
   async createWallet(
@@ -49,16 +49,22 @@ export class ManagedWalletsController {
 
   @Get()
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_READ)
-  @ApiOperation({ summary: 'List managed wallets owned by the current finance manager' })
-  async listWallets(@CurrentUser('userId') userId: string) {
-    return this.managedWalletsService.listWallets(userId);
+  @ApiOperation({
+    summary:
+      'List managed wallets (all wallets for ADMIN; own wallets for RISK_OFFICER)',
+  })
+  async listWallets(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRole,
+  ) {
+    return this.managedWalletsService.listWallets(userId, role);
   }
 
   @Get('deposit-defaults')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get current default deposit wallets and recommended chain' })
   async getDepositDefaults() {
@@ -67,7 +73,7 @@ export class ManagedWalletsController {
 
   @Patch('settings/recommended-chain')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Set the recommended deposit chain shown to users' })
   async setRecommendedChain(@Body() dto: UpdateRecommendedChainDto) {
@@ -76,69 +82,74 @@ export class ManagedWalletsController {
 
   @Get(':walletId')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get managed wallet details and live on-chain balance' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
   async getWalletDetail(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.managedWalletsService.getWalletDetail(userId, walletId);
+    return this.managedWalletsService.getWalletDetail(userId, walletId, role);
   }
 
   @Get(':walletId/transactions')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get recent on-chain transactions for a managed wallet' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
   async getWalletTransactions(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
-    return this.managedWalletsService.getWalletTransactions(userId, walletId, limit);
+    return this.managedWalletsService.getWalletTransactions(userId, walletId, role, limit);
   }
 
   @Post(':walletId/send')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_WITHDRAW)
   @ApiOperation({ summary: 'Send TRX from a managed wallet' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
   async sendTransaction(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
     @Body() dto: SendManagedTransactionDto,
   ) {
-    return this.managedWalletsService.sendTransaction(userId, walletId, dto);
+    return this.managedWalletsService.sendTransaction(userId, walletId, role, dto);
   }
 
   @Patch(':walletId/set-deposit-default')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Set a managed wallet as the default deposit wallet for its chain' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
   async setDepositDefault(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.managedWalletsService.setDepositDefault(userId, walletId);
+    return this.managedWalletsService.setDepositDefault(userId, walletId, role);
   }
 
   @Delete(':walletId')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Deactivate a managed wallet' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
   async deactivateWallet(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.managedWalletsService.deactivateWallet(userId, walletId);
+    return this.managedWalletsService.deactivateWallet(userId, walletId, role);
   }
 }
