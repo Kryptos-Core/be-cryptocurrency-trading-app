@@ -327,6 +327,64 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   SMTP_FROM?: string;
+
+  /** Fiat (bank) withdrawal — min amount in platform cash currency (e.g. USDT). */
+  @IsString()
+  @IsOptional()
+  FIAT_WITHDRAW_MIN?: string = '10';
+
+  /** Fiat withdrawal — max single request amount. */
+  @IsString()
+  @IsOptional()
+  FIAT_WITHDRAW_MAX?: string = '100000';
+
+  /**
+   * Max total pending+completed fiat withdrawal amount per user per UTC day.
+   * 0 = disabled (no daily cap).
+   */
+  @IsString()
+  @IsOptional()
+  FIAT_WITHDRAW_DAILY_LIMIT_USER?: string = '0';
+
+  /**
+   * Chuỗi provider JSON (ưu tiên A → B). Ví dụ:
+   * [{"id":"vietqr","banksUrl":"https://...","lookupUrl":"https://...","healthUrl":"https://...","clientId":"","apiKey":""}]
+   */
+  @IsString()
+  @IsOptional()
+  FIAT_BANK_PROVIDER_CHAIN_JSON?: string;
+
+  /** Third-party provider endpoint for bank list (e.g. VietQR /v2/banks). */
+  @IsUrl()
+  @IsOptional()
+  FIAT_BANK_PROVIDER_BANKS_URL?: string;
+
+  /** Third-party provider endpoint for account-name lookup (e.g. /v2/lookup). */
+  @IsUrl()
+  @IsOptional()
+  FIAT_BANK_PROVIDER_LOOKUP_URL?: string;
+
+  /** Optional dedicated health URL (legacy single-provider). */
+  @IsUrl()
+  @IsOptional()
+  FIAT_BANK_PROVIDER_HEALTH_URL?: string;
+
+  /** Third-party provider credential header x-client-id (if required). */
+  @IsString()
+  @IsOptional()
+  FIAT_BANK_PROVIDER_CLIENT_ID?: string;
+
+  /** Third-party provider credential header x-api-key (if required). */
+  @IsString()
+  @IsOptional()
+  FIAT_BANK_PROVIDER_API_KEY?: string;
+
+  /** Timeout for third-party provider calls, milliseconds. */
+  @IsInt()
+  @Min(1000)
+  @Max(30000)
+  @IsOptional()
+  FIAT_BANK_PROVIDER_TIMEOUT_MS?: number = 8000;
 }
 
 /**
@@ -408,6 +466,16 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'SMTP_USER',
     'SMTP_PASS',
     'SMTP_FROM',
+    'FIAT_WITHDRAW_MIN',
+    'FIAT_WITHDRAW_MAX',
+    'FIAT_WITHDRAW_DAILY_LIMIT_USER',
+    'FIAT_BANK_PROVIDER_CHAIN_JSON',
+    'FIAT_BANK_PROVIDER_BANKS_URL',
+    'FIAT_BANK_PROVIDER_LOOKUP_URL',
+    'FIAT_BANK_PROVIDER_HEALTH_URL',
+    'FIAT_BANK_PROVIDER_CLIENT_ID',
+    'FIAT_BANK_PROVIDER_API_KEY',
+    'FIAT_BANK_PROVIDER_TIMEOUT_MS',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

@@ -16,7 +16,8 @@ export interface LedgerEntryInput {
     | 'EXTERNAL_DEPOSIT'
     | 'EXTERNAL_WITHDRAWAL'
     | 'EXTERNAL_SYNC'
-    | 'RECONCILIATION';
+    | 'RECONCILIATION'
+    | 'FIAT_WITHDRAWAL';
   /** Reference ID: integer for legacy rows, UUID string for new rows (e.g. adjustmentId). */
   refId: number | string;
   direction: 'CREDIT' | 'DEBIT';

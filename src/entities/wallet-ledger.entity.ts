@@ -50,6 +50,7 @@ export class WalletLedger {
       'EXTERNAL_WITHDRAWAL',
       'EXTERNAL_SYNC',
       'RECONCILIATION',
+      'FIAT_WITHDRAWAL',
     ],
   })
   ref_type!:
@@ -62,7 +63,8 @@ export class WalletLedger {
     | 'EXTERNAL_DEPOSIT'
     | 'EXTERNAL_WITHDRAWAL'
     | 'EXTERNAL_SYNC'
-    | 'RECONCILIATION';
+    | 'RECONCILIATION'
+    | 'FIAT_WITHDRAWAL';
 
   /** Reference to order_id, trade_id, deposit_id, withdraw_id, etc. (UUID). */
   @Column({ type: 'char', length: 36 })

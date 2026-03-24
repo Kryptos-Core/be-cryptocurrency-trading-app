@@ -24,6 +24,7 @@ import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { MarketMakerModule } from './modules/market-maker/market-maker.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
+import { FiatWithdrawalsModule } from './modules/fiat-withdrawals/fiat-withdrawals.module';
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
@@ -76,6 +77,7 @@ import appConfig from './config/app.config';
     MarketMakerModule,
     PaymentConfigModule,
     TreasuryModule,
+    FiatWithdrawalsModule,
   ],
 })
 export class AppModule {}

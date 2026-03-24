@@ -151,6 +151,8 @@ export enum WalletReferenceType {
   EXTERNAL_WITHDRAWAL = 'EXTERNAL_WITHDRAWAL',
   EXTERNAL_SYNC = 'EXTERNAL_SYNC',
   RECONCILIATION = 'RECONCILIATION',
+  /** Fiat (bank) withdrawal — freeze/unfreeze/debit ledger for manual payout */
+  FIAT_WITHDRAWAL = 'FIAT_WITHDRAWAL',
 }
 
 /** Wallet ledger entry direction - Double-entry accounting */

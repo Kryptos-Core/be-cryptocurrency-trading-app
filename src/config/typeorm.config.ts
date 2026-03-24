@@ -29,6 +29,8 @@ import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
 import { TransactionWallet } from '../entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '../entities/treasury-operation.entity';
+import { UserBankAccount } from '../entities/user-bank-account.entity';
+import { FiatWithdrawalRequest } from '../entities/fiat-withdrawal-request.entity';
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
@@ -56,6 +58,8 @@ const ALL_ENTITIES = [
   TransactionWallet,
   TreasuryMainWallet,
   TreasuryOperation,
+  UserBankAccount,
+  FiatWithdrawalRequest,
 ];
 
 export const getTypeOrmConfig = (
