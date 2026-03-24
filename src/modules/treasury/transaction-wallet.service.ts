@@ -155,6 +155,38 @@ export class TransactionWalletService {
     );
   }
 
+  /** Native TRX balance (sun) — snapshot before Fund for post-broadcast polling. */
+  async getTronNativeBalanceSun(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    address: string,
+  ): Promise<number> {
+    const tronWeb = this.buildTronReadOnlyClient(chain);
+    return tronWeb.trx.getBalance(address);
+  }
+
+  /**
+   * After TRON fund broadcast, public RPC often returns stale balance briefly — poll until balance
+   * rises above pre-tx snapshot so the next API read after cache invalidation is not re-primed wrong.
+   */
+  async waitForTronBalanceReflectFund(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    address: string,
+    balanceSunBeforeTx: number,
+  ): Promise<void> {
+    const deadline = Date.now() + 60_000;
+    const tronWeb = this.buildTronReadOnlyClient(chain);
+    while (Date.now() < deadline) {
+      const sun = await tronWeb.trx.getBalance(address);
+      if (sun > balanceSunBeforeTx) {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+    this.logger.warn(
+      `Treasury TRON fund: balance for ${address} did not increase above pre-tx ${balanceSunBeforeTx} sun after 60s; UI may lag until cache TTL`,
+    );
+  }
+
   async getWalletById(walletId: string): Promise<TransactionWallet> {
     const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
 

@@ -174,7 +174,28 @@ export class TreasuryOperationsService {
       const amount = this.normalizePositiveAmount(operation.amount);
       const mainAddress = await this.transactionWalletService.getMainWalletAddress(wallet.chain);
 
+      let tronPreFundSun: number | null = null;
+      if (
+        wallet.chain === 'TRON_NILE' ||
+        wallet.chain === 'TRON_SHASTA' ||
+        wallet.chain === 'TRON_MAINNET'
+      ) {
+        tronPreFundSun = await this.transactionWalletService.getTronNativeBalanceSun(
+          wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+          wallet.address,
+        );
+      }
+
       const txHash = await this.sendFundFromMain(wallet.chain, wallet.address, amount);
+
+      if (tronPreFundSun !== null) {
+        await this.transactionWalletService.waitForTronBalanceReflectFund(
+          wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+          wallet.address,
+          tronPreFundSun,
+        );
+      }
+
       await this.finalizeSuccess(operation, mainAddress, wallet.address, txHash, amount);
       await this.publishEvent('operation.completed', {
         operationId: operation.operation_id,
