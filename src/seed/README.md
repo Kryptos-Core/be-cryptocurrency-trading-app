@@ -26,7 +26,7 @@ Cần file `.env` hợp lệ (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`
 
 File: [`data/users.json`](data/users.json)
 
-Mỗi phần tử hỗ trợ tối thiểu: `email`, `password`, `first_name`, `last_name`, `status`, `role` (ví dụ `ADMIN`, `TRADER`, `GUEST`, …). UUID user do seed sinh khi chạy.
+Mỗi phần tử hỗ trợ tối thiểu: `email`, `password`, `first_name`, `last_name`, `status`, `role` (ví dụ `ADMIN`, `TRADER`, `MARKET_MAKER`, …). UUID user do seed sinh khi chạy. Xác minh định danh dùng cột `identity_verified` (migration), không dùng role `VERIFIED_USER`.
 
 Ví dụ cấu trúc một dòng:
 

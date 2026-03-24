@@ -135,7 +135,8 @@ export class FiatWithdrawalsController {
   @Post('requests')
   @ApiOperation({
     summary: 'Tạo yêu cầu rút USDT về ngân hàng (manual payout)',
-    description: 'Cần role VERIFIED_USER (hoặc admin). Số dư sẽ bị freeze chờ duyệt.',
+    description:
+      'Cần identity_verified (trader/MM) hoặc nhân sự admin/risk/finance. Số dư sẽ bị freeze chờ duyệt.',
   })
   @ApiSuccessResponse('Đã tạo yêu cầu')
   @ApiBadRequestResponse()
@@ -143,9 +144,15 @@ export class FiatWithdrawalsController {
   createRequest(
     @CurrentUser('userId') userId: string,
     @CurrentUser('role') role: UserRole,
+    @CurrentUser('identityVerified') identityVerified: boolean,
     @Body() dto: CreateFiatWithdrawalRequestDto,
   ) {
-    return this.fiatWithdrawalsService.createWithdrawalRequest(userId, role, dto);
+    return this.fiatWithdrawalsService.createWithdrawalRequest(
+      userId,
+      role,
+      dto,
+      identityVerified,
+    );
   }
 
   @Get('requests')

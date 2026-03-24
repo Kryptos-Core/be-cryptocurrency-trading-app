@@ -9,6 +9,7 @@ import { BadRequestException, BusinessException } from '@/common/exceptions';
 import { BlockchainNetwork } from '@/common/enums';
 import { Permission, UserRole } from '@/common/enums';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
+import { normalizeUserRole } from '@/common/authz/user-role.util';
 import { newUuid } from '@/common/utils/uuid.util';
 
 /** Response for wallet auth (login or register) */
@@ -146,14 +147,15 @@ export class WalletAuthService {
   }
 
   private buildAccessToken(user: User): string {
-    const isValidRole = (Object.values(UserRole) as string[]).includes(user.role as string);
-    const role = isValidRole ? (user.role as UserRole) : UserRole.TRADER;
+    const role = normalizeUserRole(user.role as string);
     const permissions = getPermissionsForRole(role) as Permission[];
+    const identityVerified = user.identity_verified === 1;
 
     const payload = {
       userId: user.user_id,
       email: user.email,
       role,
+      identityVerified,
       permissions,
       sub: user.user_id,
     };

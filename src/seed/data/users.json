@@ -37,7 +37,7 @@
     "first_name": "Guest",
     "last_name": "User",
     "status": "ACTIVE",
-    "role": "GUEST"
+    "role": "TRADER"
   },
   {
     "email": "verified@example.com",
@@ -45,7 +45,7 @@
     "first_name": "Verified",
     "last_name": "User",
     "status": "ACTIVE",
-    "role": "VERIFIED_USER"
+    "role": "TRADER"
   },
   {
     "email": "hsondz1910@gmail.com",

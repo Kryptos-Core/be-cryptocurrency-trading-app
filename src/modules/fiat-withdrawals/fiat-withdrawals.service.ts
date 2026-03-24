@@ -33,8 +33,7 @@ const IDEMPOTENCY_TTL_SEC = 24 * 60 * 60;
 /** Cas gửi lại webhook tới 17 lần / 24h — TTL Redis > 24h để idempotent. */
 const CAS_WEBHOOK_IDEMPOTENCY_TTL_SEC = 48 * 60 * 60;
 
-const FIAT_WITHDRAW_ROLES: ReadonlySet<UserRole> = new Set([
-  UserRole.VERIFIED_USER,
+const FIAT_WITHDRAW_STAFF_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.ADMIN,
   UserRole.RISK_OFFICER,
   UserRole.FINANCE_MANAGER,
@@ -230,12 +229,27 @@ export class FiatWithdrawalsService {
     };
   }
 
-  private assertFiatWithdrawRole(role?: UserRole): void {
-    if (!role || !FIAT_WITHDRAW_ROLES.has(role)) {
+  /**
+   * Nhân sự (admin/risk/finance) luôn được; trader / market maker cần identity_verified (CCCD/Passport).
+   */
+  private assertFiatWithdrawEligibility(role?: UserRole, identityVerified?: boolean): void {
+    if (!role) {
+      throw new ForbiddenException('Không xác định được vai trò người dùng.');
+    }
+    if (FIAT_WITHDRAW_STAFF_ROLES.has(role)) {
+      return;
+    }
+    if (role === UserRole.TRADER || role === UserRole.MARKET_MAKER) {
+      if (identityVerified === true) {
+        return;
+      }
       throw new ForbiddenException(
-        'Chỉ tài khoản đã xác minh (VERIFIED_USER) hoặc nhân sự được phép mới tạo yêu cầu rút ngân hàng.',
+        'Cần xác minh định danh (CCCD/Passport) trước khi tạo yêu cầu rút ngân hàng. (IDENTITY_NOT_VERIFIED)',
       );
     }
+    throw new ForbiddenException(
+      'Vai trò của bạn không được phép tạo yêu cầu rút ngân hàng.',
+    );
   }
 
   private toLedgerRefId(seed: string): number {
@@ -367,8 +381,9 @@ export class FiatWithdrawalsService {
     userId: string,
     role: UserRole | undefined,
     dto: CreateFiatWithdrawalRequestDto,
+    identityVerified?: boolean,
   ) {
-    this.assertFiatWithdrawRole(role);
+    this.assertFiatWithdrawEligibility(role, identityVerified);
 
     const idemKey = `fiat_withdraw:idem:${userId}:${dto.idempotencyKey.trim()}`;
     const cached = await this.cacheService.get<Record<string, unknown>>(idemKey);

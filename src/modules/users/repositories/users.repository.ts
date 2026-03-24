@@ -89,6 +89,7 @@ export class UsersRepository {
           'u.status',
           'u.avatar_url',
           'u.two_fa_enabled',
+          'u.identity_verified',
           'u.created_at',
         ]);
 
@@ -188,16 +189,19 @@ export class UsersRepository {
    */
   async update(
     userId: string,
-    updates: { email?: string; status?: string; role?: UserRole },
+    updates: { email?: string; status?: string; role?: UserRole; identityVerified?: boolean },
   ): Promise<void> {
     try {
+      const idvArg =
+        updates.identityVerified === undefined ? null : updates.identityVerified ? 1 : 0;
       await this.dataSource.query(
-        'CALL sp_user_update(?, ?, ?, ?)',
+        'CALL sp_user_update(?, ?, ?, ?, ?)',
         [
           userId,
           updates.email ? updates.email.toLowerCase() : null,
           updates.status || null,
           updates.role || null,
+          idvArg,
         ],
       );
 

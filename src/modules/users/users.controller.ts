@@ -70,7 +70,11 @@ export class UsersController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search email, first_name, last_name' })
   @ApiQuery({ name: 'email', required: false, type: String, description: 'Exact email match' })
-  @ApiQuery({ name: 'role', required: false, enum: ['GUEST', 'TRADER', 'VERIFIED_USER', 'ADMIN', 'RISK_OFFICER', 'SUPPORT_AGENT', 'MARKET_MAKER', 'FINANCE_MANAGER'] })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    enum: ['TRADER', 'ADMIN', 'RISK_OFFICER', 'SUPPORT_AGENT', 'MARKET_MAKER', 'FINANCE_MANAGER'],
+  })
   @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'BANNED', 'PENDING'] })
   @ApiQuery({ name: 'sortBy', required: false, enum: ['created_at', 'email', 'first_name'] })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })

@@ -159,7 +159,12 @@ export class UsersService {
     }
 
     // Update user via repository
-    await this.usersRepository.update(userId, updateUserDto);
+    await this.usersRepository.update(userId, {
+      email: updateUserDto.email,
+      status: updateUserDto.status,
+      role: updateUserDto.role,
+      identityVerified: updateUserDto.identityVerified,
+    });
 
     // Fetch and return updated user
     return this.findOne(userId);

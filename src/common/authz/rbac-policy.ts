@@ -1,13 +1,7 @@
 import { Permission, UserRole } from '@/common/enums';
 
 const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
-  [UserRole.GUEST]: [],
   [UserRole.TRADER]: [
-    Permission.ORDERS_PLACE,
-    Permission.ORDERS_CANCEL,
-    Permission.WALLETS_WITHDRAW,
-  ],
-  [UserRole.VERIFIED_USER]: [
     Permission.ORDERS_PLACE,
     Permission.ORDERS_CANCEL,
     Permission.WALLETS_WITHDRAW,

@@ -41,27 +41,20 @@ export class User {
 
   @Column({
     type: 'enum',
-    enum: [
-      'GUEST',
-      'TRADER',
-      'VERIFIED_USER',
-      'ADMIN',
-      'RISK_OFFICER',
-      'SUPPORT_AGENT',
-      'MARKET_MAKER',
-      'FINANCE_MANAGER',
-    ],
+    enum: ['TRADER', 'ADMIN', 'RISK_OFFICER', 'SUPPORT_AGENT', 'MARKET_MAKER', 'FINANCE_MANAGER'],
     default: 'TRADER',
   })
   role!:
-    | 'GUEST'
     | 'TRADER'
-    | 'VERIFIED_USER'
     | 'ADMIN'
     | 'RISK_OFFICER'
     | 'SUPPORT_AGENT'
     | 'MARKET_MAKER'
     | 'FINANCE_MANAGER';
+
+  /** Đã xác minh định danh (CCCD/Passport) — tách khỏi role. */
+  @Column({ type: 'tinyint', width: 1, default: 0 })
+  identity_verified!: number;
 
   @Column({ type: 'varchar', length: 512, nullable: true })
   avatar_url!: string | null;

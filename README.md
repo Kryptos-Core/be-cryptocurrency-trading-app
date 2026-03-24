@@ -139,7 +139,7 @@ Luồng nằm trong module **deposits**. Production bắt buộc cấu hình đ�
 | trader2@example.com | Trader@123! | Trader |
 | trader3@example.com | Trader@123! | Trader |
 | guest@example.com | Guest@123! | Guest |
-| verified@example.com | Verified@123! | Đã xác minh |
+| verified@example.com | Verified@123! | Verified |
 | hsondz1910@gmail.com | Risk@123! | Risk Officer |
 | support@example.com | Support@123! | Support |
 | maxnoah901@gmail.com | Maker@123! | Market Maker |

@@ -4,6 +4,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UnauthorizedException } from '@/common/exceptions';
 import { Permission, UserRole } from '@/common/enums';
+import { getPermissionsForRole } from '@/common/authz/rbac-policy';
+import { normalizeUserRole } from '@/common/authz/user-role.util';
 
 /**
  * JWT Strategy - Xác thực token và inject user vào request
@@ -13,6 +15,8 @@ export interface JwtPayload {
   sub: string; // user_id (UUID v7)
   email: string;
   role?: UserRole;
+  /** JWT mới; token cũ có thể thiếu — legacy role VERIFIED_USER vẫn được công nhận ở validate(). */
+  identityVerified?: boolean;
   permissions?: Permission[];
   iat?: number;
   exp?: number;
@@ -37,13 +41,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    // Return user object - sẽ được inject vào request.user
+    const rawRole = payload.role as string | undefined;
+    const role = normalizeUserRole(rawRole);
+    const legacyVerified = rawRole === 'VERIFIED_USER';
+    const identityVerified = payload.identityVerified === true || legacyVerified;
+    const permissions = (payload.permissions as Permission[] | undefined)?.length
+      ? (payload.permissions as Permission[])
+      : (getPermissionsForRole(role) as Permission[]);
+
     return {
       userId: payload.sub,
       email: payload.email,
-      role: payload.role,
-      roles: payload.role ? [payload.role] : [],
-      permissions: payload.permissions || [],
+      role,
+      roles: [role],
+      permissions,
+      identityVerified,
     };
   }
 }

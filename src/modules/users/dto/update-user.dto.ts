@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@/common/enums';
 
@@ -29,4 +29,12 @@ export class UpdateUserDto {
   @IsEnum(UserRole)
   @IsOptional()
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Đã xác minh định danh (CCCD/Passport) — tách khỏi role',
+    example: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  identityVerified?: boolean;
 }
