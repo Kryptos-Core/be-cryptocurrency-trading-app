@@ -168,6 +168,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * SET key NX EX — dùng cho idempotency webhook / distributed lock nhẹ.
+   * @returns true nếu key chưa tồn tại và đã ghi thành công.
+   */
+  async setIfNotExists(key: string, value: string, ttlSec: number): Promise<boolean> {
+    const r = await this.client.set(key, value, 'EX', ttlSec, 'NX');
+    return r === 'OK';
+  }
+
+  /**
    * Get value by key
    */
   async get(key: string): Promise<string | null> {

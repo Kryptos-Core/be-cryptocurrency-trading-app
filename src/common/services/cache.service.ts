@@ -41,6 +41,15 @@ export class CacheService {
   }
 
   /**
+   * Idempotent claim: chỉ set nếu key chưa có (Redis SET NX EX).
+   */
+  async setIfNotExists<T>(key: string, value: T, ttlSec: number): Promise<boolean> {
+    const serialized =
+      typeof value === 'string' ? value : JSON.stringify(value);
+    return this.redisService.setIfNotExists(key, serialized, ttlSec);
+  }
+
+  /**
    * Delete key from cache
    */
   async delete(key: string): Promise<void> {

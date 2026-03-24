@@ -5,6 +5,7 @@ import { FiatWithdrawalRequest } from '@/entities/fiat-withdrawal-request.entity
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { WalletEncryptionService } from '@/common/services';
+import { CasBankHubService } from './cas-bankhub.service';
 import { FiatWithdrawalsService } from './fiat-withdrawals.service';
 import { FiatWithdrawalsController } from './fiat-withdrawals.controller';
 import { FiatWithdrawalsAdminController } from './fiat-withdrawals-admin.controller';
@@ -15,7 +16,7 @@ import { FiatWithdrawalsAdminController } from './fiat-withdrawals-admin.control
     WalletsModule,
     CurrenciesModule,
   ],
-  providers: [FiatWithdrawalsService, WalletEncryptionService],
+  providers: [CasBankHubService, FiatWithdrawalsService, WalletEncryptionService],
   controllers: [FiatWithdrawalsController, FiatWithdrawalsAdminController],
   exports: [FiatWithdrawalsService],
 })

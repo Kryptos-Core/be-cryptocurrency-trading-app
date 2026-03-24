@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/common/guards';
 import {
@@ -11,6 +12,8 @@ import {
 import { UserRole } from '@/common/enums';
 import { FiatWithdrawalsService } from './fiat-withdrawals.service';
 import {
+  CasCompleteLinkDto,
+  CasGrantTokenDto,
   CreateBankAccountDto,
   CreateFiatWithdrawalRequestDto,
   ResolveBankAccountHolderDto,
@@ -32,15 +35,47 @@ export class FiatWithdrawalsController {
   }
 
   @Public()
+  @Get('integration-settings')
+  @ApiOperation({
+    summary: 'Cấu hình tích hợp ngân hàng (Cas/BankHub vs HTTP chain)',
+    description: 'FE dùng để hiển thị luồng liên kết Cas hoặc form STK + lookup.',
+  })
+  @ApiSuccessResponse('OK')
+  integrationSettings() {
+    return this.fiatWithdrawalsService.getIntegrationSettings();
+  }
+
+  @Public()
   @Get('providers/health')
   @ApiOperation({
-    summary: 'Health-check provider ngân hàng (monitoring / load balancer)',
-    description:
-      'Kiểm tra từng provider theo thứ tự chain: healthUrl hoặc banksUrl. Không gọi lookup STK để tránh quota.',
+    summary: 'Health-check Cas/BankHub (monitoring / load balancer)',
+    description: 'POST /grant/token probe — không gọi lookup STK.',
   })
   @ApiSuccessResponse('OK')
   bankProvidersHealth() {
     return this.fiatWithdrawalsService.healthCheckBankProviders();
+  }
+
+  @Public()
+  @Post('webhooks/cas')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Webhook Cas.so / BankHub (Console)',
+    description:
+      'POST JSON từ Cas. Balance Hook (biến động số dư): cấu hình loại TRANSACTIONS trên Console — ' +
+      'https://cas.so/product/balance-hook . Trả 200 nhanh (<10s) để tránh retry 17 lần/24h.',
+  })
+  @ApiSuccessResponse('OK')
+  casConsoleWebhook(@Req() req: Request, @Body() body: unknown) {
+    const forwarded = req.headers['x-forwarded-for'];
+    const fromForwarded =
+      typeof forwarded === 'string'
+        ? forwarded.split(',')[0]?.trim()
+        : Array.isArray(forwarded)
+          ? forwarded[0]?.trim()
+          : '';
+    const clientIp = fromForwarded || req.socket?.remoteAddress || '';
+    return this.fiatWithdrawalsService.handleCasConsoleWebhook(body, { clientIp });
   }
 
   @Post('bank-accounts')
@@ -53,6 +88,26 @@ export class FiatWithdrawalsController {
     @Body() dto: CreateBankAccountDto,
   ) {
     return this.fiatWithdrawalsService.createBankAccount(userId, dto);
+  }
+
+  @Post('cas/grant-token')
+  @ApiOperation({ summary: 'Cas/BankHub: tạo grant token (mở Cas Link)' })
+  @ApiSuccessResponse('OK')
+  @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  casGrantToken(@CurrentUser('userId') _userId: string, @Body() dto: CasGrantTokenDto) {
+    return this.fiatWithdrawalsService.createCasGrantToken(dto);
+  }
+
+  @Post('cas/complete-link')
+  @ApiOperation({
+    summary: 'Cas/BankHub: đổi publicToken → lưu STK (PENDING) từ identity',
+  })
+  @ApiSuccessResponse('Đã tạo')
+  @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  casCompleteLink(@CurrentUser('userId') userId: string, @Body() dto: CasCompleteLinkDto) {
+    return this.fiatWithdrawalsService.completeCasBankLink(userId, dto.publicToken);
   }
 
   @Get('bank-accounts/resolve-holder')

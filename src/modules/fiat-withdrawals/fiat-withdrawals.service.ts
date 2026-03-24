@@ -11,12 +11,14 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@/common/exceptions';
+import type { CasWebhookEnvelope } from './types/cas-webhook.types';
 import { UserRole, WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { WalletTransactionDto } from '@/modules/wallets/dto/wallet-transaction.dto';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { UserBankAccount } from '@/entities/user-bank-account.entity';
 import { FiatWithdrawalRequest } from '@/entities/fiat-withdrawal-request.entity';
+import { resolveVietnamBankName, VIETNAM_BANKS } from './constants/vietnam-banks';
 import {
   CreateBankAccountDto,
   CreateFiatWithdrawalRequestDto,
@@ -24,12 +26,12 @@ import {
   RejectWithReasonDto,
   ResolveBankAccountHolderDto,
 } from './dto';
-import { buildFiatBankProviderChain } from './fiat-bank-provider-chain';
-import type { FiatBankProviderConfig } from './fiat-bank-provider.types';
+import { CasBankHubService } from './cas-bankhub.service';
 
 const LOCK_TTL_SEC = 60;
 const IDEMPOTENCY_TTL_SEC = 24 * 60 * 60;
-const BANKS_CACHE_TTL_SEC = 6 * 60 * 60;
+/** Cas gửi lại webhook tới 17 lần / 24h — TTL Redis > 24h để idempotent. */
+const CAS_WEBHOOK_IDEMPOTENCY_TTL_SEC = 48 * 60 * 60;
 
 const FIAT_WITHDRAW_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.VERIFIED_USER,
@@ -37,13 +39,6 @@ const FIAT_WITHDRAW_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.RISK_OFFICER,
   UserRole.FINANCE_MANAGER,
 ]);
-
-type ThirdPartyBank = {
-  code: string;
-  name: string;
-  shortName?: string;
-  bin?: string;
-};
 
 @Injectable()
 export class FiatWithdrawalsService {
@@ -60,286 +55,178 @@ export class FiatWithdrawalsService {
     private readonly configService: ConfigService,
     private readonly cacheService: CacheService,
     private readonly walletEncryptionService: WalletEncryptionService,
+    private readonly casBankHub: CasBankHubService,
   ) {}
 
-  private requestTimeoutMs(): number {
-    return this.configService.get<number>('FIAT_BANK_PROVIDER_TIMEOUT_MS') ?? 8000;
+  async listVietnamBanks() {
+    return [...VIETNAM_BANKS];
   }
 
-  private getProviderChain(): FiatBankProviderConfig[] {
-    return buildFiatBankProviderChain({
-      chainJson: this.configService.get<string>('FIAT_BANK_PROVIDER_CHAIN_JSON'),
-      banksUrl: this.configService.get<string>('FIAT_BANK_PROVIDER_BANKS_URL'),
-      lookupUrl: this.configService.get<string>('FIAT_BANK_PROVIDER_LOOKUP_URL'),
-      healthUrl: this.configService.get<string>('FIAT_BANK_PROVIDER_HEALTH_URL'),
-      clientId: this.configService.get<string>('FIAT_BANK_PROVIDER_CLIENT_ID'),
-      apiKey: this.configService.get<string>('FIAT_BANK_PROVIDER_API_KEY'),
+  getIntegrationSettings() {
+    try {
+      return {
+        bankAdapter: 'cas' as const,
+        casRedirectUri: this.casBankHub.redirectUri(),
+      };
+    } catch {
+      return {
+        bankAdapter: 'cas' as const,
+        casRedirectUri: null as string | null,
+        casConfigIncomplete: true as const,
+      };
+    }
+  }
+
+  async createCasGrantToken(dto?: { language?: string }) {
+    const raw = await this.casBankHub.createGrantToken({
+      scopes: this.casBankHub.defaultScopes(),
+      language: (dto?.language ?? 'vi').trim() || 'vi',
+      redirectUri: this.casBankHub.redirectUri(),
     });
-  }
-
-  private providerHeadersFor(p: FiatBankProviderConfig): Record<string, string> {
+    const linkUrl = this.casBankHub.extractLinkUrl(raw);
     return {
-      'Content-Type': 'application/json',
-      ...(p.clientId ? { 'x-client-id': p.clientId } : {}),
-      ...(p.apiKey ? { 'x-api-key': p.apiKey } : {}),
+      linkUrl,
+      payload: this.casBankHub.unwrapData(raw),
     };
   }
 
-  private async fetchJson(url: string, init: RequestInit, provider: FiatBankProviderConfig): Promise<any> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs());
-    try {
-      const baseHeaders = this.providerHeadersFor(provider);
-      const extra = init.headers as Record<string, string> | undefined;
-      const res = await fetch(url, {
-        ...init,
-        headers: { ...baseHeaders, ...extra },
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        throw new BadRequestException(
-          `Bank provider error: ${res.status}`,
-          'BANK_PROVIDER_HTTP_ERROR',
-        );
-      }
-      return await res.json();
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.logger.error('Failed to call bank provider', error as Error);
+  async completeCasBankLink(userId: string, publicToken: string) {
+    const exchanged = await this.casBankHub.exchangePublicToken(publicToken);
+    const accessToken = this.casBankHub.extractAccessToken(exchanged);
+    if (!accessToken) {
       throw new BadRequestException(
-        'Không thể kết nối dịch vụ ngân hàng bên thứ 3.',
-        'BANK_PROVIDER_UNAVAILABLE',
-      );
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private normalizeBanksResponse(payload: any): ThirdPartyBank[] {
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-    return rows
-      .map((row: any) => ({
-        code: String(row?.code ?? '').trim().toUpperCase(),
-        name: String(row?.name ?? row?.shortName ?? '').trim(),
-        shortName: String(row?.shortName ?? '').trim(),
-        bin: String(row?.bin ?? '').trim(),
-      }))
-      .filter((row: ThirdPartyBank) => row.code && row.name);
-  }
-
-  private async getThirdPartyBanks(): Promise<ThirdPartyBank[]> {
-    const cacheKey = 'fiat_withdraw:third_party_banks';
-    const cached = await this.cacheService.get<ThirdPartyBank[]>(cacheKey);
-    if (cached && cached.length > 0) return cached;
-
-    const chain = this.getProviderChain();
-    if (chain.length === 0) {
-      throw new BadRequestException(
-        'Thiếu cấu hình provider ngân hàng (FIAT_BANK_PROVIDER_CHAIN_JSON hoặc FIAT_BANK_PROVIDER_BANKS_URL + LOOKUP_URL).',
-        'BANK_PROVIDER_CONFIG_MISSING',
+        'BankHub không trả accessToken sau exchange.',
+        'CAS_EXCHANGE_NO_TOKEN',
       );
     }
+    const identityRaw = await this.casBankHub.fetchIdentity(accessToken);
+    const id = this.casBankHub.parseIdentity(identityRaw);
 
-    let lastError: unknown;
-    for (const p of chain) {
-      try {
-        const payload = await this.fetchJson(
-          p.banksUrl,
-          {
-            method: 'GET',
-          },
-          p,
-        );
-        const banks = this.normalizeBanksResponse(payload);
-        if (banks.length === 0) {
-          throw new BadRequestException(
-            'Danh sách ngân hàng từ bên thứ 3 không hợp lệ.',
-            'BANK_PROVIDER_INVALID_BANKS',
-          );
-        }
-        await this.cacheService.set(cacheKey, banks, BANKS_CACHE_TTL_SEC);
-        await this.cacheService.set('fiat_withdraw:third_party_banks_source', p.id, BANKS_CACHE_TTL_SEC);
-        return banks;
-      } catch (e) {
-        lastError = e;
-        this.logger.warn(`Bank list provider "${p.id}" failed, trying fallback if any: ${e}`);
-      }
+    let bankCode = id.bankCode ?? 'CAS';
+    let bankName = id.bankName;
+    if (id.bankCode) {
+      const resolved = resolveVietnamBankName(id.bankCode);
+      if (resolved) bankName = resolved;
     }
+    bankName = bankName ?? resolveVietnamBankName(bankCode) ?? 'Cas/BankHub';
 
-    if (lastError instanceof BadRequestException) throw lastError;
-    throw new BadRequestException(
-      'Tất cả provider danh sách ngân hàng đều thất bại.',
-      'BANK_PROVIDER_ALL_FAILED',
-    );
-  }
-
-  private async resolveBankByCode(code: string): Promise<ThirdPartyBank> {
-    const normalized = code.trim().toUpperCase();
-    const banks = await this.getThirdPartyBanks();
-    const bank = banks.find(
-      (b) => b.code === normalized || b.shortName?.trim().toUpperCase() === normalized,
-    );
-    if (!bank) {
-      throw new BadRequestException('Mã ngân hàng không hợp lệ.', 'INVALID_BANK_CODE');
-    }
-    return bank;
-  }
-
-  async listVietnamBanks() {
-    const banks = await this.getThirdPartyBanks();
-    return banks.map((b) => ({ code: b.code, name: b.name }));
+    return this.persistUserBankAccount(userId, {
+      bankCode,
+      bankName,
+      accountNumber: id.accountNumber,
+      accountHolderName: id.accountHolderName,
+    });
   }
 
   async resolveBankAccountHolder(userId: string, dto: ResolveBankAccountHolderDto) {
     void userId;
-    const bank = await this.resolveBankByCode(dto.bankCode);
-    const acct = dto.accountNumber.replace(/\s/g, '');
-    if (!/^\d{6,19}$/.test(acct)) {
-      throw new BadRequestException('Số tài khoản không hợp lệ.', 'INVALID_ACCOUNT_NUMBER');
-    }
-    if (!bank.bin) {
-      throw new BadRequestException(
-        'Ngân hàng chưa có mã BIN để tra cứu bên thứ 3.',
-        'BANK_PROVIDER_BIN_MISSING',
-      );
-    }
-
-    const chain = this.getProviderChain();
-    if (chain.length === 0) {
-      throw new BadRequestException(
-        'Thiếu cấu hình provider ngân hàng.',
-        'BANK_PROVIDER_CONFIG_MISSING',
-      );
-    }
-
-    let lastError: unknown;
-    for (const p of chain) {
-      try {
-        const payload = await this.fetchJson(
-          p.lookupUrl,
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              bin: bank.bin,
-              accountNumber: acct,
-            }),
-          },
-          p,
-        );
-
-        const accountName = String(payload?.data?.accountName ?? '').trim();
-        if (!accountName) {
-          throw new BadRequestException(
-            'Không truy xuất được tên chủ tài khoản từ bên thứ 3.',
-            'BANK_PROVIDER_LOOKUP_FAILED',
-          );
-        }
-
-        return {
-          bankCode: bank.code,
-          bankName: bank.name,
-          accountNumberLast4: acct.slice(-4),
-          accountHolderName: accountName,
-          source: `THIRD_PARTY:${p.id}`,
-        };
-      } catch (e) {
-        lastError = e;
-        this.logger.warn(`Lookup provider "${p.id}" failed, trying fallback if any: ${e}`);
-      }
-    }
-
-    if (lastError instanceof BadRequestException) throw lastError;
+    void dto;
     throw new BadRequestException(
-      'Tất cả provider tra cứu STK đều thất bại.',
-      'BANK_PROVIDER_LOOKUP_ALL_FAILED',
+      'Vui lòng liên kết tài khoản qua Cas.so / BankHub (Balance Hook), không tra cứu STK thủ công.',
+      'USE_CAS_LINK_FLOW',
     );
   }
 
   /**
-   * Kiểm tra từng provider: GET `healthUrl` (nếu có) hoặc GET `banksUrl` và kiểm tra body có danh sách.
-   * Không gọi lookup để tránh tốn quota.
+   * Nhận webhook từ Cas Console (Balance Hook: loại TRANSACTIONS; Grant: GRANT, …).
+   * Idempotent qua Redis SET NX theo transaction.id (hoặc fallback transactionCode).
+   * Nghiệp vụ ghi có ví / đối soát: mở rộng tại đây sau khi có bảng map grantId ↔ user.
    */
-  async healthCheckBankProviders(options?: { includeDetails?: boolean }) {
-    const chain = this.getProviderChain();
-    const checkedAt = new Date().toISOString();
-    if (chain.length === 0) {
-      return {
-        ok: false,
-        checkedAt,
-        message: 'No bank providers configured',
-        providers: [] as Array<Record<string, unknown>>,
-      };
+  async handleCasConsoleWebhook(
+    body: unknown,
+    meta?: { clientIp?: string },
+  ): Promise<{ received: true; duplicate?: boolean; webhookType?: string }> {
+    if (body === null || typeof body !== 'object') {
+      throw new BadRequestException('Webhook body phải là JSON object.', 'CAS_WEBHOOK_INVALID_BODY');
     }
 
-    const providers: Array<Record<string, unknown>> = [];
-    for (const p of chain) {
-      const url = p.healthUrl ?? p.banksUrl;
-      const checkedVia = p.healthUrl ? 'healthUrl' : 'banksUrl';
-      const started = Date.now();
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs());
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: this.providerHeadersFor(p),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const latencyMs = Date.now() - started;
-
-        if (!res.ok) {
-          providers.push({
-            id: p.id,
-            ok: false,
-            httpStatus: res.status,
-            latencyMs,
-            checkedVia,
-            ...(options?.includeDetails ? { error: `HTTP ${res.status}` } : {}),
-          });
-          continue;
-        }
-
-        if (p.healthUrl) {
-          providers.push({ id: p.id, ok: true, httpStatus: res.status, latencyMs, checkedVia });
-          continue;
-        }
-
-        const payload = await res.json();
-        const banks = this.normalizeBanksResponse(payload);
-        providers.push({
-          id: p.id,
-          ok: banks.length > 0,
-          httpStatus: res.status,
-          latencyMs,
-          checkedVia,
-          bankCount: banks.length,
-          ...(options?.includeDetails && banks.length === 0
-            ? { error: 'Empty or invalid banks payload' }
-            : {}),
-        });
-      } catch (e) {
-        const latencyMs = Date.now() - started;
-        const msg = e instanceof Error ? e.message : String(e);
-        providers.push({
-          id: p.id,
-          ok: false,
-          latencyMs,
-          checkedVia,
-          ...(options?.includeDetails ? { error: msg } : {}),
-        });
+    const trusted = this.configService.get<string>('CAS_WEBHOOK_TRUSTED_IPS')?.trim();
+    if (trusted) {
+      const allowed = trusted
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const ip = (meta?.clientIp ?? '').trim();
+      if (allowed.length > 0 && (!ip || !allowed.includes(ip))) {
+        this.logger.warn(`Cas webhook rejected: IP not in CAS_WEBHOOK_TRUSTED_IPS (ip=${ip || 'empty'})`);
+        throw new ForbiddenException('Webhook source not allowed');
       }
     }
 
-    const ok = providers.some((r) => r.ok === true);
+    const env = body as CasWebhookEnvelope;
+    const webhookType = String(env.webhookType ?? '').trim().toUpperCase();
 
+    if (webhookType === 'TRANSACTIONS') {
+      const tx = env.transaction;
+      const tid =
+        tx?.id != null && String(tx.id).trim() !== ''
+          ? String(tx.id).trim()
+          : tx?.transactionCode != null && String(tx.transactionCode).trim() !== ''
+            ? `code:${String(tx.transactionCode).trim()}`
+            : null;
+
+      if (!tid) {
+        this.logger.warn('Cas TRANSACTIONS webhook: missing transaction.id and transactionCode');
+        return { received: true, webhookType };
+      }
+
+      const key = `cas:wh:txn:${tid}`;
+      const first = await this.cacheService.setIfNotExists(
+        key,
+        { at: new Date().toISOString() },
+        CAS_WEBHOOK_IDEMPOTENCY_TTL_SEC,
+      );
+
+      if (!first) {
+        return { received: true, duplicate: true, webhookType };
+      }
+
+      this.logger.log(
+        JSON.stringify({
+          event: 'cas_webhook_transactions',
+          grantId: env.grantId,
+          webhookCode: env.webhookCode,
+          transactionId: tx?.id,
+          transactionCode: tx?.transactionCode,
+          amount: tx?.amount,
+          currency: tx?.currency,
+          accountNumber: tx?.accountNumber,
+        }),
+      );
+
+      return { received: true, webhookType };
+    }
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'cas_webhook',
+        webhookType: webhookType || 'UNKNOWN',
+        webhookCode: env.webhookCode,
+        grantId: env.grantId,
+        hasError: env.error != null,
+      }),
+    );
+
+    return { received: true, webhookType: webhookType || undefined };
+  }
+
+  /** Cas/BankHub: probe POST grant/token — không gọi lookup. */
+  async healthCheckBankProviders(options?: { includeDetails?: boolean }) {
+    const ping = await this.casBankHub.healthPing();
     return {
-      ok,
-      checkedAt,
-      providers,
+      ok: ping.ok,
+      checkedAt: new Date().toISOString(),
+      mode: 'cas_bankhub',
+      providers: [
+        {
+          id: 'cas_bankhub',
+          ok: ping.ok,
+          httpStatus: ping.httpStatus,
+          latencyMs: ping.latencyMs,
+          checkedVia: 'POST /grant/token (empty probe)',
+          ...(options?.includeDetails && ping.error ? { error: ping.error } : {}),
+        },
+      ],
     };
   }
 
@@ -401,15 +288,21 @@ export class FiatWithdrawalsService {
     return new Decimal(String(raw));
   }
 
-  async createBankAccount(userId: string, dto: CreateBankAccountDto) {
-    const code = dto.bankCode.trim().toUpperCase();
-    const bank = await this.resolveBankByCode(code);
-    const bankName = bank.name;
-
-    const acct = dto.accountNumber.replace(/\s/g, '');
+  private async persistUserBankAccount(
+    userId: string,
+    opts: {
+      bankCode: string;
+      bankName: string;
+      accountNumber: string;
+      accountHolderName: string;
+    },
+  ) {
+    const code = opts.bankCode.trim().toUpperCase();
+    const bankName = opts.bankName.trim();
+    const acct = opts.accountNumber.replace(/\s/g, '');
     const last4 = acct.slice(-4);
     const encrypted = this.walletEncryptionService.encrypt(acct);
-    const holder = dto.accountHolderName.replace(/\s+/g, ' ').trim();
+    const holder = opts.accountHolderName.replace(/\s+/g, ' ').trim();
 
     const id = uuidv7();
     await this.bankRepo.insert({
@@ -436,6 +329,22 @@ export class FiatWithdrawalsService {
       accountHolderName: holder,
       status: 'PENDING',
     };
+  }
+
+  async createBankAccount(userId: string, dto: CreateBankAccountDto) {
+    const code = dto.bankCode.trim().toUpperCase();
+    const resolved = resolveVietnamBankName(code);
+    if (!resolved) {
+      throw new BadRequestException('Mã ngân hàng không hợp lệ.', 'INVALID_BANK_CODE');
+    }
+    const bankName = resolved;
+
+    return this.persistUserBankAccount(userId, {
+      bankCode: code,
+      bankName,
+      accountNumber: dto.accountNumber,
+      accountHolderName: dto.accountHolderName,
+    });
   }
 
   async listMyBankAccounts(userId: string) {
