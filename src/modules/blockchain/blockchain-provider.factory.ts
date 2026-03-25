@@ -8,7 +8,11 @@ import { BadRequestException } from '@/common/exceptions';
 
 /**
  * Blockchain Provider Factory
- * Factory Pattern: Trả về provider phù hợp theo network enum
+ * Pattern applied: Simple Factory
+ *
+ * Purpose: Encapsulates the logic of retrieving the correct IBlockchainProvider implementation
+ * based on the network type. Client code acts against the IBlockchainProvider interface
+ * and relies on this factory to supply the correct concrete implementation.
  */
 @Injectable()
 export class BlockchainProviderFactory {
@@ -20,6 +24,7 @@ export class BlockchainProviderFactory {
     private readonly solanaProvider: SolanaProvider,
     private readonly ethereumProvider: EthereumProvider,
   ) {
+    // Register concrete providers for each network
     this.providerMap = new Map<BlockchainNetwork, IBlockchainProvider>([
       [BlockchainNetwork.TRON_NILE, this.tronProvider],
       [BlockchainNetwork.TRON_SHASTA, this.tronProvider],
@@ -28,26 +33,29 @@ export class BlockchainProviderFactory {
     ]);
 
     this.logger.log(
-      `BlockchainProviderFactory khởi tạo: ${this.providerMap.size} providers`,
+      `BlockchainProviderFactory initialized with ${this.providerMap.size} network mappings`,
     );
   }
 
   /**
-   * Lấy provider theo network
-   * @throws BadRequestException nếu network không được hỗ trợ
+   * Factory Method: Returns the specific provider instance for the requested network.
+   *
+   * @param network The blockchain network enum
+   * @returns IBlockchainProvider implementation
+   * @throws BadRequestException if the network is unknown
    */
   getProvider(network: BlockchainNetwork): IBlockchainProvider {
     const provider = this.providerMap.get(network);
     if (!provider) {
       throw new BadRequestException(
-        `Mạng blockchain không được hỗ trợ: ${network}`,
+        `Unsupported blockchain network: ${network}`,
         'UNSUPPORTED_NETWORK',
       );
     }
     return provider;
   }
 
-  /** Lấy danh sách tất cả network được hỗ trợ */
+  /** Returns list of all supported networks in this factory */
   getSupportedNetworks(): BlockchainNetwork[] {
     return Array.from(this.providerMap.keys());
   }

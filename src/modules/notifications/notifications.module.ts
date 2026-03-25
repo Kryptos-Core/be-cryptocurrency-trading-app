@@ -8,6 +8,7 @@ import { NotificationsGateway } from './notifications.gateway';
 import { NotificationRepository } from './repositories/notification.repository';
 import { FcmService } from '@/common/services/fcm.service';
 import { AuthModule } from '@/modules/auth/auth.module';
+import { InAppNotificationStrategy, PushNotificationStrategy, NOTIFICATION_STRATEGIES } from './strategies/notification.strategy';
 
 /**
  * Notifications Module
@@ -27,7 +28,19 @@ import { AuthModule } from '@/modules/auth/auth.module';
     forwardRef(() => AuthModule),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationsGateway, NotificationRepository, FcmService],
+  providers: [
+    NotificationsService, 
+    NotificationsGateway, 
+    NotificationRepository, 
+    FcmService,
+    InAppNotificationStrategy,
+    PushNotificationStrategy,
+    {
+      provide: NOTIFICATION_STRATEGIES,
+      useFactory: (inApp: InAppNotificationStrategy, push: PushNotificationStrategy) => [inApp, push],
+      inject: [InAppNotificationStrategy, PushNotificationStrategy]
+    }
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

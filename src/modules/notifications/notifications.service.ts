@@ -1,18 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import { RedisService } from '@/common/services/redis.service';
-import { FcmService } from '@/common/services/fcm.service';
 import { NotificationRepository } from './repositories/notification.repository';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationQueryDto } from './dto/notification-query.dto';
+import { INotificationStrategy, NOTIFICATION_STRATEGIES } from './strategies/notification.strategy';
 
 export const NOTIFICATIONS_CHANNEL = 'notifications:broadcast';
 export const NOTIFICATIONS_TARGETED_CHANNEL = 'notifications:targeted';
 
 /**
  * Notification Service
- * Observer Pattern: publish to Redis channel → NotificationsGateway broadcasts to all connected sockets.
- * Facade Pattern: orchestrates DB write + Redis publish + FCM push in one call.
+ * Strategy Pattern: Injects an array of strategies (InApp, Push) and executes them.
+ * Facade Pattern: orchestrates DB write + Strategy executions.
  */
 @Injectable()
 export class NotificationsService {
@@ -20,8 +19,7 @@ export class NotificationsService {
 
   constructor(
     private readonly notificationRepo: NotificationRepository,
-    private readonly redisService: RedisService,
-    private readonly fcmService: FcmService,
+    @Inject(NOTIFICATION_STRATEGIES) private readonly strategies: INotificationStrategy[],
   ) {}
 
   /**
@@ -44,33 +42,12 @@ export class NotificationsService {
       data: dto.data ?? null,
     });
 
-    const payload = {
-      targetUserId,
-      notification_id: notificationId,
-      title: dto.title,
-      body: dto.body,
-      type: dto.type ?? 'system',
-      data: dto.data ?? null,
-      created_at: new Date().toISOString(),
-    };
+    const token = await this.notificationRepo.getFcmTokenByUserId(targetUserId);
 
-    await this.redisService.publish(
-      NOTIFICATIONS_TARGETED_CHANNEL,
-      JSON.stringify(payload),
+    // Execute all registered strategies (Strategy Pattern)
+    await Promise.all(
+      this.strategies.map(strategy => strategy.sendToUser(targetUserId, notificationId, dto, token ?? undefined))
     );
-
-    try {
-      const token = await this.notificationRepo.getFcmTokenByUserId(targetUserId);
-      if (token) {
-        await this.fcmService.sendToTokens([token], dto.title, dto.body, {
-          notification_id: notificationId,
-          type: dto.type ?? 'system',
-          ...dto.data,
-        });
-      }
-    } catch (error) {
-      this.logger.error('FCM push to user failed (non-critical)', error);
-    }
   }
 
   async broadcast(dto: CreateNotificationDto, adminId: string) {
@@ -85,28 +62,12 @@ export class NotificationsService {
       data: dto.data ?? null,
     });
 
-    const payload = {
-      notification_id: notificationId,
-      title: dto.title,
-      body: dto.body,
-      type: dto.type ?? 'system',
-      data: dto.data ?? null,
-      created_at: new Date().toISOString(),
-    };
+    const tokens = await this.notificationRepo.findAllFcmTokens();
 
-    // Publish to Redis — NotificationsGateway will fan-out to all connected WS clients
-    await this.redisService.publish(NOTIFICATIONS_CHANNEL, JSON.stringify(payload));
-
-    // FCM push — fire and forget for offline mobile devices
-    try {
-      const tokens = await this.notificationRepo.findAllFcmTokens();
-      await this.fcmService.sendToTokens(tokens, dto.title, dto.body, {
-        notification_id: notificationId,
-        type: dto.type ?? 'system',
-      });
-    } catch (error) {
-      this.logger.error('FCM push failed (non-critical)', error);
-    }
+    // Execute all registered strategies (Strategy Pattern)
+    await Promise.all(
+      this.strategies.map(strategy => strategy.broadcast(notificationId, dto, tokens))
+    );
 
     return notification;
   }
