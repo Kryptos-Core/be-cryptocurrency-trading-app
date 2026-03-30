@@ -12,6 +12,10 @@ import { WcSessionData, WcSessionStatus } from './dto';
 /**
  * WalletConnectService
  *
+ * Đăng nhập public dùng URI + SignClient thật qua `walletconnect-dapp-client.factory.ts`
+ * (xem `WalletConnectAuthService`). Module này (liên kết ví JWT) vẫn dùng URI ghép + submit tay
+ * cho tới khi thống nhất cùng factory.
+ *
  * Patterns:
  *  - Facade Pattern: ẩn phức tạp của WC SDK, chỉ expose initSession / getStatus
  *  - Strategy Pattern: delegate verify sang WalletLinkingService (tái dụng logic)
@@ -56,7 +60,10 @@ export class WalletConnectService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    this.projectId = this.configService.get<string>('WALLETCONNECT_PROJECT_ID', '');
+    const raw =
+      (this.configService.get<string>('WALLETCONNECT_PROJECT_ID', '') ?? '').trim() ||
+      (this.configService.get<string>('REOWN_PROJECT_ID', '') ?? '').trim();
+    this.projectId = raw;
     this.relayUrl = this.configService.get<string>(
       'WALLETCONNECT_RELAY_URL',
       'wss://relay.walletconnect.com',
@@ -64,7 +71,9 @@ export class WalletConnectService implements OnModuleInit {
     this.webhookSecret = this.configService.get<string>('WALLETCONNECT_WEBHOOK_SECRET', '');
 
     if (!this.projectId) {
-      this.logger.warn('[WalletConnect] WALLETCONNECT_PROJECT_ID chưa được cấu hình!');
+      this.logger.warn(
+        '[WalletConnect] Chưa có WALLETCONNECT_PROJECT_ID hoặc REOWN_PROJECT_ID!',
+      );
     } else {
       this.logger.log(`[WalletConnect] Khởi tạo với projectId=${this.projectId.substring(0, 8)}...`);
     }

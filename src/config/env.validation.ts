@@ -388,6 +388,23 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CAS_WEBHOOK_TRUSTED_IPS?: string;
+
+  /** WalletConnect / Reown — phải có trong envVarKeys để ConfigService nhận từ .env */
+  @IsString()
+  @IsOptional()
+  WALLETCONNECT_PROJECT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  REOWN_PROJECT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  WALLETCONNECT_RELAY_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  WALLETCONNECT_WEBHOOK_SECRET?: string;
 }
 
 /**
@@ -398,6 +415,8 @@ export class EnvironmentVariables {
 export function validateEnvironment(config: Record<string, unknown>): EnvironmentVariables {
   // Filter chỉ lấy các properties có trong EnvironmentVariables class
   // Để tránh validate các system environment variables
+  // Lưu ý: biến nào cần `ConfigService.get()` phải có trong envVarKeys + class ở trên
+  // (Nest gán object đã validate vào process.env; thiếu key = .env có mà app không đọc được).
   const envVarKeys = [
     'NODE_ENV',
     'PORT',
@@ -480,6 +499,10 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'CAS_BALANCE_HOOK_SCOPES',
     'CAS_BANKHUB_API_VERSION',
     'CAS_WEBHOOK_TRUSTED_IPS',
+    'WALLETCONNECT_PROJECT_ID',
+    'REOWN_PROJECT_ID',
+    'WALLETCONNECT_RELAY_URL',
+    'WALLETCONNECT_WEBHOOK_SECRET',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm
