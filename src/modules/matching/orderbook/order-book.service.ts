@@ -14,17 +14,23 @@ export class OrderBookService {
     { buy: BuyQueueService; sell: SellQueueService }
   >();
 
+  /** MySQL CHAR(n) pads with spaces; callers may pass an untrimmed API id — one canonical key per pair. */
+  private normalizePairId(pairId: string): string {
+    return (pairId ?? '').trim();
+  }
+
   private getBook(pairId: string): {
     buy: BuyQueueService;
     sell: SellQueueService;
   } {
-    let book = this.books.get(pairId);
+    const key = this.normalizePairId(pairId);
+    let book = this.books.get(key);
     if (!book) {
       book = {
         buy: new BuyQueueService(),
         sell: new SellQueueService(),
       };
-      this.books.set(pairId, book);
+      this.books.set(key, book);
     }
     return book;
   }
@@ -39,7 +45,7 @@ export class OrderBookService {
   }
 
   removeOrder(pairId: string, orderId: string, side: 'BUY' | 'SELL'): boolean {
-    const book = this.books.get(pairId);
+    const book = this.books.get(this.normalizePairId(pairId));
     if (!book) return false;
     return side === 'BUY' ? book.buy.remove(orderId) : book.sell.remove(orderId);
   }
@@ -63,7 +69,8 @@ export class OrderBookService {
   }
 
   loadOrders(pairId: string, orders: OrderBookOrder[]): void {
-    this.books.set(pairId, {
+    const key = this.normalizePairId(pairId);
+    this.books.set(key, {
       buy: new BuyQueueService(),
       sell: new SellQueueService(),
     });

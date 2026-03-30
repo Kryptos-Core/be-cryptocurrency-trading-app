@@ -65,6 +65,16 @@ Sau đó điền thông tin và chạy ứng dụng.
 | TRON_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Tron |
 | BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chỉ dùng cho phát triển, mặc định là false |
 
+### WalletConnect v2 (liên kết ví qua QR / deep link)
+
+| Biến | Mô tả |
+|------|--------|
+| WALLETCONNECT_PROJECT_ID | Project ID từ Reown (WalletConnect) Cloud — dùng khi khởi tạo WC trên backend. |
+| WALLETCONNECT_RELAY_URL | WebSocket relay; mặc định `wss://relay.walletconnect.com` nếu không set. |
+| WALLETCONNECT_WEBHOOK_SECRET | Tùy chọn: secret chung để verify HMAC trên `POST .../wc/relay-webhook`. Để trống nếu chỉ dùng luồng FE `submit` (không có caller ký webhook). |
+
+Xem luồng đầy đủ: [WALLETCONNECT.md](WALLETCONNECT.md).
+
 ### PayOS
 
 | Biến | Mô tả |

@@ -32,6 +32,7 @@ describe('OrdersController', () => {
       findOne: jest.fn(),
       getOrderBook: jest.fn(),
       findMyOrders: jest.fn(),
+      reconcileMatchingForPair: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,7 +54,7 @@ describe('OrdersController', () => {
   describe('create', () => {
     it('calls service.create with userId and dto', async () => {
       const dto = {
-        pairId: 1,
+        pairId: 'p1',
         side: 'BUY' as const,
         type: 'LIMIT' as const,
         price: '50000',
@@ -61,8 +62,8 @@ describe('OrdersController', () => {
         idempotencyKey: 'key-1',
       };
       ordersService.create.mockResolvedValue(mockOrder);
-      const result = await controller.create(1, dto);
-      expect(ordersService.create).toHaveBeenCalledWith({ userId: 1, dto });
+      const result = await controller.create('u1', dto);
+      expect(ordersService.create).toHaveBeenCalledWith({ userId: 'u1', dto });
       expect(result).toEqual(mockOrder);
     });
   });
@@ -71,8 +72,8 @@ describe('OrdersController', () => {
     it('calls service.getOrderBook with pairId, side, limit', async () => {
       const levels = [{ price: '50000', remaining: '1', order_count: 2 }];
       ordersService.getOrderBook.mockResolvedValue(levels);
-      const result = await controller.getOrderBook(1, 'BUY', 50);
-      expect(ordersService.getOrderBook).toHaveBeenCalledWith(1, 'BUY', 50);
+      const result = await controller.getOrderBook('p1', 'BUY', 50);
+      expect(ordersService.getOrderBook).toHaveBeenCalledWith('p1', 'BUY', 50);
       expect(result).toEqual(levels);
     });
   });
@@ -81,8 +82,8 @@ describe('OrdersController', () => {
     it('calls service.findMyOrders with userId, page, limit, status', async () => {
       const payload = { data: [mockOrder], total: 1, page: 1, limit: 20 };
       ordersService.findMyOrders.mockResolvedValue(payload);
-      const result = await controller.findMyOrders(1, 1, 20, 'OPEN');
-      expect(ordersService.findMyOrders).toHaveBeenCalledWith(1, 1, 20, 'OPEN');
+      const result = await controller.findMyOrders('u1', 1, 20, 'OPEN');
+      expect(ordersService.findMyOrders).toHaveBeenCalledWith('u1', 1, 20, 'OPEN');
       expect(result).toEqual(payload);
     });
   });
@@ -90,9 +91,25 @@ describe('OrdersController', () => {
   describe('findOne', () => {
     it('calls service.findOne with orderId and userId', async () => {
       ordersService.findOne.mockResolvedValue(mockOrder);
-      const result = await controller.findOne(1, 1);
-      expect(ordersService.findOne).toHaveBeenCalledWith(1, 1);
+      const result = await controller.findOne('u1', 'o1');
+      expect(ordersService.findOne).toHaveBeenCalledWith('o1', 'u1');
       expect(result).toEqual(mockOrder);
+    });
+  });
+
+  describe('reconcileMatchingForPair', () => {
+    it('calls service.reconcileMatchingForPair with pairId', async () => {
+      const summary = {
+        pairId: 'pair-uuid',
+        tradesExecuted: 1,
+        matchRuns: 2,
+        openOrdersRemaining: 0,
+        stoppedReason: 'all_matched' as const,
+      };
+      ordersService.reconcileMatchingForPair.mockResolvedValue(summary);
+      const result = await controller.reconcileMatchingForPair('pair-uuid');
+      expect(ordersService.reconcileMatchingForPair).toHaveBeenCalledWith('pair-uuid');
+      expect(result).toEqual(summary);
     });
   });
 
@@ -100,10 +117,10 @@ describe('OrdersController', () => {
     it('calls service.cancel with userId, orderId, and optional idempotencyKey', async () => {
       const cancelled = { ...mockOrder, status: 'CANCELLED' };
       ordersService.cancel.mockResolvedValue(cancelled as Order);
-      const result = await controller.cancel(1, 1, {});
+      const result = await controller.cancel('u1', 'o1', {});
       expect(ordersService.cancel).toHaveBeenCalledWith({
-        userId: 1,
-        orderId: 1,
+        userId: 'u1',
+        orderId: 'o1',
         idempotencyKey: undefined,
       });
       expect(result.status).toBe('CANCELLED');

@@ -31,6 +31,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.WITHDRAWALS_APPROVE,
     /** Giám sát lệnh / phát hiện bất thường */
     Permission.ORDERS_READ,
+    /** Khôi phục khớp lệnh thủ công theo cặp khi cần */
+    Permission.MATCHING_RECONCILE,
   ],
   [UserRole.FINANCE_MANAGER]: [
     Permission.WALLETS_READ,
@@ -49,6 +51,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.ORDERS_BATCH_PLACE,
     Permission.ORDERS_READ,
     Permission.ORDERS_MANAGE,
+    Permission.MATCHING_RECONCILE,
     Permission.WALLETS_READ,
     Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,

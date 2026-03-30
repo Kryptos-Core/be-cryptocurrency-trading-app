@@ -65,11 +65,15 @@ export class MatchingRepository {
     const amount = parseFloat(r.amount ?? '0');
     const filled = parseFloat(r.filled_amount ?? '0');
     return {
-      order_id: String(r.order_id ?? ''),
-      pair_id: String(r.pair_id ?? ''),
-      user_id: String(r.user_id ?? ''),
-      side: r.side,
-      type: r.type,
+      order_id: String(r.order_id ?? '').trim(),
+      pair_id: String(r.pair_id ?? '').trim(),
+      user_id: String(r.user_id ?? '').trim(),
+      side: String(r.side ?? '')
+        .trim()
+        .toUpperCase() as 'BUY' | 'SELL',
+      type: String(r.type ?? '')
+        .trim()
+        .toUpperCase() as 'LIMIT' | 'MARKET',
       time_in_force: r.time_in_force ?? 'GTC',
       price: r.price != null ? String(r.price) : null,
       amount: String(r.amount ?? '0'),

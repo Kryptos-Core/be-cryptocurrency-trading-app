@@ -83,6 +83,24 @@ export class OrdersController {
     return this.ordersService.findAllForAdmin({ userId, pairId, status, page, limit });
   }
 
+  @Post('admin/reconcile-matching/:pairId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MATCHING_RECONCILE)
+  @ApiOperation({
+    summary: 'Admin/Ops: Re-run matching for a pair (manual)',
+    description:
+      'Retries matching for all OPEN/PARTIAL orders on the given pair until no further trades execute or a safety cap is hit. Use for operational recovery (stale book, missed matches); audited via application logs.',
+  })
+  @ApiParam({
+    name: 'pairId',
+    type: String,
+    description: 'Market pair_id (UUID) or trading symbol BASE/QUOTE (e.g. OG/USDT, URL-encoded)',
+  })
+  async reconcileMatchingForPair(@Param('pairId') pairId: string) {
+    return this.ordersService.reconcileMatchingForPair(pairId);
+  }
+
   @Get('book/:pairId')
   @ApiOperation({ summary: 'Order book', description: 'Get order book for a pair and side.' })
   @ApiParam({ name: 'pairId', type: String, description: 'Pair UUID' })

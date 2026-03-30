@@ -6,6 +6,8 @@ import { PriceTimePriorityStrategy } from './strategies/price-time-priority.stra
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { RedisService } from '@/common/services';
 import { OrderBookOrder } from './interfaces';
+import { AuditTradeVisitor } from './visitors/audit-trade.visitor';
+import { MetricsTradeVisitor } from './visitors/metrics-trade.visitor';
 
 function order(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {
@@ -56,6 +58,8 @@ describe('MatchingService', () => {
           provide: RedisService,
           useValue: { getClient: () => redisClient, del: redisDel },
         },
+        { provide: AuditTradeVisitor, useValue: { visit: jest.fn() } },
+        { provide: MetricsTradeVisitor, useValue: { visit: jest.fn() } },
       ],
     }).compile();
 
@@ -64,8 +68,8 @@ describe('MatchingService', () => {
     matchingRepository = module.get(MatchingRepository);
   });
 
-  it('returns [] when lock is not acquired', async () => {
-    redisClient.set.mockResolvedValueOnce(null);
+  it('returns [] when lock is not acquired after retries', async () => {
+    redisClient.set.mockImplementation(() => Promise.resolve(null));
 
     const results = await service.runMatch({
       takerOrder: order({ order_id: 'tk1' }),
@@ -156,5 +160,26 @@ describe('MatchingService', () => {
     });
 
     expect(redisDel).toHaveBeenCalledWith('matching:lock:pair-1');
+  });
+
+  it('reloads order book from DB on every match (buy + sell queries)', async () => {
+    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
+
+    await service.runMatch({
+      takerOrder: order({ order_id: 'tk1' }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+    await service.runMatch({
+      takerOrder: order({ order_id: 'tk2' }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(matchingRepository.getOpenOrdersForPair).toHaveBeenCalledTimes(4);
   });
 });

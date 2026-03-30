@@ -12,6 +12,7 @@ API backend cho nền tảng giao dịch tiền mã hóa, xây dựng bằng **N
 | **Khớp lệnh** | Engine price–time priority, Redis lock, thực thi giao dịch |
 | **Ví** | Số dư nội bộ, đối soát, đồng bộ ví ngoài (Binance) theo cấu hình |
 | **Nạp/rút** | Nạp fiat qua **PayOS**, nạp/rút on-chain (TRON, Ethereum, Solana testnet) |
+| **Liên kết ví** | **WalletConnect v2** (QR / deep link) + route nonce cổ điển; xem `docs/WALLETCONNECT.md` |
 | **Kho bạc (Treasury)** | Ví giao dịch, sweep, thao tác vận hành (RBAC) |
 | **Realtime** | WebSocket (Socket.IO) — giá, trading |
 | **Thông báo** | Firebase Admin (FCM) |
@@ -67,7 +68,7 @@ npm run start:dev
 - Mẫu đầy đủ: [`env.example`](env.example)
 - **Không** commit file `.env` hoặc khóa thật lên git.
 
-Các nhóm quan trọng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `FIREBASE_*` (push), SMTP (2FA).
+Các nhóm quan trọng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `WALLETCONNECT_*` (liên kết ví WC v2), `FIREBASE_*` (push), SMTP (2FA).
 
 ## Scripts npm
 
@@ -117,6 +118,7 @@ be-cryptocurrency-trading-app/
 ## Tài liệu thêm
 
 - [Redis Usage](docs/REDIS_USAGE.md)
+- [WalletConnect v2 — liên kết ví](docs/WALLETCONNECT.md)
 - [Swagger](docs/SWAGGER_USAGE.md) · [Env / biến môi trường](docs/ENV_CONFIG_USAGE.md)
 - [Base Repository Usage](docs/BASE_REPOSITORY_USAGE.md)
 - [Treasury daily runbook](docs/TREASURY_DAILY_RUNBOOK.md)

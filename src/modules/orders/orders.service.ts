@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { newUuid } from '@/common/utils/uuid.util';
 import { OrderRepository } from './repositories';
 import { OrderValidationStrategy } from './strategies';
@@ -16,6 +16,7 @@ import { Order } from '@/entities/order.entity';
 import { MarketRepository } from '@/modules/markets/repositories';
 import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
 import { MatchingService } from '@/modules/matching/matching.service';
+import { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400; // 24h
@@ -28,6 +29,8 @@ const MAX_BATCH_ORDERS = 20;
  */
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly orderRepository: OrderRepository,
     private readonly marketRepository: MarketRepository,
@@ -143,7 +146,9 @@ export class OrdersService {
             order = (await this.orderRepository.findById(result.order_id)) ?? order;
           }
         } catch (e) {
-          // Don't fail create if matching fails (e.g. lock, DB)
+          this.logger.warn(
+            `Matching failed after order create ${result.order_id}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`,
+          );
         }
       }
     }
@@ -168,6 +173,9 @@ export class OrdersService {
       );
     }
 
+    const pairId = order.pair_id;
+    const side = order.side;
+
     const result = await this.orderRepository.cancelOrderViaProcedure(
       orderId,
       userId,
@@ -182,6 +190,16 @@ export class OrdersService {
 
     if (!result.cancelled) {
       throw new BusinessException('Cancel failed', 'CANCEL_FAILED');
+    }
+
+    if (side === 'BUY' || side === 'SELL') {
+      try {
+        this.matchingService.removeOrderFromBook(pairId, orderId, side);
+      } catch (e) {
+        this.logger.warn(
+          `Order book remove after cancel ${orderId}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
     }
 
     const updated = await this.orderRepository.findById(orderId);
@@ -346,6 +364,28 @@ export class OrdersService {
       page,
       limit,
     };
+  }
+
+  /**
+   * Admin / vận hành: kích hoạt khớp lại thủ công cho mọi lệnh OPEN/PARTIAL trên một cặp
+   * (không cần user đặt lệnh mới). Dùng khi nghi sổ RAM lệch DB hoặc lệnh “kẹt” sau sự cố.
+   */
+  async reconcileMatchingForPair(pairIdOrSymbol: string): Promise<MatchingReconcileResult> {
+    const raw = (pairIdOrSymbol ?? '').trim();
+    let pair = await this.marketRepository.findById(raw);
+    if (!pair && raw.includes('/')) {
+      pair = await this.marketRepository.findBySymbol(raw);
+    }
+    if (!pair) {
+      throw new NotFoundException('Market pair', raw);
+    }
+    const pairId = String(pair.pair_id);
+    return this.matchingService.reconcileOpenOrdersForPair({
+      pairId,
+      feeCurrencyId: pair.quote_currency_id,
+      makerFeeRate: pair.maker_fee_rate ?? '0.001',
+      takerFeeRate: pair.taker_fee_rate ?? '0.001',
+    });
   }
 
   private throwFromProcedureError(code: string, message?: string): void {

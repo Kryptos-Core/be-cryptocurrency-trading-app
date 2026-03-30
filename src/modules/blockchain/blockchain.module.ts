@@ -10,6 +10,9 @@ import { WalletLinkingService } from './wallet-linking.service';
 import { OnchainTransferService } from './onchain-transfer.service';
 import { DepositFxService } from './deposit-fx.service';
 import { BlockchainController } from './blockchain.controller';
+import { WalletConnectModule } from './wallet-connect/wallet-connect.module';
+import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
+import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
@@ -35,7 +38,7 @@ import { NotificationsModule } from '@/modules/notifications/notifications.modul
     PaymentConfigModule,
     forwardRef(() => NotificationsModule),
   ],
-  controllers: [BlockchainController],
+  controllers: [BlockchainController, WalletConnectController],
   providers: [
     // Blockchain providers (Strategy Pattern)
     TronProvider,
@@ -49,11 +52,14 @@ import { NotificationsModule } from '@/modules/notifications/notifications.modul
     DepositFxService,
     WalletLinkingService,
     OnchainTransferService,
+    // WalletConnect v2 (Universal Wallet Linking)
+    WalletConnectService,
   ],
   exports: [
     BlockchainProviderFactory,
     DepositFxService,
     WalletLinkingService,
+    WalletConnectService,
     OnchainTransferService,
   ],
 })

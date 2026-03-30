@@ -74,6 +74,8 @@ export enum Permission {
   // ORDERS
   ORDERS_READ = 'orders:read',
   ORDERS_MANAGE = 'orders:manage',
+  /** Ops: POST reconcile matching for a pair (manual recovery, admin/risk). */
+  MATCHING_RECONCILE = 'matching:reconcile',
   ORDERS_BATCH_PLACE = 'orders:batch_place',
   MARKET_MAKER_CONFIG = 'market_maker:config',
   MARKET_MAKER_DASHBOARD = 'market_maker:dashboard',

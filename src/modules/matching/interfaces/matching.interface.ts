@@ -34,6 +34,15 @@ export interface TradeExecutionResult {
   created_at: Date;
 }
 
+/** Result of admin/ops manual reconcile (retry matching for a pair). */
+export interface MatchingReconcileResult {
+  pairId: string;
+  tradesExecuted: number;
+  matchRuns: number;
+  openOrdersRemaining: number;
+  stoppedReason: 'all_matched' | 'no_progress' | 'max_rounds';
+}
+
 /**
  * Context passed to matching strategy (Strategy Pattern).
  */

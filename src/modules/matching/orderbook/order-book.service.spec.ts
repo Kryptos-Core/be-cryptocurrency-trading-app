@@ -86,4 +86,16 @@ describe('OrderBookService', () => {
     expect(service.getBestBid('pair-1')?.order_id).toBe('new-b');
     expect(service.getBestAsk('pair-1')?.order_id).toBe('new-s');
   });
+
+  it('loads into the same book when pair_id rows are CHAR-padded but lookup uses trim id', () => {
+    const padded = 'pair-1      ';
+    service.loadOrders('pair-1', [
+      order({ order_id: 'new-b', side: 'BUY', pair_id: padded }),
+      order({ order_id: 'new-s', side: 'SELL', pair_id: padded }),
+    ]);
+
+    expect(service.size('pair-1')).toBe(2);
+    expect(service.peekBestMaker('pair-1', 'SELL')?.order_id).toBe('new-s');
+    expect(service.peekBestMaker('pair-1', 'BUY')?.order_id).toBe('new-b');
+  });
 });

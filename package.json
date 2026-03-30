@@ -49,6 +49,8 @@
     "@solana/web3.js": "^1.98.4",
     "@types/nodemailer": "^7.0.11",
     "@types/passport-jwt": "^4.0.1",
+    "@walletconnect/core": "^2.23.9",
+    "@walletconnect/sign-client": "^2.23.9",
     "bcrypt": "^5.1.1",
     "bull": "^4.16.5",
     "class-transformer": "^0.5.1",

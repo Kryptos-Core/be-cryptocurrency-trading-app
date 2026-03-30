@@ -4,6 +4,17 @@ Module Blockchain cung cấp tính năng liên kết ví và hỗ trợ nạp/r�
 
 ## Các route liên kết ví (Wallet linking)
 
+### WalletConnect v2 (QR / deep link — luồng chính trên app)
+
+- POST /api/v1/blockchain/wallets/wc/init — tạo session + `wcUri` (JWT)
+- GET /api/v1/blockchain/wallets/wc/status/:sessionId — poll trạng thái (JWT)
+- POST /api/v1/blockchain/wallets/wc/submit — gửi signature sau khi user ký (JWT)
+- POST /api/v1/blockchain/wallets/wc/relay-webhook — callback relay (public; HMAC tùy chọn)
+
+Chi tiết luồng và biến môi trường: [WALLETCONNECT.md](WALLETCONNECT.md).
+
+### Liên kết cổ điển (nonce + ký message)
+
 - POST /api/v1/blockchain/wallets/request-link
 - POST /api/v1/blockchain/wallets/verify-link
 - GET /api/v1/blockchain/wallets
@@ -28,6 +39,9 @@ Module Blockchain cung cấp tính năng liên kết ví và hỗ trợ nạp/r�
 
 ## Các phụ thuộc cấu hình (Config dependencies)
 
+- WALLETCONNECT_PROJECT_ID (khuyến nghị cho WC v2)
+- WALLETCONNECT_RELAY_URL (tùy chọn)
+- WALLETCONNECT_WEBHOOK_SECRET (tùy chọn — chỉ khi bật verify webhook relay)
 - TRON_NILE_FULL_HOST
 - TRON_SHASTA_FULL_HOST
 - TRON_DEFAULT_NETWORK
