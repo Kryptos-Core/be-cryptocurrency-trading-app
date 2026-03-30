@@ -1,33 +1,33 @@
 # WalletConnect & Reown — đăng nhập và liên kết ví
 
-Tài liệu **duy nhất** mô tả luồng WalletConnect v2 / Reown: Flutter + NestJS, biến môi trường FE & BE, API. Mọi route REST dưới prefix **`/api/v1`**.
+Tài liệu mô tả WalletConnect v2 / Reown cho **API NestJS**: route REST, SignClient, relay, biến môi trường **backend**. Phía ứng dụng khách (Reown AppKit, poll status, v.v.) có `.env` và mã nguồn riêng — không mô tả chi tiết trong tệp này. Mọi route REST dưới prefix **`/api/v1`**.
 
 ---
 
 ## Project ID (Reown Cloud)
 
 - Tạo project tại [cloud.reown.com](https://cloud.reown.com/) (WalletConnect Cloud).
-- **Cùng một giá trị** cho app production: đặt ở **cả** FE và BE (hai file `.env` độc lập, không chia sẻ file).
+- **Cùng một giá trị** cho app production: đặt ở **cả** ứng dụng khách và server API (hai file `.env` độc lập, không chia sẻ file).
 
 | Nơi | Biến | Khi nào cần |
 |-----|------|-------------|
-| **FE** `.env` | `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` | **Bắt buộc** cho **Reown AppKit** trên **Android/iOS** — SDK tạo URI/QR thật, pairing qua relay. |
-| **BE** `.env` | `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` (cùng giá trị; BE lấy biến nào có trước) | **Bắt buộc** cho **desktop Sepolia tự động**: SignClient + relay thật. Thiếu **cả hai** → URI giả, QR không kết nối ví, chỉ còn **dán tay**. |
+| **Ứng dụng khách** `.env` | `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` | **Bắt buộc** cho **Reown AppKit** trên **Android/iOS** — SDK tạo URI/QR thật, pairing qua relay. |
+| **Server API** `.env` | `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` (cùng giá trị; server lấy biến nào có trước) | **Bắt buộc** cho **desktop Sepolia tự động**: SignClient + relay thật. Thiếu **cả hai** → URI giả, QR không kết nối ví, chỉ còn **dán tay**. |
 | Cả hai | (cùng ID) | Không bắt buộc riêng cho cặp **`/auth/wallet-nonce`** + **`/auth/wallet-verify`** nếu client đã ký xong; vẫn nên đồng bộ để một project trên dashboard và tránh nhầm relay. |
 
 ---
 
 ## Desktop native — `/auth/wallet/wc/*` + SignClient
 
-Áp dụng **Flutter desktop** (Windows / macOS / Linux), chọn **Sepolia**, BE có **Project ID** (và biến đã qua whitelist — xem mục `env.validation.ts`):
+Áp dụng **desktop native** (ví dụ Flutter Windows / macOS / Linux), chọn **Sepolia**, server có **Project ID** (và biến đã qua whitelist — xem mục `env.validation.ts`):
 
 1. **`POST /auth/wallet/wc/init`** — Nest `@walletconnect/sign-client`: URI relay thật, Redis, trả `relayPairing: true`, `caip2Chain`, … Nền: sau khi ví approve → **`personal_sign`** (message UTF-8 → hex `0x…`) → lưu **`address`**, **`signature`**, `status`.
-2. FE poll **`GET /auth/wallet/wc/status/:sessionId`** — đủ `signed` + `address`/`signature` thì **tự verify** (không bắt buộc dán tay).
+2. Ứng dụng khách poll **`GET /auth/wallet/wc/status/:sessionId`** — đủ `signed` + `address`/`signature` thì **tự verify** (không bắt buộc dán tay).
 3. **`POST /auth/wallet/wc/verify`** — contract cũ (`sessionId`, `chain`, `address`, `signature`).
 
-**`relayPairing: false`:** thiếu project id trên BE hoặc không phải luồng relay Sepolia → URI không dùng được như QR relay; FE cảnh báo, chỉ **dán tay** (hoặc Solana tương tự).
+**`relayPairing: false`:** thiếu project id trên server hoặc không phải luồng relay Sepolia → URI không dùng được như QR relay; ứng dụng khách cảnh báo, chỉ **dán tay** (hoặc Solana tương tự).
 
-**SDK 2.23+ / ví (ví dụ MetaMask):** `optionalNamespaces` chỉ **gợi ý** Sepolia; session WC có thể là **Ethereum Mainnet** (`eip155:1`). BE gửi `personal_sign` với **`chainId` khớp account trong session** (CAIP-2). **Đăng nhập** vẫn xác minh theo **`ETH_SEPOLIA`** + message trong Redis — `personal_sign` off-chain, cùng EOA + cùng message thì chữ ký hợp lệ.
+**SDK 2.23+ / ví (ví dụ MetaMask):** `optionalNamespaces` chỉ **gợi ý** Sepolia; session WC có thể là **Ethereum Mainnet** (`eip155:1`). Server gửi `personal_sign` với **`chainId` khớp account trong session** (CAIP-2). **Đăng nhập** vẫn xác minh theo **`ETH_SEPOLIA`** + message trong Redis — `personal_sign` off-chain, cùng EOA + cùng message thì chữ ký hợp lệ.
 
 **Timeout BE:** `SignClient.init` ~18s (lỗi → reset singleton); có timeout cho `personal_sign` / pairing trong `wallet-connect-auth.service.ts` (tránh treo HTTP).
 
@@ -40,7 +40,7 @@ Tài liệu **duy nhất** mô tả luồng WalletConnect v2 / Reown: Flutter + 
 | Cách | Nền tảng | Ghi chú |
 |------|-----------|--------|
 | **Reown AppKit** | Android, iOS | `reown_appkit` → `personal_sign` → **`/auth/wallet-verify`**. |
-| **Extension** | Flutter **Web** | MetaMask / TronLink. |
+| **Extension** | **Web** (ví dụ Flutter web) | MetaMask / TronLink. |
 | **QR server `/auth/wallet/wc/*`** | Web (nâng cao), **desktop** | Chi tiết: mục **Desktop native** ở trên. |
 | **Solana / thiếu project id BE** | Cùng endpoint | URI giả; dán address + signature. |
 
@@ -92,7 +92,7 @@ Nếu không: request `init` và poll `status` có thể rơi vào **instance kh
 
 ## POST `/auth/wallet/wc/init` chậm / timeout / log relay `JWT … not yet valid`
 
-Relay so sánh `iat` của JWT với giờ thực. **Đồng hồ máy chạy Nest lệch** → relay đóng socket (code 3000) → kết nối SDK lỗi / chậm. **Bật đồng bộ thời gian (NTP)** trên OS chạy Nest; trên Windows kiểm tra **“Đồng bộ ngay”** và dịch vụ **Windows Time** — chỉ bật “tự động” nhưng **lần sync thành công quá cũ** vẫn có thể lệch. BE đã giới hạn thời gian chờ **`SignClient.init`** (~18s) và **pairing / `personal_sign`** trong service để trả lỗi thay vì im lặng đến khi client HTTP timeout.
+Relay so sánh `iat` của JWT với giờ thực. **Đồng hồ máy chạy Nest lệch** → relay đóng socket (code 3000) → kết nối SDK lỗi / chậm. **Bật đồng bộ thời gian (NTP)** trên OS chạy Nest; trên Windows kiểm tra **“Đồng bộ ngay”** và dịch vụ **Windows Time** — chỉ bật “tự động” nhưng **lần sync thành công quá cũ** vẫn có thể lệch. Service đã giới hạn thời gian chờ **`SignClient.init`** (~18s) và **pairing / `personal_sign`** để trả lỗi thay vì im lặng đến khi client HTTP timeout.
 
 ---
 
@@ -114,26 +114,11 @@ Nếu thêm biến mới vào **`.env`** mà **không** khai báo tương ứng 
 
 ---
 
-## Biến môi trường — Frontend (`fe-cryptocurrency-trading-app`)
-
-| Biến | Mô tả |
-|------|--------|
-| `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` | Reown AppKit (mobile). Trùng **cùng project** với BE. |
-
----
-
-## Mã nguồn tham chiếu
-
-**Backend**
+## Mã nguồn tham chiếu (backend)
 
 - Đăng nhập WC public: `src/modules/auth/wallet-connect-auth.service.ts`, `auth.controller.ts` (`wallet/wc/*`); factory: `src/modules/blockchain/wallet-connect/walletconnect-dapp-client.factory.ts`
 - Whitelist env: `src/config/env.validation.ts` (`EnvironmentVariables` + `envVarKeys`)
 - Liên kết WC (JWT): `src/modules/blockchain/wallet-connect/*` (flow khác; có thể tái dùng factory sau)
-
-**Flutter (`fe-cryptocurrency-trading-app`)**
-
-- Đăng nhập: `lib/presentation/widgets/wallet_connect_auth_login_dialog.dart` (`relayPairing`, poll auto-verify), `lib/data/datasources/auth_remote_datasource.dart` (`WcAuthInitResult` / `WcAuthStatusResult`), `lib/core/services/wallet_connect/reown_wallet_auth_config.dart`, `lib/core/utils/wallet_auth_handler.dart`
-- Liên kết ví (BE-driven QR): `lib/presentation/screens/blockchain/widgets/link_wallet_dialog.dart`, `wc_qr_session_card.dart`, `wc_deeplink_launcher.dart`, `wc_session_poller.dart`, `blockchain_provider.dart`, `api_constants.dart` (`blockchainWc*`)
 
 ---
 

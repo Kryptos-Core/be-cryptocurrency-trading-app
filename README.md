@@ -12,7 +12,7 @@ API backend cho nền tảng giao dịch tiền mã hóa, xây dựng bằng **N
 | **Khớp lệnh** | Engine price–time priority, Redis lock, thực thi giao dịch |
 | **Ví** | Số dư nội bộ, đối soát, đồng bộ ví ngoài (Binance) theo cấu hình |
 | **Nạp/rút** | Nạp fiat qua **PayOS**, nạp/rút on-chain (TRON, Ethereum, Solana testnet) |
-| **Liên kết ví** | WalletConnect / Reown — `docs/WALLETCONNECT.md` |
+| **Liên kết ví & đăng nhập WC** | Đăng nhập public (desktop QR + SignClient): `/auth/wallet/wc/*`. Liên kết ví (JWT): `/blockchain/wallets/wc/*`. Chi tiết: [`docs/WALLETCONNECT.md`](docs/WALLETCONNECT.md) |
 | **Kho bạc (Treasury)** | Ví giao dịch, sweep, thao tác vận hành (RBAC) |
 | **Realtime** | WebSocket (Socket.IO) — giá, trading |
 | **Thông báo** | Firebase Admin (FCM) |
@@ -68,7 +68,7 @@ npm run start:dev
 - Mẫu đầy đủ: [`env.example`](env.example)
 - **Không** commit file `.env` hoặc khóa thật lên git.
 
-Các nhóm quan trọng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `WALLETCONNECT_*` (xem `docs/WALLETCONNECT.md`), `FIREBASE_*` (push), SMTP (2FA).
+Các nhóm quan trọng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, **`WALLETCONNECT_PROJECT_ID` / `REOWN_PROJECT_ID`** + `WALLETCONNECT_RELAY_URL` (xem [`docs/WALLETCONNECT.md`](docs/WALLETCONNECT.md)), `FIREBASE_*` (push), SMTP (2FA). Biến mà `ConfigService` đọc phải nằm trong whitelist `src/config/env.validation.ts` — xem [`docs/ENV_CONFIG_USAGE.md`](docs/ENV_CONFIG_USAGE.md).
 
 ## Scripts npm
 
@@ -153,6 +153,6 @@ Luồng nằm trong module **deposits**. Production bắt buộc cấu hình đ�
 - **Xóa toàn bộ dữ liệu** trong DB hiện tại (TRUNCATE mọi bảng, **giữ** bảng `migrations` và cấu trúc schema): `npm run db:clean`  
   Trên **production**, lệnh bị chặn trừ khi đặt `ALLOW_DB_CLEAN=true` trong môi trường.
 
-## Frontend
+## Ứng dụng khách
 
-Ứng dụng Flutter nằm ở repo **`fe-cryptocurrency-trading-app`** (cùng solution). Cấu hình `BASE_URL` trỏ tới `http://127.0.0.1:3000/api/v1` (hoặc `http://10.0.2.2:3000/api/v1` trên Android emulator).
+Ứng dụng Flutter nằm trong **thư mục riêng** cùng workspace (không thuộc repo backend này). Cấu hình `BASE_URL` trỏ tới `http://127.0.0.1:3000/api/v1` (hoặc `http://10.0.2.2:3000/api/v1` trên Android emulator).

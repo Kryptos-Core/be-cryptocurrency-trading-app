@@ -34,3 +34,7 @@ docker compose -f docker-compose.infrastructure.yml --env-file .env up -d redis
 - Không log chuỗi chứa mật khẩu Redis.
 
 Tài liệu liên quan: [README.md](../README.md) (hạ tầng), module **matching** (lock khớp lệnh).
+
+## Key bổ sung (theo module)
+
+- **Đăng nhập WalletConnect công khai:** prefix `wc:auth:session:{sessionId}` — TTL ~5 phút; lưu `wcUri`, message, `status`, `address`, `signature` khi có. Chi tiết luồng: **[WALLETCONNECT.md](WALLETCONNECT.md)**.

@@ -3,8 +3,8 @@
 ## Tổng quan
 
 Backend sử dụng:
-- `src/config/env.validation.ts` để xác thực các biến môi trường.
-- `src/config/app.config.ts` để ánh xạ biến môi trường sang cấu hình ứng dụng.
+- `src/config/env.validation.ts` — `validateEnvironment`: chỉ các key khai báo trong class **`EnvironmentVariables`** và trong mảng **`envVarKeys`** mới đi vào object đã validate và được **`ConfigService.get()`** đọc từ `.env`. Thêm biến mới mà quên hai chỗ này → biến **không có hiệu lực** (đã gặp với `WALLETCONNECT_*` trước khi bổ sung whitelist).
+- `src/config/app.config.ts` — ánh xạ sang namespace `app` (đọc `process.env` sau bước validate).
 
 Ứng dụng sẽ thất bại khi khởi động nếu có lỗi xác thực (validation).
 
@@ -64,7 +64,7 @@ Sau đó điền thông tin và chạy ứng dụng.
 | ETH_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Ethereum |
 | TRON_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Tron |
 | BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chỉ dùng cho phát triển, mặc định là false |
-| WALLETCONNECT_PROJECT_ID, WALLETCONNECT_RELAY_URL, WALLETCONNECT_WEBHOOK_SECRET | WalletConnect / Reown — bảng và luồng: **docs/WALLETCONNECT.md** |
+| `WALLETCONNECT_PROJECT_ID`, `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `WALLETCONNECT_WEBHOOK_SECRET` | WalletConnect / Reown — desktop SignClient + liên kết ví; bảng đầy đủ và luồng: **[WALLETCONNECT.md](WALLETCONNECT.md)** |
 
 ### PayOS
 
@@ -92,3 +92,4 @@ Nếu thiếu, ứng dụng sẽ dừng khởi động ngay lập tức.
 - Không lưu (commit) file `.env` thực tế lên kho mã nguồn.
 - Nếu thay đổi biến môi trường, phải khởi động lại backend.
 - Trong nhật ký (logs), hãy ưu tiên kiểm tra thông báo "Environment validation failed" nếu ứng dụng không khởi động được.
+- Thêm biến mới cho **`ConfigService`** (hoặc cho code đọc qua cùng cơ chế validate): cập nhật **`env.validation.ts`** (`EnvironmentVariables` + `envVarKeys`), không chỉ `env.example`.

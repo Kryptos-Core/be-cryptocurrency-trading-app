@@ -4,7 +4,17 @@ Module Blockchain cung cấp tính năng liên kết ví và hỗ trợ nạp/r�
 
 ## Các route liên kết ví (Wallet linking)
 
-### WalletConnect v2 (QR / deep link — luồng chính trên app)
+### Đăng nhập công khai qua WalletConnect (không JWT)
+
+Nằm trong module **auth** (không phải `blockchain`):
+
+- POST /api/v1/auth/wallet/wc/init — session + `wcUri` + `relayPairing` (desktop Sepolia + SignClient khi BE có project id)
+- GET /api/v1/auth/wallet/wc/status/:sessionId — poll (`address` / `signature` khi có)
+- POST /api/v1/auth/wallet/wc/verify — JWT sau khi verify chữ ký
+
+Chi tiết: **[WALLETCONNECT.md](WALLETCONNECT.md)**.
+
+### WalletConnect v2 — liên kết ví (đã đăng nhập, JWT)
 
 - POST /api/v1/blockchain/wallets/wc/init — tạo session + `wcUri` (JWT)
 - GET /api/v1/blockchain/wallets/wc/status/:sessionId — poll trạng thái (JWT)
@@ -46,3 +56,4 @@ Module Blockchain cung cấp tính năng liên kết ví và hỗ trợ nạp/r�
 - TRON_HOT_WALLET_PRIVATE_KEY
 - ETH_HOT_WALLET_PRIVATE_KEY
 - BLOCKCHAIN_ALLOW_TEST_SIGNATURE (hỗ trợ chỉ dành cho phát triển)
+- WalletConnect (đăng nhập + liên kết): `WALLETCONNECT_PROJECT_ID` / `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `WALLETCONNECT_WEBHOOK_SECRET` — xem **[WALLETCONNECT.md](WALLETCONNECT.md)** và whitelist trong `env.validation.ts`
