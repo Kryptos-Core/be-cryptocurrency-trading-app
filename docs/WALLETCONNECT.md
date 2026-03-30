@@ -11,6 +11,12 @@ Tài liệu mô tả luồng **WalletConnect v2** đã tích hợp: backend Nest
 | **3 — FE UI** | `wc_qr_session_card`, `wc_deeplink_launcher`, `wc_session_poller`, refactor `link_wallet_dialog` (WC-first), test WC flow | Hoàn thành |
 | **4 — Cleanup (tùy chọn)** | Xóa `wallet_extension_precheck_service.dart` / `windows_extension_precheck_card.dart` nếu không còn reference | Chưa bắt buộc |
 
+## Lưu ý kiến trúc (Flutter & Tron)
+
+- **Không cần Flutter WalletConnect SDK:** Kiến trúc **BE-driven** đủ — session WC được tạo và theo dõi hoàn toàn trên backend (`@walletconnect/sign-client`). Phía Flutter chỉ cần **`qr_flutter`** (đã có trong project) để hiển thị QR từ `wcUri`, cùng poll REST + deep link khi cần.
+- **`walletconnect_flutter_v2` đã deprecated**; hướng thay thế phổ biến là **`reown_appkit`** — **ta không tích hợp** các SDK này vì không quản lý session WC trên client.
+- **Tron (TRX / TRC-20):** Trên **web**, chuỗi Tron vẫn dùng **TronLink Extension** (hoặc luồng tương thích Tron) — **đúng thiết kế**: Tron **không phải EVM**, không dùng chung MetaMask/EVM WalletConnect như Ethereum.
+
 ## Luồng khuyến nghị (DApp)
 
 1. **FE (đã đăng nhập)** gọi `POST /blockchain/wallets/wc/init` với `chain` → nhận `sessionId`, `wcUri`, `expiresIn`.
