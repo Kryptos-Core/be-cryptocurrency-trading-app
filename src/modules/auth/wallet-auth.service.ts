@@ -100,6 +100,43 @@ export class WalletAuthService {
 
     await this.cacheService.delete(cacheKey);
 
+    return this.finishWalletAuthentication(chain, address);
+  }
+
+  /**
+   * Đăng nhập/đăng ký khi đã có message + chữ ký hợp lệ (không dùng nonce Redis),
+   * ví dụ flow WalletConnect public: message lưu trong session wc:auth:*.
+   */
+  async verifyAndAuthenticateWithMessage(
+    chain: BlockchainNetwork,
+    address: string,
+    signature: string,
+    message: string,
+  ): Promise<WalletAuthResult> {
+    const provider = this.providerFactory.getProvider(chain);
+
+    if (!provider.isValidAddress(address)) {
+      throw new BadRequestException(
+        `Địa chỉ ví không hợp lệ trên mạng ${chain}`,
+        'INVALID_ADDRESS',
+      );
+    }
+
+    const isValid = await provider.verifySignature(address, message, signature);
+    if (!isValid) {
+      throw new BadRequestException(
+        'Chữ ký không hợp lệ. Vui lòng ký lại bằng ví đúng.',
+        'INVALID_SIGNATURE',
+      );
+    }
+
+    return this.finishWalletAuthentication(chain, address);
+  }
+
+  private async finishWalletAuthentication(
+    chain: BlockchainNetwork,
+    address: string,
+  ): Promise<WalletAuthResult> {
     let user = await this.authRepository.findByLinkedWallet(chain, address);
 
     if (user) {

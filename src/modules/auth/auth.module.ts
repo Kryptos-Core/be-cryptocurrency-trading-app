@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { WalletAuthService } from './wallet-auth.service';
+import { WalletConnectAuthService } from './wallet-connect-auth.service';
 import { TwoFaService } from './two-fa.service';
 import { AuthRepository } from './repositories';
 import { JwtStrategy } from './strategies';
@@ -36,6 +37,7 @@ import { MailService } from '@/common/services';
   providers: [
     AuthService,
     WalletAuthService,
+    WalletConnectAuthService,
     TwoFaService,
     AuthRepository,
     JwtStrategy,

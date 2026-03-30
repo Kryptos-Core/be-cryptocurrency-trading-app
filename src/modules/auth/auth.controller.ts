@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -8,6 +8,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { WalletAuthService } from './wallet-auth.service';
+import { WalletConnectAuthService } from './wallet-connect-auth.service';
 import { TwoFaService } from './two-fa.service';
 import {
   RegisterDto,
@@ -16,6 +17,8 @@ import {
   WalletVerifyAuthDto,
   TwoFaOtpDto,
   ChangePasswordDto,
+  WcAuthInitDto,
+  WcAuthVerifyDto,
 } from './dto';
 import { Public, CurrentUser } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
@@ -37,6 +40,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly walletAuthService: WalletAuthService,
+    private readonly walletConnectAuthService: WalletConnectAuthService,
     private readonly twoFaService: TwoFaService,
   ) {}
 
@@ -149,6 +153,72 @@ export class AuthController {
   @ApiBadRequestResponse('Invalid signature or expired nonce')
   async walletVerify(@Body() dto: WalletVerifyAuthDto) {
     return this.walletAuthService.verifyAndAuthenticate(
+      dto.chain,
+      dto.address,
+      dto.signature,
+    );
+  }
+
+  /**
+   * Khởi tạo session WalletConnect đăng nhập (không cần JWT).
+   * POST /auth/wallet/wc/init
+   */
+  @Public()
+  @Post('wallet/wc/init')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Init WalletConnect login session (public)',
+    description:
+      'Tạo session Redis + wcUri + message ký. FE poll GET .../status/:sessionId rồi POST .../verify khi đã có chữ ký.',
+  })
+  @ApiBody({ type: WcAuthInitDto })
+  @ApiSuccessResponse('WC auth session created')
+  @ApiBadRequestResponse('Invalid chain')
+  async wcAuthInit(@Body() dto: WcAuthInitDto) {
+    return this.walletConnectAuthService.initSession(dto.chain);
+  }
+
+  /**
+   * Poll trạng thái session đăng nhập WC (public).
+   * GET /auth/wallet/wc/status/:sessionId
+   */
+  @Public()
+  @Get('wallet/wc/status/:sessionId')
+  @ApiOperation({
+    summary: 'Poll WalletConnect login session status',
+    description: 'Trả về pending/expired và metadata; chữ ký chỉ có khi relay/SDK cập nhật (tùy triển khai).',
+  })
+  @ApiSuccessResponse('Session status')
+  @ApiBadRequestResponse('Invalid session id')
+  async wcAuthStatus(@Param('sessionId') sessionId: string) {
+    return this.walletConnectAuthService.getSessionStatus(sessionId);
+  }
+
+  /**
+   * Hoàn tất đăng nhập: xác minh chữ ký với message của session, cấp JWT.
+   * POST /auth/wallet/wc/verify
+   */
+  @Public()
+  @Post('wallet/wc/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify WalletConnect login signature',
+    description: 'Cùng định dạng phản hồi user/token như POST /auth/wallet-verify',
+  })
+  @ApiBody({ type: WcAuthVerifyDto })
+  @ApiSuccessResponse('Wallet auth successful', {
+    schema: {
+      example: {
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: { user_id: '...', email: '0x1234@eth_sepolia.wallet', status: 'ACTIVE' },
+        isNewUser: true,
+      },
+    },
+  })
+  @ApiBadRequestResponse('Invalid signature or expired session')
+  async wcAuthVerify(@Body() dto: WcAuthVerifyDto) {
+    return this.walletConnectAuthService.verifySession(
+      dto.sessionId,
       dto.chain,
       dto.address,
       dto.signature,

@@ -1,73 +1,98 @@
-# WalletConnect v2 — Liên kết ví (Universal Wallet Linking)
+# WalletConnect & Reown — đăng nhập và liên kết ví
 
-Tài liệu mô tả luồng **WalletConnect v2** đã tích hợp: backend NestJS + Flutter (WC-first trong dialog liên kết ví). Các route REST nằm dưới prefix **`/api/v1`**.
+Tài liệu **duy nhất** mô tả luồng WalletConnect v2 / Reown: Flutter + NestJS, biến môi trường FE & BE, API. Mọi route REST dưới prefix **`/api/v1`**.
 
-## Trạng thái triển khai (checklist)
+---
 
-| Phase | Nội dung | Trạng thái |
-|-------|-----------|------------|
-| **1 — Backend** | Module `wallet-connect`, `@walletconnect/sign-client` + `@walletconnect/core`, service/controller/DTO, biến môi trường | Hoàn thành |
-| **2 — FE core** | Entities, `ApiConstants`, repository + `BlockchainRepositoryImpl`, `blockchain_provider` (session + methods) | Hoàn thành |
-| **3 — FE UI** | `wc_qr_session_card`, `wc_deeplink_launcher`, `wc_session_poller`, refactor `link_wallet_dialog` (WC-first), test WC flow | Hoàn thành |
-| **4 — Cleanup (tùy chọn)** | Xóa `wallet_extension_precheck_service.dart` / `windows_extension_precheck_card.dart` nếu không còn reference | Chưa bắt buộc |
+## Project ID (Reown Cloud)
 
-## Lưu ý kiến trúc (Flutter & Tron)
+- Tạo project tại [cloud.reown.com](https://cloud.reown.com/) (WalletConnect Cloud).
+- **Cùng một giá trị** cho app production: đặt ở **cả** FE và BE (hai file `.env` độc lập, không chia sẻ file).
 
-- **Không cần Flutter WalletConnect SDK:** Kiến trúc **BE-driven** đủ — session WC được tạo và theo dõi hoàn toàn trên backend (`@walletconnect/sign-client`). Phía Flutter chỉ cần **`qr_flutter`** (đã có trong project) để hiển thị QR từ `wcUri`, cùng poll REST + deep link khi cần.
-- **`walletconnect_flutter_v2` đã deprecated**; hướng thay thế phổ biến là **`reown_appkit`** — **ta không tích hợp** các SDK này vì không quản lý session WC trên client.
-- **Tron (TRX / TRC-20):** Trên **web**, chuỗi Tron vẫn dùng **TronLink Extension** (hoặc luồng tương thích Tron) — **đúng thiết kế**: Tron **không phải EVM**, không dùng chung MetaMask/EVM WalletConnect như Ethereum.
+| Nơi | Biến | Khi nào cần |
+|-----|------|-------------|
+| **FE** `.env` | `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` | **Bắt buộc** cho **Reown AppKit** trên **Android/iOS** — SDK tạo URI/QR thật, pairing qua relay. |
+| **BE** `.env` | `WALLETCONNECT_PROJECT_ID` | **Khuyến nghị** khi Nest **ghép URI `wc:`** (đăng nhập legacy + liên kết ví có JWT). Thiếu → log cảnh báo, URI có thể thiếu `projectId`. |
+| Cả hai | (cùng ID) | Không bắt buộc riêng cho cặp **`/auth/wallet-nonce`** + **`/auth/wallet-verify`** nếu client đã ký xong; vẫn nên đồng bộ để một project trên dashboard và tránh nhầm relay. |
 
-## Luồng khuyến nghị (DApp)
+---
 
-1. **FE (đã đăng nhập)** gọi `POST /blockchain/wallets/wc/init` với `chain` → nhận `sessionId`, `wcUri`, `expiresIn`.
-2. Hiển thị **QR** (desktop) hoặc **deep link** (mobile) từ `wcUri`.
-3. **Poll** `GET /blockchain/wallets/wc/status/:sessionId` (ví dụ mỗi ~2s) cho đến khi session sẵn sàng nhận chữ ký.
-4. Khi wallet đã ký (qua SDK / sự kiện WC trên client), **FE gọi** `POST /blockchain/wallets/wc/submit` với `sessionId`, `address`, `signature`, `chain` → backend verify on-chain và tạo `linked_wallet` (tái dùng `WalletLinkingService`).
+## Đăng nhập bằng ví (chưa có JWT)
 
-Luồng **relay webhook** (`POST /blockchain/wallets/wc/relay-webhook`) là **tùy chọn**: dùng khi có dịch vụ POST callback và (nếu bật) chữ ký HMAC khớp `WALLETCONNECT_WEBHOOK_SECRET`. Xem mục biến môi trường bên dưới.
+| Cách | Nền tảng | Cơ chế |
+|------|-----------|--------|
+| **Reown AppKit** | Android, iOS | FE: `reown_appkit`, `reown_wallet_auth_config.dart`, `wallet_connect_auth_login_dialog.dart`. Sau kết nối: nonce → `personal_sign` → **`/auth/wallet-verify`**. |
+| **Extension** | Flutter **Web** | MetaMask / TronLink trong dialog; ký qua bridge web. |
+| **QR do BE tạo (legacy)** | Web (mục nâng cao), **desktop native**, hoặc khi không dùng Reown | **`POST /auth/wallet/wc/init`**, poll **`GET .../status/:sessionId`**, **`POST .../verify`** → JWT. Session Redis: `wc:auth:session:{sessionId}`. QR hiển thị bằng `qr_flutter` từ `wcUri`. |
+| **Desktop Windows / Linux / macOS (app native)** | Không WebView cho `webview_flutter` | Reown **không** khởi tạo; dùng **legacy QR** hoặc email. |
 
-## API Backend
+Tron không phải EVM: trên web dùng **TronLink**, không gom chung luồng EVM WalletConnect.
+
+---
+
+## Liên kết ví (đã đăng nhập, có JWT)
+
+1. **`POST /blockchain/wallets/wc/init`** — `sessionId`, `wcUri`, `expiresIn`.
+2. Hiển thị QR / deep link từ `wcUri`.
+3. **`GET /blockchain/wallets/wc/status/:sessionId`** — poll (~2s).
+4. **`POST /blockchain/wallets/wc/submit`** — `address`, `signature`, `chain` → verify, tạo `linked_wallet`.
+
+**Relay webhook (tùy chọn):** **`POST /blockchain/wallets/wc/relay-webhook`**. Nếu cấu hình `WALLETCONNECT_WEBHOOK_SECRET`, caller phải gửi HMAC đúng header (`X-WC-Signature` hoặc `X-Relay-Signature`). Secret này **không** lấy từ tab “Secret” AppKit trên dashboard Reown — chỉ dùng nếu bạn tự triển khai caller ký body.
+
+---
+
+## Liên kết cổ điển (không WC)
+
+- `POST /blockchain/wallets/request-link`, `POST .../verify-link`, `GET .../wallets`, v.v. — xem Swagger nhóm **blockchain**.
+
+---
+
+## API tổng hợp
 
 | Method | Path | Auth | Mô tả |
 |--------|------|------|--------|
-| POST | `/api/v1/blockchain/wallets/wc/init` | JWT | Tạo session, trả URI cho QR/deep link |
-| GET | `/api/v1/blockchain/wallets/wc/status/:sessionId` | JWT | Poll trạng thái session |
-| POST | `/api/v1/blockchain/wallets/wc/submit` | JWT | Gửi signature sau khi user ký trên wallet |
-| POST | `/api/v1/blockchain/wallets/wc/relay-webhook` | Public | Callback relay (tùy chọn); verify HMAC nếu có secret + header `X-WC-Signature` hoặc `X-Relay-Signature` |
+| POST | `/auth/wallet/wc/init` | Public | Session đăng nhập WC: `wcUri`, `message`, `expiresIn`, … |
+| GET | `/auth/wallet/wc/status/:sessionId` | Public | Poll trạng thái session đăng nhập |
+| POST | `/auth/wallet/wc/verify` | Public | Chữ ký hợp lệ → JWT |
+| POST | `/blockchain/wallets/wc/init` | JWT | Session liên kết ví |
+| GET | `/blockchain/wallets/wc/status/:sessionId` | JWT | Poll liên kết |
+| POST | `/blockchain/wallets/wc/submit` | JWT | Gửi signature sau khi user ký |
+| POST | `/blockchain/wallets/wc/relay-webhook` | Public | Callback relay (HMAC tùy chọn) |
 
-Các route **cũ** (nonce + ký trực tiếp) vẫn dùng được: `request-link`, `verify-link`, … — xem [BLOCKCHAIN_API_PURPOSE.md](BLOCKCHAIN_API_PURPOSE.md).
+---
 
-## Biến môi trường
+## Biến môi trường — Backend (`env.example`)
 
 | Biến | Bắt buộc | Mô tả |
 |------|-----------|--------|
-| `WALLETCONNECT_PROJECT_ID` | Khuyến nghị | Project ID từ [Reown Cloud](https://cloud.reown.com/) (trước đây WalletConnect Cloud). Thiếu thì BE log cảnh báo. |
+| `WALLETCONNECT_PROJECT_ID` | Khuyến nghị | Project ID Reown Cloud — gắn vào URI `wc:` do Nest tạo. |
 | `WALLETCONNECT_RELAY_URL` | Tùy chọn | Mặc định `wss://relay.walletconnect.com` |
-| `WALLETCONNECT_WEBHOOK_SECRET` | Tùy chọn | Secret dùng chung để verify HMAC-SHA256 body webhook. **Không** lấy từ tab “Secret” Dashboard API / AppKit Auth trên Reown — chỉ có ý nghĩa nếu bên **gọi** `relay-webhook` ký đúng thuật toán và header. Để trống nếu chưa có caller: verify bị bỏ qua. |
+| `WALLETCONNECT_WEBHOOK_SECRET` | Tùy chọn | Verify HMAC cho `relay-webhook`; để trống nếu không có caller ký webhook. |
 
-Chi tiết các nhóm biến khác: [ENV_CONFIG_USAGE.md](ENV_CONFIG_USAGE.md).
+---
 
-## Mã nguồn tham chiếu (Backend)
+## Biến môi trường — Frontend (`fe-cryptocurrency-trading-app`)
 
-- `src/modules/blockchain/wallet-connect/wallet-connect.module.ts`
-- `src/modules/blockchain/wallet-connect/wallet-connect.service.ts`
-- `src/modules/blockchain/wallet-connect/wallet-connect.controller.ts`
-- `src/modules/blockchain/wallet-connect/dto/`
-- Đăng ký trong `blockchain.module.ts`
+| Biến | Mô tả |
+|------|--------|
+| `WALLETCONNECT_PROJECT_ID` hoặc `REOWN_PROJECT_ID` | Reown AppKit (mobile). Trùng **cùng project** với BE. |
 
-## Mã nguồn tham chiếu (Flutter)
+---
 
-Repo **`fe-cryptocurrency-trading-app`**:
+## Mã nguồn tham chiếu
 
-- `lib/presentation/screens/blockchain/widgets/link_wallet_dialog.dart` — WC-first
-- `lib/presentation/screens/blockchain/widgets/wc_qr_session_card.dart`
-- `lib/presentation/screens/blockchain/widgets/wc_deeplink_launcher.dart`
-- `lib/presentation/screens/blockchain/widgets/wc_session_poller.dart`
-- `lib/domain/entities/blockchain/wc_session_proposal.dart`, `wc_session_status.dart`
-- API: `lib/core/constants/api_constants.dart` (`blockchainWcInit`, `blockchainWcStatus`, `blockchainWcSubmit`)
-- `lib/data/repositories/blockchain_repository_impl.dart`, `lib/domain/repositories/blockchain_repository.dart`
-- `lib/presentation/providers/blockchain_provider.dart`
+**Backend**
+
+- Đăng nhập WC public: `src/modules/auth/wallet-connect-auth.service.ts`, `auth.controller.ts` (`wallet/wc/*`)
+- Liên kết WC: `src/modules/blockchain/wallet-connect/*`
+
+**Flutter (`fe-cryptocurrency-trading-app`)**
+
+- Đăng nhập: `lib/presentation/widgets/wallet_connect_auth_login_dialog.dart`, `lib/core/services/wallet_connect/reown_wallet_auth_config.dart`, `lib/core/utils/wallet_auth_handler.dart`
+- Liên kết ví (BE-driven QR): `lib/presentation/screens/blockchain/widgets/link_wallet_dialog.dart`, `wc_qr_session_card.dart`, `wc_deeplink_launcher.dart`, `wc_session_poller.dart`, `blockchain_provider.dart`, `api_constants.dart` (`blockchainWc*`)
+
+---
 
 ## Swagger
 
-Khi `NODE_ENV !== production`, xem nhóm **blockchain** tại `/api/docs`.
+Khi `NODE_ENV !== production`: nhóm **auth** (WC login) và **blockchain** tại `/api/docs`.

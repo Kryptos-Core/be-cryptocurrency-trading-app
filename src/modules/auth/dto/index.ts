@@ -3,5 +3,7 @@ export * from './login.dto';
 export * from './refresh-token.dto';
 export * from './wallet-nonce.dto';
 export * from './wallet-verify-auth.dto';
+export * from './wc-auth-init.dto';
+export * from './wc-auth-verify.dto';
 export * from './two-fa-otp.dto';
 export * from './change-password.dto';
