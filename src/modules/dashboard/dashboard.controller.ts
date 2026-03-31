@@ -1,19 +1,19 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
-import { JwtAuthGuard } from '@/common/guards';
+import { OptionalJwtAuthGuard } from '@/common/guards';
 import { CurrentUser } from '@/common/decorators';
 
 /**
  * Dashboard Controller
  * Single aggregated endpoint: replaces 3 separate calls (markets + tickers + wallets).
- * JWT required — returns user's wallet summary + portfolio total alongside top markets.
- * Available to ALL authenticated roles (trader, admin, support, risk, finance, market maker).
+ * JWT tùy chọn: không token → vẫn trả top markets; có token hợp lệ → thêm ví + tổng danh mục.
+ * Bearer sai/hết hạn → 401 (không lộ dữ liệu cá nhân).
  */
 @ApiTags('dashboard')
 @ApiBearerAuth('JWT-auth')
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard)
+@UseGuards(OptionalJwtAuthGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
@@ -26,9 +26,9 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Dashboard summary',
     description:
-      'Aggregated dashboard data: top 10 markets by 24h volume with live tickers, user wallet balances with estimated USD values, and total portfolio value.',
+      'Top 10 markets by 24h volume (public). With a valid JWT: also wallet balances, portfolio total, and wallet counts.',
   })
-  getDashboardSummary(@CurrentUser('userId') userId: string) {
+  getDashboardSummary(@CurrentUser('userId') userId: string | undefined) {
     return this.dashboardService.getDashboardSummary(userId ?? null);
   }
 }

@@ -33,7 +33,15 @@ export class OnchainTransaction {
 
   @Column({
     type: 'enum',
-    enum: ['TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA'],
+    enum: [
+      'TRON_NILE',
+      'TRON_SHASTA',
+      'TRON_MAINNET',
+      'SOLANA_DEVNET',
+      'SOLANA_MAINNET',
+      'ETH_SEPOLIA',
+      'ETH_MAINNET',
+    ],
   })
   chain!: string;
 

@@ -198,13 +198,9 @@ export class EnvironmentVariables {
   WALLET_ENCRYPTION_KEY?: string;
 
   // Hot Wallet Configuration
-  @IsString()
-  @IsOptional()
-  ETH_HOT_WALLET_PRIVATE_KEY?: string;
-
-  @IsString()
-  @IsOptional()
-  TRON_HOT_WALLET_PRIVATE_KEY?: string;
+  // NOTE: ETH_HOT_WALLET_PRIVATE_KEY and TRON_HOT_WALLET_PRIVATE_KEY removed.
+  // Private keys are now managed via treasury_main_wallets table (DB).
+  // Use POST /treasury/main-wallets (requires MFA + Risk Officer approval).
 
   @IsBoolean()
   @IsOptional()
@@ -329,65 +325,7 @@ export class EnvironmentVariables {
   @IsOptional()
   SMTP_FROM?: string;
 
-  /** Fiat (bank) withdrawal — min amount in platform cash currency (e.g. USDT). */
-  @IsString()
-  @IsOptional()
-  FIAT_WITHDRAW_MIN?: string = '10';
 
-  /** Fiat withdrawal — max single request amount. */
-  @IsString()
-  @IsOptional()
-  FIAT_WITHDRAW_MAX?: string = '100000';
-
-  /**
-   * Max total pending+completed fiat withdrawal amount per user per UTC day.
-   * 0 = disabled (no daily cap).
-   */
-  @IsString()
-  @IsOptional()
-  FIAT_WITHDRAW_DAILY_LIMIT_USER?: string = '0';
-
-  /** Timeout cho gọi Cas.so / BankHub (grant, exchange, identity), milliseconds. */
-  @IsInt()
-  @Min(1000)
-  @Max(30000)
-  @IsOptional()
-  CAS_BANKHUB_TIMEOUT_MS?: number = 8000;
-
-  /** BankHub base: sandbox `https://sandbox.bankhub.dev`, production từ Console. */
-  @IsUrl()
-  @IsOptional()
-  CAS_BANKHUB_BASE_URL?: string;
-
-  @IsString()
-  @IsOptional()
-  CAS_CLIENT_ID?: string;
-
-  @IsString()
-  @IsOptional()
-  CAS_SECRET_KEY?: string;
-
-  /** Redirect sau Cas Link (khớp cấu hình Console). */
-  @IsUrl()
-  @IsOptional()
-  CAS_BALANCE_HOOK_REDIRECT_URI?: string;
-
-  /** Ví dụ docs: `qrpay` — chỉnh theo product Balance Hook trong Console. */
-  @IsString()
-  @IsOptional()
-  CAS_BALANCE_HOOK_SCOPES?: string;
-
-  @IsString()
-  @IsOptional()
-  CAS_BANKHUB_API_VERSION?: string = '2023-01-01';
-
-  /**
-   * Danh sách IP được phép gọi POST webhook Cas (comma-separated).
-   * Sandbox doc: 20.2.69.168. Để trống = không chặn theo IP (chỉ dùng khi dev / sau reverse proxy).
-   */
-  @IsString()
-  @IsOptional()
-  CAS_WEBHOOK_TRUSTED_IPS?: string;
 
   /** WalletConnect / Reown — phải có trong envVarKeys để ConfigService nhận từ .env */
   @IsString()
@@ -456,8 +394,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'WALLET_SYNC_INTERVAL',
     'WALLET_RECONCILIATION_THRESHOLD',
     'WALLET_ENCRYPTION_KEY',
-    'ETH_HOT_WALLET_PRIVATE_KEY',
-    'TRON_HOT_WALLET_PRIVATE_KEY',
+    // ETH_HOT_WALLET_PRIVATE_KEY removed — managed via treasury_main_wallets
+    // TRON_HOT_WALLET_PRIVATE_KEY removed — managed via treasury_main_wallets
     'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
     'BLOCKCHAIN_WITHDRAW_AUTO_MAX',
     'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
@@ -488,17 +426,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'SMTP_USER',
     'SMTP_PASS',
     'SMTP_FROM',
-    'FIAT_WITHDRAW_MIN',
-    'FIAT_WITHDRAW_MAX',
-    'FIAT_WITHDRAW_DAILY_LIMIT_USER',
-    'CAS_BANKHUB_TIMEOUT_MS',
-    'CAS_BANKHUB_BASE_URL',
-    'CAS_CLIENT_ID',
-    'CAS_SECRET_KEY',
-    'CAS_BALANCE_HOOK_REDIRECT_URI',
-    'CAS_BALANCE_HOOK_SCOPES',
-    'CAS_BANKHUB_API_VERSION',
-    'CAS_WEBHOOK_TRUSTED_IPS',
+
     'WALLETCONNECT_PROJECT_ID',
     'REOWN_PROJECT_ID',
     'WALLETCONNECT_RELAY_URL',

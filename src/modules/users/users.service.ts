@@ -15,6 +15,7 @@ import { User } from '@/entities/user.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
 import { newUuid } from '@/common/utils/uuid.util';
+import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { OrderRepository } from '@/modules/orders/repositories';
 
@@ -220,6 +221,16 @@ export class UsersService {
     dto: RequestSecurityChangeDto,
   ): Promise<{ requestId: string; status: string }> {
     const user = await this.findOne(userId);
+
+    if (
+      isWalletPlaceholderEmail(user.email) &&
+      dto.changeType === 'EMAIL_CHANGE'
+    ) {
+      throw new BadRequestException(
+        'Tài khoản ví dùng email tạm. Vui lòng xác minh email thật trong Hồ sơ: nhập địa chỉ mới và nhập OTP được gửi tới email đó.',
+        'USE_CONTACT_EMAIL_VERIFICATION',
+      );
+    }
 
     // Chỉ cho phép gửi yêu cầu thay đổi thông tin nhạy cảm khi đã bật 2FA
     if (user.two_fa_enabled !== 1) {

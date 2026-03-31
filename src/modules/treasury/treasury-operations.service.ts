@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { TronWeb } from 'tronweb';
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
+import bs58 from 'bs58';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
 import {
@@ -36,7 +38,9 @@ type SupportedTreasuryChain =
   | 'ETH_MAINNET'
   | 'TRON_NILE'
   | 'TRON_SHASTA'
-  | 'TRON_MAINNET';
+  | 'TRON_MAINNET'
+  | 'SOLANA_DEVNET'
+  | 'SOLANA_MAINNET';
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
 interface TreasuryJobData {
@@ -348,6 +352,35 @@ export class TreasuryOperationsService {
       };
     }
 
+    if (wallet.chain === 'SOLANA_DEVNET' || wallet.chain === 'SOLANA_MAINNET') {
+      const connection = this.buildSolanaConnection(wallet.chain);
+      const decodedKey = bs58.decode(privateKey);
+      const keypair = Keypair.fromSecretKey(decodedKey);
+      
+      const balanceLamports = await connection.getBalance(keypair.publicKey);
+      const reserveLamports = 5000; // standard solana fee
+      const transferLamports = Math.max(0, balanceLamports - reserveLamports);
+      
+      if (transferLamports <= 0) {
+        throw new BusinessException('Insufficient SOL balance to sweep', 'TREASURY_SWEEP_INSUFFICIENT_BALANCE');
+      }
+
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: new PublicKey(mainAddress),
+          lamports: transferLamports,
+        })
+      );
+
+      const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
+      
+      return {
+        txHash,
+        amount: new Decimal(transferLamports).div(1_000_000_000).toString(),
+      };
+    }
+
     const tronWeb = this.buildTronSigner(wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
     const balanceSun = await tronWeb.trx.getBalance(wallet.address);
     const reserveSun = 100_000; // Keep 0.1 TRX for fees/bandwidth.
@@ -382,6 +415,24 @@ export class TreasuryOperationsService {
         value: ethers.parseEther(amount),
       });
       return tx.hash;
+    }
+
+    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+      const connection = this.buildSolanaConnection(chain);
+      const decodedKey = bs58.decode(privateKey);
+      const keypair = Keypair.fromSecretKey(decodedKey);
+      const lamports = Math.floor(new Decimal(amount).mul(1_000_000_000).toNumber());
+      
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: new PublicKey(toAddress),
+          lamports,
+        })
+      );
+      
+      const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
+      return txHash;
     }
 
     const tronWeb = this.buildTronSigner(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
@@ -433,6 +484,13 @@ export class TreasuryOperationsService {
         ? (this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com')
         : (this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org');
     return new JsonRpcProvider(rpcUrl);
+  }
+
+  private buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Connection {
+    const defaultUrl = chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
+    const configPath = chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
+    const url = this.configService.get<string>(configPath) ?? defaultUrl;
+    return new Connection(url, 'confirmed');
   }
 
   private buildTronSigner(

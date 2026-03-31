@@ -4,3 +4,4 @@ export * from './sweep-wallet.dto';
 export * from './list-treasury-wallets.dto';
 export * from './list-treasury-operations.dto';
 export * from './list-treasury-transactions.dto';
+export * from './main-wallet.dto';

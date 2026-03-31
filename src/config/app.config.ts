@@ -82,7 +82,7 @@ export interface AppConfig {
       shastaFullHost: string;
       mainnetFullHost: string;
       defaultNetwork: 'TRON_NILE' | 'TRON_SHASTA';
-      hotWalletPrivateKey?: string;
+      // NOTE: hotWalletPrivateKey removed. Managed via treasury_main_wallets table.
     };
     solana: {
       devnetUrl: string;
@@ -92,7 +92,7 @@ export interface AppConfig {
       chainId: number;
       mainnetRpcUrl: string;
       mainnetChainId: number;
-      hotWalletPrivateKey?: string;
+      // NOTE: hotWalletPrivateKey removed. Managed via treasury_main_wallets table.
     };
   };
   /** Price oracle: on-demand OHLCV. App uses Binance only (no DB persist). UNISWAP_* env not used. */
@@ -224,8 +224,6 @@ export class AppConfigBuilder {
     ethSepoliaChainId: number,
     ethMainnetRpcUrl: string,
     ethMainnetChainId: number,
-    tronHotWalletPrivateKey?: string,
-    ethHotWalletPrivateKey?: string,
   ): this {
     this.config.blockchain = {
       tron: {
@@ -233,7 +231,7 @@ export class AppConfigBuilder {
         shastaFullHost: tronShastaFullHost,
         mainnetFullHost: tronMainnetFullHost,
         defaultNetwork: tronDefaultNetwork as 'TRON_NILE' | 'TRON_SHASTA',
-        hotWalletPrivateKey: tronHotWalletPrivateKey,
+        // hotWalletPrivateKey intentionally omitted — managed via treasury_main_wallets table
       },
       solana: {
         devnetUrl: solanaDevnetUrl,
@@ -243,7 +241,7 @@ export class AppConfigBuilder {
         chainId: ethSepoliaChainId,
         mainnetRpcUrl: ethMainnetRpcUrl,
         mainnetChainId: ethMainnetChainId,
-        hotWalletPrivateKey: ethHotWalletPrivateKey,
+        // hotWalletPrivateKey intentionally omitted — managed via treasury_main_wallets table
       },
     };
     return this;
@@ -346,8 +344,7 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       parseInt((env as any).ETH_SEPOLIA_CHAIN_ID, 10) || 11155111,
       (env as any).ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com',
       parseInt((env as any).ETH_MAINNET_CHAIN_ID, 10) || 1,
-      (env as any).TRON_HOT_WALLET_PRIVATE_KEY,
-      (env as any).ETH_HOT_WALLET_PRIVATE_KEY,
+      // hotWalletPrivateKey params removed — managed via treasury_main_wallets table
     )
     .setPriceOracle(
       (env as any).UNISWAP_SUBGRAPH_URL ||

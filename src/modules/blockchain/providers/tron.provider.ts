@@ -6,8 +6,7 @@ import {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
 } from '../interfaces';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 
 import { TronWeb } from 'tronweb';
 
@@ -15,9 +14,9 @@ import { TronWeb } from 'tronweb';
  * Tron Blockchain Provider
  * Strategy Pattern: implements IBlockchainProvider for TRON_NILE / TRON_SHASTA / TRON_MAINNET.
  *
- * Hot wallet key resolution (Cache-Aside):
- *  1. PaymentConfigService.getActiveConfig('TRON', network) — DB/Redis
- *  2. Fallback: TRON_HOT_WALLET_PRIVATE_KEY from .env
+ * Hot wallet key resolution (Single Source of Truth):
+ *  treasury_main_wallets table (via TreasuryMainWalletService) — DB/Redis
+ *  No .env fallback. Import via POST /treasury/main-wallets.
  */
 @Injectable()
 export class TronProvider implements IBlockchainProvider {
@@ -30,7 +29,7 @@ export class TronProvider implements IBlockchainProvider {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly paymentConfigService: PaymentConfigService,
+    private readonly treasuryMainWalletService: TreasuryMainWalletService,
   ) {
     const defaultNetwork =
       this.configService.get<string>('app.blockchain.tron.defaultNetwork') ?? 'TRON_NILE';
@@ -62,18 +61,8 @@ export class TronProvider implements IBlockchainProvider {
   // ── Hot wallet key resolution ────────────────────────────────────────────
 
   private async resolveHotWalletKey(): Promise<string> {
-    const dbConfig = await this.paymentConfigService.getActiveConfig('TRON', this.networkKey);
-    if (dbConfig) {
-      const blockchainConfig = dbConfig as BlockchainGatewayConfig;
-      if (blockchainConfig.hotWalletPrivateKey) return blockchainConfig.hotWalletPrivateKey;
-    }
-
-    // .env fallback
-    const envKey = this.configService.get<string>('app.blockchain.tron.hotWalletPrivateKey');
-    if (!envKey) {
-      throw new Error('TRON hot wallet private key not configured (DB or TRON_HOT_WALLET_PRIVATE_KEY)');
-    }
-    return envKey;
+    const networkEnum = this.network === BlockchainNetwork.TRON_SHASTA ? 'TRON_SHASTA' : 'TRON_NILE';
+    return this.treasuryMainWalletService.resolveMainWalletPrivateKey(networkEnum);
   }
 
   private buildTronWebWithKey(privateKey: string): any {

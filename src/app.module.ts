@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
@@ -24,13 +25,14 @@ import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { MarketMakerModule } from './modules/market-maker/market-maker.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
-import { FiatWithdrawalsModule } from './modules/fiat-withdrawals/fiat-withdrawals.module';
+
 import { validateEnvironment } from './config/env.validation';
 import appConfig from './config/app.config';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
+    ScheduleModule.forRoot(), // enables @Cron / @Interval decorators
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -77,7 +79,7 @@ import appConfig from './config/app.config';
     MarketMakerModule,
     PaymentConfigModule,
     TreasuryModule,
-    FiatWithdrawalsModule,
+
   ],
 })
 export class AppModule {}

@@ -44,6 +44,6 @@ import { MailService } from '@/common/services';
     MailService,
   ],
   controllers: [AuthController],
-  exports: [AuthService, AuthRepository, TwoFaService, JwtModule],
+  exports: [AuthService, AuthRepository, TwoFaService, JwtModule, MailService],
 })
 export class AuthModule {}

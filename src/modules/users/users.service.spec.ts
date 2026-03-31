@@ -99,6 +99,24 @@ describe('UsersService', () => {
       );
     });
 
+    it('should reject EMAIL_CHANGE for wallet placeholder email (use contact-email OTP flow)', async () => {
+      (usersRepository.findById as jest.Mock).mockResolvedValueOnce({
+        ...mockUser,
+        email: 'abcd1234@eth_sepolia.wallet',
+        two_fa_enabled: 0,
+      });
+      const dto: RequestSecurityChangeDto = {
+        changeType: 'EMAIL_CHANGE',
+        payload: { email: 'human@example.com' },
+        otpCode: '123456',
+      };
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(twoFaService.verifyOtp).not.toHaveBeenCalled();
+      expect(usersRepository.createSecurityChangeRequest).not.toHaveBeenCalled();
+    });
+
     it('should reject EMAIL_CHANGE if email already exists', async () => {
       (usersRepository.emailExists as jest.Mock).mockResolvedValue(true);
       const dto: RequestSecurityChangeDto = {

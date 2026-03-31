@@ -61,7 +61,6 @@ export class WalletsService {
       WITHDRAW: 'DEBIT',
       EXTERNAL_DEPOSIT: 'CREDIT',
       EXTERNAL_WITHDRAWAL: 'DEBIT',
-      FIAT_WITHDRAWAL: 'DEBIT',
     };
     const seen = new Set<string>();
     const result: WalletLedgerEntryDto[] = [];

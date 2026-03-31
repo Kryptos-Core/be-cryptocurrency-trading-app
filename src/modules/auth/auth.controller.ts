@@ -23,6 +23,7 @@ import {
 import { Public, CurrentUser } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
 import { BadRequestException } from '@/common/exceptions';
+import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import {
   ApiSuccessResponse,
   ApiBadRequestResponse,
@@ -237,6 +238,12 @@ export class AuthController {
   @ApiUnauthorizedResponse('Unauthorized')
   async sendTwoFaOtp(@CurrentUser('userId') userId: string) {
     const user = await this.authService.getUserById(userId);
+    if (isWalletPlaceholderEmail(user.email)) {
+      throw new BadRequestException(
+        'Tài khoản đăng nhập bằng ví chưa có email liên hệ thật. Vui lòng thêm email trong Hồ sơ (bảo mật) và chờ duyệt trước khi dùng OTP qua mail.',
+        'CONTACT_EMAIL_REQUIRED',
+      );
+    }
     return this.twoFaService.sendOtp(userId, user.email);
   }
 

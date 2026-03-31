@@ -16,6 +16,7 @@ import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
+import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import {
   CreateManagedWalletDto,
   ManagedWalletResponseDto,
@@ -292,7 +293,7 @@ export class ManagedWalletsService {
     const methods = await Promise.all(
       ManagedWalletsService.SUPPORTED_CHAINS.map(async (chain) => {
         const configuredWallet = await this.getConfiguredDepositWallet(chain);
-        const fallbackHotWallet = this.getFallbackHotWalletAddress(chain);
+        const fallbackHotWallet = await this.getFallbackHotWalletAddress(chain);
         const networkConfig = networkMap.get(chain);
         return {
           chain,
@@ -373,13 +374,24 @@ export class ManagedWalletsService {
     });
   }
 
-  private getFallbackHotWalletAddress(chain: SupportedManagedWalletChain): string | null {
-    const privateKey = this.configService.get<string>('TRON_HOT_WALLET_PRIVATE_KEY')?.trim();
-    if (!privateKey) {
+  /**
+   * Fallback deposit address: reads the default ACTIVE main wallet for the given TRON chain.
+   * Used when no transaction wallet is configured yet.
+   * No .env read — treasury_main_wallets is the single source of truth.
+   */
+  private async getFallbackHotWalletAddress(
+    chain: SupportedManagedWalletChain,
+  ): Promise<string | null> {
+    try {
+      const repo = this.dataSource.getRepository(TreasuryMainWallet);
+      const wallet = await repo.findOne({
+        where: { chain, is_default: true, status: 'ACTIVE' } as any,
+        select: ['address'],
+      });
+      return wallet?.address ?? null;
+    } catch {
       return null;
     }
-
-    return this.buildTronWeb(chain, privateKey).defaultAddress.base58 || null;
   }
 
   private normalizePositiveAmount(rawAmount: string): string {

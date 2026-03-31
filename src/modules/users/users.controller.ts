@@ -27,12 +27,15 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { ContactEmailVerificationService } from './contact-email-verification.service';
 import {
   UpdateUserDto,
   UpdateMyProfileBasicDto,
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
   UserFilterDto,
+  SendContactEmailOtpDto,
+  VerifyContactEmailDto,
 } from './dto';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { CurrentUser } from '@/common/decorators';
@@ -55,7 +58,10 @@ import { Permission, UserRole } from '@/common/enums';
 @Controller('users')
 @UseGuards(JwtAuthGuard) // All routes require authentication
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly contactEmailVerificationService: ContactEmailVerificationService,
+  ) {}
 
   /**
    * Get all users with search/filter/sort
@@ -138,6 +144,53 @@ export class UsersController {
     @Body() dto: UpdateMyProfileBasicDto,
   ) {
     return this.usersService.updateProfileBasic(userId, dto);
+  }
+
+  /**
+   * Gửi OTP tới email mới (chỉ user ví / email @*.wallet).
+   * POST /users/me/contact-email/send-otp
+   */
+  @Post('me/contact-email/send-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Send contact email verification OTP',
+    description:
+      'Sends a 6-digit OTP to the new address. Only for accounts with a wallet placeholder email.',
+  })
+  @ApiBody({ type: SendContactEmailOtpDto })
+  @ApiSuccessResponse('OTP sent')
+  @ApiBadRequestResponse('Invalid email or cooldown')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async sendContactEmailOtp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: SendContactEmailOtpDto,
+  ) {
+    return this.contactEmailVerificationService.sendOtp(userId, dto.email);
+  }
+
+  /**
+   * Xác minh OTP và cập nhật email đăng nhập sang địa chỉ mới.
+   * POST /users/me/contact-email/verify
+   */
+  @Post('me/contact-email/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify contact email OTP',
+    description: 'Validates OTP sent to the new email and updates the user email.',
+  })
+  @ApiBody({ type: VerifyContactEmailDto })
+  @ApiSuccessResponse('Email updated')
+  @ApiBadRequestResponse('Invalid or expired OTP')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async verifyContactEmail(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: VerifyContactEmailDto,
+  ) {
+    return this.contactEmailVerificationService.verifyAndUpdateEmail(
+      userId,
+      dto.email,
+      dto.otpCode,
+    );
   }
 
   /**

@@ -17,14 +17,16 @@ export class TransactionWallet {
 
   @Column({
     type: 'enum',
-    enum: ['ETH_SEPOLIA', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'ETH_MAINNET'],
+    enum: ['ETH_SEPOLIA', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'ETH_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'],
   })
   chain!:
     | 'ETH_SEPOLIA'
     | 'TRON_NILE'
     | 'TRON_SHASTA'
     | 'TRON_MAINNET'
-    | 'ETH_MAINNET';
+    | 'ETH_MAINNET'
+    | 'SOLANA_DEVNET'
+    | 'SOLANA_MAINNET';
 
   @Column({ type: 'varchar', length: 255 })
   address!: string;

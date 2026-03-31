@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
+import { ContactEmailVerificationService } from './contact-email-verification.service';
 import { UsersController } from './users.controller';
 import { UsersRepository } from './repositories';
 import { User } from '@/entities/user.entity';
@@ -17,7 +18,13 @@ import { Order } from '@/entities/order.entity';
     AuthModule,
     WalletsModule,
   ],
-  providers: [UsersService, UsersRepository, CloudinaryService, OrderRepository],
+  providers: [
+    UsersService,
+    UsersRepository,
+    CloudinaryService,
+    OrderRepository,
+    ContactEmailVerificationService,
+  ],
   controllers: [UsersController],
   exports: [UsersService, UsersRepository],
 })

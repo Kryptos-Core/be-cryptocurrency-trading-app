@@ -10,7 +10,9 @@ type SupportedTreasuryChain =
   | 'ETH_MAINNET'
   | 'TRON_NILE'
   | 'TRON_SHASTA'
-  | 'TRON_MAINNET';
+  | 'TRON_MAINNET'
+  | 'SOLANA_DEVNET'
+  | 'SOLANA_MAINNET';
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
 @Injectable()

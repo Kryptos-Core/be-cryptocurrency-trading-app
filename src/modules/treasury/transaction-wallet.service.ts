@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FindOptionsWhere } from 'typeorm';
+import { DataSource, FindOptionsWhere } from 'typeorm';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { TronWeb } from 'tronweb';
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
+import bs58 from 'bs58';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
 import {
@@ -12,8 +14,7 @@ import {
   NotFoundException,
 } from '@/common/exceptions';
 import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
@@ -27,7 +28,9 @@ type SupportedTreasuryChain =
   | 'ETH_MAINNET'
   | 'TRON_NILE'
   | 'TRON_SHASTA'
-  | 'TRON_MAINNET';
+  | 'TRON_MAINNET'
+  | 'SOLANA_DEVNET'
+  | 'SOLANA_MAINNET';
 
 const TRON_DEPOSIT_UI_CHAINS = ['TRON_NILE', 'TRON_SHASTA'] as const;
 type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
@@ -42,11 +45,11 @@ export class TransactionWalletService {
   private readonly logger = new Logger(TransactionWalletService.name);
 
   constructor(
+    private readonly dataSource: DataSource,
     private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepository,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,
-    private readonly paymentConfigService: PaymentConfigService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -218,7 +221,16 @@ export class TransactionWalletService {
       };
     }
 
-    const tronWeb = this.buildTronReadOnlyClient(chain);
+    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+      const connection = this.buildSolanaConnection(chain);
+      const lamports = await connection.getBalance(new PublicKey(address));
+      return {
+        balance: new Decimal(lamports).div(1_000_000_000).toString(),
+        symbol: 'SOL',
+      };
+    }
+
+    const tronWeb = this.buildTronReadOnlyClient(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET');
     const sun = await tronWeb.trx.getBalance(address);
     return {
       balance: new Decimal(sun).div(1_000_000).toString(),
@@ -232,6 +244,13 @@ export class TransactionWalletService {
       return new ethers.Wallet(key).address;
     }
 
+    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+      const key = await this.resolveMainWalletPrivateKey(chain);
+      const decoded = bs58.decode(key);
+      const keypair = Keypair.fromSecretKey(decoded);
+      return keypair.publicKey.toBase58();
+    }
+
     const key = await this.resolveMainWalletPrivateKey(chain);
     const address = TronWeb.address.fromPrivateKey(key);
     if (!address) {
@@ -240,38 +259,24 @@ export class TransactionWalletService {
     return address;
   }
 
+  /**
+   * Resolve the private key for the active default main wallet on a given chain.
+   * Reads directly from treasury_main_wallets table to avoid circular dependency
+   * with TreasuryMainWalletService (which injects TransactionWalletService for balance queries).
+   */
   async resolveMainWalletPrivateKey(chain: SupportedTreasuryChain): Promise<string> {
-    if (chain === 'ETH_SEPOLIA') {
-      const dbConfig = await this.paymentConfigService.getActiveConfig('ETH', 'SEPOLIA');
-      const fromDb = (dbConfig as BlockchainGatewayConfig | null)?.hotWalletPrivateKey;
-      const fromEnv = this.configService.get<string>('app.blockchain.ethereum.hotWalletPrivateKey');
-      const privateKey = fromDb ?? fromEnv;
-      if (!privateKey) {
-        throw new BusinessException('ETH main wallet private key is not configured', 'ETH_MAIN_WALLET_NOT_CONFIGURED');
-      }
-      return privateKey;
+    const repo = this.dataSource.getRepository(TreasuryMainWallet);
+    const wallet = await repo.findOne({
+      where: { chain, is_default: true, status: 'ACTIVE' } as any,
+    });
+    if (!wallet) {
+      throw new BusinessException(
+        `No active default main wallet configured for chain ${chain}. `
+        + `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
+        'TREASURY_MAIN_WALLET_NOT_CONFIGURED',
+      );
     }
-
-    if (chain === 'ETH_MAINNET') {
-      const dbConfig = await this.paymentConfigService.getActiveConfig('ETH', 'MAINNET');
-      const fromDb = (dbConfig as BlockchainGatewayConfig | null)?.hotWalletPrivateKey;
-      const fromEnv = this.configService.get<string>('app.blockchain.ethereum.hotWalletPrivateKey');
-      const privateKey = fromDb ?? fromEnv;
-      if (!privateKey) {
-        throw new BusinessException('ETH mainnet wallet private key is not configured', 'ETH_MAINNET_WALLET_NOT_CONFIGURED');
-      }
-      return privateKey;
-    }
-
-    const networkKey = chain === 'TRON_SHASTA' ? 'SHASTA' : chain === 'TRON_MAINNET' ? 'MAINNET' : 'NILE';
-    const dbConfig = await this.paymentConfigService.getActiveConfig('TRON', networkKey);
-    const fromDb = (dbConfig as BlockchainGatewayConfig | null)?.hotWalletPrivateKey;
-    const fromEnv = this.configService.get<string>('app.blockchain.tron.hotWalletPrivateKey');
-    const privateKey = fromDb ?? fromEnv;
-    if (!privateKey) {
-      throw new BusinessException('TRON main wallet private key is not configured', 'TRON_MAIN_WALLET_NOT_CONFIGURED');
-    }
-    return privateKey;
+    return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
   }
 
   decryptWalletPrivateKey(wallet: TransactionWallet): string {
@@ -385,7 +390,26 @@ export class TransactionWalletService {
       return tx.hash;
     }
 
-    const tw = this.buildTronWebWithPrivateKey(chain, pk);
+    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+      const connection = this.buildSolanaConnection(chain);
+      const decodedKey = bs58.decode(pk);
+      const keypair = Keypair.fromSecretKey(decodedKey);
+      const lamports = Math.floor(new Decimal(amount).mul(1_000_000_000).toNumber());
+      
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: new PublicKey(toAddress),
+          lamports,
+        })
+      );
+      
+      const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
+      this.logger.log(`Withdrawal SOL sent from tx wallet ${wallet.wallet_id}: ${txHash}`);
+      return txHash;
+    }
+
+    const tw = this.buildTronWebWithPrivateKey(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', pk);
     if (!tw.isAddress(toAddress)) {
       throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
     }
@@ -402,7 +426,7 @@ export class TransactionWalletService {
   }
 
   private isTreasuryChain(chain: string): chain is SupportedTreasuryChain {
-    return ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'].includes(chain);
+    return ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'].includes(chain);
   }
 
   private buildTronWebWithPrivateKey(
@@ -420,7 +444,7 @@ export class TransactionWalletService {
   }
 
   private assertSupportedChain(chain: string): SupportedTreasuryChain {
-    const supported = ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'];
+    const supported = ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'];
     if (!supported.includes(chain)) {
       throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', { chain });
     }
@@ -428,6 +452,14 @@ export class TransactionWalletService {
   }
 
   private async generateAccount(chain: SupportedTreasuryChain): Promise<{ address: string; privateKey: string }> {
+    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+      const keypair = Keypair.generate();
+      return {
+        address: keypair.publicKey.toBase58(),
+        privateKey: bs58.encode(keypair.secretKey),
+      };
+    }
+
     if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
       const wallet = ethers.Wallet.createRandom();
       return {
@@ -449,6 +481,13 @@ export class TransactionWalletService {
         ? (this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com')
         : (this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org');
     return new JsonRpcProvider(rpcUrl);
+  }
+
+  private buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Connection {
+    const defaultUrl = chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
+    const configPath = chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
+    const url = this.configService.get<string>(configPath) ?? defaultUrl;
+    return new Connection(url, 'confirmed');
   }
 
   private buildTronReadOnlyClient(

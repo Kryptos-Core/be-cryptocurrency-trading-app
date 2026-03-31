@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
@@ -7,6 +7,7 @@ import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import { WalletEncryptionService } from '@/common/services';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
+import { AuthModule } from '@/modules/auth/auth.module';
 import { TREASURY_QUEUE } from './constants';
 import { TreasuryController } from './treasury.controller';
 import { TransactionWalletService } from './transaction-wallet.service';
@@ -16,6 +17,7 @@ import { TreasuryProcessor } from './treasury.processor';
 import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
+import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
 
 @Module({
   imports: [
@@ -26,6 +28,7 @@ import { TreasuryTransactionWalletRepository } from './repositories/treasury-tra
       OnchainTransaction,
     ]),
     PaymentConfigModule,
+    forwardRef(() => AuthModule), // forwardRef avoids potential circular deps
     BullModule.registerQueue({
       name: TREASURY_QUEUE,
     }),
@@ -40,6 +43,7 @@ import { TreasuryTransactionWalletRepository } from './repositories/treasury-tra
     TreasuryMainWalletService,
     TreasuryOperationsService,
     TreasuryProcessor,
+    MainWalletRotationScheduler,
   ],
   exports: [TransactionWalletService, TreasuryMainWalletService, TreasuryOperationsService],
 })

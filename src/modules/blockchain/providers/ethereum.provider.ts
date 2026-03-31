@@ -7,16 +7,15 @@ import {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
 } from '../interfaces';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 
 /**
  * Ethereum Blockchain Provider (Sepolia testnet / ETH Mainnet)
  * Compatible with MetaMask — uses EIP-191 personal_sign.
  *
- * Hot wallet key resolution (Cache-Aside):
- *  1. PaymentConfigService.getActiveConfig('ETH', 'SEPOLIA' | 'MAINNET') — DB/Redis
- *  2. Fallback: ETH_HOT_WALLET_PRIVATE_KEY from .env
+ * Hot wallet key resolution (Single Source of Truth):
+ *  treasury_main_wallets table (via TreasuryMainWalletService) — DB/Redis
+ *  No .env fallback. Import via POST /treasury/main-wallets.
  */
 @Injectable()
 export class EthereumProvider implements IBlockchainProvider {
@@ -28,7 +27,7 @@ export class EthereumProvider implements IBlockchainProvider {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly paymentConfigService: PaymentConfigService,
+    private readonly treasuryMainWalletService: TreasuryMainWalletService,
   ) {
     const rpcUrl =
       this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ??
@@ -47,17 +46,7 @@ export class EthereumProvider implements IBlockchainProvider {
   // ── Hot wallet key resolution ────────────────────────────────────────────
 
   private async resolveHotWalletKey(): Promise<string> {
-    const dbConfig = await this.paymentConfigService.getActiveConfig('ETH', this.networkKey);
-    if (dbConfig) {
-      const blockchainConfig = dbConfig as BlockchainGatewayConfig;
-      if (blockchainConfig.hotWalletPrivateKey) return blockchainConfig.hotWalletPrivateKey;
-    }
-
-    const envKey = this.configService.get<string>('app.blockchain.ethereum.hotWalletPrivateKey');
-    if (!envKey) {
-      throw new Error('ETH hot wallet private key not configured (DB or ETH_HOT_WALLET_PRIVATE_KEY)');
-    }
-    return envKey;
+    return this.treasuryMainWalletService.resolveMainWalletPrivateKey('ETH_SEPOLIA');
   }
 
   // ── IBlockchainProvider ──────────────────────────────────────────────────
