@@ -47,7 +47,7 @@ export class WalletConnectAuthService implements OnModuleInit {
 
   private static readonly CHAIN_CAIP: Record<string, string> = {
     [BlockchainNetwork.ETH_SEPOLIA]: 'eip155:11155111',
-    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRAqHX4t7hs',
+    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
   };
 
   /** Tránh POST /wc/init chờ connect() vô hạn khi relay treo. */

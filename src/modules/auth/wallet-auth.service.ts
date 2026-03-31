@@ -143,6 +143,10 @@ export class WalletAuthService {
       if (user.status === 'BANNED') {
         throw new BusinessException('Tài khoản đã bị khoá', 'ACCOUNT_BANNED');
       }
+      const full = await this.authRepository.findById(user.user_id);
+      if (full) {
+        user = full;
+      }
       this.logger.log(`[WalletAuth] Login: userId=${user.user_id}, chain=${chain}`);
       const accessToken = this.buildAccessToken(user);
       return {
@@ -187,12 +191,14 @@ export class WalletAuthService {
     const role = normalizeUserRole(user.role as string);
     const permissions = getPermissionsForRole(role) as Permission[];
     const identityVerified = user.identity_verified === 1;
+    const emailVerified = user.email_verified === 1;
 
     const payload = {
       userId: user.user_id,
       email: user.email,
       role,
       identityVerified,
+      emailVerified,
       permissions,
       sub: user.user_id,
     };

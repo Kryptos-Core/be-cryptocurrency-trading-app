@@ -176,12 +176,14 @@ export class AuthService {
     const role = normalizeUserRole(user.role as string);
     const permissions = getPermissionsForRole(role) as Permission[];
     const identityVerified = user.identity_verified === 1;
+    const emailVerified = user.email_verified === 1;
 
     const payload = {
       userId: user.user_id,
       email: user.email,
       role,
       identityVerified,
+      emailVerified,
       permissions,
       sub: user.user_id, // Keep for compatibility
     };

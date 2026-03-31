@@ -90,6 +90,7 @@ export class UsersRepository {
           'u.avatar_url',
           'u.two_fa_enabled',
           'u.identity_verified',
+          'u.email_verified',
           'u.created_at',
         ]);
 
@@ -269,6 +270,14 @@ export class UsersRepository {
       this.logger.error(`Error checking email: ${email}`, error);
       throw error;
     }
+  }
+
+  /** Đánh dấu đã xác minh inbox qua OTP (2FA / email liên hệ ví). */
+  async setEmailVerified(userId: string, verified: boolean): Promise<void> {
+    await this.dataSource.query(
+      'UPDATE users SET email_verified = ? WHERE user_id = ?',
+      [verified ? 1 : 0, userId],
+    );
   }
 
   /**

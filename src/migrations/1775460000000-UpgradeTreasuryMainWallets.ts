@@ -10,36 +10,19 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // 1. Extend chain enum to include Solana
-    await queryRunner.query(`
-      ALTER TABLE \`treasury_main_wallets\`
-        MODIFY \`chain\` enum (
-          'ETH_SEPOLIA', 'ETH_MAINNET',
-          'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
-          'SOLANA_DEVNET', 'SOLANA_MAINNET'
-        ) NOT NULL;
-        
-      ALTER TABLE \`transaction_wallets\`
-        MODIFY \`chain\` enum (
-          'ETH_SEPOLIA', 'ETH_MAINNET',
-          'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
-          'SOLANA_DEVNET', 'SOLANA_MAINNET'
-        ) NOT NULL;
-        
-      ALTER TABLE \`treasury_operations\`
-        MODIFY \`chain\` enum (
-          'ETH_SEPOLIA', 'ETH_MAINNET',
-          'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
-          'SOLANA_DEVNET', 'SOLANA_MAINNET'
-        ) NOT NULL;
-        
-      ALTER TABLE \`onchain_transactions\`
-        MODIFY \`chain\` enum (
-          'ETH_SEPOLIA', 'ETH_MAINNET',
-          'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
-          'SOLANA_DEVNET', 'SOLANA_MAINNET'
-        ) NOT NULL;
-    `);
+    // 1. Extend chain enum to include Solana (mỗi bảng một query — MySQL driver không chạy multi-statement)
+    const chainEnumValues =
+      `'ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'`;
+    for (const table of [
+      'treasury_main_wallets',
+      'transaction_wallets',
+      'treasury_operations',
+      'onchain_transactions',
+    ] as const) {
+      await queryRunner.query(
+        `ALTER TABLE \`${table}\` MODIFY \`chain\` enum (${chainEnumValues}) NOT NULL`,
+      );
+    }
 
     // 2. Add status column for approval workflow
     await queryRunner.query(`
@@ -96,15 +79,19 @@ export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterfa
         DROP COLUMN \`created_by\`,
         DROP COLUMN \`status\`
     `);
+    const chainRevertTmwTwTo = `enum ('ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET') NOT NULL`;
+    await queryRunner.query(
+      `ALTER TABLE \`treasury_main_wallets\` MODIFY \`chain\` ${chainRevertTmwTwTo}`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE \`transaction_wallets\` MODIFY \`chain\` ${chainRevertTmwTwTo}`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE \`treasury_operations\` MODIFY \`chain\` ${chainRevertTmwTwTo}`,
+    );
     await queryRunner.query(`
-      ALTER TABLE \`treasury_main_wallets\`
-        MODIFY \`chain\` enum ('ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET') NOT NULL;
-      ALTER TABLE \`transaction_wallets\`
-        MODIFY \`chain\` enum ('ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET') NOT NULL;
-      ALTER TABLE \`treasury_operations\`
-        MODIFY \`chain\` enum ('ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET') NOT NULL;
       ALTER TABLE \`onchain_transactions\`
-        MODIFY \`chain\` enum ('TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA') NOT NULL;
+        MODIFY \`chain\` enum ('TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA') NOT NULL
     `);
   }
 }

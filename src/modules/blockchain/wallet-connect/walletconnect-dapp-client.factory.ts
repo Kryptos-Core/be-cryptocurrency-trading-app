@@ -2,7 +2,7 @@ import SignClient from '@walletconnect/sign-client';
 
 /**
  * Singleton SignClient (dapp / initiator) cho relay WalletConnect v2.
- * Dùng cho đăng nhập public (`WalletConnectAuthService`). Module liên kết ví JWT có thể tái dùng sau.
+ * Dùng cho đăng nhập public (`WalletConnectAuthService`) và liên kết ví JWT (`WalletConnectService`, Sepolia + project id).
  */
 let signClientPromise: Promise<SignClient> | null = null;
 

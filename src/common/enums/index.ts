@@ -46,7 +46,7 @@ export enum UserStatus {
   PENDING = 'PENDING',
 }
 
-/** User role model for RBAC (không có GUEST — chưa đăng nhập không lưu role; không có VERIFIED_USER — dùng users.identity_verified). */
+/** User role model for RBAC (không có GUEST — khách = client chưa JWT; không có VERIFIED_USER — KYC: users.identity_verified; inbox OTP: users.email_verified). */
 export enum UserRole {
   TRADER = 'TRADER',
   ADMIN = 'ADMIN',

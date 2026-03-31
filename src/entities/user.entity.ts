@@ -56,6 +56,10 @@ export class User {
   @Column({ type: 'tinyint', width: 1, default: 0 })
   identity_verified!: number;
 
+  /** Đã xác minh email qua OTP (2FA hoặc luồng email liên hệ ví). Khác KYC. */
+  @Column({ type: 'tinyint', width: 1, default: 0 })
+  email_verified!: number;
+
   @Column({ type: 'varchar', length: 512, nullable: true })
   avatar_url!: string | null;
 

@@ -17,6 +17,8 @@ export interface JwtPayload {
   role?: UserRole;
   /** JWT mới; token cũ có thể thiếu — legacy role VERIFIED_USER vẫn được công nhận ở validate(). */
   identityVerified?: boolean;
+  /** Đã xác minh email qua OTP (2FA / luồng email liên hệ). Token cũ có thể thiếu → false. */
+  emailVerified?: boolean;
   permissions?: Permission[];
   iat?: number;
   exp?: number;
@@ -45,6 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const role = normalizeUserRole(rawRole);
     const legacyVerified = rawRole === 'VERIFIED_USER';
     const identityVerified = payload.identityVerified === true || legacyVerified;
+    const emailVerified = payload.emailVerified === true;
     const permissions = (payload.permissions as Permission[] | undefined)?.length
       ? (payload.permissions as Permission[])
       : (getPermissionsForRole(role) as Permission[]);
@@ -56,6 +59,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roles: [role],
       permissions,
       identityVerified,
+      emailVerified,
     };
   }
 }

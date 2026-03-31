@@ -129,6 +129,7 @@ export class ContactEmailVerificationService {
     await this.cacheService.delete(this.cooldownKey(userId, newEmail));
 
     await this.usersRepository.update(userId, { email: newEmail });
+    await this.usersRepository.setEmailVerified(userId, true);
     const updated = await this.usersRepository.findById(userId);
     if (!updated) {
       throw new NotFoundException('User', userId);
