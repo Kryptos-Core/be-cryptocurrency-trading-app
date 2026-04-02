@@ -10,6 +10,7 @@ import { WalletsService } from '@/modules/wallets/wallets.service';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { BlockchainNetwork, OnchainTxStatus, WalletTransactionAction } from '@/common/enums';
 
 describe('OnchainTransferService', () => {
@@ -21,6 +22,7 @@ describe('OnchainTransferService', () => {
   let walletsService: jest.Mocked<WalletsService>;
   let currencyRepository: jest.Mocked<CurrencyRepository>;
   let configService: jest.Mocked<ConfigService>;
+  let systemConfigService: jest.Mocked<Pick<SystemConfigService, 'get'>>;
 
   const provider = {
     getTransactionStatus: jest.fn(),
@@ -55,6 +57,10 @@ describe('OnchainTransferService', () => {
       get: jest.fn(),
     };
 
+    const systemConfigMock = {
+      get: jest.fn(),
+    };
+
     const txWalletMock = {
       getWithdrawalSourceWallet: jest.fn().mockResolvedValue(null),
       sendWithdrawalNativeTransfer: jest.fn(),
@@ -81,6 +87,7 @@ describe('OnchainTransferService', () => {
         { provide: WalletsService, useValue: walletsMock },
         { provide: CurrencyRepository, useValue: currencyRepoMock },
         { provide: ConfigService, useValue: configMock },
+        { provide: SystemConfigService, useValue: systemConfigMock },
         { provide: NotificationsService, useValue: { sendToUser: jest.fn() } },
         { provide: TransactionWalletService, useValue: txWalletMock },
       ],
@@ -94,6 +101,7 @@ describe('OnchainTransferService', () => {
     walletsService = module.get(WalletsService);
     currencyRepository = module.get(CurrencyRepository);
     configService = module.get(ConfigService);
+    systemConfigService = module.get(SystemConfigService);
 
     providerFactory.getProvider.mockReturnValue(provider as any);
     provider.getHotWalletAddress.mockReturnValue('0xHotWallet');
@@ -126,6 +134,13 @@ describe('OnchainTransferService', () => {
     dataSource.query.mockResolvedValue([] as never);
 
     jest.clearAllMocks();
+
+    systemConfigService.get.mockImplementation(async (key: string) => {
+      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '10';
+      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA') return null;
+      if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
+      return null;
+    });
   });
 
   it('auto withdrawal success should freeze -> unfreeze -> debit', async () => {
@@ -186,6 +201,12 @@ describe('OnchainTransferService', () => {
       if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '0.5';
       if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
       return undefined;
+    });
+    systemConfigService.get.mockImplementation(async (key: string) => {
+      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '0.5';
+      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA') return null;
+      if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
+      return null;
     });
 
     const result = await service.requestWithdrawal('user-1', {

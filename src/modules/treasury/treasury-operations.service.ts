@@ -30,6 +30,7 @@ import {
 } from './constants';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { TreasuryMainWalletService } from './treasury-main-wallet.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 
@@ -57,6 +58,7 @@ export class TreasuryOperationsService {
     private readonly transactionWalletService: TransactionWalletService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly configService: ConfigService,
+    private readonly systemConfigService: SystemConfigService,
     private readonly treasuryOperationRepository: TreasuryOperationRepository,
     private readonly treasuryOnchainReadRepository: TreasuryOnchainReadRepository,
     @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: Queue,
@@ -326,7 +328,7 @@ export class TreasuryOperationsService {
     const privateKey = this.transactionWalletService.decryptWalletPrivateKey(wallet);
 
     if (wallet.chain === 'ETH_SEPOLIA' || wallet.chain === 'ETH_MAINNET') {
-      const provider = this.buildEthereumProvider(wallet.chain);
+      const provider = await this.buildEthereumProvider(wallet.chain);
       const signer = new ethers.Wallet(privateKey, provider);
       const balanceWei = await provider.getBalance(wallet.address);
       const feeData = await provider.getFeeData();
@@ -353,7 +355,7 @@ export class TreasuryOperationsService {
     }
 
     if (wallet.chain === 'SOLANA_DEVNET' || wallet.chain === 'SOLANA_MAINNET') {
-      const connection = this.buildSolanaConnection(wallet.chain);
+      const connection = await this.buildSolanaConnection(wallet.chain);
       const decodedKey = bs58.decode(privateKey);
       const keypair = Keypair.fromSecretKey(decodedKey);
       
@@ -381,7 +383,7 @@ export class TreasuryOperationsService {
       };
     }
 
-    const tronWeb = this.buildTronSigner(wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
+    const tronWeb = await this.buildTronSigner(wallet.chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
     const balanceSun = await tronWeb.trx.getBalance(wallet.address);
     const reserveSun = 100_000; // Keep 0.1 TRX for fees/bandwidth.
     const transferSun = Math.max(0, balanceSun - reserveSun);
@@ -408,7 +410,7 @@ export class TreasuryOperationsService {
     const privateKey = await this.transactionWalletService.resolveMainWalletPrivateKey(chain);
 
     if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
-      const provider = this.buildEthereumProvider(chain);
+      const provider = await this.buildEthereumProvider(chain);
       const signer = new ethers.Wallet(privateKey, provider);
       const tx = await signer.sendTransaction({
         to: toAddress,
@@ -418,7 +420,7 @@ export class TreasuryOperationsService {
     }
 
     if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
-      const connection = this.buildSolanaConnection(chain);
+      const connection = await this.buildSolanaConnection(chain);
       const decodedKey = bs58.decode(privateKey);
       const keypair = Keypair.fromSecretKey(decodedKey);
       const lamports = Math.floor(new Decimal(amount).mul(1_000_000_000).toNumber());
@@ -435,7 +437,7 @@ export class TreasuryOperationsService {
       return txHash;
     }
 
-    const tronWeb = this.buildTronSigner(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
+    const tronWeb = await this.buildTronSigner(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', privateKey);
     const sun = Math.floor(new Decimal(amount).mul(1_000_000).toNumber());
     const tx = await tronWeb.trx.sendTransaction(toAddress, sun);
     if (!tx?.result || !tx?.txid) {
@@ -478,32 +480,47 @@ export class TreasuryOperationsService {
     return value.toFixed();
   }
 
-  private buildEthereumProvider(chain: 'ETH_SEPOLIA' | 'ETH_MAINNET'): JsonRpcProvider {
-    const rpcUrl =
-      chain === 'ETH_MAINNET'
-        ? (this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com')
-        : (this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org');
+  private async buildEthereumProvider(chain: 'ETH_SEPOLIA' | 'ETH_MAINNET'): Promise<JsonRpcProvider> {
+    if (chain === 'ETH_MAINNET') {
+      const rpcUrl =
+        this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com';
+      return new JsonRpcProvider(rpcUrl);
+    }
+    const rpcUrl = await this.systemConfigService.getEffectiveString('ETH_SEPOLIA_RPC_URL');
     return new JsonRpcProvider(rpcUrl);
   }
 
-  private buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Connection {
-    const defaultUrl = chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
-    const configPath = chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
-    const url = this.configService.get<string>(configPath) ?? defaultUrl;
+  private async buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Promise<Connection> {
+    const defaultUrl =
+      chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
+    const configPath =
+      chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
+    const url =
+      chain === 'SOLANA_DEVNET'
+        ? await this.systemConfigService.getEffectiveString('SOLANA_DEVNET_URL')
+        : (this.configService.get<string>(configPath) ?? defaultUrl);
     return new Connection(url, 'confirmed');
   }
 
-  private buildTronSigner(
+  private async resolveTronFullHost(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+  ): Promise<string> {
+    if (chain === 'TRON_SHASTA') {
+      return this.systemConfigService.getEffectiveString('TRON_SHASTA_FULL_HOST');
+    }
+    if (chain === 'TRON_MAINNET') {
+      return (
+        this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io'
+      );
+    }
+    return this.systemConfigService.getEffectiveString('TRON_NILE_FULL_HOST');
+  }
+
+  private async buildTronSigner(
     chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
     privateKey: string,
-  ): TronWeb {
-    const fullHost =
-      chain === 'TRON_SHASTA'
-        ? (this.configService.get<string>('app.blockchain.tron.shastaFullHost') ?? 'https://api.shasta.trongrid.io')
-        : chain === 'TRON_MAINNET'
-          ? (this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io')
-          : (this.configService.get<string>('app.blockchain.tron.nileFullHost') ?? 'https://nile.trongrid.io');
-
+  ): Promise<TronWeb> {
+    const fullHost = await this.resolveTronFullHost(chain);
     return new TronWeb({ fullHost, privateKey });
   }
 

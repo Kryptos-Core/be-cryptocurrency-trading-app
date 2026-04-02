@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
 import { CacheService } from '@/common/services';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { BlockchainNetwork } from '@/common/enums';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 export interface DepositConversionResult {
   /** ID của currency platform cash (USDT) sẽ được credit vào ví user (UUID) */
@@ -31,24 +31,12 @@ export interface DepositConversionResult {
 export class DepositFxService {
   private readonly logger = new Logger(DepositFxService.name);
   private static readonly PRICE_CACHE_TTL = 60; // giây
-  private readonly cashCurrencySymbol: string;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly cacheService: CacheService,
     private readonly currencyRepository: CurrencyRepository,
-  ) {
-    this.cashCurrencySymbol =
-      this.configService.get<string>('PLATFORM_CASH_CURRENCY_SYMBOL')?.trim().toUpperCase() ||
-      this.configService.get<string>('PAYOS_DEPOSIT_CURRENCY_SYMBOL')?.trim().toUpperCase() ||
-      'USDT';
-    if (this.cashCurrencySymbol !== 'USDT') {
-      this.logger.warn(
-        `Platform cash is "${this.cashCurrencySymbol}" — on-chain deposits will credit that wallet. ` +
-          'Expected USDT. Set PLATFORM_CASH_CURRENCY_SYMBOL=USDT in .env.',
-      );
-    }
-  }
+    private readonly systemConfigService: SystemConfigService,
+  ) {}
 
   /**
    * Chuyển đổi số lượng native coin → platform cash (USDT).
@@ -58,11 +46,12 @@ export class DepositFxService {
     chain: BlockchainNetwork,
     nativeAmount: string,
   ): Promise<DepositConversionResult> {
-    const nativeSymbol = this.getNativeSymbol(chain);
-    const creditCurrencyId = await this.resolveCashCurrencyId();
+    const cashCurrencySymbol = await this.resolveCashCurrencySymbol();
+    const nativeSymbol = await this.getNativeSymbol(chain);
+    const creditCurrencyId = await this.resolveCashCurrencyId(cashCurrencySymbol);
 
     // Nếu native coin ĐÃ là cash currency (ví dụ deposit USDT trực tiếp), skip conversion
-    if (nativeSymbol.toUpperCase() === this.cashCurrencySymbol.toUpperCase()) {
+    if (nativeSymbol.toUpperCase() === cashCurrencySymbol.toUpperCase()) {
       return {
         creditCurrencyId,
         creditAmount: nativeAmount,
@@ -71,13 +60,13 @@ export class DepositFxService {
       };
     }
 
-    const rate = await this.fetchConversionRate(nativeSymbol, this.cashCurrencySymbol);
+    const rate = await this.fetchConversionRate(nativeSymbol, cashCurrencySymbol);
     const creditAmount = new Decimal(nativeAmount)
       .mul(rate)
       .toFixed(8, Decimal.ROUND_DOWN);
 
     this.logger.log(
-      `[DepositFx] ${nativeAmount} ${nativeSymbol} → ${creditAmount} ${this.cashCurrencySymbol} (rate=${rate})`,
+      `[DepositFx] ${nativeAmount} ${nativeSymbol} → ${creditAmount} ${cashCurrencySymbol} (rate=${rate})`,
     );
 
     return {
@@ -115,7 +104,7 @@ export class DepositFxService {
 
     // Fallback: config cứng
     if (!rate) {
-      rate = this.getConfigFallbackRate(fromSymbol);
+      rate = await this.getConfigFallbackRate(fromSymbol);
     }
 
     if (!rate) {
@@ -150,35 +139,56 @@ export class DepositFxService {
     }
   }
 
-  private getConfigFallbackRate(fromSymbol: string): string | null {
+  private async getConfigFallbackRate(fromSymbol: string): Promise<string | null> {
     const key = `BLOCKCHAIN_DEPOSIT_${fromSymbol.toUpperCase()}_TO_USDT_RATE`;
-    const val = this.configService.get<string>(key)?.trim();
+    const val = (await this.systemConfigService.get<string>(key))?.trim();
     if (val && !isNaN(Number(val)) && Number(val) > 0) {
       return val;
     }
     return null;
   }
 
-  private getNativeSymbol(chain: BlockchainNetwork): string {
+  private async resolveCashCurrencySymbol(): Promise<string> {
+    const sym = (
+      await this.systemConfigService.getEffectiveString('PLATFORM_CASH_CURRENCY_SYMBOL')
+    ).trim().toUpperCase();
+    if (sym !== 'USDT') {
+      this.logger.warn(
+        `Platform cash is "${sym}" — on-chain deposits will credit that wallet. Expected USDT for typical setups.`,
+      );
+    }
+    return sym;
+  }
+
+  private async getNativeSymbol(chain: BlockchainNetwork): Promise<string> {
     switch (chain) {
       case BlockchainNetwork.ETH_SEPOLIA:
-        return this.configService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL')?.trim().toUpperCase() || 'ETH';
+        return (
+          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL'))?.trim().toUpperCase() ||
+          'ETH'
+        );
       case BlockchainNetwork.SOLANA_DEVNET:
-        return this.configService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL')?.trim().toUpperCase() || 'SOL';
+        return (
+          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL'))?.trim().toUpperCase() ||
+          'SOL'
+        );
       case BlockchainNetwork.TRON_NILE:
       case BlockchainNetwork.TRON_SHASTA:
-        return this.configService.get<string>('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL')?.trim().toUpperCase() || 'TRX';
+        return (
+          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL'))?.trim().toUpperCase() ||
+          'TRX'
+        );
       default:
         throw new Error(`Unsupported chain for deposit FX: ${chain}`);
     }
   }
 
-  private async resolveCashCurrencyId(): Promise<string> {
-    const currency = await this.currencyRepository.findBySymbol(this.cashCurrencySymbol);
+  private async resolveCashCurrencyId(cashCurrencySymbol: string): Promise<string> {
+    const currency = await this.currencyRepository.findBySymbol(cashCurrencySymbol);
     if (!currency?.currency_id) {
       throw new Error(
-        `Platform cash currency "${this.cashCurrencySymbol}" not found in DB. ` +
-        `Ensure PLATFORM_CASH_CURRENCY_SYMBOL is set to a valid currency symbol.`,
+        `Platform cash currency "${cashCurrencySymbol}" not found in DB. ` +
+          `Ensure PLATFORM_CASH_CURRENCY_SYMBOL is set to a valid currency symbol.`,
       );
     }
     return String(currency.currency_id);

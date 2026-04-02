@@ -17,6 +17,7 @@ import { WalletsService } from '@/modules/wallets/wallets.service';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { ConfigService } from '@nestjs/config';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 
@@ -118,6 +119,7 @@ export class OnchainTransferService {
     private readonly walletsService: WalletsService,
     private readonly currencyRepository: CurrencyRepository,
     private readonly configService: ConfigService,
+    private readonly systemConfigService: SystemConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly transactionWalletService: TransactionWalletService,
   ) {}
@@ -151,10 +153,10 @@ export class OnchainTransferService {
     return `${userId}:${dto.chain}:${dto.linkedWalletId}:${dto.amount}`;
   }
 
-  private getWithdrawAutoMaxByChain(chain: BlockchainNetwork): Decimal {
-    const globalMax = this.configService.get<string>('BLOCKCHAIN_WITHDRAW_AUTO_MAX') || '0';
+  private async getWithdrawAutoMaxByChain(chain: BlockchainNetwork): Promise<Decimal> {
+    const globalMax = await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_AUTO_MAX') || '0';
     const chainKey = `BLOCKCHAIN_WITHDRAW_AUTO_MAX_${chain}`;
-    const chainMax = this.configService.get<string>(chainKey);
+    const chainMax = await this.systemConfigService.get<string>(chainKey);
     const resolved = chainMax?.trim() ? chainMax : globalMax;
     try {
       const parsed = new Decimal(resolved);
@@ -164,22 +166,22 @@ export class OnchainTransferService {
     }
   }
 
-  private getChainAssetSymbol(chain: BlockchainNetwork): string {
+  private async getChainAssetSymbol(chain: BlockchainNetwork): Promise<string> {
     switch (chain) {
       case BlockchainNetwork.ETH_SEPOLIA:
-        return this.configService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL')?.trim().toUpperCase() || 'ETH';
+        return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL'))?.trim().toUpperCase() || 'ETH';
       case BlockchainNetwork.SOLANA_DEVNET:
-        return this.configService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL')?.trim().toUpperCase() || 'SOL';
+        return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL'))?.trim().toUpperCase() || 'SOL';
       case BlockchainNetwork.TRON_NILE:
       case BlockchainNetwork.TRON_SHASTA:
-        return this.configService.get<string>('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL')?.trim().toUpperCase() || 'TRX';
+        return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL'))?.trim().toUpperCase() || 'TRX';
       default:
         throw new BadRequestException('Mạng blockchain không được hỗ trợ', 'CHAIN_NOT_SUPPORTED');
     }
   }
 
   private async resolveWithdrawalCurrencyId(chain: BlockchainNetwork): Promise<string> {
-    const symbol = this.getChainAssetSymbol(chain);
+    const symbol = await this.getChainAssetSymbol(chain);
     const currency = await this.currencyRepository.findBySymbol(symbol);
     if (!currency?.currency_id) {
       throw new BadRequestException(
@@ -544,7 +546,7 @@ export class OnchainTransferService {
       refId: freezeRefId,
     });
 
-    const autoMax = this.getWithdrawAutoMaxByChain(dto.chain);
+    const autoMax = await this.getWithdrawAutoMaxByChain(dto.chain as BlockchainNetwork);
     const shouldAutoSend = amount.lessThanOrEqualTo(autoMax);
 
     if (!shouldAutoSend) {
@@ -789,7 +791,7 @@ export class OnchainTransferService {
     await this.cacheService.set(`withdrawal:status:${txId}`, result, 3600);
 
     try {
-      const symbol = this.getChainAssetSymbol(tx.chain as BlockchainNetwork);
+      const symbol = await this.getChainAssetSymbol(tx.chain as BlockchainNetwork);
       await this.notificationsService.sendToUser(
         tx.user_id,
         {

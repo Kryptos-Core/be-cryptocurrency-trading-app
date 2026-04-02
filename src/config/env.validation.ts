@@ -206,6 +206,11 @@ export class EnvironmentVariables {
   @IsOptional()
   BLOCKCHAIN_ALLOW_TEST_SIGNATURE?: boolean = false;
 
+  /** When true, production allows PATCH of BLOCKCHAIN_ALLOW_TEST_SIGNATURE via admin API (high risk). */
+  @IsBoolean()
+  @IsOptional()
+  ALLOW_UI_TEST_SIGNATURE?: boolean = false;
+
   @IsString()
   @IsOptional()
   BLOCKCHAIN_WITHDRAW_AUTO_MAX?: string = '0';
@@ -397,6 +402,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     // ETH_HOT_WALLET_PRIVATE_KEY removed — managed via treasury_main_wallets
     // TRON_HOT_WALLET_PRIVATE_KEY removed — managed via treasury_main_wallets
     'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
+    'ALLOW_UI_TEST_SIGNATURE',
     'BLOCKCHAIN_WITHDRAW_AUTO_MAX',
     'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
     'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',

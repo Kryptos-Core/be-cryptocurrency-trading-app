@@ -32,22 +32,6 @@
     "role": "TRADER"
   },
   {
-    "email": "guest@example.com",
-    "password": "Guest@123!",
-    "first_name": "Guest",
-    "last_name": "User",
-    "status": "ACTIVE",
-    "role": "TRADER"
-  },
-  {
-    "email": "verified@example.com",
-    "password": "Verified@123!",
-    "first_name": "Verified",
-    "last_name": "User",
-    "status": "ACTIVE",
-    "role": "TRADER"
-  },
-  {
     "email": "hsondz1910@gmail.com",
     "password": "Risk@123!",
     "first_name": "Risk",

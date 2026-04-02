@@ -19,6 +19,7 @@ import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
+import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 
 /**
  * Blockchain Module
@@ -37,6 +38,7 @@ import { NotificationsModule } from '@/modules/notifications/notifications.modul
     TreasuryModule,
     PaymentConfigModule,
     forwardRef(() => NotificationsModule),
+    SystemConfigModule,
   ],
   controllers: [BlockchainController, WalletConnectController],
   providers: [

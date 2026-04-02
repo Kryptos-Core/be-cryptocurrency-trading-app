@@ -18,6 +18,8 @@ import { TREASURY_EVENTS_CHANNEL } from '@/modules/treasury/constants';
 import { WALLET_BALANCE_EVENTS_CHANNEL, WalletBalanceEvent } from '@/modules/wallets/constants';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
 
+const SYSTEM_CONFIG_EVENTS_CHANNEL = 'system_config.updated';
+
 const NOTIFICATIONS_ROOM = 'notifications';
 
 /**
@@ -152,8 +154,22 @@ export class NotificationsGateway
       }
     });
 
+    await this.redisService.subscribe(SYSTEM_CONFIG_EVENTS_CHANNEL, (message) => {
+      try {
+        const payload = JSON.parse(message);
+        this.server.to(NOTIFICATIONS_ROOM).emit('system_config:updated', {
+          type: 'system_config:updated',
+          data: payload,
+          timestamp: Date.now(),
+        });
+        this.logger.debug(`Broadcast system config update: ${payload.key}`);
+      } catch (error) {
+        this.logger.error('Failed to parse/broadcast system config event', error);
+      }
+    });
+
     this.logger.log(
-      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config + treasury + wallet_balance)',
+      'NotificationsGateway subscribed to Redis channels (notifications + targeted + payment_config + treasury + wallet_balance + system_config)',
     );
   }
 

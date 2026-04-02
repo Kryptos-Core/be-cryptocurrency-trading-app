@@ -7,6 +7,7 @@ import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import { WalletEncryptionService } from '@/common/services';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
+import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { TREASURY_QUEUE } from './constants';
 import { TreasuryController } from './treasury.controller';
@@ -28,6 +29,7 @@ import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
       OnchainTransaction,
     ]),
     PaymentConfigModule,
+    SystemConfigModule,
     forwardRef(() => AuthModule), // forwardRef avoids potential circular deps
     BullModule.registerQueue({
       name: TREASURY_QUEUE,

@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { ConfigService } from '@nestjs/config';
 import {
   Connection,
@@ -28,23 +30,44 @@ import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/pay
  *  2. Fallback: SOLANA_HOT_WALLET_PRIVATE_KEY from .env (base64 encoded secret key)
  */
 @Injectable()
-export class SolanaProvider implements IBlockchainProvider {
+export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(SolanaProvider.name);
-  private readonly connection: Connection;
+  private connection!: Connection;
   private readonly networkKey: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly paymentConfigService: PaymentConfigService,
+    private readonly systemConfigService: SystemConfigService,
   ) {
-    const rpcUrl =
-      this.configService.get<string>('app.blockchain.solana.devnetUrl') ??
-      'https://api.devnet.solana.com';
-
-    this.connection = new Connection(rpcUrl, 'confirmed');
     this.networkKey = 'DEVNET';
+    const bootstrap =
+      this.configService.get<string>('app.blockchain.solana.devnetUrl') ?? 'https://api.devnet.solana.com';
+    this.connection = new Connection(bootstrap, 'confirmed');
+  }
 
+  async onModuleInit() {
+    const rpcUrl = await this.resolveDevnetRpcUrl();
+    this.connection = new Connection(rpcUrl, 'confirmed');
     this.logger.log(`SolanaProvider initialized: devnet → ${rpcUrl}`);
+  }
+
+  private async resolveDevnetRpcUrl(): Promise<string> {
+    return (
+      (await this.systemConfigService.get<string>('SOLANA_DEVNET_URL')) ||
+      this.configService.get<string>('app.blockchain.solana.devnetUrl') ||
+      'https://api.devnet.solana.com'
+    );
+  }
+
+  @OnEvent('system_config_updated')
+  async handleConfigChanged(payload: { key: string; value: string }) {
+    if (payload.key !== 'SOLANA_DEVNET_URL') return;
+    const url =
+      payload.value?.trim() ||
+      (await this.resolveDevnetRpcUrl());
+    this.logger.log(`[Dynamic Config] Solana devnet RPC → ${url}`);
+    this.connection = new Connection(url, 'confirmed');
   }
 
   getNetwork(): BlockchainNetwork {

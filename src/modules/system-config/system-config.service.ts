@@ -1,0 +1,365 @@
+import { Injectable, Logger, OnModuleInit, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { RedisService } from '@/common/services';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SystemConfig, ConfigCategory, ConfigDataType } from '@/entities/system-config.entity';
+import {
+  RUNTIME_SETTING_KEY_SET,
+  RUNTIME_SETTING_SEEDS,
+  RuntimeSettingKey,
+} from './runtime-settings.definitions';
+
+@Injectable()
+export class SystemConfigService implements OnModuleInit {
+  private readonly logger = new Logger(SystemConfigService.name);
+  private readonly REDIS_HASH_KEY = 'global:system_configs';
+  private readonly UPDATE_EVENT = 'system_config.updated';
+
+  constructor(
+    @InjectRepository(SystemConfig)
+    private readonly configRepo: Repository<SystemConfig>,
+    private readonly redisService: RedisService,
+    private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async onModuleInit() {
+    this.logger.log('Initializing system configs (runtime keys + Redis sync)...');
+    await this.ensureRuntimeRows();
+    await this.syncDbToRedis();
+    this.subscribeToPubSub();
+  }
+
+  /** Bootstrap: insert any missing whitelisted rows using env/app defaults. */
+  private async ensureRuntimeRows() {
+    for (const seed of RUNTIME_SETTING_SEEDS) {
+      const exists = await this.configRepo.findOne({ where: { key: seed.key } });
+      if (exists) continue;
+
+      const value = this.resolveEnvFallback(seed.key);
+      await this.configRepo.save({
+        key: seed.key,
+        value,
+        type: seed.type,
+        category: seed.category,
+        name: seed.name,
+        description: seed.description,
+        isReadOnly: seed.isReadOnly ?? false,
+      });
+      this.logger.log(`Seeded runtime config key: ${seed.key}`);
+    }
+  }
+
+  private async syncDbToRedis() {
+    const configs = await this.configRepo.find();
+    if (configs.length === 0) {
+      this.logger.warn('No system configs in DB yet.');
+      return;
+    }
+
+    const cachePipeline = this.redisService.getClient().pipeline();
+    cachePipeline.del(this.REDIS_HASH_KEY);
+
+    configs.forEach((config) => {
+      cachePipeline.hset(this.REDIS_HASH_KEY, config.key, config.value);
+    });
+
+    await cachePipeline.exec();
+    this.logger.log(`Synced ${configs.length} configs to Redis`);
+  }
+
+  private subscribeToPubSub() {
+    const subscriber = this.redisService.getSubscriber();
+    if (subscriber) {
+      subscriber.subscribe(this.UPDATE_EVENT, (err) => {
+        if (err) {
+          this.logger.error('Failed to subscribe to ' + this.UPDATE_EVENT, err.message);
+        }
+      });
+
+      subscriber.on('message', async (channel, message) => {
+        if (channel === this.UPDATE_EVENT) {
+          try {
+            const { key, value } = JSON.parse(message) as { key: string; value: string };
+            this.logger.log(`[PubSub] system_config.updated: ${key}`);
+            this.eventEmitter.emit('system_config_updated', { key, value });
+          } catch {
+            // ignore
+          }
+        }
+      });
+    }
+  }
+
+  private castValue(value: string, type: string): unknown {
+    switch (type) {
+      case 'int':
+        return parseInt(value, 10);
+      case 'float':
+        return parseFloat(value);
+      case 'bool':
+        return value === 'true';
+      case 'string':
+      default:
+        return value;
+    }
+  }
+
+  /**
+   * Redis → DB → env/app fallback (for whitelisted runtime keys only).
+   */
+  async get<T = string>(key: string): Promise<T | null> {
+    const cachedStr = await this.redisService.getClient().hget(this.REDIS_HASH_KEY, key);
+
+    if (cachedStr !== null && cachedStr !== undefined) {
+      return cachedStr as unknown as T;
+    }
+
+    const config = await this.configRepo.findOne({ where: { key } });
+    if (config) {
+      await this.redisService.getClient().hset(this.REDIS_HASH_KEY, key, config.value);
+      return config.value as unknown as T;
+    }
+
+    if (RUNTIME_SETTING_KEY_SET.has(key)) {
+      return this.resolveEnvFallback(key) as unknown as T;
+    }
+
+    return null;
+  }
+
+  async getTyped<T>(key: string, expectedType: ConfigDataType): Promise<T | null> {
+    const raw = await this.get<string>(key);
+    if (raw === null) return null;
+    return this.castValue(raw, expectedType) as T;
+  }
+
+  /**
+   * Effective string for a runtime key (never null for whitelisted keys).
+   */
+  async getEffectiveString(key: RuntimeSettingKey): Promise<string> {
+    const v = await this.get<string>(key);
+    return v ?? this.resolveEnvFallback(key);
+  }
+
+  resolveEnvFallback(key: string): string {
+    const app = (path: string, def: string | number): string => {
+      const v = this.configService.get<string | number>(path);
+      if (v === undefined || v === null || v === '') return String(def);
+      return String(v);
+    };
+
+    const envOr = (k: string, def: string): string => {
+      const v = process.env[k];
+      if (v !== undefined && v !== '') return v.trim();
+      return def;
+    };
+
+    switch (key as RuntimeSettingKey) {
+      case 'WALLET_SYNC_INTERVAL':
+        return app('app.wallet.syncInterval', 30000);
+      case 'WALLET_RECONCILIATION_THRESHOLD':
+        return app('app.wallet.reconciliationThreshold', '0.00000001');
+      case 'TRON_NILE_FULL_HOST':
+        return app('app.blockchain.tron.nileFullHost', 'https://nile.trongrid.io');
+      case 'TRON_SHASTA_FULL_HOST':
+        return app('app.blockchain.tron.shastaFullHost', 'https://api.shasta.trongrid.io');
+      case 'TRON_DEFAULT_NETWORK':
+        return app('app.blockchain.tron.defaultNetwork', 'TRON_NILE');
+      case 'SOLANA_DEVNET_URL':
+        return app('app.blockchain.solana.devnetUrl', 'https://api.devnet.solana.com');
+      case 'ETH_SEPOLIA_RPC_URL':
+        return app('app.blockchain.ethereum.sepoliaRpcUrl', 'https://rpc.sepolia.org');
+      case 'ETH_SEPOLIA_CHAIN_ID':
+        return app('app.blockchain.ethereum.chainId', 11155111);
+      case 'BLOCKCHAIN_ALLOW_TEST_SIGNATURE': {
+        const a = (process.env.BLOCKCHAIN_ALLOW_TEST_SIGNATURE || '').toLowerCase();
+        return ['true', '1', 'yes', 'on'].includes(a) ? 'true' : 'false';
+      }
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX':
+        return envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0');
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA':
+        return envOr(
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
+          envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
+        );
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET':
+        return envOr(
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',
+          envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
+        );
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE':
+        return envOr(
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE',
+          envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
+        );
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA':
+        return envOr(
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA',
+          envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
+        );
+      case 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL', 'ETH');
+      case 'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL', 'SOL');
+      case 'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL', 'TRX');
+      case 'PLATFORM_CASH_CURRENCY_SYMBOL': {
+        const p = process.env.PLATFORM_CASH_CURRENCY_SYMBOL?.trim();
+        if (p) return p;
+        const payos = process.env.PAYOS_DEPOSIT_CURRENCY_SYMBOL?.trim();
+        return payos || 'USDT';
+      }
+      case 'BLOCKCHAIN_DEPOSIT_TRX_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_TRX_TO_USDT_RATE', '0');
+      case 'BLOCKCHAIN_DEPOSIT_ETH_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_ETH_TO_USDT_RATE', '0');
+      case 'BLOCKCHAIN_DEPOSIT_SOL_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_SOL_TO_USDT_RATE', '0');
+      default:
+        return '';
+    }
+  }
+
+  async getAllConfigs(): Promise<SystemConfig[]> {
+    return this.configRepo.find({ order: { category: 'ASC', name: 'ASC' } });
+  }
+
+  /**
+   * Admin UI: all runtime definitions with DB row + effective value + source hint.
+   */
+  async getRuntimeSettingsForAdmin(): Promise<
+    Array<{
+      key: string;
+      value: string;
+      effectiveValue: string;
+      valueSource: 'database' | 'environment';
+      type: ConfigDataType;
+      category: ConfigCategory;
+      name: string;
+      description?: string;
+      isReadOnly: boolean;
+    }>
+  > {
+    const rows = await this.configRepo.find();
+    const byKey = new Map(rows.map((r) => [r.key, r]));
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    const allowUiTestSig = ['true', '1', 'yes', 'on'].includes(
+      (process.env.ALLOW_UI_TEST_SIGNATURE || '').toLowerCase(),
+    );
+
+    return RUNTIME_SETTING_SEEDS.map((seed) => {
+      const row = byKey.get(seed.key);
+      const envFallback = this.resolveEnvFallback(seed.key);
+      const effectiveValue = row?.value ?? envFallback;
+      const testSigLocked =
+        seed.key === 'BLOCKCHAIN_ALLOW_TEST_SIGNATURE' && nodeEnv === 'production' && !allowUiTestSig;
+      return {
+        key: seed.key,
+        value: row?.value ?? envFallback,
+        effectiveValue,
+        valueSource: row ? 'database' : 'environment',
+        type: row?.type ?? seed.type,
+        category: row?.category ?? seed.category,
+        name: row?.name ?? seed.name,
+        description: row?.description ?? seed.description,
+        isReadOnly: testSigLocked || row?.isReadOnly || seed.isReadOnly || false,
+      };
+    });
+  }
+
+  private assertCanEditTestSignatureInProduction(): void {
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    if (nodeEnv !== 'production') return;
+    const allowUi = ['true', '1', 'yes', 'on'].includes(
+      (process.env.ALLOW_UI_TEST_SIGNATURE || '').toLowerCase(),
+    );
+    if (!allowUi) {
+      throw new BadRequestException(
+        'Editing BLOCKCHAIN_ALLOW_TEST_SIGNATURE in production requires ALLOW_UI_TEST_SIGNATURE=true on the server.',
+      );
+    }
+  }
+
+  private assertRuntimeKey(key: string): asserts key is RuntimeSettingKey {
+    if (!RUNTIME_SETTING_KEY_SET.has(key)) {
+      throw new BadRequestException(`Unknown or disallowed config key: ${key}`);
+    }
+  }
+
+  async updateConfig(key: string, newValue: string, userId?: string): Promise<SystemConfig> {
+    this.assertRuntimeKey(key);
+    if (key === 'BLOCKCHAIN_ALLOW_TEST_SIGNATURE') {
+      this.assertCanEditTestSignatureInProduction();
+    }
+
+    const config = await this.configRepo.findOne({ where: { key } });
+    if (!config) {
+      throw new BadRequestException(`Config key ${key} not found. Restart server to seed runtime keys.`);
+    }
+
+    if (config.isReadOnly) {
+      throw new BadRequestException(`Config ${key} is read-only.`);
+    }
+
+    config.value = newValue;
+    const updated = await this.configRepo.save(config);
+
+    await this.redisService.getClient().hset(this.REDIS_HASH_KEY, key, newValue);
+    await this.redisService.getClient().publish(
+      this.UPDATE_EVENT,
+      JSON.stringify({ key, value: newValue }),
+    );
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'runtime_setting_updated',
+        key,
+        userId: userId ?? 'unknown',
+        at: new Date().toISOString(),
+      }),
+    );
+
+    return updated;
+  }
+
+  async updateConfigsBulk(
+    updates: Record<string, string>,
+    userId?: string,
+  ): Promise<{ updated: string[] }> {
+    const keys = Object.keys(updates);
+    if (keys.length === 0) {
+      return { updated: [] };
+    }
+
+    for (const k of keys) {
+      this.assertRuntimeKey(k);
+      const val = updates[k];
+      if (val === undefined || typeof val !== 'string') {
+        throw new BadRequestException(`Invalid value for key ${k}: must be a string`);
+      }
+    }
+
+    const updatedKeys: string[] = [];
+    for (const [key, value] of Object.entries(updates)) {
+      await this.updateConfig(key, String(value), userId);
+      updatedKeys.push(key);
+    }
+
+    return { updated: updatedKeys };
+  }
+
+  async seedInitialConfig(items: Partial<SystemConfig>[]) {
+    this.logger.log('Seeding initial system configurations...');
+    for (const item of items) {
+      if (!item.key) continue;
+      const exists = await this.configRepo.findOne({ where: { key: item.key } });
+      if (!exists) {
+        await this.configRepo.save(item as SystemConfig);
+      }
+    }
+    await this.syncDbToRedis();
+  }
+}

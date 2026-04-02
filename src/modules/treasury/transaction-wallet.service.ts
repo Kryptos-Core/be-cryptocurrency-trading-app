@@ -18,6 +18,7 @@ import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 const LIST_CACHE_TTL_SECONDS = 60;
 /** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
@@ -51,6 +52,7 @@ export class TransactionWalletService {
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   async createWallet(dto: CreateTransactionWalletDto): Promise<TransactionWallet> {
@@ -145,7 +147,7 @@ export class TransactionWalletService {
   ): Promise<void> {
     const maxSun = reserveSun + 250_000;
     const deadline = Date.now() + 60_000;
-    const tronWeb = this.buildTronReadOnlyClient(chain);
+    const tronWeb = await this.buildTronReadOnlyClient(chain);
     while (Date.now() < deadline) {
       const sun = await tronWeb.trx.getBalance(address);
       if (sun <= maxSun) {
@@ -163,7 +165,7 @@ export class TransactionWalletService {
     chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
     address: string,
   ): Promise<number> {
-    const tronWeb = this.buildTronReadOnlyClient(chain);
+    const tronWeb = await this.buildTronReadOnlyClient(chain);
     return tronWeb.trx.getBalance(address);
   }
 
@@ -177,7 +179,7 @@ export class TransactionWalletService {
     balanceSunBeforeTx: number,
   ): Promise<void> {
     const deadline = Date.now() + 60_000;
-    const tronWeb = this.buildTronReadOnlyClient(chain);
+    const tronWeb = await this.buildTronReadOnlyClient(chain);
     while (Date.now() < deadline) {
       const sun = await tronWeb.trx.getBalance(address);
       if (sun > balanceSunBeforeTx) {
@@ -213,7 +215,7 @@ export class TransactionWalletService {
 
   async getBalanceByAddress(chain: SupportedTreasuryChain, address: string): Promise<{ balance: string; symbol: string }> {
     if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
-      const provider = this.buildEthereumProvider(chain);
+      const provider = await this.buildEthereumProvider(chain);
       const wei = await provider.getBalance(address);
       return {
         balance: ethers.formatEther(wei),
@@ -222,7 +224,7 @@ export class TransactionWalletService {
     }
 
     if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
-      const connection = this.buildSolanaConnection(chain);
+      const connection = await this.buildSolanaConnection(chain);
       const lamports = await connection.getBalance(new PublicKey(address));
       return {
         balance: new Decimal(lamports).div(1_000_000_000).toString(),
@@ -230,7 +232,7 @@ export class TransactionWalletService {
       };
     }
 
-    const tronWeb = this.buildTronReadOnlyClient(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET');
+    const tronWeb = await this.buildTronReadOnlyClient(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET');
     const sun = await tronWeb.trx.getBalance(address);
     return {
       balance: new Decimal(sun).div(1_000_000).toString(),
@@ -380,7 +382,7 @@ export class TransactionWalletService {
       if (!ethers.isAddress(toAddress)) {
         throw new BadRequestException('Invalid ETH destination address', 'INVALID_ETH_ADDRESS');
       }
-      const provider = this.buildEthereumProvider(chain);
+      const provider = await this.buildEthereumProvider(chain);
       const signer = new ethers.Wallet(pk, provider);
       const tx = await signer.sendTransaction({
         to: toAddress,
@@ -391,7 +393,7 @@ export class TransactionWalletService {
     }
 
     if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
-      const connection = this.buildSolanaConnection(chain);
+      const connection = await this.buildSolanaConnection(chain);
       const decodedKey = bs58.decode(pk);
       const keypair = Keypair.fromSecretKey(decodedKey);
       const lamports = Math.floor(new Decimal(amount).mul(1_000_000_000).toNumber());
@@ -409,7 +411,7 @@ export class TransactionWalletService {
       return txHash;
     }
 
-    const tw = this.buildTronWebWithPrivateKey(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', pk);
+    const tw = await this.buildTronWebWithPrivateKey(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', pk);
     if (!tw.isAddress(toAddress)) {
       throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
     }
@@ -429,17 +431,25 @@ export class TransactionWalletService {
     return ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'].includes(chain);
   }
 
-  private buildTronWebWithPrivateKey(
+  private async resolveTronFullHost(
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+  ): Promise<string> {
+    if (chain === 'TRON_SHASTA') {
+      return this.systemConfigService.getEffectiveString('TRON_SHASTA_FULL_HOST');
+    }
+    if (chain === 'TRON_MAINNET') {
+      return (
+        this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io'
+      );
+    }
+    return this.systemConfigService.getEffectiveString('TRON_NILE_FULL_HOST');
+  }
+
+  private async buildTronWebWithPrivateKey(
     chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
     privateKey: string,
-  ): TronWeb {
-    const fullHost =
-      chain === 'TRON_SHASTA'
-        ? (this.configService.get<string>('app.blockchain.tron.shastaFullHost') ?? 'https://api.shasta.trongrid.io')
-        : chain === 'TRON_MAINNET'
-          ? (this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io')
-          : (this.configService.get<string>('app.blockchain.tron.nileFullHost') ?? 'https://nile.trongrid.io');
-
+  ): Promise<TronWeb> {
+    const fullHost = await this.resolveTronFullHost(chain);
     return new TronWeb({ fullHost, privateKey });
   }
 
@@ -475,31 +485,32 @@ export class TransactionWalletService {
     };
   }
 
-  private buildEthereumProvider(chain: 'ETH_SEPOLIA' | 'ETH_MAINNET'): JsonRpcProvider {
-    const rpcUrl =
-      chain === 'ETH_MAINNET'
-        ? (this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com')
-        : (this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org');
+  private async buildEthereumProvider(chain: 'ETH_SEPOLIA' | 'ETH_MAINNET'): Promise<JsonRpcProvider> {
+    if (chain === 'ETH_MAINNET') {
+      const rpcUrl =
+        this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com';
+      return new JsonRpcProvider(rpcUrl);
+    }
+    const rpcUrl = await this.systemConfigService.getEffectiveString('ETH_SEPOLIA_RPC_URL');
     return new JsonRpcProvider(rpcUrl);
   }
 
-  private buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Connection {
-    const defaultUrl = chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
-    const configPath = chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
-    const url = this.configService.get<string>(configPath) ?? defaultUrl;
+  private async buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Promise<Connection> {
+    const defaultUrl =
+      chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
+    const configPath =
+      chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
+    const url =
+      chain === 'SOLANA_DEVNET'
+        ? await this.systemConfigService.getEffectiveString('SOLANA_DEVNET_URL')
+        : (this.configService.get<string>(configPath) ?? defaultUrl);
     return new Connection(url, 'confirmed');
   }
 
-  private buildTronReadOnlyClient(
+  private async buildTronReadOnlyClient(
     chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
-  ): TronWeb {
-    const fullHost =
-      chain === 'TRON_SHASTA'
-        ? (this.configService.get<string>('app.blockchain.tron.shastaFullHost') ?? 'https://api.shasta.trongrid.io')
-        : chain === 'TRON_MAINNET'
-          ? (this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io')
-          : (this.configService.get<string>('app.blockchain.tron.nileFullHost') ?? 'https://nile.trongrid.io');
-
+  ): Promise<TronWeb> {
+    const fullHost = await this.resolveTronFullHost(chain);
     return new TronWeb({ fullHost });
   }
 

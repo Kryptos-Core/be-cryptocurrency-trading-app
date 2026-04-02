@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
@@ -24,6 +23,7 @@ import {
   UpdateRecommendedChainDto,
 } from './dto';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 type SupportedManagedWalletChain = 'TRON_NILE' | 'TRON_SHASTA';
 
@@ -54,9 +54,9 @@ export class ManagedWalletsService {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly configService: ConfigService,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly transactionWalletService: TransactionWalletService,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   async createWallet(
@@ -152,7 +152,7 @@ export class ManagedWalletsService {
       );
     }
     const chain = this.assertSupportedChain(w.chain);
-    const tronWeb = this.buildTronWeb(
+    const tronWeb = await this.buildTronWeb(
       chain,
       this.walletEncryptionService.decrypt(w.encrypted_private_key),
     );
@@ -357,16 +357,14 @@ export class ManagedWalletsService {
     };
   }
 
-  private buildTronWeb(
+  private async buildTronWeb(
     chain: SupportedManagedWalletChain,
     privateKey?: string,
-  ): TronWeb {
+  ): Promise<TronWeb> {
     const fullHost =
       chain === BlockchainNetwork.TRON_SHASTA
-        ? this.configService.get<string>('app.blockchain.tron.shastaFullHost') ??
-          'https://api.shasta.trongrid.io'
-        : this.configService.get<string>('app.blockchain.tron.nileFullHost') ??
-          'https://nile.trongrid.io';
+        ? await this.systemConfigService.getEffectiveString('TRON_SHASTA_FULL_HOST')
+        : await this.systemConfigService.getEffectiveString('TRON_NILE_FULL_HOST');
 
     return new TronWeb({
       fullHost,

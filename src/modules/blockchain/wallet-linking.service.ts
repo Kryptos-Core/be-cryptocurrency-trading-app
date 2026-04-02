@@ -9,6 +9,7 @@ import {
 } from '@/common/exceptions';
 import { BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { LinkedWallet } from '@/entities/linked-wallet.entity';
 import { RequestLinkDto, VerifyLinkDto } from './dto';
 
@@ -33,6 +34,7 @@ export class WalletLinkingService {
     private readonly dataSource: DataSource,
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   /**
@@ -121,9 +123,9 @@ export class WalletLinkingService {
       WalletLinkingService.TEST_SIGNATURE_PREFIX,
     );
 
-    if (isTestSignature && !this.isTestSignatureBypassEnabled()) {
+    if (isTestSignature && !(await this.isTestSignatureBypassEnabled())) {
       throw new BadRequestException(
-        'Test signature bypass đang tắt. Chỉ cho phép khi NODE_ENV=development và BLOCKCHAIN_ALLOW_TEST_SIGNATURE=true.',
+        'Test signature bypass đang tắt. Development: bật BLOCKCHAIN_ALLOW_TEST_SIGNATURE (env hoặc runtime). Staging: có thể bật qua runtime. Production: luôn tắt.',
         'TEST_SIGNATURE_BYPASS_DISABLED',
       );
     }
@@ -343,13 +345,20 @@ export class WalletLinkingService {
     await this.cacheService.delete(this.linkedCacheKey(userId));
   }
 
-  private isTestSignatureBypassEnabled(): boolean {
+  private async isTestSignatureBypassEnabled(): Promise<boolean> {
     const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
-    const allow = (process.env.BLOCKCHAIN_ALLOW_TEST_SIGNATURE || '').toLowerCase();
+    const envAllow = ['true', '1', 'yes', 'on'].includes(
+      (process.env.BLOCKCHAIN_ALLOW_TEST_SIGNATURE || '').toLowerCase(),
+    );
+    const dbRaw = (await this.systemConfigService.getEffectiveString('BLOCKCHAIN_ALLOW_TEST_SIGNATURE')).toLowerCase();
+    const dbAllow = ['true', '1', 'yes', 'on'].includes(dbRaw);
 
-    const allowByEnv =
-      allow === 'true' || allow === '1' || allow === 'yes' || allow === 'on';
-
-    return nodeEnv === 'development' && allowByEnv;
+    if (nodeEnv === 'production') {
+      return false;
+    }
+    if (nodeEnv === 'development') {
+      return envAllow || dbAllow;
+    }
+    return dbAllow || envAllow;
   }
 }

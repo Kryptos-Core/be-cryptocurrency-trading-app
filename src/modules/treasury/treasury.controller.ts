@@ -112,9 +112,12 @@ export class TreasuryController {
 
   @Get('main-wallets/pending')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
-  @ApiOperation({ summary: 'List all main wallets pending Risk Officer approval' })
+  @ApiOperation({
+    summary:
+      'List main wallets pending Risk approval (Finance/Admin can track imports; only Risk approves/rejects)',
+  })
   async listPendingMainWallets() {
     return this.treasuryMainWalletService.listPendingApproval();
   }

@@ -140,18 +140,20 @@ Luồng nằm trong module **deposits**. Production bắt buộc cấu hình đ�
 
 ## Tài khoản sau seed
 
-| Email | Mật khẩu | Vai trò (RBAC) | Ghi chú |
-|-------|----------|----------------|---------|
-| max@circle-vn.com | Admin@123! | Admin | |
-| hoangsondz1910@gmail.com | Trader@123! | Trader | |
-| trader2@example.com | Trader@123! | Trader | |
-| trader3@example.com | Trader@123! | Trader | |
-| guest@example.com | Guest@123! | Trader | Tài khoản thử có tên "Guest" — không phải role Guest trên server |
-| verified@example.com | Verified@123! | Trader | Sau seed: `email_verified = 1` (demo tích xanh) |
-| hsondz1910@gmail.com | Risk@123! | Risk Officer | |
-| support@example.com | Support@123! | Support | |
-| maxnoah901@gmail.com | Maker@123! | Market Maker | |
-| finance@circle-vn.com | Finance@123! | Finance Manager | |
+Enum **`UserRole`** (cột `users.role`, claim `role` trong JWT): `ADMIN`, `TRADER`, `RISK_OFFICER`, `SUPPORT_AGENT`, `MARKET_MAKER`, `FINANCE_MANAGER` — định nghĩa tại `src/common/enums/index.ts`. **Không** có role `GUEST` trên server (khách = client chưa JWT).
+
+Dữ liệu mẫu nằm trong [`src/seed/data/users.json`](src/seed/data/users.json). Sau `npm run db:seed`, mỗi giá trị `UserRole` **đều** có ít nhất một user demo (nhiều user dùng `TRADER`).
+
+| Email | Mật khẩu | `UserRole` | Ghi chú |
+|-------|----------|------------|---------|
+| max@circle-vn.com | Admin@123! | `ADMIN` | |
+| hoangsondz1910@gmail.com | Trader@123! | `TRADER` | |
+| trader2@example.com | Trader@123! | `TRADER` | |
+| trader3@example.com | Trader@123! | `TRADER` | |
+| hsondz1910@gmail.com | Risk@123! | `RISK_OFFICER` | |
+| support@example.com | Support@123! | `SUPPORT_AGENT` | |
+| maxnoah901@gmail.com | Maker@123! | `MARKET_MAKER` | |
+| finance@circle-vn.com | Finance@123! | `FINANCE_MANAGER` | |
 
 ## Database (dev)
 

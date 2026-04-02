@@ -64,7 +64,10 @@ Sau đó điền thông tin và chạy ứng dụng.
 | ETH_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Ethereum |
 | TRON_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Tron |
 | BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chỉ dùng cho phát triển, mặc định là false |
+| ALLOW_UI_TEST_SIGNATURE | `true` trên production để cho phép sửa `BLOCKCHAIN_ALLOW_TEST_SIGNATURE` qua API/UI (rất rủi ro) |
 | `WALLETCONNECT_PROJECT_ID`, `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `WALLETCONNECT_WEBHOOK_SECRET` | WalletConnect / Reown — desktop SignClient + liên kết ví; bảng đầy đủ và luồng: **[WALLETCONNECT.md](WALLETCONNECT.md)** |
+
+**Cấu hình runtime (UI):** Các biến ví dụ `WALLET_SYNC_INTERVAL`, `TRON_*_FULL_HOST`, `BLOCKCHAIN_WITHDRAW_*`, `PLATFORM_CASH_CURRENCY_SYMBOL`, `BLOCKCHAIN_DEPOSIT_*_TO_USDT_RATE`, … được seed vào bảng `system_configs` khi khởi động (nếu thiếu) và có thể chỉnh qua **GET/PATCH `/api/v1/system-configs/runtime`** (JWT + `FINANCE_MANAGER`/`ADMIN` + `PAYMENT_CONFIGS_MANAGE`). Giá trị đọc thực tế: **Redis cache → MySQL → fallback `.env`**. Tab **Platform** trên màn **Payment Configuration** (Flutter) gọi các endpoint này.
 
 ### PayOS
 
@@ -90,6 +93,6 @@ Nếu thiếu, ứng dụng sẽ dừng khởi động ngay lập tức.
 ## Lưu ý thực tế
 
 - Không lưu (commit) file `.env` thực tế lên kho mã nguồn.
-- Nếu thay đổi biến môi trường, phải khởi động lại backend.
+- Nếu thay đổi biến môi trường, phải khởi động lại backend (trừ các key runtime đã lưu trong `system_configs` / chỉnh qua UI — chúng áp dụng sau khi cache Redis hết hạn hoặc sau PATCH).
 - Trong nhật ký (logs), hãy ưu tiên kiểm tra thông báo "Environment validation failed" nếu ứng dụng không khởi động được.
 - Thêm biến mới cho **`ConfigService`** (hoặc cho code đọc qua cùng cơ chế validate): cập nhật **`env.validation.ts`** (`EnvironmentVariables` + `envVarKeys`), không chỉ `env.example`.

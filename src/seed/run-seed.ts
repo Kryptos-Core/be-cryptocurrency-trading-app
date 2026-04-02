@@ -82,11 +82,6 @@ async function run() {
     }
     console.log('✅ Users seeded.');
 
-    await q.query(
-      `UPDATE users SET email_verified = 1 WHERE email = ?`,
-      ['verified@example.com'],
-    );
-
     console.log('\n🎉 Seed done. Users imported.');
     console.log('   Currencies & market pairs will sync automatically from Binance on backend startup if catalog is empty.');
     console.log('   Login e.g. max@circle-vn.com / Admin@123!');

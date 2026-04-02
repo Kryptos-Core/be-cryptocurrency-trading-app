@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import Decimal from 'decimal.js';
 import { AppModule } from '../src/app.module';
 import { WalletsService } from '../src/modules/wallets/wallets.service';
+import { SystemConfigService } from '../src/modules/system-config/system-config.service';
 
 type Severity = 'critical' | 'warning';
 
@@ -25,6 +26,7 @@ async function main() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
   const dataSource = app.get(DataSource);
   const walletsService = app.get(WalletsService);
+  const systemConfig = app.get(SystemConfigService);
 
   const reportAt = new Date().toISOString();
   const alerts: AlertItem[] = [];
@@ -33,7 +35,7 @@ async function main() {
   const staleConfirmingMinutes = envNumber('TREASURY_ALERT_STALE_CONFIRMING_MINUTES', 30);
   const failedWithdrawLimit = envNumber('TREASURY_ALERT_FAILED_WITHDRAWALS_24H', 10);
   const reconcileLimit = envNumber('TREASURY_RECONCILE_PAIR_LIMIT', 100);
-  const discrepancyThreshold = process.env.WALLET_RECONCILIATION_THRESHOLD || '0.001';
+  const discrepancyThreshold = await systemConfig.getEffectiveString('WALLET_RECONCILIATION_THRESHOLD');
   const failOnCritical = (process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true';
 
   try {

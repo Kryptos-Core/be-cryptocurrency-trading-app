@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BlockchainNetwork } from '@/common/enums';
 import {
@@ -9,6 +9,8 @@ import {
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 
 import { TronWeb } from 'tronweb';
+import { OnEvent } from '@nestjs/event-emitter';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 /**
  * Tron Blockchain Provider
@@ -19,17 +21,18 @@ import { TronWeb } from 'tronweb';
  *  No .env fallback. Import via POST /treasury/main-wallets.
  */
 @Injectable()
-export class TronProvider implements IBlockchainProvider {
+export class TronProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(TronProvider.name);
 
   /** Read-only TronWeb instance — no private key, used for balance/signature/tx queries */
-  private readonly tronWeb: any;
+  private tronWeb: any;
   private readonly network: BlockchainNetwork;
   private readonly networkKey: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
+    private readonly systemConfigService: SystemConfigService,
   ) {
     const defaultNetwork =
       this.configService.get<string>('app.blockchain.tron.defaultNetwork') ?? 'TRON_NILE';
@@ -54,8 +57,28 @@ export class TronProvider implements IBlockchainProvider {
     this.logger.log(`TronProvider initialized: ${this.network} → ${fullHost}`);
   }
 
+  async onModuleInit() {
+    const fullHost =
+      this.network === BlockchainNetwork.TRON_SHASTA
+        ? await this.systemConfigService.getEffectiveString('TRON_SHASTA_FULL_HOST')
+        : await this.systemConfigService.getEffectiveString('TRON_NILE_FULL_HOST');
+    this.tronWeb = new TronWeb({ fullHost });
+    this.logger.log(`TronProvider runtime RPC: ${this.network} → ${fullHost}`);
+  }
+
   getNetwork(): BlockchainNetwork {
     return this.network;
+  }
+
+  @OnEvent('system_config_updated')
+  async handleConfigChanged(payload: { key: string; value: string }) {
+    if (this.network === BlockchainNetwork.TRON_NILE && payload.key === 'TRON_NILE_FULL_HOST') {
+      this.logger.log(`[Dynamic Config] Re-initializing TRON_NILE provider with new RPC: ${payload.value}`);
+      this.tronWeb = new TronWeb({ fullHost: payload.value });
+    } else if (this.network === BlockchainNetwork.TRON_SHASTA && payload.key === 'TRON_SHASTA_FULL_HOST') {
+      this.logger.log(`[Dynamic Config] Re-initializing TRON_SHASTA provider with new RPC: ${payload.value}`);
+      this.tronWeb = new TronWeb({ fullHost: payload.value });
+    }
   }
 
   // ── Hot wallet key resolution ────────────────────────────────────────────
@@ -65,12 +88,12 @@ export class TronProvider implements IBlockchainProvider {
     return this.treasuryMainWalletService.resolveMainWalletPrivateKey(networkEnum);
   }
 
-  private buildTronWebWithKey(privateKey: string): any {
+  private async buildTronWebWithKey(privateKey: string): Promise<any> {
     const fullHost =
       this.network === BlockchainNetwork.TRON_SHASTA
-        ? this.configService.get<string>('app.blockchain.tron.shastaFullHost') ??
+        ? await this.systemConfigService.get<string>('TRON_SHASTA_FULL_HOST') ??
           'https://api.shasta.trongrid.io'
-        : this.configService.get<string>('app.blockchain.tron.nileFullHost') ??
+        : await this.systemConfigService.get<string>('TRON_NILE_FULL_HOST') ??
           'https://nile.trongrid.io';
 
     return new TronWeb({ fullHost, privateKey });
@@ -161,7 +184,7 @@ export class TronProvider implements IBlockchainProvider {
 
   async sendTransaction(to: string, amount: string): Promise<string> {
     const privateKey = await this.resolveHotWalletKey();
-    const tw = this.buildTronWebWithKey(privateKey);
+    const tw = await this.buildTronWebWithKey(privateKey);
 
     this.logger.log(`Sending ${amount} TRX to ${to}...`);
     const sunAmount = Math.floor(parseFloat(amount) * 1_000_000);
@@ -176,7 +199,7 @@ export class TronProvider implements IBlockchainProvider {
 
   async getHotWalletAddress(): Promise<string> {
     const privateKey = await this.resolveHotWalletKey();
-    const tw = this.buildTronWebWithKey(privateKey);
+    const tw = await this.buildTronWebWithKey(privateKey);
     const address = tw.defaultAddress.base58;
     if (!address) throw new Error('TRON hot wallet not configured');
     return address;

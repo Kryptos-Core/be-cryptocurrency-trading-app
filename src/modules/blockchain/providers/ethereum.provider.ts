@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { ConfigService } from '@nestjs/config';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { BlockchainNetwork } from '@/common/enums';
@@ -18,25 +20,46 @@ import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wall
  *  No .env fallback. Import via POST /treasury/main-wallets.
  */
 @Injectable()
-export class EthereumProvider implements IBlockchainProvider {
+export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(EthereumProvider.name);
 
   /** Read-only JsonRpcProvider — no signer, used for balance/tx queries */
-  private readonly provider: JsonRpcProvider;
+  private provider!: JsonRpcProvider;
   private readonly networkKey: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
+    private readonly systemConfigService: SystemConfigService,
   ) {
-    const rpcUrl =
-      this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ??
-      'https://rpc.sepolia.org';
-
-    this.provider = new JsonRpcProvider(rpcUrl);
     this.networkKey = 'SEPOLIA';
+    const bootstrap =
+      this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org';
+    this.provider = new JsonRpcProvider(bootstrap);
+  }
 
+  async onModuleInit() {
+    const rpcUrl = await this.resolveSepoliaRpcUrl();
+    this.provider = new JsonRpcProvider(rpcUrl);
     this.logger.log(`EthereumProvider initialized: Sepolia → ${rpcUrl}`);
+  }
+
+  private async resolveSepoliaRpcUrl(): Promise<string> {
+    return (
+      (await this.systemConfigService.get<string>('ETH_SEPOLIA_RPC_URL')) ||
+      this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ||
+      'https://rpc.sepolia.org'
+    );
+  }
+
+  @OnEvent('system_config_updated')
+  async handleConfigChanged(payload: { key: string; value: string }) {
+    if (payload.key !== 'ETH_SEPOLIA_RPC_URL') return;
+    const url =
+      payload.value?.trim() ||
+      (await this.resolveSepoliaRpcUrl());
+    this.logger.log(`[Dynamic Config] Ethereum Sepolia RPC → ${url}`);
+    this.provider = new JsonRpcProvider(url);
   }
 
   getNetwork(): BlockchainNetwork {
