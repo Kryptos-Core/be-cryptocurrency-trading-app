@@ -320,6 +320,33 @@ export class TreasuryMainWalletService implements OnModuleInit {
   }
 
   /**
+   * Returns decrypted private key — caller must enforce MFA (controller).
+   */
+  async revealPrivateKey(mainWalletId: string, actorUserId: string): Promise<{ privateKey: string }> {
+    const wallet = await this.getById(mainWalletId);
+    const privateKey = this.decryptPrivateKey(wallet);
+    this.logger.log(`Main wallet private key revealed (audit): ${mainWalletId} by ${actorUserId}`);
+    return { privateKey };
+  }
+
+  async updateMainWalletLabel(
+    mainWalletId: string,
+    label: string | null | undefined,
+    actorUserId: string,
+  ): Promise<MainWalletDto> {
+    const repo = this.dataSource.getRepository(TreasuryMainWallet);
+    const existing = await this.getById(mainWalletId);
+    if (label === undefined) {
+      return await this.toDto(existing);
+    }
+    const trimmed = label === null || label.trim() === '' ? null : label.trim();
+    await repo.update({ main_wallet_id: mainWalletId }, { label: trimmed });
+    const updated = await this.getById(mainWalletId);
+    this.logger.log(`Main wallet label updated: ${mainWalletId} by ${actorUserId}`);
+    return await this.toDto(updated);
+  }
+
+  /**
    * Delete a main wallet. Cannot delete the active default if others exist for the same chain.
    */
   async removeMainWallet(mainWalletId: string, actorUserId: string): Promise<void> {
@@ -523,18 +550,49 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Derive blockchain address from private key — supports ETH, TRON, Solana.
    */
   private deriveAddress(chain: SupportedTreasuryChain, privateKey: string): string {
+    const throwInvalid = (hint: string): never => {
+      throw new BadRequestException(
+        `Invalid private key for chain ${chain}. ${hint}`,
+        'TREASURY_INVALID_PRIVATE_KEY',
+      );
+    };
+
     if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
-      return new ethers.Wallet(privateKey).address;
+      try {
+        return new ethers.Wallet(privateKey).address;
+      } catch {
+        throwInvalid(
+          'Use a 32-byte hex private key (64 hex characters, optional 0x prefix). Do not paste your wallet address.',
+        );
+      }
     }
     if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
-      const decoded = bs58.decode(privateKey);
-      const keypair = Keypair.fromSecretKey(decoded);
-      return keypair.publicKey.toBase58();
+      try {
+        const decoded = bs58.decode(privateKey);
+        const keypair = Keypair.fromSecretKey(decoded);
+        return keypair.publicKey.toBase58();
+      } catch {
+        throwInvalid('Use a valid Solana secret key (Base58-encoded byte array).');
+      }
     }
-    // TRON
-    const addr = TronWeb.address.fromPrivateKey(privateKey);
-    if (!addr) throw new Error(`Invalid TRON private key for chain ${chain}`);
-    return addr;
+    // TRON — hex private key; Base58 strings starting with T are addresses, not keys
+    let pk = privateKey.trim();
+    if (pk.startsWith('0x') || pk.startsWith('0X')) {
+      pk = pk.slice(2);
+    }
+    const derived = TronWeb.address.fromPrivateKey(pk);
+    if (derived === false) {
+      throwInvalid(
+        'Use a 32-byte hex private key (64 hex characters). TRON addresses (Base58 starting with T) are not private keys.',
+      );
+    }
+    const tronAddress = derived as string;
+    if (tronAddress.length === 0) {
+      throwInvalid(
+        'Use a 32-byte hex private key (64 hex characters). TRON addresses (Base58 starting with T) are not private keys.',
+      );
+    }
+    return tronAddress;
   }
 
   private assertSupportedChain(chain: string): SupportedTreasuryChain {

@@ -12,28 +12,28 @@ API backend cho nền tảng giao dịch tiền mã hóa, xây dựng bằng **N
 | **Khớp lệnh** | Engine price–time priority, Redis lock, thực thi giao dịch |
 | **Ví** | Số dư nội bộ, đối soát, đồng bộ ví ngoài (Binance) theo cấu hình |
 | **Nạp/rút** | Nạp fiat qua **PayOS**, nạp/rút on-chain (TRON, Ethereum, Solana testnet) |
-| **Liên kết ví & đăng nhập WC** | Đăng nhập public (desktop QR + SignClient): `/auth/wallet/wc/*`. Liên kết ví (JWT): `/blockchain/wallets/wc/*`. Chi tiết: [`docs/WALLETCONNECT.md`](docs/WALLETCONNECT.md) |
+| **Liên kết ví & đăng nhập WC** | Đăng nhập public (QR + SignClient): `/auth/wallet/wc/*`. Liên kết ví (JWT): `/blockchain/wallets/wc/*` |
 | **Kho bạc (Treasury)** | Ví giao dịch, sweep, thao tác vận hành (RBAC) |
 | **Realtime** | WebSocket (Socket.IO) — giá, trading |
 | **Thông báo** | Firebase Admin (FCM) |
 
 OHLCV/ticker có thể lấy từ Binance public API theo cấu hình (`EXCHANGE_MODE`, testnet, v.v.).
 
+## Yêu cầu
+
+- Node.js + npm
+- MySQL 8 và Redis 7 (có thể chạy bằng Docker — xem mục chạy local bên dưới)
+
 ## Công nghệ
 
 - **Runtime:** Node.js (khuyến nghị LTS 20+)
 - **Framework:** NestJS 10
-- **ORM:** TypeORM 0.3 + **MySQL 8** — hướng dẫn tầng data access (Repository / `DataSource` / stored procedure): [`docs/DATA_ACCESS_PATTERNS.md`](docs/DATA_ACCESS_PATTERNS.md)
+- **ORM:** TypeORM 0.3 + **MySQL 8**
 - **Cache / lock / queue:** Redis 7, **Bull** (hàng đợi)
 - **Realtime:** `@nestjs/websockets`, Socket.IO
 - **Khác:** JWT, PayOS, Ethers, TronWeb, Solana web3, Cloudinary, Nodemailer, Firebase Admin
 
-## Yêu cầu
-
-- Node.js + npm
-- MySQL 8 và Redis 7 (có thể chạy bằng Docker — xem bên dưới)
-
-## Chạy nhanh (local)
+## Chạy backend (local)
 
 ### 1. Hạ tầng (MySQL + Redis)
 
@@ -45,7 +45,7 @@ docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
 
 Compose khởi chạy **mysql:8.0** và **redis:7-alpine** (mật khẩu Redis qua `REDIS_PASSWORD` trong `.env`).
 
-### 2. Cài đặt & database
+### 2. Cài đặt và database
 
 ```bash
 npm install
@@ -57,37 +57,20 @@ npm run db:seed
 npm run start:dev
 ```
 
-### 3. Kiểm tra
+## API, Health và Swagger
 
-- **API:** `http://127.0.0.1:3000/api/v1`
-- **Health:** `GET http://127.0.0.1:3000/api/v1/health`
-- **Swagger (không bật khi `NODE_ENV=production`):** `http://127.0.0.1:3000/api/docs`
+| | URL |
+|---|-----|
+| **Base API** | `http://127.0.0.1:3000/api/v1` |
+| **Health** | `GET http://127.0.0.1:3000/api/v1/health` |
+| **Swagger** | `http://127.0.0.1:3000/api/docs` (không bật khi `NODE_ENV=production`) |
 
 ## Biến môi trường
 
-- Mẫu đầy đủ: [`env.example`](env.example)
-- **Không** commit file `.env` hoặc khóa thật lên git.
+- Mẫu đầy đủ: `env.example` (copy thành `.env`).
+- **Không** commit `.env` hoặc khóa thật lên git.
 
-Các nhóm quan trọng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, **`WALLETCONNECT_PROJECT_ID` / `REOWN_PROJECT_ID`** + `WALLETCONNECT_RELAY_URL` (xem [`docs/WALLETCONNECT.md`](docs/WALLETCONNECT.md)), `FIREBASE_*` (push), SMTP (2FA). Biến mà `ConfigService` đọc phải nằm trong whitelist `src/config/env.validation.ts` — xem [`docs/ENV_CONFIG_USAGE.md`](docs/ENV_CONFIG_USAGE.md).
-
-## Scripts npm
-
-| Lệnh | Mô tả |
-|------|--------|
-| `npm run start:dev` | Dev watch mode |
-| `npm run build` / `npm run start:prod` | Build & chạy production |
-| `npm run migration:run` / `migration:revert` | TypeORM migrations |
-| `npm run db:seed` | Seed dữ liệu + tài khoản thử |
-| `npm test` | Jest |
-| `npm run treasury:daily` | E2E treasury + health (dev/hardening) |
-
-Đăng ký Windows Task Scheduler (treasury): `npm run treasury:schedule:register` — chi tiết trong `docs/TREASURY_DAILY_RUNBOOK.md`.
-
-## Luồng khởi động ứng dụng
-
-1. Load modules, middleware, CORS, validation pipe, interceptor.
-2. **Market catalog:** nếu DB trống, bootstrap đồng bộ currencies/markets từ Binance; thất bại có thể **fail-fast** để không chạy thiếu dữ liệu thị trường.
-3. `POST /api/v1/exchange/sync-info` vẫn dùng để admin làm mới catalog thủ công.
+Các nhóm thường dùng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `WALLETCONNECT_PROJECT_ID` / `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `FIREBASE_*` (push), SMTP (2FA). Biến mà `ConfigService` đọc được phải khai báo trong whitelist `src/config/env.validation.ts`.
 
 ## Cấu trúc thư mục
 
@@ -115,34 +98,11 @@ be-cryptocurrency-trading-app/
 └── package.json
 ```
 
-## Tài liệu thêm
-
-- [Redis Usage](docs/REDIS_USAGE.md)
-- [WalletConnect & Reown](docs/WALLETCONNECT.md)
-- [Swagger](docs/SWAGGER_USAGE.md) · [Env / biến môi trường](docs/ENV_CONFIG_USAGE.md)
-- [Base Repository Usage](docs/BASE_REPOSITORY_USAGE.md)
-- [Treasury daily runbook](docs/TREASURY_DAILY_RUNBOOK.md)
-- Mẫu env E2E treasury: `scripts/treasury-e2e.env.example`
-
-## PayOS (nạp fiat)
-
-Luồng nằm trong module **deposits**. Production bắt buộc cấu hình đủ biến PayOS. Webhook: `POST /api/v1/deposits/payos-webhook` (xem Swagger).
-
-## Đối soát / báo cáo
-
-- Export JSON (RBAC ADMIN / RISK_OFFICER): `POST /api/v1/wallets/reconciliation-report/export?limit=100` → `reports/reconciliation/YYYY-MM-DD.json`
-
-## Khách (Guest) và tích xanh xác minh email (Verified)
-
-- **Guest** là trạng thái ứng dụng khi **chưa đăng nhập** (không có JWT). Đây **không** là giá trị trong cột `role` của bảng `users`.
-- **Tích xanh (email đã xác minh)** trên app khách: người dùng có `users.email_verified = 1` sau khi chứng minh quyền sở hữu inbox bằng **OTP** (ví dụ bật 2FA có gửi OTP email, hoặc luồng xác minh email liên hệ cho tài khoản đăng nhập ví). Khác với **KYC** (`identity_verified` / CCCD).
-- JWT payload có thêm claim `emailVerified` (boolean) để client hiển thị nhất quán; sau khi đổi trạng thái trên DB, người dùng nên **đăng nhập lại** nếu cần token mới.
-
 ## Tài khoản sau seed
 
-Enum **`UserRole`** (cột `users.role`, claim `role` trong JWT): `ADMIN`, `TRADER`, `RISK_OFFICER`, `SUPPORT_AGENT`, `MARKET_MAKER`, `FINANCE_MANAGER` — định nghĩa tại `src/common/enums/index.ts`. **Không** có role `GUEST` trên server (khách = client chưa JWT).
+Enum **`UserRole`** (cột `users.role`, claim `role` trong JWT): `ADMIN`, `TRADER`, `RISK_OFFICER`, `SUPPORT_AGENT`, `MARKET_MAKER`, `FINANCE_MANAGER` — định nghĩa tại `src/common/enums/index.ts`. **Không** có role `GUEST` trên server.
 
-Dữ liệu mẫu nằm trong [`src/seed/data/users.json`](src/seed/data/users.json). Sau `npm run db:seed`, mỗi giá trị `UserRole` **đều** có ít nhất một user demo (nhiều user dùng `TRADER`).
+Dữ liệu mẫu trong `src/seed/data/users.json`. Sau `npm run db:seed`, mỗi giá trị `UserRole` đều có ít nhất một user demo.
 
 | Email | Mật khẩu | `UserRole` | Ghi chú |
 |-------|----------|------------|---------|
@@ -153,14 +113,4 @@ Dữ liệu mẫu nằm trong [`src/seed/data/users.json`](src/seed/data/users.j
 | hsondz1910@gmail.com | Risk@123! | `RISK_OFFICER` | |
 | support@example.com | Support@123! | `SUPPORT_AGENT` | |
 | maxnoah901@gmail.com | Maker@123! | `MARKET_MAKER` | |
-| finance@circle-vn.com | Finance@123! | `FINANCE_MANAGER` | |
-
-## Database (dev)
-
-- **Seed users** (xóa dữ liệu user-related rồi import lại từ `src/seed/data/users.json`): `npm run db:seed`
-- **Xóa toàn bộ dữ liệu** trong DB hiện tại (TRUNCATE mọi bảng, **giữ** bảng `migrations` và cấu trúc schema): `npm run db:clean`  
-  Trên **production**, lệnh bị chặn trừ khi đặt `ALLOW_DB_CLEAN=true` trong môi trường.
-
-## Ứng dụng khách
-
-Ứng dụng Flutter nằm trong **thư mục riêng** cùng workspace (không thuộc repo backend này). Cấu hình `BASE_URL` trỏ tới `http://127.0.0.1:3000/api/v1` (hoặc `http://10.0.2.2:3000/api/v1` trên Android emulator).
+| camego8361@marvetos.com | Finance@123! | `FINANCE_MANAGER` | |

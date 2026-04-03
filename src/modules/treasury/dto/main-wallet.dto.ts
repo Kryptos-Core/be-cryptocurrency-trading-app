@@ -81,3 +81,21 @@ export class ReviewMainWalletDto {
   @MaxLength(500)
   note?: string;
 }
+
+/** Email OTP — same verification as import main wallet. */
+export class RevealMainWalletPrivateKeyDto {
+  @ApiProperty({ description: 'Email OTP from POST /auth/2fa/send-otp', example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  @MaxLength(8)
+  mfaCode!: string;
+}
+
+export class UpdateMainWalletDto {
+  @ApiPropertyOptional({ description: 'Display label', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  label?: string | null;
+}

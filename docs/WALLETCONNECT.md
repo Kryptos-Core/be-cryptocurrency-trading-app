@@ -4,6 +4,18 @@ Tài liệu mô tả WalletConnect v2 / Reown cho **API NestJS**: route REST, Si
 
 ---
 
+## Primary stack theo nền tảng (Flutter FE + API)
+
+Mỗi môi trường client có **một** luồng / thư viện chính (desktop không dùng Reown AppKit Dart; web ưu tiên extension inject; mobile dùng Reown AppKit). Bảng dưới tóm tắt FE khách và API backend dùng chung.
+
+| Môi trường | Thư viện / luồng **chính** | API backend liên quan |
+|------------|----------------------------|------------------------|
+| **Windows / Linux / macOS (Flutter desktop)** | Nest **`@walletconnect/sign-client`** + **Redis**; client QR + poll `/auth/wallet/wc/*` | `POST /auth/wallet/wc/init`, `GET /auth/wallet/wc/status/:id`, `POST /auth/wallet/wc/verify` |
+| **Android / iOS** | Flutter **`reown_appkit`** (modal/QR); ký rồi gọi verify | `/auth/wallet-nonce`, `/auth/wallet-verify` (và tùy chọn luồng WC public như desktop) |
+| **Flutter Web** | **Injected** MetaMask / TronLink (bridge JS) | `/auth/wallet-nonce`, `/auth/wallet-verify` |
+
+---
+
 ## Project ID (Reown Cloud)
 
 - Tạo project tại [cloud.reown.com](https://cloud.reown.com/) (WalletConnect Cloud).
@@ -30,6 +42,10 @@ Tài liệu mô tả WalletConnect v2 / Reown cho **API NestJS**: route REST, Si
 **SDK 2.23+ / ví (ví dụ MetaMask):** `optionalNamespaces` chỉ **gợi ý** Sepolia; session WC có thể là **Ethereum Mainnet** (`eip155:1`). Server gửi `personal_sign` với **`chainId` khớp account trong session** (CAIP-2). **Đăng nhập** vẫn xác minh theo **`ETH_SEPOLIA`** + message trong Redis — `personal_sign` off-chain, cùng EOA + cùng message thì chữ ký hợp lệ.
 
 **Timeout BE:** `SignClient.init` ~18s (lỗi → reset singleton); có timeout cho `personal_sign` / pairing trong `wallet-connect-auth.service.ts` (tránh treo HTTP).
+
+**SignClient singleton & mutex:** Toàn process dùng **một** `SignClient` ([`walletconnect-dapp-client.factory.ts`](./../src/modules/blockchain/wallet-connect/walletconnect-dapp-client.factory.ts)). Mọi luồng `connect` → lưu Redis → chờ approve + ký + `disconnect` được **xếp hàng** qua [`wallet-connect-sign-client-gate.ts`](./../src/modules/blockchain/wallet-connect/wallet-connect-sign-client-gate.ts) (`withWalletConnectSignClientLock`) trong cả đăng nhập WC và liên kết ví — tránh race khi nhiều `POST .../wc/init` gần như đồng thời.
+
+**Relay trễ & `unhandledRejection`:** Sau `disconnect`, relay đôi khi vẫn chuyển gói cho topic cũ; engine `@walletconnect/sign-client` có thể báo `No matching key. session topic doesn't exist` trong promise nội bộ SDK (không gắn với handler của Nest). [`main.ts`](./../src/main.ts) coi pattern đó là **WARN** và **không** gọi `process.exit(1)`; các rejection khác vẫn kết thúc process như trước.
 
 **Redis:** `wc:auth:session:{sessionId}`. **Scale:** một replica hoặc sticky — xem mục **Scale ngang**.
 

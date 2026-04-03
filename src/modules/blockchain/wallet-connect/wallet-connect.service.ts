@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { appendFileSync } from 'fs';
 import { createHash, createHmac } from 'crypto';
+import { resolve } from 'path';
 import bs58 from 'bs58';
 import type { SessionTypes } from '@walletconnect/types';
 import { getAddressFromAccount, getChainFromAccount } from '@walletconnect/utils';
@@ -12,7 +14,34 @@ import { BlockchainNetwork } from '@/common/enums';
 import { WalletLinkingService } from '../wallet-linking.service';
 import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { WcSessionData, WcSessionStatus } from './dto';
-import { getWalletConnectDappClient } from './walletconnect-dapp-client.factory';
+import { withWalletConnectSignClientLock } from './wallet-connect-sign-client-gate';
+
+// #region agent log
+function agentWcLinkDebugLog(payload: {
+  location: string;
+  message: string;
+  hypothesisId: string;
+  data?: Record<string, unknown>;
+}): void {
+  const line =
+    JSON.stringify({
+      sessionId: 'cb6ec4',
+      timestamp: Date.now(),
+      ...payload,
+    }) + '\n';
+  for (const logPath of [
+    resolve(process.cwd(), '..', 'debug-cb6ec4.log'),
+    resolve(process.cwd(), 'debug-cb6ec4.log'),
+  ]) {
+    try {
+      appendFileSync(logPath, line);
+      return;
+    } catch {
+      /* try next */
+    }
+  }
+}
+// #endregion
 
 /**
  * WalletConnectService
@@ -98,57 +127,76 @@ export class WalletConnectService implements OnModuleInit {
 
     if (this.useRealWcPairing(chain)) {
       try {
-        const client = await getWalletConnectDappClient({
-          projectId: this.projectId,
-          relayUrl: this.relayUrl,
+        const { wcUri: pairedUri } = await new Promise<{ wcUri: string }>((resolveHttp, rejectHttp) => {
+          void withWalletConnectSignClientLock(
+            { projectId: this.projectId, relayUrl: this.relayUrl },
+            async (client) => {
+              try {
+                const connectPromise =
+                  chain === BlockchainNetwork.SOLANA_DEVNET
+                    ? client.connect({
+                        optionalNamespaces: {
+                          solana: {
+                            chains: [
+                              WalletConnectService.CHAIN_CAIP[BlockchainNetwork.SOLANA_DEVNET],
+                            ],
+                            methods: ['solana_signMessage', 'solana_signTransaction'],
+                            events: [],
+                          },
+                        },
+                      })
+                    : client.connect({
+                        optionalNamespaces: {
+                          eip155: {
+                            chains: ['eip155:11155111'],
+                            methods: ['personal_sign', 'eth_sendTransaction'],
+                            events: [],
+                          },
+                        },
+                      });
+                const { uri, approval } = await this.withTimeout(
+                  connectPromise,
+                  WalletConnectService.WC_CONNECT_TIMEOUT_MS,
+                  'WC_INIT_CONNECT_TIMEOUT',
+                );
+                if (!uri) {
+                  throw new Error('WalletConnect connect() returned empty uri');
+                }
+                const sessionData: WcSessionData = {
+                  sessionId,
+                  userId,
+                  chain,
+                  wcUri: uri,
+                  nonce,
+                  message,
+                  status: WcSessionStatus.PENDING,
+                  createdAt: Date.now(),
+                };
+                await this.saveSession(userId, sessionId, sessionData);
+                resolveHttp({ wcUri: uri });
+                try {
+                  await this.runLinkApprovalAndSign(
+                    userId,
+                    sessionId,
+                    chain,
+                    message,
+                    approval,
+                    client,
+                  );
+                } catch (e) {
+                  this.logger.error(
+                    `[WC] background pairing/sign error userId=${userId} sessionId=${sessionId}`,
+                    e,
+                  );
+                }
+              } catch (e) {
+                rejectHttp(e);
+                throw e;
+              }
+            },
+          ).catch(rejectHttp);
         });
-        const connectPromise =
-          chain === BlockchainNetwork.SOLANA_DEVNET
-            ? client.connect({
-                optionalNamespaces: {
-                  solana: {
-                    chains: [WalletConnectService.CHAIN_CAIP[BlockchainNetwork.SOLANA_DEVNET]],
-                    methods: ['solana_signMessage', 'solana_signTransaction'],
-                    events: [],
-                  },
-                },
-              })
-            : client.connect({
-                optionalNamespaces: {
-                  eip155: {
-                    chains: ['eip155:11155111'],
-                    methods: ['personal_sign', 'eth_sendTransaction'],
-                    events: [],
-                  },
-                },
-              });
-        const { uri, approval } = await this.withTimeout(
-          connectPromise,
-          WalletConnectService.WC_CONNECT_TIMEOUT_MS,
-          'WC_INIT_CONNECT_TIMEOUT',
-        );
-        if (!uri) {
-          throw new Error('WalletConnect connect() returned empty uri');
-        }
-        wcUri = uri;
-        const sessionData: WcSessionData = {
-          sessionId,
-          userId,
-          chain,
-          wcUri,
-          nonce,
-          message,
-          status: WcSessionStatus.PENDING,
-          createdAt: Date.now(),
-        };
-        await this.saveSession(userId, sessionId, sessionData);
-        void this.runLinkApprovalAndSign(userId, sessionId, chain, message, approval, client).catch(
-          (e) =>
-            this.logger.error(
-              `[WC] background pairing/sign error userId=${userId} sessionId=${sessionId}`,
-              e,
-            ),
-        );
+        wcUri = pairedUri;
       } catch (e) {
         this.logger.error('[WC] SignClient connect failed (link wallet)', e);
         const msg = WalletConnectService.formatWcInitError(e);
@@ -409,6 +457,21 @@ export class WalletConnectService implements OnModuleInit {
       const messageB58 = bs58.encode(Buffer.from(message, 'utf8'));
       const msLeftSign = Math.max(5_000, deadline - Date.now());
 
+      // #region agent log
+      agentWcLinkDebugLog({
+        location: 'wallet-connect.service.ts:runLinkApprovalAndSign',
+        message: 'solana connected before sign request',
+        hypothesisId: 'H4',
+        data: {
+          sessionId,
+          chainIdUsed: chainId || expectedCaip2,
+          msLeftSign,
+          deadline,
+          now: Date.now(),
+        },
+      });
+      // #endregion
+
       try {
         const raw = await this.withTimeout(
           client.request({
@@ -427,6 +490,17 @@ export class WalletConnectService implements OnModuleInit {
         );
         signature = WalletConnectService.solanaWcResultToBackendSignature(raw);
       } catch (e) {
+        // #region agent log
+        agentWcLinkDebugLog({
+          location: 'wallet-connect.service.ts:runLinkApprovalAndSign',
+          message: 'solana_signMessage error',
+          hypothesisId: 'H4',
+          data: {
+            sessionId,
+            err: e instanceof Error ? e.message : String(e),
+          },
+        });
+        // #endregion
         this.logger.warn(`[WC] solana_signMessage failed sessionId=${sessionId}`, e);
         await this.updateSession(userId, sessionId, { status: WcSessionStatus.FAILED, address });
         try {
@@ -706,7 +780,21 @@ export class WalletConnectService implements OnModuleInit {
     const remaining = Math.floor(
       (existing.createdAt + WalletConnectService.SESSION_TTL * 1000 - Date.now()) / 1000,
     );
-    if (remaining <= 0) return;
+    if (remaining <= 0) {
+      // #region agent log
+      agentWcLinkDebugLog({
+        location: 'wallet-connect.service.ts:updateSession',
+        message: 'skip session update ttl exhausted',
+        hypothesisId: 'H5',
+        data: {
+          sessionId,
+          userId,
+          partialStatus: partial.status as string | undefined,
+        },
+      });
+      // #endregion
+      return;
+    }
 
     await this.cacheService.set(
       this.sessionKey(userId, sessionId),

@@ -22,8 +22,10 @@ import {
   ListTreasuryOperationsDto,
   ListTreasuryTransactionsDto,
   ListTreasuryWalletsDto,
+  RevealMainWalletPrivateKeyDto,
   ReviewMainWalletDto,
   SweepWalletDto,
+  UpdateMainWalletDto,
 } from './dto';
 import { SupportedTreasuryChain, TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TransactionWalletService } from './transaction-wallet.service';
@@ -201,6 +203,50 @@ export class TreasuryController {
     @CurrentUser('userId') actorUserId: string,
   ) {
     return this.treasuryMainWalletService.setDefault(mainWalletId, actorUserId);
+  }
+
+  /**
+   * POST /treasury/main-wallets/:id/reveal-private-key
+   * Returns decrypted private key after email OTP verification (same as import).
+   */
+  @Post('main-wallets/:mainWalletId/reveal-private-key')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+  @ApiOperation({ summary: 'Reveal main wallet private key (MFA required)' })
+  async revealMainWalletPrivateKey(
+    @Param('mainWalletId') mainWalletId: string,
+    @Body() dto: RevealMainWalletPrivateKeyDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    const mfaValid = await this.twoFaService.verifyOtp(actorUserId, dto.mfaCode);
+    if (!mfaValid) {
+      throw new BadRequestException(
+        'Invalid or expired MFA code. Request a new OTP via POST /auth/2fa/send-otp and try again.',
+        'INVALID_MFA_CODE',
+      );
+    }
+    return this.treasuryMainWalletService.revealPrivateKey(mainWalletId, actorUserId);
+  }
+
+  /**
+   * PATCH /treasury/main-wallets/:id — update label only.
+   */
+  @Patch('main-wallets/:mainWalletId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+  @ApiOperation({ summary: 'Update main wallet label' })
+  async updateMainWallet(
+    @Param('mainWalletId') mainWalletId: string,
+    @Body() dto: UpdateMainWalletDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    return this.treasuryMainWalletService.updateMainWalletLabel(
+      mainWalletId,
+      dto.label,
+      actorUserId,
+    );
   }
 
   /**

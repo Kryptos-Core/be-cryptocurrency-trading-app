@@ -9,8 +9,25 @@ import { setupSwagger } from './config/swagger.config';
 
 const logger = new Logger('Bootstrap');
 
+/** Relay/SDK có thể gửi sự kiện trễ sau disconnect — SignClient ném lỗi này ngoài promise của app. */
+function isBenignWalletConnectRelayRejection(reason: unknown): boolean {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  const m = msg.toLowerCase();
+  return (
+    (m.includes('no matching key') && m.includes('session topic')) ||
+    m.includes("session topic doesn't exist")
+  );
+}
+
 function setupProcessErrorHandlers(): void {
-  process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  process.on('unhandledRejection', (reason: unknown, _promise: Promise<unknown>) => {
+    if (isBenignWalletConnectRelayRejection(reason)) {
+      logger.warn(
+        'Unhandled Rejection (WalletConnect relay/SDK — process continues; see docs/WALLETCONNECT.md)',
+        reason instanceof Error ? reason.message : String(reason),
+      );
+      return;
+    }
     logger.error('Unhandled Rejection', reason instanceof Error ? reason.stack : String(reason));
     process.exit(1);
   });
