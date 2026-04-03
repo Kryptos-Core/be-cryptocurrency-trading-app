@@ -102,9 +102,8 @@ export class TreasuryController {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   @Get('main-wallets')
-  @UseGuards(RoleGuard, PermissionGuard)
+  @UseGuards(RoleGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List main wallets for a chain (auto-seeded or imported)' })
   async listMainWallets(@Query('chain') chain: string) {
     return this.treasuryMainWalletService.listByChain(
@@ -113,9 +112,8 @@ export class TreasuryController {
   }
 
   @Get('main-wallets/pending')
-  @UseGuards(RoleGuard, PermissionGuard)
+  @UseGuards(RoleGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({
     summary:
       'List main wallets pending Risk approval (Finance/Admin can track imports; only Risk approves/rejects)',
@@ -160,9 +158,8 @@ export class TreasuryController {
    * Auto-sets as default if no active default exists for the chain.
    */
   @Patch('main-wallets/:mainWalletId/approve')
-  @UseGuards(RoleGuard, PermissionGuard)
+  @UseGuards(RoleGuard)
   @RequireRoles(UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Risk Officer: approve a pending main wallet import' })
   async approveMainWallet(
     @Param('mainWalletId') mainWalletId: string,
@@ -177,9 +174,8 @@ export class TreasuryController {
    * Risk Officer rejects a PENDING_APPROVAL wallet → REJECTED.
    */
   @Patch('main-wallets/:mainWalletId/reject')
-  @UseGuards(RoleGuard, PermissionGuard)
+  @UseGuards(RoleGuard)
   @RequireRoles(UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Risk Officer: reject a pending main wallet import' })
   async rejectMainWallet(
     @Param('mainWalletId') mainWalletId: string,
@@ -210,9 +206,8 @@ export class TreasuryController {
    * Returns decrypted private key after email OTP verification (same as import).
    */
   @Post('main-wallets/:mainWalletId/reveal-private-key')
-  @UseGuards(RoleGuard, PermissionGuard)
+  @UseGuards(RoleGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
-  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Reveal main wallet private key (MFA required)' })
   async revealMainWalletPrivateKey(
     @Param('mainWalletId') mainWalletId: string,
