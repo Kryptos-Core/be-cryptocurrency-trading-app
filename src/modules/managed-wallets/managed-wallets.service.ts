@@ -15,7 +15,6 @@ import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
-import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import {
   CreateManagedWalletDto,
   ManagedWalletResponseDto,
@@ -217,6 +216,16 @@ export class ManagedWalletsService {
     return this.mapTransactionWallet(updated);
   }
 
+  async clearDepositDefault(
+    userId: string,
+    walletId: string,
+    role: UserRole,
+  ): Promise<ManagedWalletResponseDto> {
+    await this.requireTransactionWalletForActor(userId, walletId, role);
+    const updated = await this.transactionWalletService.unsetDefaultUserDeposit(walletId);
+    return this.mapTransactionWallet(updated);
+  }
+
   async setRecommendedChain(
     dto: UpdateRecommendedChainDto,
   ): Promise<{ recommended_chain: SupportedManagedWalletChain }> {
@@ -293,17 +302,18 @@ export class ManagedWalletsService {
     const methods = await Promise.all(
       ManagedWalletsService.SUPPORTED_CHAINS.map(async (chain) => {
         const configuredWallet = await this.getConfiguredDepositWallet(chain);
-        const fallbackHotWallet = await this.getFallbackHotWalletAddress(chain);
         const networkConfig = networkMap.get(chain);
+        const address = configuredWallet?.address ?? '';
+        const hasDefault = address.length > 0;
         return {
           chain,
           label:
             chain === BlockchainNetwork.TRON_NILE
               ? 'Tron Network (Nile Testnet)'
               : 'Tron Network (Shasta Testnet)',
-          deposit_address: configuredWallet?.address ?? fallbackHotWallet ?? '',
+          deposit_address: address,
           is_recommended: chain === recommendedChain,
-          deposit_enabled: networkConfig?.deposit_enabled ?? true,
+          deposit_enabled: (networkConfig?.deposit_enabled ?? true) && hasDefault,
           min_confirmations: networkConfig?.min_confirmations ?? 12,
           estimated_time: '~3 minutes',
         } satisfies DepositMethodItem;
@@ -329,7 +339,11 @@ export class ManagedWalletsService {
     walletId: string,
     role: UserRole,
   ): Promise<TransactionWallet> {
-    if (role !== UserRole.ADMIN && role !== UserRole.RISK_OFFICER) {
+    if (
+      role !== UserRole.ADMIN &&
+      role !== UserRole.RISK_OFFICER &&
+      role !== UserRole.FINANCE_MANAGER
+    ) {
       throw new ForbiddenException('Not allowed to access transaction wallets');
     }
     const wallet = await this.dataSource.getRepository(TransactionWallet).findOne({
@@ -370,26 +384,6 @@ export class ManagedWalletsService {
       fullHost,
       privateKey: privateKey || undefined,
     });
-  }
-
-  /**
-   * Fallback deposit address: reads the default ACTIVE main wallet for the given TRON chain.
-   * Used when no transaction wallet is configured yet.
-   * No .env read — treasury_main_wallets is the single source of truth.
-   */
-  private async getFallbackHotWalletAddress(
-    chain: SupportedManagedWalletChain,
-  ): Promise<string | null> {
-    try {
-      const repo = this.dataSource.getRepository(TreasuryMainWallet);
-      const wallet = await repo.findOne({
-        where: { chain, is_default: true, status: 'ACTIVE' } as any,
-        select: ['address'],
-      });
-      return wallet?.address ?? null;
-    } catch {
-      return null;
-    }
   }
 
   private normalizePositiveAmount(rawAmount: string): string {

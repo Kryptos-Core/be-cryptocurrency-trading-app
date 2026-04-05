@@ -36,6 +36,9 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
   ],
   [UserRole.FINANCE_MANAGER]: [
     Permission.WALLETS_READ,
+    /** Ví nạp mặc định, điều chỉnh số dư, quản lý ví giao dịch (cùng cấp vận hành tiền với Risk). */
+    Permission.WALLETS_MANAGE,
+    Permission.WALLETS_WITHDRAW,
     Permission.PAYMENT_CONFIGS_MANAGE,
     Permission.WITHDRAWALS_APPROVE,
   ],

@@ -50,6 +50,31 @@ export class OnchainTransferService {
     }));
   }
 
+  /**
+   * Tron Nile/Shasta: chỉ chấp nhận nạp vào transaction wallet đang là default user deposit.
+   * Không có default → từ chối; có default nhưng tx.to khác → từ chối.
+   */
+  private async assertTronDepositRecipientMatchesConfiguredDefault(
+    chain: BlockchainNetwork,
+    txRecipient: string,
+  ): Promise<void> {
+    if (chain !== BlockchainNetwork.TRON_NILE && chain !== BlockchainNetwork.TRON_SHASTA) {
+      return;
+    }
+    const tw = await this.transactionWalletService.getDefaultUserDepositWallet(chain);
+    if (!tw) {
+      throw new BadRequestException(
+        'Chưa có ví nạp mặc định cho mạng này. Nạp on-chain tạm dừng cho đến khi vận hành cấu hình.',
+        'DEPOSIT_DEFAULT_NOT_CONFIGURED',
+      );
+    }
+    if (tw.address !== txRecipient) {
+      throw new BadRequestException(
+        'Giao dịch không gửi đến địa chỉ nạp hiện tại của sàn cho mạng này.',
+        'DEPOSIT_RECIPIENT_MISMATCH',
+      );
+    }
+  }
 
   /**
    * Preview giao dịch nạp tiền theo txHash để FE tự điền amount
@@ -91,6 +116,8 @@ export class OnchainTransferService {
       chain,
       txStatus.from,
     );
+
+    await this.assertTronDepositRecipientMatchesConfiguredDefault(chain, txStatus.to);
 
     return {
       chain,
@@ -351,6 +378,8 @@ export class OnchainTransferService {
           'TX_FAILED',
         );
       }
+
+      await this.assertTronDepositRecipientMatchesConfiguredDefault(dto.chain, txStatus.to);
 
       // Verify sender = ví đã liên kết của user
       const senderAddress = txStatus.from;

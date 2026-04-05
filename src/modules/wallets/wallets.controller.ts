@@ -186,7 +186,7 @@ export class WalletsController {
   /**
    * Điều chỉnh số dư ví thủ công cho người dùng bất kỳ.
    * POST /wallets/admin/adjust
-   * Yêu cầu quyền WALLETS_MANAGE (ADMIN hoặc RISK_OFFICER).
+   * Yêu cầu quyền WALLETS_MANAGE (ADMIN, RISK_OFFICER hoặc FINANCE_MANAGER).
    */
   @Post('admin/adjust')
   @UseGuards(PermissionGuard)
@@ -194,7 +194,7 @@ export class WalletsController {
   @ApiOperation({
     summary: 'Điều chỉnh số dư ví thủ công',
     description:
-      'Admin/Risk Officer nạp hoặc rút số dư ảo vào ví của người dùng bất kỳ. Tạo bản ghi audit đầy đủ.',
+      'Admin / Risk / Finance Manager nạp hoặc rút số dư ảo vào ví người dùng. Tạo bản ghi audit đầy đủ.',
   })
   @ApiSuccessResponse('Điều chỉnh số dư thành công')
   @ApiBadRequestResponse('Dữ liệu không hợp lệ hoặc số dư không đủ')
@@ -209,7 +209,7 @@ export class WalletsController {
   /**
    * Lịch sử điều chỉnh số dư thủ công theo người dùng.
    * GET /wallets/admin/adjustments/:userId
-   * Yêu cầu quyền WALLETS_MANAGE (ADMIN hoặc RISK_OFFICER).
+   * Yêu cầu quyền WALLETS_MANAGE (ADMIN, RISK_OFFICER hoặc FINANCE_MANAGER).
    */
   @Get('admin/adjustments/:userId')
   @UseGuards(PermissionGuard)

@@ -64,6 +64,7 @@ describe('OnchainTransferService', () => {
     const txWalletMock = {
       getWithdrawalSourceWallet: jest.fn().mockResolvedValue(null),
       sendWithdrawalNativeTransfer: jest.fn(),
+      getDefaultUserDepositWallet: jest.fn().mockResolvedValue(null),
     };
 
     const module: TestingModule = await Test.createTestingModule({

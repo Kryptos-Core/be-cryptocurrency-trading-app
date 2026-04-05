@@ -287,7 +287,8 @@ export class TransactionWalletService {
   ): Promise<string> {
     const contractAddress = TRON_USDT_CONTRACT[chain];
     const contract = tronWeb.contract(TRC20_BALANCE_OF_ABI as unknown as never[], contractAddress);
-    const raw = await contract.balanceOf(ownerBase58).call();
+    // Read-only TronWeb has no defaultAddress; empty `from` yields undefined owner_address on the node.
+    const raw = await contract.balanceOf(ownerBase58).call({ from: ownerBase58 });
     const rawStr = typeof raw === 'object' && raw !== null && 'balance' in raw
       ? String((raw as { balance: unknown }).balance)
       : String(raw);
@@ -377,6 +378,39 @@ export class TransactionWalletService {
     const updated = await this.treasuryTransactionWalletRepository.setDefaultUserDepositInTransaction(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
     return updated;
+  }
+
+  /**
+   * Clears the user-facing default deposit flag for this wallet. Chain may temporarily
+   * have no default until another wallet is set (deposit UI falls back to main hot wallet).
+   */
+  async unsetDefaultUserDeposit(walletId: string): Promise<TransactionWallet> {
+    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
+
+    if (!wallet) {
+      throw new NotFoundException('Transaction wallet', walletId);
+    }
+    if (wallet.purpose === 'WITHDRAWAL') {
+      throw new BadRequestException(
+        'Only DEPOSIT or BOTH wallets participate in user deposit defaults',
+        'TX_WALLET_PURPOSE_NOT_DEPOSIT',
+      );
+    }
+    if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
+      throw new BadRequestException(
+        'User deposit default is only supported for Tron Nile/Shasta',
+        'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
+      );
+    }
+    if (!wallet.is_default_user_deposit) {
+      return wallet;
+    }
+
+    wallet.is_default_user_deposit = false;
+    wallet.default_set_at = null;
+    const saved = await this.treasuryTransactionWalletRepository.save(wallet);
+    await this.cacheService.invalidatePattern('treasury:wallets:list:*');
+    return saved;
   }
 
   async deactivateWallet(walletId: string): Promise<void> {

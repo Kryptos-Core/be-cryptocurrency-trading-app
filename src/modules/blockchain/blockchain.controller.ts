@@ -163,7 +163,7 @@ export class BlockchainController {
   @ApiOperation({
     summary: 'Lấy địa chỉ nạp tiền theo mạng',
     description:
-      'Trả về địa chỉ ví nhận tiền mặc định của platform cho chain được chọn (transaction_wallets default; nếu chưa cấu hình thì hot wallet).',
+      'Tron Nile/Shasta: chỉ địa chỉ từ transaction_wallets làm default nạp user. Các chain khác: ví nóng chain. Không có default Tron → 400.',
   })
   @ApiQuery({
     name: 'chain',
@@ -180,15 +180,33 @@ export class BlockchainController {
     }
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
-    const provider = this.providerFactory.getProvider(normalizedChain);
     const depositWallet = await this.managedWalletsService.getConfiguredDepositWallet(
       normalizedChain,
     );
 
+    if (
+      normalizedChain === BlockchainNetwork.TRON_NILE ||
+      normalizedChain === BlockchainNetwork.TRON_SHASTA
+    ) {
+      if (!depositWallet) {
+        throw new BadRequestException(
+          'Chưa cấu hình ví nạp mặc định cho mạng này. Vui lòng đặt default trong Nạp tiền & ví quản lý.',
+          'DEPOSIT_DEFAULT_NOT_CONFIGURED',
+        );
+      }
+      return {
+        chain: normalizedChain,
+        depositAddress: depositWallet.address,
+        source: depositWallet.source,
+        note: 'Đây là địa chỉ ví nhận nạp on-chain do vận hành chỉ định (transaction wallet default).',
+      };
+    }
+
+    const provider = this.providerFactory.getProvider(normalizedChain);
     return {
       chain: normalizedChain,
-      depositAddress: depositWallet?.address ?? (await provider.getHotWalletAddress()),
-      source: depositWallet?.source ?? 'hot_wallet',
+      depositAddress: await provider.getHotWalletAddress(),
+      source: 'hot_wallet',
       note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
     };
   }

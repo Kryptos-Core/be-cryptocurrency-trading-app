@@ -321,7 +321,7 @@ export class UsersController {
   }
 
   /**
-   * Get wallet balances for a specific user (Admin / Risk Officer)
+   * Get wallet balances for a specific user (Admin / Risk Officer / Finance Manager)
    * GET /users/:id/wallets
    */
   @Get(':id/wallets')
@@ -331,7 +331,7 @@ export class UsersController {
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiSuccessResponse('User wallets retrieved successfully')
   @ApiNotFoundResponse('User not found')

@@ -61,7 +61,7 @@ export class DepositsController {
 
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: List all deposits', description: 'Paginated list of all fiat deposits with optional filters.' })
