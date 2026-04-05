@@ -17,6 +17,7 @@ import { CacheService, RedisService, WalletEncryptionService } from '@/common/se
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
+import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
@@ -36,9 +37,36 @@ type SupportedTreasuryChain =
 const TRON_DEPOSIT_UI_CHAINS = ['TRON_NILE', 'TRON_SHASTA'] as const;
 type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
 
+/** Official / canonical USDT (TRC-20) contract per TRON network (6 decimals). */
+const TRON_USDT_CONTRACT: Record<'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA', string> = {
+  TRON_MAINNET: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+  TRON_NILE: 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf',
+  TRON_SHASTA: 'TG3XXyExBkPp9nzdajDZsozEuVByaKQKzY',
+};
+
+const TRC20_BALANCE_OF_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: '_owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: 'balance', type: 'uint256' }],
+    type: 'function',
+  },
+] as const;
+
+const TRON_USDT_DECIMALS = 6;
+
+export interface TreasuryOnChainBalances {
+  balance: string;
+  symbol: string;
+  /** Human-readable USDT (TRC-20), TRON networks only */
+  usdtTrc20Balance?: string;
+}
+
 export interface TreasuryWalletWithBalance extends Omit<TransactionWallet, 'encrypted_private_key'> {
   balance: string;
   symbol: string;
+  usdtTrc20Balance?: string;
 }
 
 @Injectable()
@@ -48,6 +76,7 @@ export class TransactionWalletService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepository,
+    private readonly treasuryOperationRepository: TreasuryOperationRepository,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,
@@ -106,18 +135,15 @@ export class TransactionWalletService {
 
     const enriched = await Promise.all(
       wallets.map(async (w) => {
-        const { balance, symbol } = await this.getBalanceCached(w.chain, w.address);
+        const { balance, symbol, usdtTrc20Balance } = await this.getBalanceCached(w.chain, w.address);
         const { encrypted_private_key: _, ...rest } = w;
-        return { ...rest, balance, symbol } as TreasuryWalletWithBalance;
+        return { ...rest, balance, symbol, ...(usdtTrc20Balance != null ? { usdtTrc20Balance } : {}) } as TreasuryWalletWithBalance;
       }),
     );
     return enriched;
   }
 
-  async getBalanceCached(
-    chain: SupportedTreasuryChain,
-    address: string,
-  ): Promise<{ balance: string; symbol: string }> {
+  async getBalanceCached(chain: SupportedTreasuryChain, address: string): Promise<TreasuryOnChainBalances> {
     const cacheKey = `treasury:balance:${chain}:${address}`;
     return this.cacheService.getOrSet(
       cacheKey,
@@ -202,18 +228,21 @@ export class TransactionWalletService {
     return wallet;
   }
 
-  async getWalletDetail(walletId: string): Promise<TransactionWallet & { balance: string; symbol: string }> {
+  async getWalletDetail(
+    walletId: string,
+  ): Promise<TransactionWallet & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
     const wallet = await this.getWalletById(walletId);
-    const balance = await this.getBalanceByAddress(wallet.chain, wallet.address);
+    const b = await this.getBalanceByAddress(wallet.chain, wallet.address);
 
     return {
       ...wallet,
-      balance: balance.balance,
-      symbol: balance.symbol,
+      balance: b.balance,
+      symbol: b.symbol,
+      ...(b.usdtTrc20Balance != null ? { usdtTrc20Balance: b.usdtTrc20Balance } : {}),
     };
   }
 
-  async getBalanceByAddress(chain: SupportedTreasuryChain, address: string): Promise<{ balance: string; symbol: string }> {
+  async getBalanceByAddress(chain: SupportedTreasuryChain, address: string): Promise<TreasuryOnChainBalances> {
     if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
       const provider = await this.buildEthereumProvider(chain);
       const wei = await provider.getBalance(address);
@@ -232,12 +261,37 @@ export class TransactionWalletService {
       };
     }
 
-    const tronWeb = await this.buildTronReadOnlyClient(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET');
+    const tronChain = chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET';
+    const tronWeb = await this.buildTronReadOnlyClient(tronChain);
     const sun = await tronWeb.trx.getBalance(address);
+    let usdtTrc20Balance: string | undefined;
+    try {
+      usdtTrc20Balance = await this.readTronUsdtBalance(tronWeb, tronChain, address);
+    } catch (err) {
+      this.logger.warn(
+        `USDT TRC-20 balance skipped for ${address} on ${tronChain}: ${(err as Error).message}`,
+      );
+      usdtTrc20Balance = '0';
+    }
     return {
       balance: new Decimal(sun).div(1_000_000).toString(),
       symbol: 'TRX',
+      usdtTrc20Balance,
     };
+  }
+
+  private async readTronUsdtBalance(
+    tronWeb: TronWeb,
+    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    ownerBase58: string,
+  ): Promise<string> {
+    const contractAddress = TRON_USDT_CONTRACT[chain];
+    const contract = tronWeb.contract(TRC20_BALANCE_OF_ABI as unknown as never[], contractAddress);
+    const raw = await contract.balanceOf(ownerBase58).call();
+    const rawStr = typeof raw === 'object' && raw !== null && 'balance' in raw
+      ? String((raw as { balance: unknown }).balance)
+      : String(raw);
+    return new Decimal(rawStr).div(new Decimal(10).pow(TRON_USDT_DECIMALS)).toString();
   }
 
   async getMainWalletAddress(chain: SupportedTreasuryChain): Promise<string> {
@@ -339,6 +393,67 @@ export class TransactionWalletService {
     wallet.is_active = false;
     await this.treasuryTransactionWalletRepository.save(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
+  }
+
+  /**
+   * Permanently remove a transaction wallet. Requires near-zero on-chain balance, no in-flight
+   * Fund/Sweep, and must not be the user deposit default.
+   */
+  async deleteWallet(walletId: string, actorUserId: string): Promise<void> {
+    const wallet = await this.getWalletById(walletId);
+    if (wallet.is_default_user_deposit) {
+      throw new BadRequestException(
+        'Unset this wallet as the user deposit default before deleting it',
+        'TX_WALLET_DEFAULT_DEPOSIT_DELETE_FORBIDDEN',
+      );
+    }
+    const inFlight = await this.treasuryOperationRepository.countNonTerminalForWallet(walletId);
+    if (inFlight > 0) {
+      throw new BadRequestException(
+        'Wait for pending Fund/Sweep operations to finish before deleting this wallet',
+        'TX_WALLET_OPERATION_IN_FLIGHT',
+      );
+    }
+    const balInfo = await this.getBalanceByAddress(wallet.chain, wallet.address);
+    const bal = new Decimal(balInfo.balance);
+    const maxAllowed = this._maxBalanceToAllowDelete(balInfo.symbol);
+    if (bal.gt(maxAllowed)) {
+      throw new BadRequestException(
+        `Sweep funds first (on-chain balance must be at most ${maxAllowed.toString()} ${balInfo.symbol})`,
+        'TX_WALLET_NON_ZERO_BALANCE',
+      );
+    }
+    if (balInfo.usdtTrc20Balance != null && new Decimal(balInfo.usdtTrc20Balance).gt('0.000001')) {
+      throw new BadRequestException(
+        'Transfer TRC-20 USDT off this wallet before deleting it',
+        'TX_WALLET_USDT_NON_ZERO',
+      );
+    }
+    await this.treasuryTransactionWalletRepository.deleteByWalletId(walletId);
+    await this.invalidateBalanceCache(wallet.chain, wallet.address);
+    await this.cacheService.invalidatePattern('treasury:wallets:list:*');
+    this.logger.log(
+      `Transaction wallet deleted: ${walletId} chain=${wallet.chain} address=${wallet.address} by ${actorUserId}`,
+    );
+    await this.publishEvent('wallet.deleted', {
+      walletId,
+      chain: wallet.chain,
+      address: wallet.address,
+      deletedBy: actorUserId,
+    });
+  }
+
+  private _maxBalanceToAllowDelete(symbol: string): Decimal {
+    switch (symbol.toUpperCase()) {
+      case 'TRX':
+        return new Decimal('0.15');
+      case 'ETH':
+        return new Decimal('0.00005');
+      case 'SOL':
+        return new Decimal('0.00002');
+      default:
+        return new Decimal('0');
+    }
   }
 
   /**

@@ -107,4 +107,11 @@ export class TreasuryTransactionWalletRepository {
       },
     });
   }
+
+  async deleteByWalletId(walletId: string): Promise<void> {
+    const res = await this.dataSource.getRepository(TransactionWallet).delete({ wallet_id: walletId });
+    if (!res.affected) {
+      throw new NotFoundException('Transaction wallet', walletId);
+    }
+  }
 }

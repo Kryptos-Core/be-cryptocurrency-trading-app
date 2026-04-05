@@ -16,7 +16,11 @@ export type TreasuryMainWalletChain =
   | 'SOLANA_DEVNET'
   | 'SOLANA_MAINNET';
 
-export type TreasuryMainWalletStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED';
+export type TreasuryMainWalletStatus =
+  | 'PENDING_APPROVAL'
+  | 'ACTIVE'
+  | 'REJECTED'
+  | 'PENDING_DELETION';
 
 @Entity('treasury_main_wallets')
 @Index('idx_tmw_chain', ['chain'])
@@ -48,7 +52,7 @@ export class TreasuryMainWallet {
   /** Approval workflow state */
   @Column({
     type: 'enum',
-    enum: ['PENDING_APPROVAL', 'ACTIVE', 'REJECTED'],
+    enum: ['PENDING_APPROVAL', 'ACTIVE', 'REJECTED', 'PENDING_DELETION'],
     default: 'ACTIVE',
   })
   status!: TreasuryMainWalletStatus;

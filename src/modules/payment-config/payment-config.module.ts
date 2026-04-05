@@ -6,6 +6,7 @@ import { PaymentConfigRepository } from './repositories/payment-config.repositor
 import { PaymentConfigService, PAYMENT_CONFIG_QUEUE } from './payment-config.service';
 import { PaymentConfigController } from './payment-config.controller';
 import { PaymentConfigProcessor } from './payment-config.processor';
+import { PaymentConfigGraceScheduler } from './payment-config-grace.scheduler';
 import { WalletEncryptionService } from '@/common/services';
 
 /**
@@ -22,7 +23,13 @@ import { WalletEncryptionService } from '@/common/services';
     }),
   ],
   controllers: [PaymentConfigController],
-  providers: [PaymentConfigRepository, PaymentConfigService, PaymentConfigProcessor, WalletEncryptionService],
+  providers: [
+    PaymentConfigRepository,
+    PaymentConfigService,
+    PaymentConfigProcessor,
+    PaymentConfigGraceScheduler,
+    WalletEncryptionService,
+  ],
   exports: [PaymentConfigService],
 })
 export class PaymentConfigModule {}

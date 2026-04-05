@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { DataSource, Not } from 'typeorm';
+import { DataSource, In, Not } from 'typeorm';
 import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
 import { Keypair } from '@solana/web3.js';
@@ -33,6 +33,8 @@ export interface MainWalletDto {
   label: string | null;
   balance: string;
   symbol: string;
+  /** TRON: USDT (TRC-20) human balance; null when not applicable or unknown */
+  usdtTrc20Balance: string | null;
   isDefault: boolean;
   status: TreasuryMainWalletStatus;
   createdBy: string | null;
@@ -71,7 +73,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
   async listByChain(chain: SupportedTreasuryChain): Promise<MainWalletDto[]> {
     const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallets = await repo.find({
-      where: { chain },
+      where: { chain, status: In(['ACTIVE', 'PENDING_DELETION']) },
       order: { is_default: 'DESC', created_at: 'ASC' },
     });
 
@@ -85,7 +87,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
   async listPendingApproval(): Promise<MainWalletDto[]> {
     const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallets = await repo.find({
-      where: { status: 'PENDING_APPROVAL' },
+      where: { status: In(['PENDING_APPROVAL', 'PENDING_DELETION']) },
       order: { created_at: 'ASC' },
     });
     return Promise.all(wallets.map((w) => this.toDto(w)));
@@ -347,11 +349,94 @@ export class TreasuryMainWalletService implements OnModuleInit {
   }
 
   /**
-   * Delete a main wallet. Cannot delete the active default if others exist for the same chain.
+   * Finance/Admin requests deletion — wallet becomes PENDING_DELETION until Risk approves.
+   * Same default rule as hard delete: cannot request removal of default while other ACTIVE wallets exist.
    */
-  async removeMainWallet(mainWalletId: string, actorUserId: string): Promise<void> {
+  async requestMainWalletDeletion(mainWalletId: string, actorUserId: string): Promise<MainWalletDto> {
     const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallet = await this.getById(mainWalletId);
+
+    if (wallet.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        `Only ACTIVE wallets can be marked for deletion (current: ${wallet.status})`,
+        'TREASURY_MAIN_WALLET_NOT_ACTIVE',
+      );
+    }
+
+    if (wallet.is_default) {
+      const othersCount = await repo.count({
+        where: { chain: wallet.chain, main_wallet_id: Not(mainWalletId), status: 'ACTIVE' },
+      });
+      if (othersCount > 0) {
+        throw new ForbiddenException(
+          'Cannot remove the current default main wallet while other active wallets exist for this chain. Set another as default first.',
+        );
+      }
+    }
+
+    wallet.status = 'PENDING_DELETION';
+    const updated = await repo.save(wallet);
+
+    this.logger.log(`Main wallet PENDING_DELETION: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
+    await this.publishEvent('main_wallet.deletion_pending', {
+      mainWalletId,
+      chain: wallet.chain,
+      address: wallet.address,
+      requestedBy: actorUserId,
+    });
+
+    return this.toDto(updated);
+  }
+
+  /**
+   * Risk Officer: approve pending deletion — row removed from DB.
+   */
+  async approveMainWalletDeletion(mainWalletId: string, approverUserId: string): Promise<void> {
+    const wallet = await this.getById(mainWalletId);
+    if (wallet.status !== 'PENDING_DELETION') {
+      throw new BadRequestException(
+        `Wallet ${mainWalletId} is not pending deletion (current: ${wallet.status})`,
+        'TREASURY_MAIN_WALLET_NOT_PENDING_DELETION',
+      );
+    }
+    await this.executeHardDeleteMainWallet(mainWalletId, approverUserId, wallet);
+  }
+
+  /**
+   * Risk Officer: reject deletion request — wallet back to ACTIVE.
+   */
+  async rejectMainWalletDeletion(mainWalletId: string, rejectorUserId: string): Promise<MainWalletDto> {
+    const repo = this.dataSource.getRepository(TreasuryMainWallet);
+    const wallet = await this.getById(mainWalletId);
+    if (wallet.status !== 'PENDING_DELETION') {
+      throw new BadRequestException(
+        `Wallet ${mainWalletId} is not pending deletion (current: ${wallet.status})`,
+        'TREASURY_MAIN_WALLET_NOT_PENDING_DELETION',
+      );
+    }
+
+    wallet.status = 'ACTIVE';
+    const updated = await repo.save(wallet);
+
+    this.logger.log(`Main wallet deletion REJECTED (restored ACTIVE): ${mainWalletId} by ${rejectorUserId}`);
+    await this.publishEvent('main_wallet.deletion_rejected', {
+      mainWalletId,
+      chain: wallet.chain,
+      rejectedBy: rejectorUserId,
+    });
+
+    return this.toDto(updated);
+  }
+
+  /**
+   * Permanently delete a main wallet row (after Risk approval). Validates default rule.
+   */
+  private async executeHardDeleteMainWallet(
+    mainWalletId: string,
+    actorUserId: string,
+    wallet: TreasuryMainWallet,
+  ): Promise<void> {
+    const repo = this.dataSource.getRepository(TreasuryMainWallet);
 
     if (wallet.is_default) {
       const othersCount = await repo.count({
@@ -416,10 +501,12 @@ export class TreasuryMainWalletService implements OnModuleInit {
   private async toDto(w: TreasuryMainWallet): Promise<MainWalletDto> {
     let balance = '0';
     let symbol = '';
+    let usdtTrc20Balance: string | null = null;
     try {
       const result = await this.transactionWalletService.getBalanceCached(w.chain as any, w.address);
       balance = result.balance;
       symbol = result.symbol;
+      usdtTrc20Balance = result.usdtTrc20Balance ?? null;
     } catch {
       // Balance fetch is best-effort — Solana devnet may be unavailable
     }
@@ -430,6 +517,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       label: w.label,
       balance,
       symbol,
+      usdtTrc20Balance,
       isDefault: w.is_default,
       status: w.status,
       createdBy: w.created_by,
@@ -453,10 +541,12 @@ export class TreasuryMainWalletService implements OnModuleInit {
       const address = this.deriveAddress(chain, config.hotWalletPrivateKey);
       let balance = '0';
       let symbol = '';
+      let usdtTrc20Balance: string | null = null;
       try {
         const r = await this.transactionWalletService.getBalanceCached(chain as any, address);
         balance = r.balance;
         symbol = r.symbol;
+        usdtTrc20Balance = r.usdtTrc20Balance ?? null;
       } catch { /* best-effort */ }
       return [{
         mainWalletId: 'payment-config-default',
@@ -465,6 +555,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
         label: null,
         balance,
         symbol,
+        usdtTrc20Balance,
         isDefault: true,
         status: 'ACTIVE',
         createdBy: null,

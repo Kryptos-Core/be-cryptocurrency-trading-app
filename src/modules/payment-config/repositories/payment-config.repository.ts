@@ -58,6 +58,35 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
     return result as PaymentMethodConfig;
   }
 
+  /**
+   * Configs stuck in TRANSITIONING after grace elapsed (Bull missed/delayed job).
+   * Uses DB clock so it matches transition_started_at semantics.
+   */
+  async findTransitioningPastGrace(): Promise<
+    Array<{
+      config_id: string;
+      type: PaymentMethodType;
+      network: string;
+      updated_by: string;
+    }>
+  > {
+    const rows = await this.dataSource.query<
+      Array<{
+        config_id: string;
+        type: PaymentMethodType;
+        network: string;
+        updated_by: string;
+      }>
+    >(
+      `SELECT config_id, type, network, updated_by
+       FROM payment_method_configs
+       WHERE status = 'TRANSITIONING'
+         AND transition_started_at IS NOT NULL
+         AND TIMESTAMPDIFF(MINUTE, transition_started_at, NOW()) >= grace_period_minutes`,
+    );
+    return rows ?? [];
+  }
+
   /** Count PENDING onchain transactions and fiat deposits that may be affected by a config switch */
   async countPendingTransactions(): Promise<number> {
     const [onchainRow] = await this.dataSource.query<[{ cnt: string }]>(

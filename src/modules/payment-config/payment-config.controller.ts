@@ -37,6 +37,12 @@ export class PaymentConfigController {
     return this.service.listConfigs();
   }
 
+  /** Single config for edit UI — includes decrypted `config` object (secrets). */
+  @Get(':id')
+  async getOne(@Param('id') configId: string) {
+    return this.service.getConfigByIdForEdit(configId);
+  }
+
   /** Create a new payment method config (starts as INACTIVE) */
   @Post()
   async create(

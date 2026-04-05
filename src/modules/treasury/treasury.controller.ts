@@ -97,6 +97,22 @@ export class TreasuryController {
     return this.treasuryOperationsService.enqueueFund(walletId, dto, actorUserId);
   }
 
+  @Delete('wallets/:walletId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+  @ApiOperation({
+    summary:
+      'Delete a transaction wallet (near-zero balance, no in-flight Fund/Sweep, not user deposit default)',
+  })
+  async deleteTransactionWallet(
+    @Param('walletId') walletId: string,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    await this.transactionWalletService.deleteWallet(walletId, actorUserId);
+    return { ok: true };
+  }
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Main Wallets (ví chính) — CRUD + Approval Workflow
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -245,20 +261,54 @@ export class TreasuryController {
   }
 
   /**
-   * DELETE /treasury/main-wallets/:id
-   * Delete a main wallet (cannot delete active default if others exist).
+   * PATCH /treasury/main-wallets/:id/request-deletion
+   * Finance/Admin marks wallet for deletion — Risk must approve before the row is removed.
    */
-  @Delete('main-wallets/:mainWalletId')
+  @Patch('main-wallets/:mainWalletId/request-deletion')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
-  @ApiOperation({ summary: 'Delete a main wallet (ADMIN only, cannot delete active default with other alternatives)' })
-  async deleteMainWallet(
+  @ApiOperation({
+    summary: 'Request main wallet deletion (awaiting Risk Officer approval)',
+  })
+  async requestMainWalletDeletion(
     @Param('mainWalletId') mainWalletId: string,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    await this.treasuryMainWalletService.removeMainWallet(mainWalletId, actorUserId);
+    return this.treasuryMainWalletService.requestMainWalletDeletion(mainWalletId, actorUserId);
+  }
+
+  /**
+   * PATCH /treasury/main-wallets/:id/approve-deletion
+   * Risk Officer confirms deletion — wallet row is removed.
+   */
+  @Patch('main-wallets/:mainWalletId/approve-deletion')
+  @UseGuards(RoleGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @ApiOperation({ summary: 'Risk Officer: approve pending main wallet deletion' })
+  async approveMainWalletDeletion(
+    @Param('mainWalletId') mainWalletId: string,
+    @Body() _dto: ReviewMainWalletDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    await this.treasuryMainWalletService.approveMainWalletDeletion(mainWalletId, actorUserId);
     return { success: true };
+  }
+
+  /**
+   * PATCH /treasury/main-wallets/:id/reject-deletion
+   * Risk Officer rejects deletion — wallet returns to ACTIVE.
+   */
+  @Patch('main-wallets/:mainWalletId/reject-deletion')
+  @UseGuards(RoleGuard)
+  @RequireRoles(UserRole.RISK_OFFICER)
+  @ApiOperation({ summary: 'Risk Officer: reject pending main wallet deletion' })
+  async rejectMainWalletDeletion(
+    @Param('mainWalletId') mainWalletId: string,
+    @Body() _dto: ReviewMainWalletDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    return this.treasuryMainWalletService.rejectMainWalletDeletion(mainWalletId, actorUserId);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

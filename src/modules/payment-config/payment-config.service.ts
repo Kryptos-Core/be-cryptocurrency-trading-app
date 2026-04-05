@@ -105,6 +105,51 @@ export class PaymentConfigService {
     return this.repo.findAll();
   }
 
+  /**
+   * Admin UI: full row + decrypted credentials for edit form.
+   * Same RBAC as list/update — never log [config] contents.
+   */
+  async getConfigByIdForEdit(configId: string): Promise<{
+    config_id: string;
+    type: PaymentMethodType;
+    network: string;
+    display_name: string;
+    config_version: number;
+    status: string;
+    grace_period_minutes: number;
+    transition_started_at: string | null;
+    activated_at: string | null;
+    sort_order: number;
+    created_by: string;
+    updated_by: string;
+    created_at: string;
+    updated_at: string;
+    config: PaymentGatewayConfig;
+  }> {
+    const existing = await this.repo.findById(configId);
+    if (!existing) {
+      throw new NotFoundException('PaymentMethodConfig', configId);
+    }
+    const config = this.decrypt(existing.encrypted_config);
+    return {
+      config_id: existing.config_id,
+      type: existing.type,
+      network: existing.network,
+      display_name: existing.display_name,
+      config_version: existing.config_version,
+      status: existing.status,
+      grace_period_minutes: existing.grace_period_minutes,
+      transition_started_at: existing.transition_started_at?.toISOString() ?? null,
+      activated_at: existing.activated_at?.toISOString() ?? null,
+      sort_order: existing.sort_order,
+      created_by: existing.created_by,
+      updated_by: existing.updated_by,
+      created_at: existing.created_at.toISOString(),
+      updated_at: existing.updated_at.toISOString(),
+      config,
+    };
+  }
+
   // ── Public Write ─────────────────────────────────────────────────────────
 
   async createConfig(dto: CreatePaymentConfigDto, userId: string): Promise<PaymentMethodConfig> {
@@ -246,6 +291,26 @@ export class PaymentConfigService {
     });
 
     this.logger.log(`PaymentConfig ${configId} (${type}/${network}) is now ACTIVE`);
+  }
+
+  /**
+   * Safety net when Redis/Bull is down or the delayed job failed after retries.
+   * Idempotent with Bull: completeActivation is safe if already ACTIVE.
+   */
+  async flushStaleTransitioningActivations(): Promise<void> {
+    const stale = await this.repo.findTransitioningPastGrace();
+    for (const row of stale) {
+      try {
+        this.logger.log(
+          `Cron flush: completing TRANSITIONING → ACTIVE for ${row.config_id} (${row.type}/${row.network})`,
+        );
+        await this.completeActivation(row.config_id, row.type, row.network, row.updated_by);
+      } catch (e) {
+        this.logger.error(
+          `Cron flush failed for ${row.config_id}: ${(e as Error).message}`,
+        );
+      }
+    }
   }
 
   // ── Cache helpers ────────────────────────────────────────────────────────

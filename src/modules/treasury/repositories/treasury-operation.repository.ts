@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, QueryDeepPartialEntity } from 'typeorm';
+import { DataSource, In, QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
@@ -55,6 +55,17 @@ export class TreasuryOperationRepository {
   async findByOperationId(operationId: string): Promise<TreasuryOperation | null> {
     return this.dataSource.getRepository(TreasuryOperation).findOne({
       where: { operation_id: operationId },
+    });
+  }
+
+  /** Count Fund/Sweep rows still in-flight for this transaction wallet (either side). */
+  async countNonTerminalForWallet(walletId: string): Promise<number> {
+    const active = ['PENDING', 'PROCESSING'] as const;
+    return this.dataSource.getRepository(TreasuryOperation).count({
+      where: [
+        { from_wallet_id: walletId, status: In([...active]) },
+        { to_wallet_id: walletId, status: In([...active]) },
+      ],
     });
   }
 
