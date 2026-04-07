@@ -114,6 +114,11 @@ export class OrderBookService {
     this.loadedPairs.add(this.normalizePairId(pairId));
   }
 
+  getOrders(pairId: string, side: 'BUY' | 'SELL'): OrderBookOrder[] {
+    const book = this.getBook(pairId);
+    return side === 'BUY' ? book.buy.getAll() : book.sell.getAll();
+  }
+
   size(pairId: string, side?: 'BUY' | 'SELL'): number {
     const book = this.getBook(pairId);
     if (side === 'BUY') return book.buy.size();

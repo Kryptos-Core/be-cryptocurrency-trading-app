@@ -82,8 +82,9 @@ export class MatchingService implements OnModuleInit {
     feeCurrencyId: string;
     makerFeeRate: string;
     takerFeeRate: string;
+    slippageTolerance?: string;
   }): Promise<TradeExecutionResult[]> {
-    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate } = params;
+    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } = params;
 
     // Validate fee rates early to avoid silent errors in BigInt arithmetic.
     try {
@@ -128,6 +129,14 @@ export class MatchingService implements OnModuleInit {
           this.logger.log(
             `FOK order ${takerOrder.order_id} cannot be fully filled now; skip execution`,
           );
+          // Cancel the order in DB so it does not remain as OPEN indefinitely.
+          try {
+            await this.matchingRepository.cancelIocRemainder(takerOrder.order_id, takerOrder.user_id);
+          } catch (e) {
+            this.logger.warn(
+              `FOK cancel failed for order ${takerOrder.order_id}: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
           return [];
         }
       }
@@ -138,6 +147,7 @@ export class MatchingService implements OnModuleInit {
         feeCurrencyId,
         makerFeeRate,
         takerFeeRate,
+        ...(slippageTolerance !== undefined && { slippageTolerance }),
       };
 
       const executeTrade: TradeExecutor = async (makerOrder, fillAmount, price) => {
@@ -213,6 +223,17 @@ export class MatchingService implements OnModuleInit {
         });
       }
 
+      // IOC: cancel any unfilled remainder in the DB.
+      if (tif === 'IOC' && takerRemainingBu > 0n) {
+        try {
+          await this.matchingRepository.cancelIocRemainder(takerOrder.order_id, takerOrder.user_id);
+        } catch (e) {
+          this.logger.warn(
+            `IOC remainder cancel failed for order ${takerOrder.order_id}: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
+
       return results;
     } finally {
       const released = await client.eval(RELEASE_LOCK_LUA, 1, lockKey, lockValue);
@@ -230,10 +251,7 @@ export class MatchingService implements OnModuleInit {
   }): Promise<boolean> {
     const { pairId, takerOrder } = params;
     const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
-    const makers = await this.matchingRepository.getOpenOrdersForPair(
-      pairId,
-      oppositeSide,
-    );
+    const makers = this.orderBookService.getOrders(pairId, oppositeSide);
 
     const takerPriceBu = takerOrder.price ? toBaseUnits(takerOrder.price, DEFAULT_SCALE) : null;
     let remainingBu = toBaseUnits(takerOrder.remaining, DEFAULT_SCALE);
@@ -349,6 +367,8 @@ export class MatchingService implements OnModuleInit {
           feeCurrencyId,
           makerFeeRate,
           takerFeeRate,
+          // slippageTolerance intentionally omitted: reconcile is admin-initiated and
+          // processes existing orders that had their slippage window at submission time.
         });
         if (results.length > 0) {
           tradesExecuted += results.length;

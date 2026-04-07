@@ -53,6 +53,7 @@ describe('MatchingService', () => {
               error_code: null,
               error_message: null,
             }),
+            cancelIocRemainder: jest.fn().mockResolvedValue(undefined),
           },
         },
         PriceTimePriorityStrategy,
@@ -144,6 +145,8 @@ describe('MatchingService', () => {
 
     expect(results).toEqual([]);
     expect(matchingRepository.executeTrade).not.toHaveBeenCalled();
+    // FOK order must be cancelled in DB
+    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith('tk-fok', 'user-1');
   });
 
   it('does not duplicate taker snapshot when same order already loaded in book', async () => {
@@ -337,5 +340,173 @@ describe('MatchingService', () => {
     });
 
     expect(circuitBreaker.recordPriceAndCheck).not.toHaveBeenCalled();
+  });
+
+  // IOC order handling tests
+  it('IOC order with partial fill: cancels remainder in DB, does not add remainder to book', async () => {
+    const maker = order({
+      order_id: 'm-ioc-partial',
+      side: 'SELL',
+      user_id: 'user-2',
+      price: '100',
+      amount: '0.5',
+      remaining: '0.5',
+    });
+
+    matchingRepository.getOpenOrdersForPair.mockImplementation(
+      async (_pairId: string, side: 'BUY' | 'SELL') => {
+        if (side === 'SELL') return [maker];
+        return [];
+      },
+    );
+    orderBookService.markLoaded('pair-1');
+    orderBookService.addOrder(maker);
+
+    const results = await service.runMatch({
+      takerOrder: order({
+        order_id: 'tk-ioc-partial',
+        side: 'BUY',
+        user_id: 'user-1',
+        type: 'LIMIT',
+        price: '100',
+        amount: '1',
+        remaining: '1',
+        time_in_force: 'IOC',
+      }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(results).toHaveLength(1);
+    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith(
+      'tk-ioc-partial',
+      'user-1',
+    );
+    // Remainder must NOT be in the book
+    expect(orderBookService.size('pair-1', 'BUY')).toBe(0);
+  });
+
+  it('IOC order with no fills: cancels order in DB immediately', async () => {
+    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
+
+    await service.runMatch({
+      takerOrder: order({
+        order_id: 'tk-ioc-no-fill',
+        side: 'BUY',
+        user_id: 'user-1',
+        type: 'LIMIT',
+        price: '50',   // price too low, no matching sellers
+        amount: '1',
+        remaining: '1',
+        time_in_force: 'IOC',
+      }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith(
+      'tk-ioc-no-fill',
+      'user-1',
+    );
+  });
+
+  it('IOC order fully filled: does not call cancelIocRemainder', async () => {
+    const maker = order({
+      order_id: 'm-ioc-full',
+      side: 'SELL',
+      user_id: 'user-2',
+      price: '100',
+      amount: '1',
+      remaining: '1',
+    });
+
+    matchingRepository.getOpenOrdersForPair.mockImplementation(
+      async (_pairId: string, side: 'BUY' | 'SELL') => {
+        if (side === 'SELL') return [maker];
+        return [];
+      },
+    );
+    orderBookService.markLoaded('pair-1');
+    orderBookService.addOrder(maker);
+
+    const results = await service.runMatch({
+      takerOrder: order({
+        order_id: 'tk-ioc-full',
+        side: 'BUY',
+        user_id: 'user-1',
+        type: 'LIMIT',
+        price: '100',
+        amount: '1',
+        remaining: '1',
+        time_in_force: 'IOC',
+      }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(results).toHaveLength(1);
+    expect(matchingRepository.cancelIocRemainder).not.toHaveBeenCalled();
+  });
+
+  // Slippage tolerance wiring test
+  it('passes slippageTolerance from params to MatchingContext — strategy halts on second maker exceeding tolerance', async () => {
+    // Two sell makers: first at 100, second at 110 (10% higher than first fill reference).
+    // With slippageTolerance='0.05' (5%), the second maker exceeds the threshold → stop after 1 fill.
+    const maker1 = order({
+      order_id: 'm-slip-1',
+      side: 'SELL',
+      user_id: 'user-2',
+      price: '100',
+      amount: '0.5',
+      remaining: '0.5',
+      type: 'LIMIT',
+    });
+    const maker2 = order({
+      order_id: 'm-slip-2',
+      side: 'SELL',
+      user_id: 'user-3',
+      price: '110',       // 10% above first fill price (reference = 100)
+      amount: '0.5',
+      remaining: '0.5',
+      type: 'LIMIT',
+    });
+
+    matchingRepository.getOpenOrdersForPair.mockImplementation(
+      async (_pairId: string, side: 'BUY' | 'SELL') => {
+        if (side === 'SELL') return [maker1, maker2];
+        return [];
+      },
+    );
+    orderBookService.markLoaded('pair-1');
+    orderBookService.addOrder(maker1);
+    orderBookService.addOrder(maker2);
+
+    // Market BUY of 1 unit, but slippage tolerance is 5% — second maker at 110 exceeds 100 * 1.05 = 105
+    const results = await service.runMatch({
+      takerOrder: order({
+        order_id: 'tk-slippage',
+        side: 'BUY',
+        user_id: 'user-1',
+        type: 'MARKET',
+        price: null,
+        amount: '1',
+        remaining: '1',
+      }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+      slippageTolerance: '0.05',
+    });
+
+    // Only the first fill executes; second maker is rejected by slippage protection
+    expect(results).toHaveLength(1);
+    expect(results[0].maker_order_id).toBe('m-slip-1');
   });
 });

@@ -72,4 +72,17 @@ export class CreateOrderDto {
   @IsNotEmpty()
   @MaxLength(64)
   idempotencyKey!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Max allowed slippage for MARKET orders as a decimal fraction (e.g. "0.01" = 1%). ' +
+      'Ignored for LIMIT orders. When absent, no slippage protection is applied.',
+    example: '0.01',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^0(\.\d{1,18})?$/, {
+    message: 'slippageTolerance must be a decimal fraction between 0 and 1 (e.g. "0.01")',
+  })
+  slippageTolerance?: string;
 }

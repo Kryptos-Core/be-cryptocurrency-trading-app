@@ -137,6 +137,9 @@ export class OrdersService {
             feeCurrencyId: pair.quote_currency_id,
             makerFeeRate: pair.maker_fee_rate ?? '0.001',
             takerFeeRate: pair.taker_fee_rate ?? '0.001',
+            ...(order.type === 'MARKET' && command.dto.slippageTolerance !== undefined
+              ? { slippageTolerance: command.dto.slippageTolerance }
+              : {}),
           });
         } catch (e) {
           this.logger.warn(

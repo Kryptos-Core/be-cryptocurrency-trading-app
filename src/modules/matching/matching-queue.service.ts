@@ -12,6 +12,8 @@ export interface MatchOrderJobData {
   feeCurrencyId: string;
   makerFeeRate: string;
   takerFeeRate: string;
+  /** Max price slippage allowed for MARKET orders (e.g. '0.01' = 1%). Absent means no protection. */
+  slippageTolerance?: string;
 }
 
 /**

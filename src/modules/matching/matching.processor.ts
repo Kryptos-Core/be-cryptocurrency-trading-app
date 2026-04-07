@@ -17,12 +17,12 @@ export class MatchingProcessor {
 
   @Process(MATCH_ORDER_JOB)
   async handleMatch(job: Job<MatchOrderJobData>): Promise<void> {
-    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate } = job.data;
+    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } = job.data;
     this.logger.debug(
       `Processing match job ${job.id} — order=${takerOrder.order_id} pair=${pairId}`,
     );
     try {
-      await this.matchingService.runMatch({ takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate });
+      await this.matchingService.runMatch({ takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance });
     } catch (error) {
       this.logger.error(
         `Match job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,

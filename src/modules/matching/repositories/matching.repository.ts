@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { OrderBookOrder } from '../interfaces';
 
@@ -14,6 +14,8 @@ export interface TradeExecuteResult {
  */
 @Injectable()
 export class MatchingRepository {
+  private readonly logger = new Logger(MatchingRepository.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
   async getOpenOrdersForPair(
@@ -59,6 +61,21 @@ export class MatchingRepository {
       error_code: out?.error_code ?? null,
       error_message: out?.error_message ?? null,
     };
+  }
+
+  async cancelIocRemainder(orderId: string, userId: string): Promise<void> {
+    await this.dataSource.query(
+      'CALL sp_order_cancel(?, ?, @p_cancelled, @p_error_code, @p_error_message)',
+      [orderId, userId],
+    );
+    const [out] = await this.dataSource.query(
+      'SELECT @p_cancelled AS cancelled, @p_error_code AS error_code, @p_error_message AS error_message',
+    );
+    if (!out?.cancelled) {
+      this.logger.warn(
+        `cancelIocRemainder noop for ${orderId}: ${out?.error_code ?? 'UNKNOWN'} — ${out?.error_message ?? ''}`,
+      );
+    }
   }
 
   private mapRowToOrderBookOrder(r: any): OrderBookOrder {

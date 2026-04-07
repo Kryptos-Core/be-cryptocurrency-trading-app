@@ -62,7 +62,25 @@ describe('MatchingProcessor', () => {
       feeCurrencyId: data.feeCurrencyId,
       makerFeeRate: data.makerFeeRate,
       takerFeeRate: data.takerFeeRate,
+      slippageTolerance: undefined,
     });
+  });
+
+  it('forwards slippageTolerance from job data to runMatch', async () => {
+    const data: MatchOrderJobData = {
+      takerOrder: makeOrder({ order_id: 'tk-slip', type: 'MARKET' }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.002',
+      slippageTolerance: '0.02',
+    };
+
+    await processor.handleMatch(makeJob(data));
+
+    expect(matchingService.runMatch).toHaveBeenCalledWith(
+      expect.objectContaining({ slippageTolerance: '0.02' }),
+    );
   });
 
   it('rethrows MatchingService errors so Bull can retry', async () => {

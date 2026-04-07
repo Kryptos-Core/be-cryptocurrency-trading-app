@@ -9,6 +9,28 @@ function nowTag(): string {
   return Date.now().toString().slice(-8);
 }
 
+/** Poll until the order status is no longer OPEN (queue job processed), or timeout. */
+async function waitForOrderProcessed(
+  dataSource: DataSource,
+  orderId: string,
+  timeoutMs = 10000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const [row] = await dataSource.query(
+      'SELECT status FROM orders WHERE order_id = ? LIMIT 1',
+      [orderId],
+    );
+    if (!row) {
+      await new Promise((r) => setTimeout(r, 100));
+      continue;
+    }
+    if (row.status !== 'OPEN') return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`waitForOrderProcessed timed out for order ${orderId}`);
+}
+
 describe('Matching IOC/FOK Integration', () => {
   let dataSource: DataSource;
   let ordersService: OrdersService;
@@ -146,6 +168,10 @@ describe('Matching IOC/FOK Integration', () => {
         }),
       );
       createdOrderIds.push(iocOrder.order_id);
+
+      // Wait for the async Bull queue jobs to process both orders before asserting DB state.
+      await waitForOrderProcessed(dataSource, fokOrder.order_id);
+      await waitForOrderProcessed(dataSource, iocOrder.order_id);
 
       const [fokRow] = await dataSource.query(
         `SELECT status, amount, filled_amount
