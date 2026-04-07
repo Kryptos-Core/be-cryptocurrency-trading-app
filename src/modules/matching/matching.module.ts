@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { MatchingService } from './matching.service';
 import { OrderBookService } from './orderbook';
 import { BuyQueueService } from './orderbook/buy-queue.service';
@@ -7,6 +8,9 @@ import { MatchingRepository } from './repositories';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
+import { TradeAuditLogRepository } from './visitors/trade-audit-log.repository';
+import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
+import { CircuitBreakerService } from './circuit-breaker.service';
 
 /**
  * Matching Module
@@ -14,6 +18,7 @@ import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
  * Visitor Pattern: AuditTradeVisitor and MetricsTradeVisitor registered as trade observers.
  */
 @Module({
+  imports: [TypeOrmModule.forFeature([TradeAuditLog])],
   providers: [
     BuyQueueService,
     SellQueueService,
@@ -21,10 +26,12 @@ import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
     MatchingRepository,
     PriceTimePriorityStrategy,
     MarketOrderStrategy,
+    TradeAuditLogRepository,
     AuditTradeVisitor,
     MetricsTradeVisitor,
+    CircuitBreakerService,
     MatchingService,
   ],
-  exports: [MatchingService, MetricsTradeVisitor],
+  exports: [MatchingService, MetricsTradeVisitor, CircuitBreakerService],
 })
 export class MatchingModule {}

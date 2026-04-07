@@ -8,6 +8,7 @@ import { RedisService } from '@/common/services';
 import { OrderBookOrder } from './interfaces';
 import { AuditTradeVisitor } from './visitors/audit-trade.visitor';
 import { MetricsTradeVisitor } from './visitors/metrics-trade.visitor';
+import { CircuitBreakerService } from './circuit-breaker.service';
 
 function order(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {
@@ -30,6 +31,7 @@ describe('MatchingService', () => {
   let service: MatchingService;
   let orderBookService: OrderBookService;
   let matchingRepository: jest.Mocked<MatchingRepository>;
+  let circuitBreaker: jest.Mocked<CircuitBreakerService>;
   let redisClient: { set: jest.Mock; eval: jest.Mock };
 
   beforeEach(async () => {
@@ -61,12 +63,14 @@ describe('MatchingService', () => {
         },
         { provide: AuditTradeVisitor, useValue: { visit: jest.fn() } },
         { provide: MetricsTradeVisitor, useValue: { visit: jest.fn() } },
+        { provide: CircuitBreakerService, useValue: { isHalted: jest.fn().mockResolvedValue(false) } },
       ],
     }).compile();
 
     service = module.get(MatchingService);
     orderBookService = module.get(OrderBookService);
     matchingRepository = module.get(MatchingRepository);
+    circuitBreaker = module.get(CircuitBreakerService);
   });
 
   it('returns [] when lock is not acquired after retries', async () => {
@@ -81,6 +85,22 @@ describe('MatchingService', () => {
     });
 
     expect(results).toEqual([]);
+    expect(matchingRepository.getOpenOrdersForPair).not.toHaveBeenCalled();
+  });
+
+  it('returns [] immediately when circuit breaker is halted', async () => {
+    circuitBreaker.isHalted.mockResolvedValueOnce(true);
+
+    const results = await service.runMatch({
+      takerOrder: order({ order_id: 'tk-halted' }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(results).toEqual([]);
+    // Should not acquire Redis lock or query DB when halted.
     expect(matchingRepository.getOpenOrdersForPair).not.toHaveBeenCalled();
   });
 
@@ -237,8 +257,7 @@ describe('MatchingService', () => {
     expect(matchingRepository.executeTrade).not.toHaveBeenCalled();
   });
 
-  it('reloads order book from DB on every match (buy + sell queries)', async () => {
-    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
+  it('only seeds order book from DB on first match for a pair; subsequent matches use in-memory book', async () => {    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
 
     await service.runMatch({
       takerOrder: order({ order_id: 'tk1' }),
@@ -255,6 +274,7 @@ describe('MatchingService', () => {
       takerFeeRate: '0.001',
     });
 
-    expect(matchingRepository.getOpenOrdersForPair).toHaveBeenCalledTimes(4);
+    // Only 2 DB calls on the first match (BUY + SELL); second match uses in-memory book.
+    expect(matchingRepository.getOpenOrdersForPair).toHaveBeenCalledTimes(2);
   });
 });

@@ -26,10 +26,17 @@ export class MarketOrderStrategy implements IMatchingStrategy {
     },
     executeTrade: TradeExecutor,
   ): Promise<TradeExecutionResult[]> {
-    const { pairId, takerOrder } = context;
+    const { pairId, takerOrder, slippageTolerance } = context;
     const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
     let takerRemaining = new Decimal(takerOrder.remaining);
     const results: TradeExecutionResult[] = [];
+
+    const tolerance =
+      slippageTolerance && new Decimal(slippageTolerance).gt(0)
+        ? new Decimal(slippageTolerance)
+        : null;
+    /** Reference price is anchored to the first fill to compute the protection threshold. */
+    let referencePrice: Decimal | null = null;
 
     while (takerRemaining.gt(0)) {
       const maker = orderBook.peekBestMaker(pairId, oppositeSide);
@@ -51,6 +58,28 @@ export class MarketOrderStrategy implements IMatchingStrategy {
         continue;
       }
 
+      const makerPrice = new Decimal(maker.price ?? '0');
+
+      // Price protection: reject fill if slippage exceeds tolerance.
+      if (tolerance !== null && maker.price != null) {
+        const ref = referencePrice ?? makerPrice;
+        const exceeded =
+          takerOrder.side === 'BUY'
+            ? makerPrice.gt(ref.mul(new Decimal(1).plus(tolerance)))
+            : makerPrice.lt(ref.mul(new Decimal(1).minus(tolerance)));
+
+        if (exceeded) {
+          const popped = orderBook.popBestMaker(pairId, oppositeSide);
+          if (popped) {
+            orderBook.addOrder(popped);
+          }
+          this.logger.warn(
+            `Price protection: market order ${takerOrder.order_id} stopped at maker ${maker.order_id} price=${maker.price} ref=${ref.toFixed()} tolerance=${tolerance.toFixed()}`,
+          );
+          break;
+        }
+      }
+
       const fillAmount = Decimal.min(takerRemaining, makerRemaining);
       const fillAmountStr = fillAmount.toFixed();
       const priceStr = maker.price ?? '0';
@@ -63,6 +92,11 @@ export class MarketOrderStrategy implements IMatchingStrategy {
         // Execution rejected by DB (e.g. stale in-memory snapshot). Restore maker and stop this run.
         orderBook.addOrder(popped);
         break;
+      }
+
+      // Anchor reference price on first fill.
+      if (referencePrice === null) {
+        referencePrice = makerPrice;
       }
 
       results.push(tradeResult);

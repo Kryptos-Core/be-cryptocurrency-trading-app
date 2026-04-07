@@ -53,6 +53,14 @@ export interface MatchingContext {
   feeCurrencyId: string;
   makerFeeRate: string;
   takerFeeRate: string;
+  /**
+   * Market order price protection: maximum allowed slippage as a decimal fraction (e.g. '0.01' = 1%).
+   * BUY: reject fill if maker price > referencPrice * (1 + tolerance).
+   * SELL: reject fill if maker price < referencePrice * (1 - tolerance).
+   * Reference price is the first fill price in the match run.
+   * When absent or zero, no protection is applied (backward-compatible).
+   */
+  slippageTolerance?: string;
 }
 
 /**

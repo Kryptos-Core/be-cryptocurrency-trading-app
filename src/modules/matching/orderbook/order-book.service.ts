@@ -14,6 +14,12 @@ export class OrderBookService {
     { buy: BuyQueueService; sell: SellQueueService }
   >();
 
+  /**
+   * Tracks which pairs have been seeded from DB at least once.
+   * Used by MatchingService to decide whether to do a full DB load or skip (incremental).
+   */
+  private readonly loadedPairs = new Set<string>();
+
   /** MySQL CHAR(n) pads with spaces; callers may pass an untrimmed API id — one canonical key per pair. */
   private normalizePairId(pairId: string): string {
     return (pairId ?? '').trim();
@@ -74,7 +80,25 @@ export class OrderBookService {
       buy: new BuyQueueService(),
       sell: new SellQueueService(),
     });
+    // Reset loaded flag: full rebuild means the next incremental window starts fresh.
+    this.loadedPairs.delete(key);
     orders.forEach((o) => this.addOrder(o));
+  }
+
+  /**
+   * Returns true when this pair's book has been seeded from DB at least once.
+   * MatchingService uses this to skip the full-rebuild DB query on subsequent matches.
+   */
+  isLoaded(pairId: string): boolean {
+    return this.loadedPairs.has(this.normalizePairId(pairId));
+  }
+
+  /**
+   * Mark a pair's book as seeded (called by MatchingService after the initial DB load).
+   * Subsequent matches will use the in-memory book incrementally.
+   */
+  markLoaded(pairId: string): void {
+    this.loadedPairs.add(this.normalizePairId(pairId));
   }
 
   size(pairId: string, side?: 'BUY' | 'SELL'): number {

@@ -14,6 +14,7 @@ import {
 } from './interfaces';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 import { RedisService } from '@/common/services';
+import { CircuitBreakerService } from './circuit-breaker.service';
 
 const LOCK_PREFIX = 'matching:lock:';
 const LOCK_TTL_MS = 10000;
@@ -54,6 +55,7 @@ export class MatchingService implements OnModuleInit {
     private readonly redisService: RedisService,
     private readonly auditVisitor: AuditTradeVisitor,
     private readonly metricsVisitor: MetricsTradeVisitor,
+    private readonly circuitBreaker: CircuitBreakerService,
   ) {}
 
   onModuleInit(): void {
@@ -81,6 +83,12 @@ export class MatchingService implements OnModuleInit {
     const lockKey = `${LOCK_PREFIX}${pairId.trim()}`;
     const lockValue = randomBytes(16).toString('hex');
     const client = this.redisService.getClient();
+
+    // Circuit breaker: halt trading for this pair when extreme price move detected.
+    if (await this.circuitBreaker.isHalted(pairId)) {
+      this.logger.warn(`Matching halted by circuit breaker for pair ${pairId}`);
+      return [];
+    }
 
     let acquired: string | null = null;
     for (let attempt = 0; attempt < LOCK_RETRY_ATTEMPTS; attempt++) {
@@ -235,19 +243,28 @@ export class MatchingService implements OnModuleInit {
   }
 
   /**
-   * Rebuild in-memory book from DB every match (authoritative).
-   * Excludes the current taker so it only appears as context, not as a resting duplicate on its side.
+   * Seed order book from DB on first match for a pair; subsequent matches use the in-memory
+   * book incrementally (add/remove updates keep it consistent with DB state).
+   * Taker is excluded from the book so it only acts as context, not a resting duplicate.
    */
   private async refreshOrderBookFromDbExcludingTaker(
     pairId: string,
     takerOrderId: string,
   ): Promise<void> {
+    if (this.orderBookService.isLoaded(pairId)) {
+      // Incremental path: book is already seeded; just ensure the taker is not in it as a resting order.
+      this.orderBookService.removeOrder(pairId, takerOrderId, 'BUY');
+      this.orderBookService.removeOrder(pairId, takerOrderId, 'SELL');
+      return;
+    }
+
     const [buys, sells] = await Promise.all([
       this.matchingRepository.getOpenOrdersForPair(pairId, 'BUY'),
       this.matchingRepository.getOpenOrdersForPair(pairId, 'SELL'),
     ]);
     const merged = [...buys, ...sells].filter((o) => o.order_id !== takerOrderId);
     this.orderBookService.loadOrders(pairId, merged);
+    this.orderBookService.markLoaded(pairId);
   }
 
   /** Remove a cancelled/filled order from the in-memory book (keeps book aligned with DB). */

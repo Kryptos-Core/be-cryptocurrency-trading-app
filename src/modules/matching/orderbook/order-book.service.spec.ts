@@ -98,4 +98,29 @@ describe('OrderBookService', () => {
     expect(service.peekBestMaker('pair-1', 'SELL')?.order_id).toBe('new-s');
     expect(service.peekBestMaker('pair-1', 'BUY')?.order_id).toBe('new-b');
   });
+
+  describe('isLoaded / markLoaded (incremental book tracking)', () => {
+    it('returns false for a pair that has never been loaded', () => {
+      expect(service.isLoaded('pair-never')).toBe(false);
+    });
+
+    it('returns true after markLoaded is called', () => {
+      service.markLoaded('pair-1');
+      expect(service.isLoaded('pair-1')).toBe(true);
+    });
+
+    it('returns false again after loadOrders (full-rebuild resets the loaded flag)', () => {
+      service.markLoaded('pair-1');
+      expect(service.isLoaded('pair-1')).toBe(true);
+
+      service.loadOrders('pair-1', []);
+      // loadOrders wipes the book so loaded flag is reset — next match will re-seed from DB
+      expect(service.isLoaded('pair-1')).toBe(false);
+    });
+
+    it('normalizePairId: padded pair id resolves to same loaded state', () => {
+      service.markLoaded('pair-1');
+      expect(service.isLoaded('pair-1     ')).toBe(true);
+    });
+  });
 });
