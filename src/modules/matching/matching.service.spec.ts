@@ -30,12 +30,13 @@ describe('MatchingService', () => {
   let service: MatchingService;
   let orderBookService: OrderBookService;
   let matchingRepository: jest.Mocked<MatchingRepository>;
-  let redisClient: { set: jest.Mock };
-  let redisDel: jest.Mock;
+  let redisClient: { set: jest.Mock; eval: jest.Mock };
 
   beforeEach(async () => {
-    redisClient = { set: jest.fn().mockResolvedValue('OK') };
-    redisDel = jest.fn().mockResolvedValue(undefined);
+    redisClient = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1), // Lua returns 1 = key deleted (value matched)
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,7 +57,7 @@ describe('MatchingService', () => {
         MarketOrderStrategy,
         {
           provide: RedisService,
-          useValue: { getClient: () => redisClient, del: redisDel },
+          useValue: { getClient: () => redisClient },
         },
         { provide: AuditTradeVisitor, useValue: { visit: jest.fn() } },
         { provide: MetricsTradeVisitor, useValue: { visit: jest.fn() } },
@@ -150,7 +151,7 @@ describe('MatchingService', () => {
     expect(orderBookService.peekBestMaker('pair-1', 'BUY')?.order_id).toBe('tk-dup');
   });
 
-  it('releases lock in finally block', async () => {
+  it('releases lock via compare-and-delete Lua script with correct key and matching value', async () => {
     await service.runMatch({
       takerOrder: order({ order_id: 'tk1' }),
       pairId: 'pair-1',
@@ -159,7 +160,81 @@ describe('MatchingService', () => {
       takerFeeRate: '0.001',
     });
 
-    expect(redisDel).toHaveBeenCalledWith('matching:lock:pair-1');
+    // Lock acquired with SET NX
+    expect(redisClient.set).toHaveBeenCalled();
+    const setArgs = redisClient.set.mock.calls[0];
+    const acquiredKey = setArgs[0];    // 'matching:lock:pair-1'
+    const acquiredValue = setArgs[1];  // crypto.randomBytes hex string
+
+    // Lock released with Lua compare-and-delete
+    expect(redisClient.eval).toHaveBeenCalled();
+    const evalArgs = redisClient.eval.mock.calls[0];
+    expect(evalArgs[1]).toBe(1);              // KEYS count
+    expect(evalArgs[2]).toBe(acquiredKey);    // same key passed to SET
+    expect(evalArgs[3]).toBe(acquiredValue);  // same value — proves identity check is consistent
+  });
+
+  it('does NOT delete another process lock when own lock expired (safe release)', async () => {
+    // Simulate: our lock value is 'my-lock-value', but Redis now has 'other-process-value'
+    // Lua script should return 0 (no delete) and not throw
+    redisClient.eval.mockResolvedValueOnce(0); // Lua returns 0 = key not deleted (value mismatch)
+
+    // Should not throw, just log warning
+    await expect(
+      service.runMatch({
+        takerOrder: order({ order_id: 'tk-safe-release' }),
+        pairId: 'pair-1',
+        feeCurrencyId: 'quote-1',
+        makerFeeRate: '0.001',
+        takerFeeRate: '0.001',
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('FOK with all makers owned by same user returns [] and does not execute any trade', async () => {
+    // canFullyFillOrder must exclude self-owned makers (STP filter).
+    // Without the fix, canFullyFillOrder would return true (sees 2 makers = enough liquidity),
+    // then matching would skip both via STP → no fills → inconsistent behavior.
+    const selfMaker1 = order({
+      order_id: 'sm1',
+      side: 'SELL',
+      user_id: 'user-1', // same as taker
+      price: '100',
+      remaining: '1',
+    });
+    const selfMaker2 = order({
+      order_id: 'sm2',
+      side: 'SELL',
+      user_id: 'user-1', // same as taker
+      price: '100',
+      remaining: '1',
+    });
+
+    matchingRepository.getOpenOrdersForPair.mockImplementation(
+      async (_pairId: string, side: 'BUY' | 'SELL') => {
+        if (side === 'SELL') return [selfMaker1, selfMaker2];
+        return [];
+      },
+    );
+
+    const results = await service.runMatch({
+      takerOrder: order({
+        order_id: 'tk-fok-stp',
+        side: 'BUY',
+        user_id: 'user-1',
+        type: 'LIMIT',
+        amount: '2',
+        remaining: '2',
+        time_in_force: 'FOK',
+      }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(results).toEqual([]);
+    expect(matchingRepository.executeTrade).not.toHaveBeenCalled();
   });
 
   it('reloads order book from DB on every match (buy + sell queries)', async () => {

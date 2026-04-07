@@ -1,4 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import Decimal from 'decimal.js';
 import { OrderBookService } from './orderbook';
 import { MatchingRepository } from './repositories';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
@@ -20,6 +22,19 @@ const LOCK_RETRY_ATTEMPTS = 15;
 const LOCK_RETRY_DELAY_MS = 20;
 /** Safety cap for admin reconcile loops (each round may run N match attempts). */
 const RECONCILE_MAX_ROUNDS = 400;
+
+/**
+ * Lua script: atomically delete lock key only if its value matches the caller's value.
+ * Returns 1 if deleted, 0 if key doesn't exist or value mismatch.
+ * Prevents a process from deleting a lock acquired by another process after TTL expiry.
+ */
+const RELEASE_LOCK_LUA = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+else
+  return 0
+end
+`;
 
 /**
  * Matching Engine Service
@@ -57,8 +72,14 @@ export class MatchingService implements OnModuleInit {
     takerFeeRate: string;
   }): Promise<TradeExecutionResult[]> {
     const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate } = params;
+
+    // Validate fee rates early to avoid silent NaN propagation in Decimal arithmetic.
+    if (!new Decimal(makerFeeRate).isFinite() || !new Decimal(takerFeeRate).isFinite()) {
+      throw new Error(`Invalid fee rates: maker=${makerFeeRate}, taker=${takerFeeRate}`);
+    }
+
     const lockKey = `${LOCK_PREFIX}${pairId.trim()}`;
-    const lockValue = `${Date.now()}-${Math.random()}`;
+    const lockValue = randomBytes(16).toString('hex');
     const client = this.redisService.getClient();
 
     let acquired: string | null = null;
@@ -99,8 +120,8 @@ export class MatchingService implements OnModuleInit {
       };
 
       const executeTrade: TradeExecutor = async (makerOrder, fillAmount, price) => {
-        const takerFee = (parseFloat(fillAmount) * parseFloat(price) * parseFloat(takerFeeRate)).toFixed(18);
-        const makerFee = (parseFloat(fillAmount) * parseFloat(price) * parseFloat(makerFeeRate)).toFixed(18);
+        const takerFee = new Decimal(fillAmount).mul(price).mul(takerFeeRate).toFixed(18);
+        const makerFee = new Decimal(fillAmount).mul(price).mul(makerFeeRate).toFixed(18);
         const result = await this.matchingRepository.executeTrade({
           pairId,
           makerOrderId: makerOrder.order_id,
@@ -143,27 +164,31 @@ export class MatchingService implements OnModuleInit {
         takerOrder.type === 'MARKET' ? this.marketOrderStrategy : this.priceTimeStrategy;
       const results = await strategy.match(context, orderBookAdapter, executeTrade);
 
-      const takerRemaining =
-        parseFloat(takerOrder.remaining) -
-        results.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+      const totalFilled = results.reduce(
+        (sum, r) => sum.plus(r.amount),
+        new Decimal(0),
+      );
+      const takerRemaining = new Decimal(takerOrder.remaining).minus(totalFilled);
       if (
-        takerRemaining > 0 &&
+        takerRemaining.gt(0) &&
         ['OPEN', 'PARTIAL'].includes(takerOrder.status) &&
         (takerOrder.time_in_force ?? 'GTC').toUpperCase() === 'GTC'
       ) {
         this.orderBookService.addOrder({
           ...takerOrder,
-          remaining: String(takerRemaining),
-          filled_amount: String(
-            parseFloat(takerOrder.filled_amount) +
-              results.reduce((s, r) => s + parseFloat(r.amount), 0),
-          ),
+          remaining: takerRemaining.toFixed(),
+          filled_amount: new Decimal(takerOrder.filled_amount).plus(totalFilled).toFixed(),
         });
       }
 
       return results;
     } finally {
-      await this.redisService.del(lockKey);
+      const released = await client.eval(RELEASE_LOCK_LUA, 1, lockKey, lockValue);
+      if (released === 0) {
+        this.logger.warn(
+          `Lock ${lockKey} was already expired or taken by another process; skipped delete`,
+        );
+      }
     }
   }
 
@@ -178,30 +203,35 @@ export class MatchingService implements OnModuleInit {
       oppositeSide,
     );
 
-    const takerPrice = takerOrder.price ? parseFloat(takerOrder.price) : null;
-    let remaining = parseFloat(takerOrder.remaining);
+    const takerPrice = takerOrder.price ? new Decimal(takerOrder.price) : null;
+    let remaining = new Decimal(takerOrder.remaining);
 
     for (const maker of makers) {
-      if (remaining <= 0) break;
+      if (remaining.lte(0)) break;
 
-      const makerRemaining = parseFloat(maker.remaining);
-      if (!Number.isFinite(makerRemaining) || makerRemaining <= 0) continue;
+      // Self-Trade Prevention: exclude makers owned by the same user (mirrors matching strategy).
+      if (maker.user_id && takerOrder.user_id && maker.user_id === takerOrder.user_id) continue;
+
+      if (!maker.remaining) continue;
+      const makerRemaining = new Decimal(maker.remaining);
+      if (!makerRemaining.isFinite() || makerRemaining.lte(0)) continue;
 
       if (takerOrder.type === 'LIMIT') {
-        const makerPrice = maker.price ? parseFloat(maker.price) : NaN;
-        if (!Number.isFinite(makerPrice)) continue;
+        if (!maker.price) continue;
+        const makerPrice = new Decimal(maker.price);
+        if (!makerPrice.isFinite()) continue;
 
         const priceCrosses =
           takerOrder.side === 'BUY'
-            ? (takerPrice === null || makerPrice <= takerPrice)
-            : (takerPrice === null || makerPrice >= takerPrice);
+            ? (takerPrice === null || makerPrice.lte(takerPrice))
+            : (takerPrice === null || makerPrice.gte(takerPrice));
         if (!priceCrosses) continue;
       }
 
-      remaining -= Math.min(remaining, makerRemaining);
+      remaining = remaining.minus(Decimal.min(remaining, makerRemaining));
     }
 
-    return remaining <= 0;
+    return remaining.lte(0);
   }
 
   /**

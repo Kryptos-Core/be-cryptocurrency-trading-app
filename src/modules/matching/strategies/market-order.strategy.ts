@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import Decimal from 'decimal.js';
 import {
   IMatchingStrategy,
   MatchingContext,
@@ -14,6 +15,8 @@ import {
  */
 @Injectable()
 export class MarketOrderStrategy implements IMatchingStrategy {
+  private readonly logger = new Logger(MarketOrderStrategy.name);
+
   async match(
     context: MatchingContext,
     orderBook: {
@@ -25,21 +28,31 @@ export class MarketOrderStrategy implements IMatchingStrategy {
   ): Promise<TradeExecutionResult[]> {
     const { pairId, takerOrder } = context;
     const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
-    let takerRemaining = parseFloat(takerOrder.remaining);
+    let takerRemaining = new Decimal(takerOrder.remaining);
     const results: TradeExecutionResult[] = [];
 
-    while (takerRemaining > 0) {
+    while (takerRemaining.gt(0)) {
       const maker = orderBook.peekBestMaker(pairId, oppositeSide);
       if (!maker) break;
 
-      const makerRemaining = parseFloat(maker.remaining);
-      if (makerRemaining <= 0) {
+      const makerRemaining = new Decimal(maker.remaining);
+      if (makerRemaining.lte(0)) {
         orderBook.popBestMaker(pairId, oppositeSide);
         continue;
       }
 
-      const fillAmount = Math.min(takerRemaining, makerRemaining);
-      const fillAmountStr = String(fillAmount);
+      // Self-Trade Prevention (STP): evaluated unconditionally before any fill.
+      // Prevents wash trading, market manipulation, and fee arbitrage.
+      if (maker.user_id && takerOrder.user_id && maker.user_id === takerOrder.user_id) {
+        orderBook.popBestMaker(pairId, oppositeSide);
+        this.logger.warn(
+          `STP: skipped self-trade maker=${maker.order_id} taker=${takerOrder.order_id} user=${takerOrder.user_id}`,
+        );
+        continue;
+      }
+
+      const fillAmount = Decimal.min(takerRemaining, makerRemaining);
+      const fillAmountStr = fillAmount.toFixed();
       const priceStr = maker.price ?? '0';
 
       const popped = orderBook.popBestMaker(pairId, oppositeSide);
@@ -54,14 +67,14 @@ export class MarketOrderStrategy implements IMatchingStrategy {
 
       results.push(tradeResult);
 
-      takerRemaining -= fillAmount;
+      takerRemaining = takerRemaining.minus(fillAmount);
 
-      const newMakerRemaining = makerRemaining - fillAmount;
-      if (newMakerRemaining > 0) {
+      const newMakerRemaining = makerRemaining.minus(fillAmount);
+      if (newMakerRemaining.gt(0)) {
         orderBook.addOrder({
           ...maker,
-          filled_amount: String(parseFloat(maker.filled_amount) + fillAmount),
-          remaining: String(newMakerRemaining),
+          filled_amount: new Decimal(maker.filled_amount).plus(fillAmount).toFixed(),
+          remaining: newMakerRemaining.toFixed(),
         });
       }
     }
