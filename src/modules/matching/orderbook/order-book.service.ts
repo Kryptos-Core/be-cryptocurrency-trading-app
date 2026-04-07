@@ -2,6 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { BuyQueueService } from './buy-queue.service';
 import { SellQueueService } from './sell-queue.service';
 import { OrderBookOrder } from '../interfaces';
+import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from '../utils';
+
+export interface DepthLevel {
+  price: string;
+  amount: string;
+  orderCount: number;
+}
+
+export interface DepthSnapshot {
+  bids: DepthLevel[];
+  asks: DepthLevel[];
+  timestamp: string;
+}
 
 /**
  * Order Book (per-pair): buy side + sell side queues.
@@ -106,5 +119,55 @@ export class OrderBookService {
     if (side === 'BUY') return book.buy.size();
     if (side === 'SELL') return book.sell.size();
     return book.buy.size() + book.sell.size();
+  }
+
+  /**
+   * Transparent Price Discovery: aggregate the in-memory order book into
+   * depth levels (price → total amount + order count), limited to `depth` levels.
+   * Uses BigInt arithmetic for deterministic aggregation (no floating-point error).
+   * MARKET orders (null price) are excluded — only LIMIT resting orders are visible.
+   */
+  getSnapshot(pairId: string, depth: 5 | 10 | 20): DepthSnapshot {
+    const book = this.getBook(pairId);
+    const bids = this.aggregateLevels(book.buy.getAll(), depth);
+    const asks = this.aggregateLevels(book.sell.getAll(), depth);
+    return {
+      bids,
+      asks,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private aggregateLevels(
+    orders: OrderBookOrder[],
+    depth: number,
+  ): DepthLevel[] {
+    // Use a Map to aggregate by price. Orders from getAll() are already sorted.
+    // We preserve the insertion order (sorted order) by iterating sequentially.
+    const levelMap = new Map<string, { totalBu: bigint; count: number }>();
+
+    for (const o of orders) {
+      if (o.price === null) continue;
+      const key = o.price;
+      const existing = levelMap.get(key);
+      const amountBu = toBaseUnits(o.remaining, DEFAULT_SCALE);
+      if (existing) {
+        existing.totalBu += amountBu;
+        existing.count += 1;
+      } else {
+        levelMap.set(key, { totalBu: amountBu, count: 1 });
+      }
+    }
+
+    const levels: DepthLevel[] = [];
+    for (const [price, { totalBu, count }] of levelMap) {
+      if (levels.length >= depth) break;
+      levels.push({
+        price,
+        amount: fromBaseUnits(totalBu, DEFAULT_SCALE),
+        orderCount: count,
+      });
+    }
+    return levels;
   }
 }

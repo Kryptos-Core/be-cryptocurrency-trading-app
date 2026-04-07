@@ -49,6 +49,44 @@ describe('SellQueueService', () => {
     expect(service.size()).toBe(0);
   });
 
+  it('sorts correctly for prices beyond IEEE 754 precision (> 2^53)', () => {
+    const lowerPrice = order({
+      order_id: 'low',
+      price: '9007199254740992.5',
+      created_at: new Date('2025-01-01'),
+    });
+    const higherPrice = order({
+      order_id: 'high',
+      price: '9007199254740992.6',
+      created_at: new Date('2025-01-01'),
+    });
+
+    service.add(lowerPrice);
+    service.add(higherPrice);
+
+    // Best ask = lowest price = 'low'
+    expect(service.peekBest()?.order_id).toBe('low');
+  });
+
+  it('sorts correctly for 18-decimal precision prices', () => {
+    const o1 = order({
+      order_id: 'o1',
+      price: '0.000000000000000001',
+      created_at: new Date('2025-01-01'),
+    });
+    const o2 = order({
+      order_id: 'o2',
+      price: '0.000000000000000002',
+      created_at: new Date('2025-01-01'),
+    });
+
+    service.add(o1);
+    service.add(o2);
+
+    // Best ask = lowest price = o1
+    expect(service.peekBest()?.order_id).toBe('o1');
+  });
+
   it('remove, peek, pop and getAll work as expected', () => {
     service.add(order({ order_id: 'o1' }));
     service.add(order({ order_id: 'o2' }));

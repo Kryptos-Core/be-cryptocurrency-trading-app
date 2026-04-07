@@ -3,3 +3,7 @@ dist/
 *.log
 .DS_Store
 .env
+
+# Test coverage (Jest / Istanbul)
+coverage/
+.coverage-tmp/

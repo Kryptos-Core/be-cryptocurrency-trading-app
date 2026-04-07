@@ -1,16 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { IOrderQueue, OrderBookOrder } from '../interfaces';
+import { toBaseUnits, DEFAULT_SCALE } from '../utils';
 
 /**
  * Buy Queue (Queue Pattern)
  * Price-time priority: best bid first (price DESC), then oldest (created_at ASC).
+ * Uses BigInt comparison for deterministic precision on DECIMAL(36,18) prices.
  */
 @Injectable()
 export class BuyQueueService implements IOrderQueue {
   private readonly orders: OrderBookOrder[] = [];
 
   add(order: OrderBookOrder): void {
-    if (order.side !== 'BUY' || parseFloat(order.remaining) <= 0) return;
+    if (order.side !== 'BUY' || toBaseUnits(order.remaining, DEFAULT_SCALE) <= 0n) return;
     this.orders.push(order);
     this.sort();
   }
@@ -40,9 +42,9 @@ export class BuyQueueService implements IOrderQueue {
 
   private sort(): void {
     this.orders.sort((a, b) => {
-      const priceA = a.price ? parseFloat(a.price) : 0;
-      const priceB = b.price ? parseFloat(b.price) : 0;
-      if (priceB !== priceA) return priceB - priceA; // DESC
+      const priceA = a.price ? toBaseUnits(a.price, DEFAULT_SCALE) : 0n;
+      const priceB = b.price ? toBaseUnits(b.price, DEFAULT_SCALE) : 0n;
+      if (priceB !== priceA) return priceB > priceA ? 1 : -1; // DESC
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime(); // ASC time
     });
   }

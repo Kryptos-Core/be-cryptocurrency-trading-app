@@ -3,3 +3,4 @@ export * from './update-market-pair.dto';
 export * from './market-ticker.dto';
 export * from './orderbook.dto';
 export * from './market-pair-response.dto';
+export * from './depth-snapshot.dto';

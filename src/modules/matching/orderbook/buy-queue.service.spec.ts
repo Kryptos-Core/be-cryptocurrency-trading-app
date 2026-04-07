@@ -50,6 +50,46 @@ describe('BuyQueueService', () => {
     expect(service.size()).toBe(0);
   });
 
+  it('sorts correctly for prices beyond IEEE 754 precision (> 2^53)', () => {
+    // parseFloat('9007199254740992.5') === parseFloat('9007199254740992.6')
+    // BigInt-based sort must distinguish them: .6 is higher → best bid
+    const lowerPrice = order({
+      order_id: 'low',
+      price: '9007199254740992.5',
+      created_at: new Date('2025-01-01'),
+    });
+    const higherPrice = order({
+      order_id: 'high',
+      price: '9007199254740992.6',
+      created_at: new Date('2025-01-01'),
+    });
+
+    service.add(lowerPrice);
+    service.add(higherPrice);
+
+    // Best bid = highest price = 'high'
+    expect(service.peekBest()?.order_id).toBe('high');
+  });
+
+  it('sorts correctly for 18-decimal precision prices', () => {
+    const o1 = order({
+      order_id: 'o1',
+      price: '0.000000000000000001',
+      created_at: new Date('2025-01-01'),
+    });
+    const o2 = order({
+      order_id: 'o2',
+      price: '0.000000000000000002',
+      created_at: new Date('2025-01-01'),
+    });
+
+    service.add(o1);
+    service.add(o2);
+
+    // Best bid = highest price = o2
+    expect(service.peekBest()?.order_id).toBe('o2');
+  });
+
   it('remove, peek, pop and getAll work as expected', () => {
     service.add(order({ order_id: 'o1' }));
     service.add(order({ order_id: 'o2' }));

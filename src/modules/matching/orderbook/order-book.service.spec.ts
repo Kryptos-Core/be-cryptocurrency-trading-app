@@ -123,4 +123,105 @@ describe('OrderBookService', () => {
       expect(service.isLoaded('pair-1     ')).toBe(true);
     });
   });
+
+  // ── getSnapshot (Transparent Price Discovery) ─────────────────────────────
+  describe('getSnapshot', () => {
+    it('returns empty snapshot when no orders', () => {
+      const snap = service.getSnapshot('pair-1', 5);
+      expect(snap.bids).toEqual([]);
+      expect(snap.asks).toEqual([]);
+      expect(snap.timestamp).toBeDefined();
+    });
+
+    it('aggregates orders at same price level', () => {
+      service.addOrder(order({ order_id: 'b1', side: 'BUY', price: '100', remaining: '1' }));
+      service.addOrder(order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '2' }));
+      service.addOrder(order({ order_id: 'b3', side: 'BUY', price: '100', remaining: '3' }));
+
+      const snap = service.getSnapshot('pair-1', 5);
+      expect(snap.bids).toHaveLength(1);
+      expect(snap.bids[0].price).toBe('100');
+      expect(snap.bids[0].amount).toBe('6.000000000000000000');
+      expect(snap.bids[0].orderCount).toBe(3);
+    });
+
+    it('limits depth to requested number of levels', () => {
+      // Create 7 distinct bid levels
+      for (let i = 1; i <= 7; i++) {
+        service.addOrder(
+          order({
+            order_id: `b${i}`,
+            side: 'BUY',
+            price: String(100 + i),
+            remaining: '1',
+          }),
+        );
+      }
+      const snap = service.getSnapshot('pair-1', 5);
+      expect(snap.bids).toHaveLength(5);
+      // Best bid (highest price) should be first
+      expect(snap.bids[0].price).toBe('107');
+    });
+
+    it('sorts bids price DESC, asks price ASC', () => {
+      service.addOrder(order({ order_id: 'b1', side: 'BUY', price: '99', remaining: '1' }));
+      service.addOrder(order({ order_id: 'b2', side: 'BUY', price: '101', remaining: '1' }));
+      service.addOrder(order({ order_id: 's1', side: 'SELL', price: '105', remaining: '1' }));
+      service.addOrder(order({ order_id: 's2', side: 'SELL', price: '103', remaining: '1' }));
+
+      const snap = service.getSnapshot('pair-1', 20);
+      expect(snap.bids[0].price).toBe('101');
+      expect(snap.bids[1].price).toBe('99');
+      expect(snap.asks[0].price).toBe('103');
+      expect(snap.asks[1].price).toBe('105');
+    });
+
+    it('uses BigInt aggregation: no floating-point error', () => {
+      service.addOrder(
+        order({ order_id: 'b1', side: 'BUY', price: '100', remaining: '0.1' }),
+      );
+      service.addOrder(
+        order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '0.2' }),
+      );
+      service.addOrder(
+        order({ order_id: 'b3', side: 'BUY', price: '100', remaining: '0.1' }),
+      );
+
+      const snap = service.getSnapshot('pair-1', 5);
+      // 0.1 + 0.2 + 0.1 = 0.4 exactly (parseFloat would give 0.30000000000000004 + 0.1)
+      expect(snap.bids[0].amount).toBe('0.400000000000000000');
+    });
+
+    it('excludes MARKET orders (null price) from snapshot', () => {
+      service.addOrder(
+        order({ order_id: 'b1', side: 'BUY', price: null, remaining: '1', type: 'MARKET' }),
+      );
+      service.addOrder(
+        order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '1' }),
+      );
+
+      const snap = service.getSnapshot('pair-1', 5);
+      expect(snap.bids).toHaveLength(1);
+      expect(snap.bids[0].price).toBe('100');
+    });
+
+    it('returns both sides in one call', () => {
+      service.addOrder(order({ order_id: 'b1', side: 'BUY', price: '100', remaining: '1' }));
+      service.addOrder(order({ order_id: 's1', side: 'SELL', price: '101', remaining: '2' }));
+
+      const snap = service.getSnapshot('pair-1', 10);
+      expect(snap.bids).toHaveLength(1);
+      expect(snap.asks).toHaveLength(1);
+    });
+
+    it('depth=10 and depth=20 work', () => {
+      for (let i = 1; i <= 12; i++) {
+        service.addOrder(
+          order({ order_id: `s${i}`, side: 'SELL', price: String(100 + i), remaining: '1' }),
+        );
+      }
+      expect(service.getSnapshot('pair-1', 10).asks).toHaveLength(10);
+      expect(service.getSnapshot('pair-1', 20).asks).toHaveLength(12);
+    });
+  });
 });

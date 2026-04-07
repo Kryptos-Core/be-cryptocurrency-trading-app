@@ -1,6 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import Decimal from 'decimal.js';
 import { OrderBookService } from './orderbook';
 import { MatchingRepository } from './repositories';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
@@ -15,6 +14,7 @@ import {
 import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 import { RedisService } from '@/common/services';
 import { CircuitBreakerService } from './circuit-breaker.service';
+import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from './utils';
 
 const LOCK_PREFIX = 'matching:lock:';
 const LOCK_TTL_MS = 10000;
@@ -23,6 +23,16 @@ const LOCK_RETRY_ATTEMPTS = 15;
 const LOCK_RETRY_DELAY_MS = 20;
 /** Safety cap for admin reconcile loops (each round may run N match attempts). */
 const RECONCILE_MAX_ROUNDS = 400;
+
+/**
+ * Default circuit-breaker config: halt when price moves ≥5% within a 60-second window.
+ * Halt lasts 300 seconds (5 min) — admin can clear early via CircuitBreakerService.resumeTrading().
+ */
+const DEFAULT_CIRCUIT_BREAKER_CONFIG = {
+  thresholdPct: '0.05',
+  windowSec: 60,
+  haltDurationSec: 300,
+} as const;
 
 /**
  * Lua script: atomically delete lock key only if its value matches the caller's value.
@@ -75,8 +85,11 @@ export class MatchingService implements OnModuleInit {
   }): Promise<TradeExecutionResult[]> {
     const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate } = params;
 
-    // Validate fee rates early to avoid silent NaN propagation in Decimal arithmetic.
-    if (!new Decimal(makerFeeRate).isFinite() || !new Decimal(takerFeeRate).isFinite()) {
+    // Validate fee rates early to avoid silent errors in BigInt arithmetic.
+    try {
+      toBaseUnits(makerFeeRate, DEFAULT_SCALE);
+      toBaseUnits(takerFeeRate, DEFAULT_SCALE);
+    } catch {
       throw new Error(`Invalid fee rates: maker=${makerFeeRate}, taker=${takerFeeRate}`);
     }
 
@@ -128,8 +141,14 @@ export class MatchingService implements OnModuleInit {
       };
 
       const executeTrade: TradeExecutor = async (makerOrder, fillAmount, price) => {
-        const takerFee = new Decimal(fillAmount).mul(price).mul(takerFeeRate).toFixed(18);
-        const makerFee = new Decimal(fillAmount).mul(price).mul(makerFeeRate).toFixed(18);
+        // Fee = fillAmount * price * feeRate (all in base units, divide by SCALE^2 for correct decimal)
+        const SCALE = 10n ** BigInt(DEFAULT_SCALE);
+        const fillBu = toBaseUnits(fillAmount, DEFAULT_SCALE);
+        const priceBu = toBaseUnits(price, DEFAULT_SCALE);
+        const takerRateBu = toBaseUnits(takerFeeRate, DEFAULT_SCALE);
+        const makerRateBu = toBaseUnits(makerFeeRate, DEFAULT_SCALE);
+        const takerFee = fromBaseUnits((fillBu * priceBu * takerRateBu) / (SCALE * SCALE), DEFAULT_SCALE);
+        const makerFee = fromBaseUnits((fillBu * priceBu * makerRateBu) / (SCALE * SCALE), DEFAULT_SCALE);
         const result = await this.matchingRepository.executeTrade({
           pairId,
           makerOrderId: makerOrder.order_id,
@@ -157,6 +176,10 @@ export class MatchingService implements OnModuleInit {
           created_at: new Date(),
         };
         this.notifyTradeExecuted(execResult);
+        // Record price for circuit breaker monitoring (fire-and-forget; never throws into matching flow).
+        this.circuitBreaker.recordPriceAndCheck(pairId, price, DEFAULT_CIRCUIT_BREAKER_CONFIG).catch(
+          (e) => this.logger.warn(`Circuit breaker recordPrice error: ${e instanceof Error ? e.message : String(e)}`),
+        );
         return execResult;
       };
 
@@ -172,20 +195,21 @@ export class MatchingService implements OnModuleInit {
         takerOrder.type === 'MARKET' ? this.marketOrderStrategy : this.priceTimeStrategy;
       const results = await strategy.match(context, orderBookAdapter, executeTrade);
 
-      const totalFilled = results.reduce(
-        (sum, r) => sum.plus(r.amount),
-        new Decimal(0),
+      const totalFilledBu = results.reduce(
+        (sum, r) => sum + toBaseUnits(r.amount, DEFAULT_SCALE),
+        0n,
       );
-      const takerRemaining = new Decimal(takerOrder.remaining).minus(totalFilled);
+      const takerRemainingBu = toBaseUnits(takerOrder.remaining, DEFAULT_SCALE) - totalFilledBu;
       if (
-        takerRemaining.gt(0) &&
+        takerRemainingBu > 0n &&
         ['OPEN', 'PARTIAL'].includes(takerOrder.status) &&
         (takerOrder.time_in_force ?? 'GTC').toUpperCase() === 'GTC'
       ) {
+        const takerFilledBu = toBaseUnits(takerOrder.filled_amount, DEFAULT_SCALE) + totalFilledBu;
         this.orderBookService.addOrder({
           ...takerOrder,
-          remaining: takerRemaining.toFixed(),
-          filled_amount: new Decimal(takerOrder.filled_amount).plus(totalFilled).toFixed(),
+          remaining: fromBaseUnits(takerRemainingBu, DEFAULT_SCALE),
+          filled_amount: fromBaseUnits(takerFilledBu, DEFAULT_SCALE),
         });
       }
 
@@ -211,35 +235,45 @@ export class MatchingService implements OnModuleInit {
       oppositeSide,
     );
 
-    const takerPrice = takerOrder.price ? new Decimal(takerOrder.price) : null;
-    let remaining = new Decimal(takerOrder.remaining);
+    const takerPriceBu = takerOrder.price ? toBaseUnits(takerOrder.price, DEFAULT_SCALE) : null;
+    let remainingBu = toBaseUnits(takerOrder.remaining, DEFAULT_SCALE);
 
     for (const maker of makers) {
-      if (remaining.lte(0)) break;
+      if (remainingBu <= 0n) break;
 
       // Self-Trade Prevention: exclude makers owned by the same user (mirrors matching strategy).
       if (maker.user_id && takerOrder.user_id && maker.user_id === takerOrder.user_id) continue;
 
       if (!maker.remaining) continue;
-      const makerRemaining = new Decimal(maker.remaining);
-      if (!makerRemaining.isFinite() || makerRemaining.lte(0)) continue;
+      let makerRemainingBu: bigint;
+      try {
+        makerRemainingBu = toBaseUnits(maker.remaining, DEFAULT_SCALE);
+      } catch {
+        continue;
+      }
+      if (makerRemainingBu <= 0n) continue;
 
       if (takerOrder.type === 'LIMIT') {
         if (!maker.price) continue;
-        const makerPrice = new Decimal(maker.price);
-        if (!makerPrice.isFinite()) continue;
+        let makerPriceBu: bigint;
+        try {
+          makerPriceBu = toBaseUnits(maker.price, DEFAULT_SCALE);
+        } catch {
+          continue;
+        }
 
         const priceCrosses =
           takerOrder.side === 'BUY'
-            ? (takerPrice === null || makerPrice.lte(takerPrice))
-            : (takerPrice === null || makerPrice.gte(takerPrice));
+            ? (takerPriceBu === null || makerPriceBu <= takerPriceBu)
+            : (takerPriceBu === null || makerPriceBu >= takerPriceBu);
         if (!priceCrosses) continue;
       }
 
-      remaining = remaining.minus(Decimal.min(remaining, makerRemaining));
+      const fillBu = remainingBu < makerRemainingBu ? remainingBu : makerRemainingBu;
+      remainingBu -= fillBu;
     }
 
-    return remaining.lte(0);
+    return remainingBu <= 0n;
   }
 
   /**

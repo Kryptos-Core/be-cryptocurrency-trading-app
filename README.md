@@ -9,7 +9,7 @@ API backend cho nền tảng giao dịch tiền mã hóa, xây dựng bằng **N
 | **Auth & người dùng** | JWT, đăng ký/đăng nhập, RBAC, 2FA (email OTP) |
 | **Thị trường** | Cặp giao dịch, đồng bộ catalog từ Binance (testnet/mainnet theo cấu hình) |
 | **Lệnh & sổ lệnh** | Đặt/hủy lệnh, order book, market maker batch |
-| **Khớp lệnh** | Engine price–time priority, Redis lock, thực thi giao dịch |
+| **Khớp lệnh** | Engine price–time priority, Redis lock (Lua atomic), STP (self-trade prevention), incremental in-memory book, audit log persistent (`trade_audit_log`), market order slippage protection, circuit breaker per pair |
 | **Ví** | Số dư nội bộ, đối soát, đồng bộ ví ngoài (Binance) theo cấu hình |
 | **Nạp/rút** | Nạp fiat qua **PayOS**, nạp/rút on-chain (TRON, Ethereum, Solana testnet) |
 | **Liên kết ví & đăng nhập WC** | Đăng nhập public (QR + SignClient): `/auth/wallet/wc/*`. Liên kết ví (JWT): `/blockchain/wallets/wc/*` |
@@ -113,4 +113,4 @@ Dữ liệu mẫu trong `src/seed/data/users.json`. Sau `npm run db:seed`, mỗi
 | hsondz1910@gmail.com | Risk@123! | `RISK_OFFICER` | |
 | support@example.com | Support@123! | `SUPPORT_AGENT` | |
 | maxnoah901@gmail.com | Maker@123! | `MARKET_MAKER` | |
-| camego8361@marvetos.com | Finance@123! | `FINANCE_MANAGER` | |
+| xosep44185@nyspring.com | Finance@123! | `FINANCE_MANAGER` | |

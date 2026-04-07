@@ -16,6 +16,7 @@ import { Order } from '@/entities/order.entity';
 import { MarketRepository } from '@/modules/markets/repositories';
 import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
 import { MatchingService } from '@/modules/matching/matching.service';
+import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
 import { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
@@ -38,6 +39,7 @@ export class OrdersService {
     private readonly cacheService: CacheService,
     private readonly validationStrategy: OrderValidationStrategy,
     private readonly matchingService: MatchingService,
+    private readonly matchingQueueService: MatchingQueueService,
   ) {}
 
   async create(command: CreateOrderCommand): Promise<Order> {
@@ -125,29 +127,20 @@ export class OrdersService {
         parseFloat(order.amount) - parseFloat(order.filled_amount ?? '0');
       if (remaining > 0) {
         try {
-          await this.matchingService.runMatch({
+          // Phase 2 #6: Enqueue match job instead of blocking the HTTP thread.
+          // IOC/FOK cancellation after fill is handled by the consumer (MatchingProcessor)
+          // via a post-process step in MatchingService. For simple cases the queue is fire-and-forget;
+          // the client receives order status via WebSocket push.
+          await this.matchingQueueService.enqueueMatch({
             takerOrder: this.orderToOrderBookOrder(order),
             pairId: order.pair_id,
             feeCurrencyId: pair.quote_currency_id,
             makerFeeRate: pair.maker_fee_rate ?? '0.001',
             takerFeeRate: pair.taker_fee_rate ?? '0.001',
           });
-          order = (await this.orderRepository.findById(result.order_id)) ?? order;
-
-          const tif = (order.time_in_force ?? 'GTC').toUpperCase();
-          const updatedRemaining =
-            parseFloat(order.amount) - parseFloat(order.filled_amount ?? '0');
-          if (
-            updatedRemaining > 0 &&
-            (tif === 'IOC' || tif === 'FOK') &&
-            ['OPEN', 'PARTIAL'].includes(order.status)
-          ) {
-            await this.orderRepository.cancelOrderViaProcedure(order.order_id, userId);
-            order = (await this.orderRepository.findById(result.order_id)) ?? order;
-          }
         } catch (e) {
           this.logger.warn(
-            `Matching failed after order create ${result.order_id}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`,
+            `Matching enqueue failed after order create ${result.order_id}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`,
           );
         }
       }

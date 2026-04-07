@@ -63,7 +63,13 @@ describe('MatchingService', () => {
         },
         { provide: AuditTradeVisitor, useValue: { visit: jest.fn() } },
         { provide: MetricsTradeVisitor, useValue: { visit: jest.fn() } },
-        { provide: CircuitBreakerService, useValue: { isHalted: jest.fn().mockResolvedValue(false) } },
+        {
+          provide: CircuitBreakerService,
+          useValue: {
+            isHalted: jest.fn().mockResolvedValue(false),
+            recordPriceAndCheck: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -276,5 +282,60 @@ describe('MatchingService', () => {
 
     // Only 2 DB calls on the first match (BUY + SELL); second match uses in-memory book.
     expect(matchingRepository.getOpenOrdersForPair).toHaveBeenCalledTimes(2);
+  });
+
+  it('calls recordPriceAndCheck with fill price after each successful trade', async () => {
+    const maker = order({
+      order_id: 'm-cb',
+      side: 'SELL',
+      user_id: 'user-2',
+      price: '150',
+      remaining: '1',
+    });
+    matchingRepository.getOpenOrdersForPair.mockImplementation(
+      async (_pairId: string, side: 'BUY' | 'SELL') => {
+        if (side === 'SELL') return [maker];
+        return [];
+      },
+    );
+    // Mark pair as already seeded so incremental logic is used (no extra DB reload).
+    orderBookService.markLoaded('pair-1');
+    orderBookService.addOrder(maker);
+
+    await service.runMatch({
+      takerOrder: order({
+        order_id: 'tk-cb',
+        side: 'BUY',
+        user_id: 'user-1',
+        price: '150',
+        remaining: '1',
+      }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+    // Flush micro-task queue: recordPriceAndCheck is fire-and-forget; let promise resolve.
+    await Promise.resolve();
+
+    expect(circuitBreaker.recordPriceAndCheck).toHaveBeenCalledWith(
+      'pair-1',
+      '150',
+      expect.objectContaining({ thresholdPct: expect.any(String) }),
+    );
+  });
+
+  it('does not call recordPriceAndCheck when no fills occur', async () => {
+    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
+
+    await service.runMatch({
+      takerOrder: order({ order_id: 'tk-no-fill' }),
+      pairId: 'pair-1',
+      feeCurrencyId: 'quote-1',
+      makerFeeRate: '0.001',
+      takerFeeRate: '0.001',
+    });
+
+    expect(circuitBreaker.recordPriceAndCheck).not.toHaveBeenCalled();
   });
 });

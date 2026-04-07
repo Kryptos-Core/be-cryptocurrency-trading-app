@@ -11,6 +11,7 @@ import {
 import { UseFilters, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { TradingSubscriptionService } from '../services/trading-subscription.service';
 import { BinancePriceFeedService } from '../services/binance-price-feed.service';
 import { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
@@ -28,6 +29,7 @@ import {
 } from '../interfaces/websocket.interface';
 import { JwtService } from '@nestjs/jwt';
 import { WebSocketExceptionFilter } from './filters/websocket-exception.filter';
+import { RedisService } from '@/common/services';
 
 /**
  * Trading WebSocket Gateway
@@ -66,12 +68,18 @@ export class TradingGateway
     private readonly dashboardBroadcastService: DashboardBroadcastService,
     private readonly workspaceService: WorkspaceService,
     private readonly jwtService: JwtService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
-   * Inject Socket.IO server into DashboardBroadcastService after init.
+   * Attach Socket.IO Redis Adapter for horizontal scaling.
+   * Uses the existing pub/sub Redis clients from RedisService — no extra connections.
+   * Broadcasts (server.to(room).emit) will fan-out across all instances via Redis.
    */
   afterInit(server: Server) {
+    server.adapter(
+      createAdapter(this.redisService.getPublisher(), this.redisService.getSubscriber()),
+    );
     this.dashboardBroadcastService.setServer(server);
   }
 

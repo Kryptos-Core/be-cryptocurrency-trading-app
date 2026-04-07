@@ -6,6 +6,7 @@ import { CacheService } from '../../common/services';
 import { MarketRepository } from '../markets/repositories';
 import { WalletRepository } from '../wallets/repositories/wallet.repository';
 import { MatchingService } from '../matching/matching.service';
+import { MatchingQueueService } from '../matching/matching-queue.service';
 import { Order } from '../../entities/order.entity';
 import { NotFoundException, BusinessException, ForbiddenException } from '../../common/exceptions';
 
@@ -87,6 +88,7 @@ describe('OrdersService', () => {
         { provide: CacheService, useValue: mockCache },
         { provide: OrderValidationStrategy, useValue: mockValidation },
         { provide: MatchingService, useValue: matchingService },
+        { provide: MatchingQueueService, useValue: { enqueueMatch: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

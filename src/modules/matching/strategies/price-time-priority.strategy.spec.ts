@@ -69,7 +69,7 @@ describe('PriceTimePriorityStrategy', () => {
     const results = await strategy.match(context, orderBook as any, executeTrade as TradeExecutor);
     expect(results).toHaveLength(1);
     expect(results[0].trade_id).toBe('t1');
-    expect(executeTrade).toHaveBeenCalledWith(maker, '1', '99');
+    expect(executeTrade).toHaveBeenCalledWith(maker, '1.000000000000000000', '99');
   });
 
   it('does not match when price does not cross', async () => {
@@ -241,8 +241,8 @@ describe('PriceTimePriorityStrategy', () => {
 
     // All 3 fills must happen (if float error, 3rd fill gets skipped because remaining < 0.1)
     expect(results).toHaveLength(3);
-    // Third fill must pass exactly '0.1', not '0.09999999999999998'
+    // Third fill must pass exactly '0.100000000000000000' (full 18-decimal precision)
     const thirdCall = executeTrade.mock.calls[2];
-    expect(thirdCall[1]).toBe('0.1');
+    expect(thirdCall[1]).toBe('0.100000000000000000');
   });
 });

@@ -264,6 +264,34 @@ export class MarketsController {
   }
 
   /**
+   * Get real-time depth snapshot by symbol
+   * GET /markets/symbol/:symbol/depth?limit=10
+   * IMPORTANT: Must be before @Get(':id') to avoid route conflict
+   */
+  @Get('symbol/:symbol/depth')
+  @Public()
+  @ApiOperation({
+    summary: 'Get real-time order book depth by symbol',
+    description: 'Get aggregated depth levels from in-memory matching engine, by pair symbol',
+  })
+  @ApiParam({ name: 'symbol', type: String, example: 'BTC/USDT' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    enum: [5, 10, 20],
+    description: 'Number of price levels per side (default 10)',
+  })
+  @ApiSuccessResponse('Depth snapshot retrieved successfully')
+  @ApiBadRequestResponse('Depth limit must be 5, 10, or 20')
+  async getDepthBySymbol(
+    @Param('symbol') symbol: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ) {
+    return this.marketsService.getDepthSnapshotBySymbol(symbol, limit);
+  }
+
+  /**
    * Get market ticker by pair ID
    * GET /markets/:id/ticker
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
@@ -359,6 +387,35 @@ export class MarketsController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
   ) {
     return this.marketsService.getRecentTrades(id, limit);
+  }
+
+  /**
+   * Get real-time depth snapshot from in-memory matching engine
+   * GET /markets/:id/depth?limit=10
+   * IMPORTANT: Must be before @Get(':id') to avoid route conflict
+   */
+  @Get(':id/depth')
+  @Public()
+  @ApiOperation({
+    summary: 'Get real-time order book depth',
+    description:
+      'Get aggregated depth levels (price → total amount + order count) from the in-memory matching engine order book. Faster and more current than /orderbook (which queries DB stored procedures).',
+  })
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    enum: [5, 10, 20],
+    description: 'Number of price levels per side (default 10)',
+  })
+  @ApiSuccessResponse('Depth snapshot retrieved successfully')
+  @ApiBadRequestResponse('Depth limit must be 5, 10, or 20')
+  async getDepth(
+    @Param('id') id: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ) {
+    return this.marketsService.getDepthSnapshot(id, limit);
   }
 
   /**

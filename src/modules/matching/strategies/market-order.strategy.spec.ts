@@ -86,7 +86,7 @@ describe('MarketOrderStrategy', () => {
     const results = await strategy.match(context, orderBook as any, executeTrade as TradeExecutor);
     expect(results).toHaveLength(2);
     expect(orderBook.addOrder).toHaveBeenCalledWith(
-      expect.objectContaining({ order_id: 'm2', remaining: '0.5' }),
+      expect.objectContaining({ order_id: 'm2', remaining: '0.500000000000000000' }),
     );
   });
 
@@ -185,8 +185,8 @@ describe('MarketOrderStrategy', () => {
     const results = await strategy.match(context, orderBook as any, executeTrade as TradeExecutor);
     // All 3 fills must happen
     expect(results).toHaveLength(3);
-    // Third fill must pass exactly '0.1'
-    expect(executeTrade.mock.calls[2][1]).toBe('0.1');
+    // Third fill must pass exactly '0.100000000000000000' (full 18-decimal precision)
+    expect(executeTrade.mock.calls[2][1]).toBe('0.100000000000000000');
   });
 
   describe('price protection (slippage tolerance)', () => {

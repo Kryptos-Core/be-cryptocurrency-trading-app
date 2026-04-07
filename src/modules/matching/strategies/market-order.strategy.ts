@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Decimal from 'decimal.js';
 import {
   IMatchingStrategy,
   MatchingContext,
@@ -7,11 +6,16 @@ import {
   TradeExecutionResult,
   TradeExecutor,
 } from '../interfaces';
+import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from '../utils';
+
+const SCALE_MULTIPLIER = 10n ** BigInt(DEFAULT_SCALE);
 
 /**
  * Market Order Strategy (Strategy Pattern)
  * Takes best available price(s) until filled or book empty.
  * Same as price-time but taker has no price limit (treat as always crossing).
+ *
+ * Uses BigInt (int64 base units) for deterministic arithmetic — no floating-point rounding.
  */
 @Injectable()
 export class MarketOrderStrategy implements IMatchingStrategy {
@@ -28,28 +32,27 @@ export class MarketOrderStrategy implements IMatchingStrategy {
   ): Promise<TradeExecutionResult[]> {
     const { pairId, takerOrder, slippageTolerance } = context;
     const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
-    let takerRemaining = new Decimal(takerOrder.remaining);
+    let takerRemainingBu = toBaseUnits(takerOrder.remaining, DEFAULT_SCALE);
     const results: TradeExecutionResult[] = [];
 
-    const tolerance =
-      slippageTolerance && new Decimal(slippageTolerance).gt(0)
-        ? new Decimal(slippageTolerance)
+    const toleranceBu =
+      slippageTolerance && toBaseUnits(slippageTolerance, DEFAULT_SCALE) > 0n
+        ? toBaseUnits(slippageTolerance, DEFAULT_SCALE)
         : null;
     /** Reference price is anchored to the first fill to compute the protection threshold. */
-    let referencePrice: Decimal | null = null;
+    let referencePriceBu: bigint | null = null;
 
-    while (takerRemaining.gt(0)) {
+    while (takerRemainingBu > 0n) {
       const maker = orderBook.peekBestMaker(pairId, oppositeSide);
       if (!maker) break;
 
-      const makerRemaining = new Decimal(maker.remaining);
-      if (makerRemaining.lte(0)) {
+      const makerRemainingBu = toBaseUnits(maker.remaining, DEFAULT_SCALE);
+      if (makerRemainingBu <= 0n) {
         orderBook.popBestMaker(pairId, oppositeSide);
         continue;
       }
 
       // Self-Trade Prevention (STP): evaluated unconditionally before any fill.
-      // Prevents wash trading, market manipulation, and fee arbitrage.
       if (maker.user_id && takerOrder.user_id && maker.user_id === takerOrder.user_id) {
         orderBook.popBestMaker(pairId, oppositeSide);
         this.logger.warn(
@@ -58,15 +61,17 @@ export class MarketOrderStrategy implements IMatchingStrategy {
         continue;
       }
 
-      const makerPrice = new Decimal(maker.price ?? '0');
+      const makerPriceBu = toBaseUnits(maker.price ?? '0', DEFAULT_SCALE);
 
       // Price protection: reject fill if slippage exceeds tolerance.
-      if (tolerance !== null && maker.price != null) {
-        const ref = referencePrice ?? makerPrice;
+      if (toleranceBu !== null && maker.price != null) {
+        const ref = referencePriceBu ?? makerPriceBu;
+        // BUY: threshold = ref * (1 + tolerance) = ref * (SCALE + toleranceBu) / SCALE
+        // SELL: threshold = ref * (1 - tolerance) = ref * (SCALE - toleranceBu) / SCALE
         const exceeded =
           takerOrder.side === 'BUY'
-            ? makerPrice.gt(ref.mul(new Decimal(1).plus(tolerance)))
-            : makerPrice.lt(ref.mul(new Decimal(1).minus(tolerance)));
+            ? makerPriceBu * SCALE_MULTIPLIER > ref * (SCALE_MULTIPLIER + toleranceBu)
+            : makerPriceBu * SCALE_MULTIPLIER < ref * (SCALE_MULTIPLIER - toleranceBu);
 
         if (exceeded) {
           const popped = orderBook.popBestMaker(pairId, oppositeSide);
@@ -74,14 +79,14 @@ export class MarketOrderStrategy implements IMatchingStrategy {
             orderBook.addOrder(popped);
           }
           this.logger.warn(
-            `Price protection: market order ${takerOrder.order_id} stopped at maker ${maker.order_id} price=${maker.price} ref=${ref.toFixed()} tolerance=${tolerance.toFixed()}`,
+            `Price protection: market order ${takerOrder.order_id} stopped at maker ${maker.order_id} price=${maker.price} ref=${fromBaseUnits(ref, DEFAULT_SCALE)} tolerance=${slippageTolerance}`,
           );
           break;
         }
       }
 
-      const fillAmount = Decimal.min(takerRemaining, makerRemaining);
-      const fillAmountStr = fillAmount.toFixed();
+      const fillAmountBu = takerRemainingBu < makerRemainingBu ? takerRemainingBu : makerRemainingBu;
+      const fillAmountStr = fromBaseUnits(fillAmountBu, DEFAULT_SCALE);
       const priceStr = maker.price ?? '0';
 
       const popped = orderBook.popBestMaker(pairId, oppositeSide);
@@ -95,20 +100,21 @@ export class MarketOrderStrategy implements IMatchingStrategy {
       }
 
       // Anchor reference price on first fill.
-      if (referencePrice === null) {
-        referencePrice = makerPrice;
+      if (referencePriceBu === null) {
+        referencePriceBu = makerPriceBu;
       }
 
       results.push(tradeResult);
 
-      takerRemaining = takerRemaining.minus(fillAmount);
+      takerRemainingBu -= fillAmountBu;
 
-      const newMakerRemaining = makerRemaining.minus(fillAmount);
-      if (newMakerRemaining.gt(0)) {
+      const newMakerRemainingBu = makerRemainingBu - fillAmountBu;
+      if (newMakerRemainingBu > 0n) {
+        const makerFilledBu = toBaseUnits(maker.filled_amount, DEFAULT_SCALE) + fillAmountBu;
         orderBook.addOrder({
           ...maker,
-          filled_amount: new Decimal(maker.filled_amount).plus(fillAmount).toFixed(),
-          remaining: newMakerRemaining.toFixed(),
+          filled_amount: fromBaseUnits(makerFilledBu, DEFAULT_SCALE),
+          remaining: fromBaseUnits(newMakerRemainingBu, DEFAULT_SCALE),
         });
       }
     }

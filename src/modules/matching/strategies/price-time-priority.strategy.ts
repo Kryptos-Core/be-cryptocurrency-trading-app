@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Decimal from 'decimal.js';
 import {
   IMatchingStrategy,
   MatchingContext,
@@ -7,12 +6,15 @@ import {
   TradeExecutionResult,
   TradeExecutor,
 } from '../interfaces';
+import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from '../utils';
 
 /**
  * Price-Time Priority Strategy (Strategy Pattern)
  * Limit order matching: match when taker price crosses maker price.
  * BUY taker matches SELL makers with maker.price <= taker.price (best ask first).
  * SELL taker matches BUY makers with maker.price >= taker.price (best bid first).
+ *
+ * Uses BigInt (int64 base units) for deterministic arithmetic — no floating-point rounding.
  */
 @Injectable()
 export class PriceTimePriorityStrategy implements IMatchingStrategy {
@@ -29,11 +31,11 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
   ): Promise<TradeExecutionResult[]> {
     const { pairId, takerOrder } = context;
     const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
-    const takerPrice = takerOrder.price ? new Decimal(takerOrder.price) : null;
-    let takerRemaining = new Decimal(takerOrder.remaining);
+    const takerPriceBu = takerOrder.price ? toBaseUnits(takerOrder.price, DEFAULT_SCALE) : null;
+    let takerRemainingBu = toBaseUnits(takerOrder.remaining, DEFAULT_SCALE);
     const results: TradeExecutionResult[] = [];
 
-    while (takerRemaining.gt(0)) {
+    while (takerRemainingBu > 0n) {
       const maker = orderBook.peekBestMaker(pairId, oppositeSide);
       if (!maker) break;
 
@@ -44,15 +46,14 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
         continue;
       }
 
-      const makerPrice = new Decimal(maker.price);
-      const makerRemaining = new Decimal(maker.remaining);
-      if (makerRemaining.lte(0)) {
+      const makerPriceBu = toBaseUnits(maker.price, DEFAULT_SCALE);
+      const makerRemainingBu = toBaseUnits(maker.remaining, DEFAULT_SCALE);
+      if (makerRemainingBu <= 0n) {
         orderBook.popBestMaker(pairId, oppositeSide);
         continue;
       }
 
       // Self-Trade Prevention (STP): evaluated before price check to ensure it is unconditional.
-      // Prevents wash trading, market manipulation, and fee arbitrage.
       if (maker.user_id && takerOrder.user_id && maker.user_id === takerOrder.user_id) {
         orderBook.popBestMaker(pairId, oppositeSide);
         this.logger.warn(
@@ -63,12 +64,12 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
 
       const priceCrosses =
         takerOrder.side === 'BUY'
-          ? (takerPrice === null || makerPrice.lte(takerPrice))
-          : (takerPrice === null || makerPrice.gte(takerPrice));
+          ? (takerPriceBu === null || makerPriceBu <= takerPriceBu)
+          : (takerPriceBu === null || makerPriceBu >= takerPriceBu);
       if (!priceCrosses) break;
 
-      const fillAmount = Decimal.min(takerRemaining, makerRemaining);
-      const fillAmountStr = fillAmount.toFixed();
+      const fillAmountBu = takerRemainingBu < makerRemainingBu ? takerRemainingBu : makerRemainingBu;
+      const fillAmountStr = fromBaseUnits(fillAmountBu, DEFAULT_SCALE);
       const priceStr = maker.price;
 
       const popped = orderBook.popBestMaker(pairId, oppositeSide);
@@ -83,14 +84,15 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
 
       results.push(tradeResult);
 
-      takerRemaining = takerRemaining.minus(fillAmount);
+      takerRemainingBu -= fillAmountBu;
 
-      const newMakerRemaining = makerRemaining.minus(fillAmount);
-      if (newMakerRemaining.gt(0)) {
+      const newMakerRemainingBu = makerRemainingBu - fillAmountBu;
+      if (newMakerRemainingBu > 0n) {
+        const makerFilledBu = toBaseUnits(maker.filled_amount, DEFAULT_SCALE) + fillAmountBu;
         orderBook.addOrder({
           ...maker,
-          filled_amount: new Decimal(maker.filled_amount).plus(fillAmount).toFixed(),
-          remaining: newMakerRemaining.toFixed(),
+          filled_amount: fromBaseUnits(makerFilledBu, DEFAULT_SCALE),
+          remaining: fromBaseUnits(newMakerRemainingBu, DEFAULT_SCALE),
         });
       }
     }

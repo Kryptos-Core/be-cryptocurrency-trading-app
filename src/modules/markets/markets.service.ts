@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef, Optional } from '@nestjs/common';
 import { MarketRepository } from './repositories';
 import { CreateMarketPairDto, UpdateMarketPairDto, MarketTickerDto } from './dto';
 import { MarketPair } from '@/entities/market-pair.entity';
@@ -7,6 +7,7 @@ import { OHLCVProviderRegistry } from '@/modules/price-oracle';
 import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
+import { OrderBookService, DepthSnapshot } from '@/modules/matching/orderbook/order-book.service';
 
 /** Default string for missing/zero price (repository contract). */
 const TICKER_ZERO = '0';
@@ -38,6 +39,9 @@ export class MarketsService implements OnModuleInit {
     @Inject(forwardRef(() => CurrenciesService))
     private readonly currenciesService: CurrenciesService,
     private readonly ohlcvProviderRegistry: OHLCVProviderRegistry,
+    @Optional()
+    @Inject(forwardRef(() => OrderBookService))
+    private readonly orderBookService?: OrderBookService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -813,6 +817,31 @@ export class MarketsService implements OnModuleInit {
     }
 
     return interval;
+  }
+
+  /**
+   * Transparent Price Discovery: real-time depth snapshot from in-memory matching engine.
+   * Depth levels: 5, 10, or 20 price levels per side.
+   * No cache — reads directly from the live order book for sub-second freshness.
+   */
+  async getDepthSnapshot(pairId: string, depth: number): Promise<DepthSnapshot> {
+    if (![5, 10, 20].includes(depth)) {
+      throw new BadRequestException('Depth limit must be 5, 10, or 20');
+    }
+    // Validate pair exists
+    await this.findOne(pairId);
+    if (!this.orderBookService) {
+      throw new BadRequestException('Order book service not available');
+    }
+    return this.orderBookService.getSnapshot(pairId, depth as 5 | 10 | 20);
+  }
+
+  /**
+   * Get depth snapshot by symbol
+   */
+  async getDepthSnapshotBySymbol(symbol: string, depth: number): Promise<DepthSnapshot> {
+    const pair = await this.findBySymbol(symbol);
+    return this.getDepthSnapshot(pair.pair_id, depth);
   }
 
   /**

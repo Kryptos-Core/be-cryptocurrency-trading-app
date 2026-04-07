@@ -38,3 +38,12 @@ Tài liệu liên quan: [README.md](../README.md) (hạ tầng), module **matchi
 ## Key bổ sung (theo module)
 
 - **Đăng nhập WalletConnect công khai:** prefix `wc:auth:session:{sessionId}` — TTL ~5 phút; lưu `wcUri`, message, `status`, `address`, `signature` khi có. Chi tiết luồng: **[WALLETCONNECT.md](WALLETCONNECT.md)**.
+
+- **Matching Engine — Redis lock:** prefix `matching:lock:{pairId}` — TTL 10s, giá trị là hex token ngẫu nhiên; xóa atomic bằng Lua script (chỉ DEL nếu value khớp). Chi tiết: `matching/matching.service.ts`.
+
+- **Circuit Breaker:** hai prefix per pair:
+  - `circuit:halt:{pairId}` — tồn tại khi pair đang bị halt; TTL = `haltDurationSec` (cấu hình). Giá trị là JSON `{ triggeredAt, referencePrice, currentPrice }`. Admin xóa thủ công bằng `resumeTrading()`.
+  - `circuit:price:{pairId}` — giá tham chiếu đầu cửa sổ rolling; TTL = `windowSec`. Dùng để phát hiện biến động giá vượt ngưỡng.
+  - Chi tiết: `matching/circuit-breaker.service.ts`.
+
+- **Idempotency key đặt lệnh:** prefix `order:idempotency:{userId}:{key}` — TTL 24h; lưu snapshot JSON của Order để tránh tạo lệnh trùng. Chi tiết: `orders/orders.service.ts`.

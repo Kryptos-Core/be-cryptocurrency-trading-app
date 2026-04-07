@@ -47,6 +47,7 @@
     "@nestjs/typeorm": "^10.0.0",
     "@nestjs/websockets": "^10.2.10",
     "@payos/node": "^2.0.5",
+    "@socket.io/redis-adapter": "^8.3.0",
     "@solana/web3.js": "^1.98.4",
     "@types/nodemailer": "^7.0.11",
     "@types/passport-jwt": "^4.0.1",
