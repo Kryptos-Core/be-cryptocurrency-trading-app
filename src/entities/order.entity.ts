@@ -74,6 +74,9 @@ export class Order {
   @Column({ type: 'varchar', length: 64 })
   idempotency_key!: string;
 
+  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  slippage_tolerance!: string | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

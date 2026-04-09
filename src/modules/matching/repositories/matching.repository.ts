@@ -98,6 +98,8 @@ export class MatchingRepository {
       status: r.status ?? 'OPEN',
       created_at: r.created_at,
       remaining: String(amount - filled),
+      slippage_tolerance:
+        r.slippage_tolerance != null ? String(r.slippage_tolerance) : null,
     };
   }
 }

@@ -55,6 +55,11 @@ export interface AppConfig {
   trading: {
     environment: 'testnet' | 'mainnet';
     exchangeMode: 'binance' | 'mock';
+    /** Used when exchangeMode is mock (Decimal-parseable strings). */
+    mockExchange: {
+      balance: string;
+      orderStatusPrice: string;
+    };
     binance: {
       testnet: {
         enabled: boolean;
@@ -177,10 +182,16 @@ export class AppConfigBuilder {
     binanceMainnetApiKey: string,
     binanceMainnetApiSecret: string,
     binanceMainnetBaseUrl: string,
+    mockExchangeBalance: string = '10000',
+    mockExchangeOrderStatusPrice: string = '50000',
   ): this {
     this.config.trading = {
       environment,
       exchangeMode,
+      mockExchange: {
+        balance: mockExchangeBalance,
+        orderStatusPrice: mockExchangeOrderStatusPrice,
+      },
       binance: {
         testnet: {
           enabled: binanceTestnetEnabled,
@@ -327,6 +338,8 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.BINANCE_MAINNET_API_KEY || '',
       env.BINANCE_MAINNET_API_SECRET || '',
       env.BINANCE_MAINNET_BASE_URL || 'https://fapi.binance.com',
+      env.MOCK_EXCHANGE_BALANCE ?? '10000',
+      env.MOCK_EXCHANGE_ORDER_STATUS_PRICE ?? '50000',
     )
     .setWallet(
       env.BINANCE_TESTNET_ENABLED || false,

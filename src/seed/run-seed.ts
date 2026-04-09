@@ -10,8 +10,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import { newUuid } from '@/common/utils/uuid.util';
 import { UserRole } from '@/common/enums';
+import { newUuid } from '@/common/utils/uuid.util';
+import { parseAndValidateSeedUsers } from '@/seed/seed-users-json.util';
+import { resolveSeedUsersJsonPath } from '@/seed/seed-users-path.util';
 
 dotenv.config();
 
@@ -49,34 +51,26 @@ async function run() {
     await q.query('SET FOREIGN_KEY_CHECKS = 1');
     console.log('✅ Cleared.');
 
-    const seedDir = path.join(process.cwd(), 'src', 'seed', 'data');
-    const usersPath = path.join(seedDir, 'users.json');
-    const usersData: Array<{
-      email: string;
-      password: string;
-      first_name?: string;
-      last_name?: string;
-      status: 'ACTIVE' | 'BANNED' | 'PENDING';
-      role?: UserRole;
-    }> = JSON.parse(fs.readFileSync(usersPath, 'utf-8'));
+    const usersPath = resolveSeedUsersJsonPath({ cwd: process.cwd() });
+    const usersData = parseAndValidateSeedUsers(fs.readFileSync(usersPath, 'utf-8'));
+    console.log(`📄 Seed users file: ${usersPath}`);
 
     console.log(`📥 Seeding ${usersData.length} users...`);
     for (const u of usersData) {
       const userId = newUuid();
       const passwordHash = await bcrypt.hash(u.password, SALT_ROUNDS);
-      const role = u.role ?? (u.email.toLowerCase() === 'max@circle-vn.com' ? UserRole.ADMIN : UserRole.TRADER);
 
       await q.query(
         `INSERT INTO users (user_id, email, password_hash, first_name, last_name, status, role)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
-          u.email.toLowerCase(),
+          u.email,
           passwordHash,
           u.first_name ?? null,
           u.last_name ?? null,
-          u.status ?? 'ACTIVE',
-          role,
+          u.status,
+          u.role,
         ],
       );
     }
@@ -84,7 +78,10 @@ async function run() {
 
     console.log('\n🎉 Seed done. Users imported.');
     console.log('   Currencies & market pairs will sync automatically from Binance on backend startup if catalog is empty.');
-    console.log('   Login e.g. max@circle-vn.com / Admin@123!');
+    const firstAdmin = usersData.find((x) => x.role === UserRole.ADMIN);
+    if (firstAdmin) {
+      console.log(`   Login e.g. ${firstAdmin.email} / (password from your seed file)`);
+    }
   } catch (err) {
     console.error('Seed failed:', err);
     process.exit(1);

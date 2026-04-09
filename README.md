@@ -72,6 +72,12 @@ npm run start:dev
 
 Các nhóm thường dùng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `WALLETCONNECT_PROJECT_ID` / `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `FIREBASE_*` (push), SMTP (2FA). Biến mà `ConfigService` đọc được phải khai báo trong whitelist `src/config/env.validation.ts`.
 
+### Matching engine (queue + sổ lệnh)
+
+- **Một worker** xử lý queue `matching` được khuyến nghị trong production; processor đã đặt `concurrency: 1` cho job khớp lệnh.
+- **`MATCHING_BOOK_FULL_REFRESH`**: đặt `true` / `1` / `yes` nếu nhiều process cùng consume queue — mỗi lần `runMatch` reload sổ từ DB (tải DB hơn, giảm lệch in-memory). Mặc định để trống (tắt).
+- **Migration `1775510000000`**: `npm run migration:revert` **không** hoàn tác migration này; cần backup hoặc tái tạo procedure/cột thủ công (xem JSDoc trong file migration).
+
 ## Cấu trúc thư mục
 
 ```
@@ -102,15 +108,16 @@ be-cryptocurrency-trading-app/
 
 Enum **`UserRole`** (cột `users.role`, claim `role` trong JWT): `ADMIN`, `TRADER`, `RISK_OFFICER`, `SUPPORT_AGENT`, `MARKET_MAKER`, `FINANCE_MANAGER` — định nghĩa tại `src/common/enums/index.ts`. **Không** có role `GUEST` trên server.
 
-Dữ liệu mẫu trong `src/seed/data/users.json`. Sau `npm run db:seed`, mỗi giá trị `UserRole` đều có ít nhất một user demo.
+Mặc định seed đọc `src/seed/data/users.json` nếu có; nếu không, dùng [`src/seed/data/users.json.example`](src/seed/data/users.json.example). Có thể đặt `SEED_USERS_JSON` trỏ tới file khác. Mỗi user **bắt buộc** có trường `role`. Copy `users.json.example` → `users.json`, đổi mật khẩu trước khi dùng ngoài dev (file `users.json` được gitignore).
 
-| Email | Mật khẩu | `UserRole` | Ghi chú |
-|-------|----------|------------|---------|
-| max@circle-vn.com | Admin@123! | `ADMIN` | |
-| hoangsondz1910@gmail.com | Trader@123! | `TRADER` | |
-| trader2@example.com | Trader@123! | `TRADER` | |
-| trader3@example.com | Trader@123! | `TRADER` | |
-| hsondz1910@gmail.com | Risk@123! | `RISK_OFFICER` | |
-| support@example.com | Support@123! | `SUPPORT_AGENT` | |
-| maxnoah901@gmail.com | Maker@123! | `MARKET_MAKER` | |
-| xosep44185@nyspring.com | Finance@123! | `FINANCE_MANAGER` | |
+Sau `npm run db:seed`, mỗi giá trị `UserRole` trong file mẫu đều có ít nhất một user demo:
+
+| Email | Mật khẩu (mẫu) | `UserRole` |
+|-------|----------------|------------|
+| admin@example.com | ChangeMeAdmin! | `ADMIN` |
+| trader1@example.com | ChangeMeTrader! | `TRADER` |
+| trader2@example.com | ChangeMeTrader! | `TRADER` |
+| risk@example.com | ChangeMeRisk! | `RISK_OFFICER` |
+| support@example.com | ChangeMeSupport! | `SUPPORT_AGENT` |
+| maker@example.com | ChangeMeMaker! | `MARKET_MAKER` |
+| finance@example.com | ChangeMeFinance! | `FINANCE_MANAGER` |

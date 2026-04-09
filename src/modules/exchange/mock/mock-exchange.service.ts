@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
 import {
   IExchangeProvider,
@@ -15,13 +16,26 @@ import {
 export class MockExchangeService implements IExchangeProvider {
   private readonly logger = new Logger(MockExchangeService.name);
 
+  constructor(private readonly configService: ConfigService) {}
+
+  private mockBalance(): Decimal {
+    const raw = this.configService.get<string>('app.trading.mockExchange.balance') ?? '10000';
+    return new Decimal(raw);
+  }
+
+  private mockOrderStatusPrice(): Decimal {
+    const raw =
+      this.configService.get<string>('app.trading.mockExchange.orderStatusPrice') ?? '50000';
+    return new Decimal(raw);
+  }
+
   async getBalance(asset: string): Promise<ExchangeBalanceDto> {
     this.logger.debug(`[MOCK] Getting balance for ${asset}`);
-    
+    const total = this.mockBalance();
     return {
-      available: new Decimal(10000),
+      available: total,
       frozen: new Decimal(0),
-      total: new Decimal(10000),
+      total,
       currency: asset,
       timestamp: new Date(),
     };
@@ -49,14 +63,14 @@ export class MockExchangeService implements IExchangeProvider {
 
   async getOrderStatus(orderId: string, symbol: string): Promise<ExchangeOrderResponse> {
     this.logger.debug(`[MOCK] Getting order status ${orderId}`);
-    
+    const price = this.mockOrderStatusPrice();
     return {
       orderId,
       symbol,
       status: 'FILLED',
       side: 'BUY',
       type: 'LIMIT',
-      price: new Decimal(50000),
+      price,
       quantity: new Decimal(1),
       executedQty: new Decimal(1),
       timestamp: new Date(),

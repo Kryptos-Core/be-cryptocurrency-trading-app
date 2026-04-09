@@ -9,6 +9,8 @@ import { OrderBookOrder } from './interfaces';
 import { AuditTradeVisitor } from './visitors/audit-trade.visitor';
 import { MetricsTradeVisitor } from './visitors/metrics-trade.visitor';
 import { CircuitBreakerService } from './circuit-breaker.service';
+import { ConfigService } from '@nestjs/config';
+import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
 
 function order(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {
@@ -71,6 +73,10 @@ describe('MatchingService', () => {
             recordPriceAndCheck: jest.fn().mockResolvedValue(false),
           },
         },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -80,18 +86,19 @@ describe('MatchingService', () => {
     circuitBreaker = module.get(CircuitBreakerService);
   });
 
-  it('returns [] when lock is not acquired after retries', async () => {
+  it('throws MatchingLockContentionError when lock is not acquired after retries', async () => {
     redisClient.set.mockImplementation(() => Promise.resolve(null));
 
-    const results = await service.runMatch({
-      takerOrder: order({ order_id: 'tk1' }),
-      pairId: 'pair-1',
-      feeCurrencyId: 'quote-1',
-      makerFeeRate: '0.001',
-      takerFeeRate: '0.001',
-    });
+    await expect(
+      service.runMatch({
+        takerOrder: order({ order_id: 'tk1' }),
+        pairId: 'pair-1',
+        feeCurrencyId: 'quote-1',
+        makerFeeRate: '0.001',
+        takerFeeRate: '0.001',
+      }),
+    ).rejects.toThrow(MatchingLockContentionError);
 
-    expect(results).toEqual([]);
     expect(matchingRepository.getOpenOrdersForPair).not.toHaveBeenCalled();
   });
 
@@ -147,6 +154,47 @@ describe('MatchingService', () => {
     expect(matchingRepository.executeTrade).not.toHaveBeenCalled();
     // FOK order must be cancelled in DB
     expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith('tk-fok', 'user-1');
+  });
+
+  it('FOK MARKET: slippage check prevents false positive when depth exists but second price breaches tolerance', async () => {
+    const mkSell = (id: string, price: string, rem: string, uid = 'user-2') =>
+      order({
+        order_id: id,
+        side: 'SELL',
+        user_id: uid,
+        type: 'LIMIT',
+        price,
+        remaining: rem,
+        amount: rem,
+      });
+
+    matchingRepository.getOpenOrdersForPair.mockImplementation(
+      async (_pairId: string, side: 'BUY' | 'SELL') => {
+        if (side === 'SELL') return [mkSell('m-a', '100', '0.5'), mkSell('m-b', '110', '0.5', 'user-3')];
+        return [];
+      },
+    );
+
+    await expect(
+      service.runMatch({
+        takerOrder: order({
+          order_id: 'tk-fok-mkt',
+          side: 'BUY',
+          type: 'MARKET',
+          amount: '1',
+          remaining: '1',
+          time_in_force: 'FOK',
+          slippage_tolerance: '0.05',
+        }),
+        pairId: 'pair-1',
+        feeCurrencyId: 'quote-1',
+        makerFeeRate: '0.001',
+        takerFeeRate: '0.001',
+      }),
+    ).resolves.toEqual([]);
+
+    expect(matchingRepository.executeTrade).not.toHaveBeenCalled();
+    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith('tk-fok-mkt', 'user-1');
   });
 
   it('does not duplicate taker snapshot when same order already loaded in book', async () => {

@@ -12,6 +12,8 @@ export interface OrderValidationContext {
   timeInForce?: string;
   minOrderAmount: string;
   availableBalance: string;
+  /** MARKET BUY: max quote to reserve (must match DB freeze) */
+  requiredQuoteForBuy?: string;
   amountScale?: number;
   priceScale?: number;
 }
@@ -115,7 +117,17 @@ export class OrderValidationStrategy implements IOrderValidationStrategy {
     const price = context.price ? parseFloat(context.price) : 0;
 
     if (context.side === 'BUY') {
-      const required = amount * price;
+      let required: number;
+      if (context.requiredQuoteForBuy !== undefined) {
+        required = parseFloat(context.requiredQuoteForBuy);
+        if (Number.isNaN(required) || required <= 0) {
+          throw new ValidationException('Invalid required quote for buy order', {
+            requiredQuoteForBuy: context.requiredQuoteForBuy,
+          });
+        }
+      } else {
+        required = amount * price;
+      }
       if (available < required) {
         throw new BusinessException(
           'Insufficient quote balance for this order',

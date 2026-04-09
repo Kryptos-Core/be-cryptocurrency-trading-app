@@ -1,15 +1,15 @@
 [
   {
-    "email": "max@circle-vn.com",
-    "password": "Admin@123!",
+    "email": "admin@example.com",
+    "password": "ChangeMeAdmin!",
     "first_name": "Admin",
     "last_name": "User",
     "status": "ACTIVE",
     "role": "ADMIN"
   },
   {
-    "email": "hoangsondz1910@gmail.com",
-    "password": "Trader@123!",
+    "email": "trader1@example.com",
+    "password": "ChangeMeTrader!",
     "first_name": "Trader",
     "last_name": "One",
     "status": "ACTIVE",
@@ -17,23 +17,15 @@
   },
   {
     "email": "trader2@example.com",
-    "password": "Trader@123!",
+    "password": "ChangeMeTrader!",
     "first_name": "Trader",
     "last_name": "Two",
     "status": "ACTIVE",
     "role": "TRADER"
   },
   {
-    "email": "trader3@example.com",
-    "password": "Trader@123!",
-    "first_name": "Trader",
-    "last_name": "Three",
-    "status": "ACTIVE",
-    "role": "TRADER"
-  },
-  {
-    "email": "hsondz1910@gmail.com",
-    "password": "Risk@123!",
+    "email": "risk@example.com",
+    "password": "ChangeMeRisk!",
     "first_name": "Risk",
     "last_name": "Officer",
     "status": "ACTIVE",
@@ -41,23 +33,23 @@
   },
   {
     "email": "support@example.com",
-    "password": "Support@123!",
+    "password": "ChangeMeSupport!",
     "first_name": "Support",
     "last_name": "Agent",
     "status": "ACTIVE",
     "role": "SUPPORT_AGENT"
   },
   {
-    "email": "maxnoah901@gmail.com",
-    "password": "Maker@123!",
+    "email": "maker@example.com",
+    "password": "ChangeMeMaker!",
     "first_name": "Market",
     "last_name": "Maker",
     "status": "ACTIVE",
     "role": "MARKET_MAKER"
   },
   {
-    "email": "xosep44185@nyspring.com",
-    "password": "Finance@123!",
+    "email": "finance@example.com",
+    "password": "ChangeMeFinance!",
     "first_name": "Finance",
     "last_name": "Manager",
     "status": "ACTIVE",

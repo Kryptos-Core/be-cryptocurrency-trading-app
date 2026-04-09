@@ -65,6 +65,22 @@ export class OrderRepository extends BaseRepository<Order> {
     }
   }
 
+  /**
+   * Best ask: lowest LIMIT sell price with liquidity (DB source of truth for MARKET BUY reserve).
+   */
+  async findBestLimitSellPrice(pairId: string): Promise<string | null> {
+    const trimmed = pairId.trim();
+    const rows = await this.dataSource.query(
+      `SELECT MIN(price) AS best_ask FROM orders
+       WHERE TRIM(pair_id) = ? AND side = 'SELL' AND type = 'LIMIT'
+         AND status IN ('OPEN', 'PARTIAL') AND price IS NOT NULL AND price > 0`,
+      [trimmed],
+    );
+    const raw = rows?.[0]?.best_ask;
+    if (raw == null || raw === '') return null;
+    return String(raw);
+  }
+
   async getOrderBook(
     pairId: string,
     side: 'BUY' | 'SELL',
@@ -109,10 +125,12 @@ export class OrderRepository extends BaseRepository<Order> {
     timeInForce: string;
     clientOrderId: string | null;
     idempotencyKey: string;
+    slippageTolerance: string | null;
+    marketBuyReservedQuote: string | null;
   }): Promise<CreateOrderProcedureResult> {
     try {
       await this.dataSource.query(
-        'CALL sp_order_create(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)',
+        'CALL sp_order_create(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)',
         [
           params.orderId,
           params.userId,
@@ -124,6 +142,8 @@ export class OrderRepository extends BaseRepository<Order> {
           params.timeInForce,
           params.clientOrderId ?? null,
           params.idempotencyKey,
+          params.slippageTolerance,
+          params.marketBuyReservedQuote,
         ],
       );
       const [out] = await this.dataSource.query(
@@ -263,6 +283,8 @@ export class OrderRepository extends BaseRepository<Order> {
     order.reserved_base = String(row.reserved_base ?? '0');
     order.client_order_id = row.client_order_id ?? (null as any);
     order.idempotency_key = row.idempotency_key ?? '';
+    order.slippage_tolerance =
+      row.slippage_tolerance != null ? String(row.slippage_tolerance) : null;
     order.created_at = row.created_at;
     order.updated_at = row.updated_at;
     return order;

@@ -36,6 +36,9 @@ Sau đó điền thông tin và chạy ứng dụng.
 |---|---|
 | TRADING_ENVIRONMENT | `testnet` hoặc `mainnet` |
 | EXCHANGE_MODE | `binance` hoặc `mock` |
+| MOCK_EXCHANGE_BALANCE | (chỉ khi `EXCHANGE_MODE=mock`) Chuỗi Decimal — số dư mock trả về `getBalance` (mặc định `10000`) |
+| MOCK_EXCHANGE_ORDER_STATUS_PRICE | (chỉ khi mock) Giá mock trong `getOrderStatus` (mặc định `50000`) |
+| SEED_USERS_JSON | (tùy chọn, script seed) Đường dẫn file JSON users; nếu không set, dùng `src/seed/data/users.json` hoặc `users.json.example` |
 | BINANCE_TESTNET_ENABLED | `true`/`false` |
 | BINANCE_TESTNET_API_KEY | API key bản thử nghiệm |
 | BINANCE_TESTNET_API_SECRET | API secret bản thử nghiệm |

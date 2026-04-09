@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { OrderBookService } from './orderbook';
 import { MatchingRepository } from './repositories';
@@ -15,6 +16,8 @@ import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 import { RedisService } from '@/common/services';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from './utils';
+import { marketOrderCanFullyFillRemaining } from './utils/market-fok-fill.util';
+import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
 
 const LOCK_PREFIX = 'matching:lock:';
 const LOCK_TTL_MS = 10000;
@@ -66,6 +69,7 @@ export class MatchingService implements OnModuleInit {
     private readonly auditVisitor: AuditTradeVisitor,
     private readonly metricsVisitor: MetricsTradeVisitor,
     private readonly circuitBreaker: CircuitBreakerService,
+    private readonly configService: ConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -114,17 +118,25 @@ export class MatchingService implements OnModuleInit {
     }
     if (acquired !== 'OK') {
       this.logger.warn(
-        `Matching lock not acquired for pair ${pairId} after ${LOCK_RETRY_ATTEMPTS} attempts, skipping`,
+        `Matching lock contention pair=${pairId} order=${takerOrder.order_id} reason=lock_exhausted attempts=${LOCK_RETRY_ATTEMPTS}`,
       );
-      return [];
+      throw new MatchingLockContentionError(pairId.trim(), takerOrder.order_id);
     }
 
     try {
       await this.refreshOrderBookFromDbExcludingTaker(pairId, takerOrder.order_id);
 
       const tif = (takerOrder.time_in_force ?? 'GTC').toUpperCase();
+      const effectiveSlippage =
+        slippageTolerance?.trim() ||
+        takerOrder.slippage_tolerance?.trim() ||
+        undefined;
       if (tif === 'FOK') {
-        const canFullyFill = await this.canFullyFillOrder({ pairId, takerOrder });
+        const canFullyFill = await this.canFullyFillOrder({
+          pairId,
+          takerOrder,
+          fokSlippageTolerance: effectiveSlippage,
+        });
         if (!canFullyFill) {
           this.logger.log(
             `FOK order ${takerOrder.order_id} cannot be fully filled now; skip execution`,
@@ -147,7 +159,7 @@ export class MatchingService implements OnModuleInit {
         feeCurrencyId,
         makerFeeRate,
         takerFeeRate,
-        ...(slippageTolerance !== undefined && { slippageTolerance }),
+        ...(effectiveSlippage !== undefined && { slippageTolerance: effectiveSlippage }),
       };
 
       const executeTrade: TradeExecutor = async (makerOrder, fillAmount, price) => {
@@ -248,10 +260,20 @@ export class MatchingService implements OnModuleInit {
   private async canFullyFillOrder(params: {
     pairId: string;
     takerOrder: OrderBookOrder;
+    /** When set on MARKET FOK, must match MarketOrderStrategy slippage rules. */
+    fokSlippageTolerance?: string;
   }): Promise<boolean> {
-    const { pairId, takerOrder } = params;
+    const { pairId, takerOrder, fokSlippageTolerance } = params;
     const oppositeSide = takerOrder.side === 'BUY' ? 'SELL' : 'BUY';
     const makers = this.orderBookService.getOrders(pairId, oppositeSide);
+
+    if (
+      takerOrder.type === 'MARKET' &&
+      fokSlippageTolerance &&
+      toBaseUnits(fokSlippageTolerance, DEFAULT_SCALE) > 0n
+    ) {
+      return marketOrderCanFullyFillRemaining(makers, takerOrder, fokSlippageTolerance);
+    }
 
     const takerPriceBu = takerOrder.price ? toBaseUnits(takerOrder.price, DEFAULT_SCALE) : null;
     let remainingBu = toBaseUnits(takerOrder.remaining, DEFAULT_SCALE);
@@ -299,11 +321,23 @@ export class MatchingService implements OnModuleInit {
    * book incrementally (add/remove updates keep it consistent with DB state).
    * Taker is excluded from the book so it only acts as context, not a resting duplicate.
    */
+  private matchingBookFullRefreshEnabled(): boolean {
+    const v = (
+      this.configService.get<string>('MATCHING_BOOK_FULL_REFRESH') ??
+      process.env.MATCHING_BOOK_FULL_REFRESH ??
+      ''
+    )
+      .trim()
+      .toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  }
+
   private async refreshOrderBookFromDbExcludingTaker(
     pairId: string,
     takerOrderId: string,
   ): Promise<void> {
-    if (this.orderBookService.isLoaded(pairId)) {
+    const fullRefresh = this.matchingBookFullRefreshEnabled();
+    if (!fullRefresh && this.orderBookService.isLoaded(pairId)) {
       // Incremental path: book is already seeded; just ensure the taker is not in it as a resting order.
       this.orderBookService.removeOrder(pairId, takerOrderId, 'BUY');
       this.orderBookService.removeOrder(pairId, takerOrderId, 'SELL');
@@ -361,15 +395,24 @@ export class MatchingService implements OnModuleInit {
       let progressed = false;
       for (const taker of sorted) {
         matchRuns += 1;
-        const results = await this.runMatch({
-          takerOrder: taker,
-          pairId,
-          feeCurrencyId,
-          makerFeeRate,
-          takerFeeRate,
-          // slippageTolerance intentionally omitted: reconcile is admin-initiated and
-          // processes existing orders that had their slippage window at submission time.
-        });
+        let results: TradeExecutionResult[] = [];
+        try {
+          results = await this.runMatch({
+            takerOrder: taker,
+            pairId,
+            feeCurrencyId,
+            makerFeeRate,
+            takerFeeRate,
+          });
+        } catch (e) {
+          if (e instanceof MatchingLockContentionError) {
+            this.logger.warn(
+              `Reconcile: lock contention for pair ${pairId} order ${taker.order_id}, will retry next round`,
+            );
+            continue;
+          }
+          throw e;
+        }
         if (results.length > 0) {
           tradesExecuted += results.length;
           progressed = true;

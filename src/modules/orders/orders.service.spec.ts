@@ -50,6 +50,7 @@ describe('OrdersService', () => {
       createOrderViaProcedure: jest.fn(),
       cancelOrderViaProcedure: jest.fn(),
       getOrderBook: jest.fn(),
+      findBestLimitSellPrice: jest.fn(),
       findByUser: jest.fn(),
       countByUser: jest.fn(),
     };
@@ -159,7 +160,12 @@ describe('OrdersService', () => {
       orderRepository.findById.mockResolvedValue(mockOrder);
       const result = await service.create({ userId: 'u1', dto });
       expect(validationStrategy.validate).toHaveBeenCalled();
-      expect(orderRepository.createOrderViaProcedure).toHaveBeenCalled();
+      expect(orderRepository.createOrderViaProcedure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slippageTolerance: null,
+          marketBuyReservedQuote: null,
+        }),
+      );
       expect(cacheService.set).toHaveBeenCalled();
       expect(result).toEqual(mockOrder);
     });

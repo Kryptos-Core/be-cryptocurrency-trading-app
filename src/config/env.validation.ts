@@ -78,6 +78,14 @@ export class EnvironmentVariables {
   @IsOptional()
   REDIS_DB?: number = 0;
 
+  /**
+   * When true/1/yes: reload order book from DB on every match (reduces stale in-memory book if multiple workers run matching).
+   * Default off. Bull consumer uses concurrency 1 per job name; prefer a single matching worker in production.
+   */
+  @IsString()
+  @IsOptional()
+  MATCHING_BOOK_FULL_REFRESH?: string;
+
   // JWT Configuration
   @IsString()
   @IsNotEmpty()
@@ -151,6 +159,21 @@ export class EnvironmentVariables {
   @IsEnum(['binance', 'mock'])
   @IsOptional()
   EXCHANGE_MODE?: string = 'mock';
+
+  /** Mock exchange: Decimal-parseable balance returned by getBalance (default 10000). */
+  @IsString()
+  @IsOptional()
+  MOCK_EXCHANGE_BALANCE?: string;
+
+  /** Mock exchange: Decimal-parseable price in getOrderStatus (default 50000). */
+  @IsString()
+  @IsOptional()
+  MOCK_EXCHANGE_ORDER_STATUS_PRICE?: string;
+
+  /** Optional path to seed users JSON (absolute or relative to process cwd). Seed script only. */
+  @IsString()
+  @IsOptional()
+  SEED_USERS_JSON?: string;
 
   // Binance Testnet Configuration
   @IsBoolean()
@@ -373,6 +396,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'REDIS_PORT',
     'REDIS_PASSWORD',
     'REDIS_DB',
+    'MATCHING_BOOK_FULL_REFRESH',
     'JWT_SECRET',
     'JWT_EXPIRATION',
     'JWT_REFRESH_SECRET',
@@ -389,6 +413,9 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'EXTERNAL_API_KEY',
     'TRADING_ENVIRONMENT',
     'EXCHANGE_MODE',
+    'MOCK_EXCHANGE_BALANCE',
+    'MOCK_EXCHANGE_ORDER_STATUS_PRICE',
+    'SEED_USERS_JSON',
     'BINANCE_TESTNET_ENABLED',
     'BINANCE_TESTNET_API_KEY',
     'BINANCE_TESTNET_API_SECRET',

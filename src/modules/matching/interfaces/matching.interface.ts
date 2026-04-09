@@ -16,6 +16,8 @@ export interface OrderBookOrder {
   created_at: Date;
   /** amount - filled_amount */
   remaining: string;
+  /** Persisted for MARKET orders (FOK slippage check, match job) */
+  slippage_tolerance?: string | null;
 }
 
 /**

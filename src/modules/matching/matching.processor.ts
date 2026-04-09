@@ -8,6 +8,7 @@ import { MATCHING_QUEUE, MATCH_ORDER_JOB, MatchOrderJobData } from './matching-q
  * MatchingProcessor — Bull queue consumer.
  * Picks up MATCH_ORDER_JOB jobs and delegates to MatchingService.runMatch().
  * Errors are rethrown so Bull can apply the retry policy from MatchingQueueService.enqueueMatch().
+ * concurrency: 1 per queue reduces in-memory order book races when multiple workers share Redis.
  */
 @Processor(MATCHING_QUEUE)
 export class MatchingProcessor {
@@ -15,7 +16,7 @@ export class MatchingProcessor {
 
   constructor(private readonly matchingService: MatchingService) {}
 
-  @Process(MATCH_ORDER_JOB)
+  @Process({ name: MATCH_ORDER_JOB, concurrency: 1 })
   async handleMatch(job: Job<MatchOrderJobData>): Promise<void> {
     const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } = job.data;
     this.logger.debug(

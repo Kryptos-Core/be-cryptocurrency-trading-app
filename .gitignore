@@ -4,6 +4,9 @@ dist/
 .DS_Store
 .env
 
+# Local seed users (copy from src/seed/data/users.json.example)
+src/seed/data/users.json
+
 # Test coverage (Jest / Istanbul)
 coverage/
 .coverage-tmp/

@@ -24,16 +24,16 @@ Cần file `.env` hợp lệ (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`
 
 ## Nguồn dữ liệu users
 
-File: [`data/users.json`](data/users.json)
+Thứ tự: biến môi trường `SEED_USERS_JSON` (đường dẫn tuyệt đối hoặc tương đối cwd) → `src/seed/data/users.json` nếu tồn tại → nếu không thì `src/seed/data/users.json.example`.
 
-Mỗi phần tử hỗ trợ tối thiểu: `email`, `password`, `first_name`, `last_name`, `status`, `role` (ví dụ `ADMIN`, `TRADER`, `MARKET_MAKER`, …). UUID user do seed sinh khi chạy. Xác minh định danh dùng cột `identity_verified` (migration), không dùng role `VERIFIED_USER`.
+Mỗi phần tử bắt buộc: `email`, `password`, `role`; khuyến nghị `status` (`ACTIVE` \| `BANNED` \| `PENDING`). Không còn gán `role` theo email trong code. UUID user do seed sinh khi chạy.
 
-Ví dụ cấu trúc một dòng:
+Ví dụ một dòng:
 
 ```json
 {
-  "email": "max@circle-vn.com",
-  "password": "Admin@123!",
+  "email": "admin@example.com",
+  "password": "ChangeMeAdmin!",
   "first_name": "Admin",
   "last_name": "User",
   "status": "ACTIVE",
@@ -41,8 +41,8 @@ Ví dụ cấu trúc một dòng:
 }
 ```
 
-Sửa `data/users.json` rồi chạy lại `npm run db:seed` để áp dụng (lưu ý: seed xóa user cũ theo logic trong `run-seed.ts`).
+Copy [`data/users.json.example`](data/users.json.example) thành `data/users.json` để tùy chỉnh local (`users.json` không commit). Chạy lại `npm run db:seed` sau khi sửa file.
 
 ## Danh sách đăng nhập thử (sau seed mặc định)
 
-Xem bảng tài khoản trong [README.md](../../README.md) gốc backend (đồng bộ với `users.json`).
+Xem bảng trong [README.md](../../README.md) gốc backend.

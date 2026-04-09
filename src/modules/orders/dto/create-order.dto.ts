@@ -5,6 +5,7 @@ import {
   IsEnum,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -75,11 +76,22 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional({
     description:
-      'Max allowed slippage for MARKET orders as a decimal fraction (e.g. "0.01" = 1%). ' +
-      'Ignored for LIMIT orders. When absent, no slippage protection is applied.',
+      'Slippage as decimal fraction (e.g. "0.01" = 1%). Required for MARKET BUY (quote reserve cap). ' +
+      'Optional for MARKET SELL (match-time protection). Ignored for LIMIT.',
     example: '0.01',
   })
+  @ValidateIf((o: CreateOrderDto) => o.type !== 'MARKET')
   @IsOptional()
+  @ValidateIf((o: CreateOrderDto) => o.type === 'MARKET' && o.side === 'BUY')
+  @IsNotEmpty({
+    message: 'slippageTolerance is required for MARKET BUY orders',
+  })
+  @ValidateIf(
+    (o: CreateOrderDto) =>
+      o.type === 'MARKET' &&
+      (o.side === 'BUY' ||
+        (o.slippageTolerance != null && String(o.slippageTolerance).trim() !== '')),
+  )
   @IsString()
   @Matches(/^0(\.\d{1,18})?$/, {
     message: 'slippageTolerance must be a decimal fraction between 0 and 1 (e.g. "0.01")',

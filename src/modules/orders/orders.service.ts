@@ -12,6 +12,7 @@ import {
   BusinessException,
   ForbiddenException,
 } from '@/common/exceptions';
+import { computeMarketBuyMaxQuoteReserve } from './utils/market-buy-reserve.util';
 import { Order } from '@/entities/order.entity';
 import { MarketRepository } from '@/modules/markets/repositories';
 import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
@@ -78,6 +79,33 @@ export class OrdersService {
     const availableQuote = quoteWallet?.available ?? '0';
     const availableBase = baseWallet?.available ?? '0';
 
+    let requiredQuoteForBuy: string | undefined;
+    let slippageForDb: string | null = null;
+    let marketBuyReservedQuote: string | null = null;
+
+    if (dto.type === 'MARKET' && dto.side === 'BUY') {
+      const slip = dto.slippageTolerance?.trim() ?? '';
+      if (!slip) {
+        throw new BusinessException(
+          'slippageTolerance is required for MARKET BUY orders',
+          'INVALID_INPUT',
+        );
+      }
+      const bestAsk = await this.orderRepository.findBestLimitSellPrice(dto.pairId);
+      if (!bestAsk) {
+        throw new BusinessException(
+          'No sell-side limit liquidity for this pair',
+          'NO_LIQUIDITY',
+        );
+      }
+      const maxQuote = computeMarketBuyMaxQuoteReserve(bestAsk, dto.amount, slip);
+      requiredQuoteForBuy = maxQuote;
+      marketBuyReservedQuote = maxQuote;
+      slippageForDb = slip;
+    } else if (dto.type === 'MARKET' && dto.slippageTolerance?.trim()) {
+      slippageForDb = dto.slippageTolerance.trim();
+    }
+
     this.validationStrategy.validate({
       pairId: dto.pairId,
       side: dto.side,
@@ -87,6 +115,7 @@ export class OrdersService {
       timeInForce: dto.timeInForce,
       minOrderAmount: pair.min_order_amount ?? '0.0001',
       availableBalance: dto.side === 'BUY' ? availableQuote : availableBase,
+      ...(requiredQuoteForBuy !== undefined ? { requiredQuoteForBuy } : {}),
       amountScale: Number(pair.amount_scale ?? 18),
       priceScale: Number(pair.price_scale ?? 18),
     });
@@ -104,6 +133,8 @@ export class OrdersService {
       timeInForce: dto.timeInForce ?? 'GTC',
       clientOrderId: dto.clientOrderId ?? null,
       idempotencyKey: dto.idempotencyKey,
+      slippageTolerance: slippageForDb,
+      marketBuyReservedQuote,
     });
 
     if (result.error_code) {
@@ -137,8 +168,8 @@ export class OrdersService {
             feeCurrencyId: pair.quote_currency_id,
             makerFeeRate: pair.maker_fee_rate ?? '0.001',
             takerFeeRate: pair.taker_fee_rate ?? '0.001',
-            ...(order.type === 'MARKET' && command.dto.slippageTolerance !== undefined
-              ? { slippageTolerance: command.dto.slippageTolerance }
+            ...(order.type === 'MARKET' && order.slippage_tolerance
+              ? { slippageTolerance: order.slippage_tolerance }
               : {}),
           });
         } catch (e) {
@@ -394,6 +425,12 @@ export class OrdersService {
         throw new BusinessException(msg, code);
       case 'INSUFFICIENT_BALANCE':
         throw new BusinessException(msg, 'INSUFFICIENT_BALANCE');
+      case 'NO_LIQUIDITY':
+        throw new BusinessException(msg, 'NO_LIQUIDITY');
+      case 'INVALID_INPUT':
+        throw new BusinessException(msg, 'INVALID_INPUT');
+      case 'INVALID_MARKET_BUY_RESERVE':
+        throw new BusinessException(msg, 'INVALID_MARKET_BUY_RESERVE');
       case 'ORDER_NOT_FOUND':
         throw new NotFoundException('Order', '');
       case 'FORBIDDEN':
@@ -422,6 +459,7 @@ export class OrdersService {
       reserved_base: o.reserved_base,
       client_order_id: o.client_order_id,
       idempotency_key: o.idempotency_key,
+      slippage_tolerance: o.slippage_tolerance,
       created_at: o.created_at,
       updated_at: o.updated_at,
     };
@@ -454,6 +492,7 @@ export class OrdersService {
     status: string;
     created_at: Date;
     remaining: string;
+    slippage_tolerance?: string | null;
   } {
     const filled = parseFloat(o.filled_amount ?? '0');
     const amount = parseFloat(o.amount ?? '0');
@@ -470,6 +509,7 @@ export class OrdersService {
       status: o.status,
       created_at: o.created_at,
       remaining: String(amount - filled),
+      slippage_tolerance: o.slippage_tolerance ?? null,
     };
   }
 }
