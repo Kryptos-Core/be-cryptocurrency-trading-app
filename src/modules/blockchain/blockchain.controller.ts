@@ -163,13 +163,13 @@ export class BlockchainController {
   @ApiOperation({
     summary: 'Lấy địa chỉ nạp tiền theo mạng',
     description:
-      'Tron Nile/Shasta: chỉ địa chỉ từ transaction_wallets làm default nạp user. Các chain khác: ví nóng chain. Không có default Tron → 400.',
+      'Tron mainnet (TRC-20): địa chỉ từ transaction_wallets default nạp user. Các chain khác: ví nóng. Không có default Tron → 400.',
   })
   @ApiQuery({
     name: 'chain',
     required: true,
     type: String,
-    example: 'ETH_SEPOLIA',
+    example: 'ETH_MAINNET',
   })
   @ApiSuccessResponse('Địa chỉ nạp tiền theo mạng')
   @ApiBadRequestResponse('Thiếu chain hoặc chain không hợp lệ')
@@ -184,10 +184,7 @@ export class BlockchainController {
       normalizedChain,
     );
 
-    if (
-      normalizedChain === BlockchainNetwork.TRON_NILE ||
-      normalizedChain === BlockchainNetwork.TRON_SHASTA
-    ) {
+    if (normalizedChain === BlockchainNetwork.TRON_MAINNET) {
       if (!depositWallet) {
         throw new BadRequestException(
           'Chưa cấu hình ví nạp mặc định cho mạng này. Vui lòng đặt default trong Nạp tiền & ví quản lý.',
@@ -221,7 +218,7 @@ export class BlockchainController {
     description:
       'Kiểm tra nhanh giao dịch on-chain để FE tự điền amount trước khi submit deposit.',
   })
-  @ApiQuery({ name: 'chain', required: true, type: String, example: 'ETH_SEPOLIA' })
+  @ApiQuery({ name: 'chain', required: true, type: String, example: 'ETH_MAINNET' })
   @ApiQuery({ name: 'txHash', required: true, type: String })
   @ApiSuccessResponse('Thông tin preview giao dịch nạp')
   @ApiBadRequestResponse('Thiếu chain/txHash hoặc txHash không hợp lệ')

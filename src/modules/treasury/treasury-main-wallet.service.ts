@@ -23,6 +23,7 @@ import {
 } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { ImportMainWalletDto } from './dto';
+import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
 
 export type SupportedTreasuryChain = TreasuryMainWalletChain;
 
@@ -582,8 +583,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
     if (count > 0) return;
 
     const chains: SupportedTreasuryChain[] = [
-      'ETH_SEPOLIA', 'ETH_MAINNET',
-      'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
+      'ETH_MAINNET',
+      'BSC_MAINNET',
+      'TRON_MAINNET',
+      'SOLANA_MAINNET',
     ];
 
     for (const chain of chains) {
@@ -622,17 +625,16 @@ export class TreasuryMainWalletService implements OnModuleInit {
     chain: SupportedTreasuryChain,
   ): Promise<BlockchainGatewayConfig | null> {
     const mapping: Partial<Record<SupportedTreasuryChain, [string, string]>> = {
-      ETH_SEPOLIA: ['ETH', 'SEPOLIA'],
       ETH_MAINNET: ['ETH', 'MAINNET'],
-      TRON_NILE: ['TRON', 'NILE'],
-      TRON_SHASTA: ['TRON', 'SHASTA'],
+      BSC_MAINNET: ['BSC', 'MAINNET'],
       TRON_MAINNET: ['TRON', 'MAINNET'],
+      SOLANA_MAINNET: ['SOL', 'MAINNET'],
     };
     const entry = mapping[chain];
     if (!entry) return null;
     const [type, network] = entry;
     return this.paymentConfigService.getActiveConfig(
-      type as 'ETH' | 'TRON',
+      type as 'ETH' | 'TRON' | 'SOL' | 'BSC',
       network,
     ) as Promise<BlockchainGatewayConfig | null>;
   }
@@ -648,7 +650,12 @@ export class TreasuryMainWalletService implements OnModuleInit {
       );
     };
 
-    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+    if (
+      chain === 'ETH_MAINNET' ||
+      chain === 'ETH_SEPOLIA' ||
+      chain === 'BSC_MAINNET' ||
+      chain === 'BSC_CHAPEL'
+    ) {
       try {
         return new ethers.Wallet(privateKey).address;
       } catch {
@@ -657,7 +664,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
         );
       }
     }
-    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+    if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
       try {
         const decoded = bs58.decode(privateKey);
         const keypair = Keypair.fromSecretKey(decoded);
@@ -687,14 +694,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
   }
 
   private assertSupportedChain(chain: string): SupportedTreasuryChain {
-    const supported: SupportedTreasuryChain[] = [
-      'ETH_SEPOLIA', 'ETH_MAINNET',
-      'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
-      'SOLANA_DEVNET', 'SOLANA_MAINNET',
-    ];
-    if (!supported.includes(chain as SupportedTreasuryChain)) {
+    if (!BLOCKCHAIN_CHAIN_DB_VALUES.includes(chain as SupportedTreasuryChain)) {
       throw new BadRequestException(
-        `Unsupported chain: ${chain}. Supported: ${supported.join(', ')}`,
+        `Unsupported chain: ${chain}. Supported: ${BLOCKCHAIN_CHAIN_DB_VALUES.join(', ')}`,
         'TREASURY_CHAIN_UNSUPPORTED',
       );
     }

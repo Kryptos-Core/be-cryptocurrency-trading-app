@@ -240,19 +240,19 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA?: string;
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET?: string;
 
   @IsString()
   @IsOptional()
-  BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET?: string;
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_BSC_MAINNET?: string;
 
   @IsString()
   @IsOptional()
-  BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE?: string;
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET?: string;
 
   @IsString()
   @IsOptional()
-  BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA?: string;
+  BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET?: string;
 
   @IsString()
   @IsOptional()
@@ -272,11 +272,59 @@ export class EnvironmentVariables {
 
   @IsUrl()
   @IsOptional()
+  SOLANA_MAINNET_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
   ETH_MAINNET_RPC_URL?: string;
 
   @IsInt()
   @IsOptional()
   ETH_MAINNET_CHAIN_ID?: number;
+
+  @IsUrl()
+  @IsOptional()
+  BSC_MAINNET_RPC_URL?: string;
+
+  @IsInt()
+  @IsOptional()
+  BSC_MAINNET_CHAIN_ID?: number;
+
+  /**
+   * On-chain stack: production = mainnets only in resolver; sandbox = testnets (requires sandbox RPC URLs below).
+   * Independent of PayOS sandbox vs production accounts.
+   */
+  @IsIn(['production', 'sandbox'])
+  @IsOptional()
+  ONCHAIN_OPERATOR_MODE?: string = 'production';
+
+  @IsUrl()
+  @IsOptional()
+  TRON_NILE_FULL_HOST?: string;
+
+  @IsUrl()
+  @IsOptional()
+  TRON_SHASTA_FULL_HOST?: string;
+
+  @IsUrl()
+  @IsOptional()
+  SOLANA_DEVNET_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  ETH_SEPOLIA_RPC_URL?: string;
+
+  @IsInt()
+  @IsOptional()
+  ETH_SEPOLIA_CHAIN_ID?: number;
+
+  @IsUrl()
+  @IsOptional()
+  BSC_CHAPEL_RPC_URL?: string;
+
+  @IsInt()
+  @IsOptional()
+  BSC_CHAPEL_CHAIN_ID?: number;
 
   // PayOS Configuration
   @IsString()
@@ -431,16 +479,27 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
     'ALLOW_UI_TEST_SIGNATURE',
     'BLOCKCHAIN_WITHDRAW_AUTO_MAX',
-    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
-    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',
-    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE',
-    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_BSC_MAINNET',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET',
+    'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET',
     'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL',
     'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL',
     'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL',
     'TRON_MAINNET_FULL_HOST',
+    'SOLANA_MAINNET_URL',
     'ETH_MAINNET_RPC_URL',
     'ETH_MAINNET_CHAIN_ID',
+    'BSC_MAINNET_RPC_URL',
+    'BSC_MAINNET_CHAIN_ID',
+    'ONCHAIN_OPERATOR_MODE',
+    'TRON_NILE_FULL_HOST',
+    'TRON_SHASTA_FULL_HOST',
+    'SOLANA_DEVNET_URL',
+    'ETH_SEPOLIA_RPC_URL',
+    'ETH_SEPOLIA_CHAIN_ID',
+    'BSC_CHAPEL_RPC_URL',
+    'BSC_CHAPEL_CHAIN_ID',
     'PAYOS_CLIENT_ID',
     'PAYOS_API_KEY',
     'PAYOS_CHECKSUM_KEY',
@@ -497,26 +556,33 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     throw new Error(`Environment validation failed:\n${errorMessages}`);
   }
 
-  if (validatedConfig.NODE_ENV === Environment.Production) {
-    const requiredPayosKeys: Array<keyof EnvironmentVariables> = [
-      'PAYOS_CLIENT_ID',
-      'PAYOS_API_KEY',
-      'PAYOS_CHECKSUM_KEY',
-      'PAYOS_RETURN_URL',
-      'PAYOS_CANCEL_URL',
-    ];
+  // PayOS: optional at startup — active credentials may live in payment_method_configs (UI).
+  // DepositsService falls back to PAYOS_* from .env when no active DB config exists.
 
-    const missingPayosKeys = requiredPayosKeys.filter((key) => {
-      const value = validatedConfig[key];
-      return typeof value !== 'string' || value.trim().length === 0;
-    });
+  assertOnchainSandboxRpcOrThrow(validatedConfig);
 
-    if (missingPayosKeys.length > 0) {
+  return validatedConfig;
+}
+
+/** When ONCHAIN_OPERATOR_MODE=sandbox, require canonical sandbox RPC endpoints (resolver families). */
+export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): void {
+  const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production').toLowerCase().trim();
+  if (mode !== 'sandbox') return;
+
+  const required: Array<{ key: keyof EnvironmentVariables; label: string }> = [
+    { key: 'TRON_NILE_FULL_HOST', label: 'TRON_NILE_FULL_HOST' },
+    { key: 'SOLANA_DEVNET_URL', label: 'SOLANA_DEVNET_URL' },
+    { key: 'ETH_SEPOLIA_RPC_URL', label: 'ETH_SEPOLIA_RPC_URL' },
+    { key: 'BSC_CHAPEL_RPC_URL', label: 'BSC_CHAPEL_RPC_URL' },
+  ];
+
+  for (const { key, label } of required) {
+    const v = config[key];
+    const ok = typeof v === 'string' && v.trim().length > 0;
+    if (!ok) {
       throw new Error(
-        `Environment validation failed:\nMissing required PayOS env vars in production: ${missingPayosKeys.join(', ')}`,
+        `Environment validation failed: ONCHAIN_OPERATOR_MODE=sandbox requires ${label} (valid URL)`,
       );
     }
   }
-
-  return validatedConfig;
 }

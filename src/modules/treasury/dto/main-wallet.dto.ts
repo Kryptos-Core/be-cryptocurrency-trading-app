@@ -1,27 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
 
-export type TreasuryMainWalletChainDto =
-  | 'ETH_SEPOLIA'
-  | 'ETH_MAINNET'
-  | 'TRON_NILE'
-  | 'TRON_SHASTA'
-  | 'TRON_MAINNET'
-  | 'SOLANA_DEVNET'
-  | 'SOLANA_MAINNET';
+export type TreasuryMainWalletChainDto = BlockchainChainDbValue;
 
-const SUPPORTED_CHAINS: TreasuryMainWalletChainDto[] = [
-  'ETH_SEPOLIA', 'ETH_MAINNET',
-  'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET',
-  'SOLANA_DEVNET', 'SOLANA_MAINNET',
-];
+const SUPPORTED_CHAINS = [...BLOCKCHAIN_CHAIN_DB_VALUES] as const;
 
 /**
  * DTO for importing a new treasury main wallet via private key.
@@ -31,9 +24,9 @@ export class ImportMainWalletDto {
   @ApiProperty({
     description: 'Blockchain network for this main wallet',
     enum: SUPPORTED_CHAINS,
-    example: 'TRON_NILE',
+    example: 'TRON_MAINNET',
   })
-  @IsEnum(SUPPORTED_CHAINS)
+  @IsIn(SUPPORTED_CHAINS)
   chain!: TreasuryMainWalletChainDto;
 
   @ApiProperty({
@@ -48,7 +41,7 @@ export class ImportMainWalletDto {
 
   @ApiPropertyOptional({
     description: 'Human-readable label for this wallet',
-    example: 'TRON Nile Primary',
+    example: 'TRON Mainnet Primary',
     maxLength: 100,
   })
   @IsString()

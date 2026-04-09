@@ -82,22 +82,27 @@ export interface AppConfig {
     enableExternalSync: boolean;
   };
   blockchain: {
+    onchainOperatorMode: 'production' | 'sandbox';
     tron: {
+      mainnetFullHost: string;
       nileFullHost: string;
       shastaFullHost: string;
-      mainnetFullHost: string;
-      defaultNetwork: 'TRON_NILE' | 'TRON_SHASTA';
-      // NOTE: hotWalletPrivateKey removed. Managed via treasury_main_wallets table.
     };
     solana: {
+      mainnetUrl: string;
       devnetUrl: string;
     };
     ethereum: {
-      sepoliaRpcUrl: string;
-      chainId: number;
       mainnetRpcUrl: string;
       mainnetChainId: number;
-      // NOTE: hotWalletPrivateKey removed. Managed via treasury_main_wallets table.
+      sepoliaRpcUrl: string;
+      sepoliaChainId: number;
+    };
+    bsc: {
+      mainnetRpcUrl: string;
+      mainnetChainId: number;
+      chapelRpcUrl: string;
+      chapelChainId: number;
     };
   };
   /** Price oracle: on-demand OHLCV. App uses Binance only (no DB persist). UNISWAP_* env not used. */
@@ -226,33 +231,46 @@ export class AppConfigBuilder {
   }
 
   setBlockchain(
-    tronNileFullHost: string,
-    tronShastaFullHost: string,
     tronMainnetFullHost: string,
-    tronDefaultNetwork: string,
-    solanaDevnetUrl: string,
-    ethSepoliaRpcUrl: string,
-    ethSepoliaChainId: number,
+    solanaMainnetUrl: string,
     ethMainnetRpcUrl: string,
     ethMainnetChainId: number,
+    bscMainnetRpcUrl: string,
+    bscMainnetChainId: number,
+    extras?: {
+      onchainOperatorMode: 'production' | 'sandbox';
+      tronNileFullHost: string;
+      tronShastaFullHost: string;
+      solanaDevnetUrl: string;
+      ethSepoliaRpcUrl: string;
+      ethSepoliaChainId: number;
+      bscChapelRpcUrl: string;
+      bscChapelChainId: number;
+    },
   ): this {
+    const mode = extras?.onchainOperatorMode ?? 'production';
     this.config.blockchain = {
+      onchainOperatorMode: mode,
       tron: {
-        nileFullHost: tronNileFullHost,
-        shastaFullHost: tronShastaFullHost,
         mainnetFullHost: tronMainnetFullHost,
-        defaultNetwork: tronDefaultNetwork as 'TRON_NILE' | 'TRON_SHASTA',
-        // hotWalletPrivateKey intentionally omitted — managed via treasury_main_wallets table
+        nileFullHost: extras?.tronNileFullHost ?? 'https://nile.trongrid.io',
+        shastaFullHost: extras?.tronShastaFullHost ?? 'https://api.shasta.trongrid.io',
       },
       solana: {
-        devnetUrl: solanaDevnetUrl,
+        mainnetUrl: solanaMainnetUrl,
+        devnetUrl: extras?.solanaDevnetUrl ?? 'https://api.devnet.solana.com',
       },
       ethereum: {
-        sepoliaRpcUrl: ethSepoliaRpcUrl,
-        chainId: ethSepoliaChainId,
         mainnetRpcUrl: ethMainnetRpcUrl,
         mainnetChainId: ethMainnetChainId,
-        // hotWalletPrivateKey intentionally omitted — managed via treasury_main_wallets table
+        sepoliaRpcUrl: extras?.ethSepoliaRpcUrl ?? 'https://rpc.sepolia.org',
+        sepoliaChainId: extras?.ethSepoliaChainId ?? 11155111,
+      },
+      bsc: {
+        mainnetRpcUrl: bscMainnetRpcUrl,
+        mainnetChainId: bscMainnetChainId,
+        chapelRpcUrl: extras?.bscChapelRpcUrl ?? 'https://data-seed-prebsc-1-s1.binance.org:8545',
+        chapelChainId: extras?.bscChapelChainId ?? 97,
       },
     };
     return this;
@@ -348,16 +366,25 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.EXCHANGE_MODE === 'binance',
     )
     .setBlockchain(
-      (env as any).TRON_NILE_FULL_HOST || 'https://nile.trongrid.io',
-      (env as any).TRON_SHASTA_FULL_HOST || 'https://api.shasta.trongrid.io',
-      (env as any).TRON_MAINNET_FULL_HOST || 'https://api.trongrid.io',
-      (env as any).TRON_DEFAULT_NETWORK || 'TRON_NILE',
-      (env as any).SOLANA_DEVNET_URL || 'https://api.devnet.solana.com',
-      (env as any).ETH_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
-      parseInt((env as any).ETH_SEPOLIA_CHAIN_ID, 10) || 11155111,
-      (env as any).ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com',
-      parseInt((env as any).ETH_MAINNET_CHAIN_ID, 10) || 1,
-      // hotWalletPrivateKey params removed — managed via treasury_main_wallets table
+      env.TRON_MAINNET_FULL_HOST || 'https://api.trongrid.io',
+      env.SOLANA_MAINNET_URL || 'https://api.mainnet-beta.solana.com',
+      env.ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com',
+      env.ETH_MAINNET_CHAIN_ID ?? 1,
+      env.BSC_MAINNET_RPC_URL || 'https://bsc-dataseed.binance.org',
+      env.BSC_MAINNET_CHAIN_ID ?? 56,
+      {
+        onchainOperatorMode:
+          String(env.ONCHAIN_OPERATOR_MODE || 'production').toLowerCase().trim() === 'sandbox'
+            ? 'sandbox'
+            : 'production',
+        tronNileFullHost: env.TRON_NILE_FULL_HOST || 'https://nile.trongrid.io',
+        tronShastaFullHost: env.TRON_SHASTA_FULL_HOST || 'https://api.shasta.trongrid.io',
+        solanaDevnetUrl: env.SOLANA_DEVNET_URL || 'https://api.devnet.solana.com',
+        ethSepoliaRpcUrl: env.ETH_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+        ethSepoliaChainId: env.ETH_SEPOLIA_CHAIN_ID ?? 11155111,
+        bscChapelRpcUrl: env.BSC_CHAPEL_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545',
+        bscChapelChainId: env.BSC_CHAPEL_CHAIN_ID ?? 97,
+      },
     )
     .setPriceOracle(
       (env as any).UNISWAP_SUBGRAPH_URL ||

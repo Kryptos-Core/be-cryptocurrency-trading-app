@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { User } from './user.entity';
+import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
 
 @Entity('linked_wallets')
 @Index('uk_linked_wallet_user_chain_addr', ['user_id', 'chain', 'address'], {
@@ -25,7 +26,7 @@ export class LinkedWallet {
 
   @Column({
     type: 'enum',
-    enum: ['TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA'],
+    enum: [...BLOCKCHAIN_CHAIN_DB_VALUES],
   })
   chain!: string;
 

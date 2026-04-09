@@ -2,18 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, DeepPartial, FindOptionsWhere, In } from 'typeorm';
 import { NotFoundException } from '@/common/exceptions';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
-const TRON_DEPOSIT_UI_CHAINS = ['TRON_NILE', 'TRON_SHASTA'] as const;
-type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
-
-type SupportedTreasuryChain =
-  | 'ETH_SEPOLIA'
-  | 'ETH_MAINNET'
-  | 'TRON_NILE'
-  | 'TRON_SHASTA'
-  | 'TRON_MAINNET'
-  | 'SOLANA_DEVNET'
-  | 'SOLANA_MAINNET';
+export const TRON_DEPOSIT_UI_CHAINS = ['TRON_MAINNET', 'TRON_NILE', 'TRON_SHASTA'] as const;
+export type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
 
 @Injectable()
 export class TreasuryTransactionWalletRepository {
@@ -98,7 +90,7 @@ export class TreasuryTransactionWalletRepository {
     });
   }
 
-  async findActiveWithdrawalCandidates(chain: SupportedTreasuryChain): Promise<TransactionWallet[]> {
+  async findActiveWithdrawalCandidates(chain: BlockchainChainDbValue): Promise<TransactionWallet[]> {
     return this.dataSource.getRepository(TransactionWallet).find({
       where: {
         chain,

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { TransactionWallet } from './transaction-wallet.entity';
+import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
 @Entity('treasury_operations')
 @Index('idx_treasury_op_chain_type_status', ['chain', 'type', 'status'])
@@ -26,16 +27,9 @@ export class TreasuryOperation {
 
   @Column({
     type: 'enum',
-    enum: ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'],
+    enum: [...BLOCKCHAIN_CHAIN_DB_VALUES],
   })
-  chain!:
-    | 'ETH_SEPOLIA'
-    | 'ETH_MAINNET'
-    | 'TRON_NILE'
-    | 'TRON_SHASTA'
-    | 'TRON_MAINNET'
-    | 'SOLANA_DEVNET'
-    | 'SOLANA_MAINNET';
+  chain!: BlockchainChainDbValue;
 
   @Column({ type: 'char', length: 36, nullable: true })
   @ForeignKey(() => TransactionWallet)

@@ -6,15 +6,9 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
+import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
-export type TreasuryMainWalletChain =
-  | 'ETH_SEPOLIA'
-  | 'ETH_MAINNET'
-  | 'TRON_NILE'
-  | 'TRON_SHASTA'
-  | 'TRON_MAINNET'
-  | 'SOLANA_DEVNET'
-  | 'SOLANA_MAINNET';
+export type TreasuryMainWalletChain = BlockchainChainDbValue;
 
 export type TreasuryMainWalletStatus =
   | 'PENDING_APPROVAL'
@@ -33,7 +27,7 @@ export class TreasuryMainWallet {
 
   @Column({
     type: 'enum',
-    enum: ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'],
+    enum: [...BLOCKCHAIN_CHAIN_DB_VALUES],
   })
   chain!: TreasuryMainWalletChain;
 

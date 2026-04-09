@@ -1,0 +1,10 @@
+/** Injection tokens for multi-network blockchain provider instances. */
+export const BC_TRON_MAINNET = 'BC_TRON_MAINNET';
+export const BC_TRON_NILE = 'BC_TRON_NILE';
+export const BC_TRON_SHASTA = 'BC_TRON_SHASTA';
+export const BC_SOLANA_MAINNET = 'BC_SOLANA_MAINNET';
+export const BC_SOLANA_DEVNET = 'BC_SOLANA_DEVNET';
+export const EVM_ETH_MAINNET_PROVIDER = 'BLOCKCHAIN_EVM_ETH_MAINNET';
+export const EVM_ETH_SEPOLIA_PROVIDER = 'BLOCKCHAIN_EVM_ETH_SEPOLIA';
+export const EVM_BSC_MAINNET_PROVIDER = 'BLOCKCHAIN_EVM_BSC_MAINNET';
+export const EVM_BSC_CHAPEL_PROVIDER = 'BLOCKCHAIN_EVM_BSC_CHAPEL';

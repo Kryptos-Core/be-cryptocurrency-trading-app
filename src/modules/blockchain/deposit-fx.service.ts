@@ -162,16 +162,25 @@ export class DepositFxService {
 
   private async getNativeSymbol(chain: BlockchainNetwork): Promise<string> {
     switch (chain) {
+      case BlockchainNetwork.ETH_MAINNET:
       case BlockchainNetwork.ETH_SEPOLIA:
         return (
           (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL'))?.trim().toUpperCase() ||
           'ETH'
         );
+      case BlockchainNetwork.BSC_MAINNET:
+      case BlockchainNetwork.BSC_CHAPEL:
+        return (
+          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_BNB_SYMBOL'))?.trim().toUpperCase() ||
+          'BNB'
+        );
+      case BlockchainNetwork.SOLANA_MAINNET:
       case BlockchainNetwork.SOLANA_DEVNET:
         return (
           (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL'))?.trim().toUpperCase() ||
           'SOL'
         );
+      case BlockchainNetwork.TRON_MAINNET:
       case BlockchainNetwork.TRON_NILE:
       case BlockchainNetwork.TRON_SHASTA:
         return (

@@ -7,7 +7,7 @@ export class RequestLinkDto {
   @ApiProperty({
     description: 'Mạng blockchain',
     enum: BlockchainNetwork,
-    example: BlockchainNetwork.ETH_SEPOLIA,
+    example: BlockchainNetwork.ETH_MAINNET,
   })
   @IsEnum(BlockchainNetwork)
   chain!: BlockchainNetwork;

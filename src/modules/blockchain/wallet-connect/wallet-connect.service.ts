@@ -44,9 +44,9 @@ function agentWcLinkDebugLog(payload: {
 // #endregion
 
 /**
- * WalletConnectService
+ * WalletConnectService (liên kết ví đã đăng nhập)
  *
- * Sepolia hoặc Solana devnet + project id: SignClient + relay thật; ký tương ứng `personal_sign` /
+ * ETH_MAINNET / BSC_MAINNET / SOLANA_MAINNET + project id: SignClient + relay; ký `personal_sign` /
  * `solana_signMessage`. Thiếu project id: URI ghép (legacy) — QR không nối relay.
  *
  * Relay webhook (`/relay-webhook`) vẫn stub — không dùng cho luồng chính.
@@ -59,16 +59,26 @@ export class WalletConnectService implements OnModuleInit {
   private static readonly SESSION_TTL = 300; // 5 phút
   /** Tránh POST /wc/init treo khi relay không phản hồi */
   private static readonly WC_CONNECT_TIMEOUT_MS = 15_000;
-  /** EVM chains được hỗ trợ qua WalletConnect */
-  private static readonly EVM_CHAINS: BlockchainNetwork[] = [
+  /** Chains dùng SignClient relay (EVM + Solana mainnet/sandbox). Tron: URI legacy, không pairing relay ở đây. */
+  private static readonly WC_PAIRING_CHAINS: BlockchainNetwork[] = [
+    BlockchainNetwork.ETH_MAINNET,
     BlockchainNetwork.ETH_SEPOLIA,
+    BlockchainNetwork.BSC_MAINNET,
+    BlockchainNetwork.BSC_CHAPEL,
+    BlockchainNetwork.SOLANA_MAINNET,
     BlockchainNetwork.SOLANA_DEVNET,
   ];
-  /** CAIP-2 namespace mapping */
-  private static readonly CHAIN_CAIP: Record<string, string> = {
+  /** CAIP-2 cho init / QR (đủ mạng enum backend). */
+  private static readonly CHAIN_CAIP: Record<BlockchainNetwork, string> = {
+    [BlockchainNetwork.ETH_MAINNET]: 'eip155:1',
     [BlockchainNetwork.ETH_SEPOLIA]: 'eip155:11155111',
-    // CAIP-2 devnet: genesis hash 32 ký tự đầu (chainagnostic namespaces/solana-caip2)
-    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+    [BlockchainNetwork.BSC_MAINNET]: 'eip155:56',
+    [BlockchainNetwork.BSC_CHAPEL]: 'eip155:97',
+    [BlockchainNetwork.SOLANA_MAINNET]: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRAB9YDFxGeBnSP6rg6DhzZZHc7yBtomxv2kXyPwb',
+    [BlockchainNetwork.TRON_MAINNET]: 'tron:0x2b6653dc',
+    [BlockchainNetwork.TRON_NILE]: 'tron:0xcd8690dc',
+    [BlockchainNetwork.TRON_SHASTA]: 'tron:0x94a8759',
   };
 
   private projectId!: string;
@@ -116,7 +126,7 @@ export class WalletConnectService implements OnModuleInit {
     caip2Chain: string;
     relayPairing: boolean;
   }> {
-    this.assertEvmChain(chain);
+    this.assertWcInitChain(chain);
 
     const sessionId = uuidv7();
     const nonce = uuidv7();
@@ -132,28 +142,25 @@ export class WalletConnectService implements OnModuleInit {
             { projectId: this.projectId, relayUrl: this.relayUrl },
             async (client) => {
               try {
-                const connectPromise =
-                  chain === BlockchainNetwork.SOLANA_DEVNET
-                    ? client.connect({
-                        optionalNamespaces: {
-                          solana: {
-                            chains: [
-                              WalletConnectService.CHAIN_CAIP[BlockchainNetwork.SOLANA_DEVNET],
-                            ],
-                            methods: ['solana_signMessage', 'solana_signTransaction'],
-                            events: [],
-                          },
+                const connectPromise = WalletConnectService.isSolanaWcChain(chain)
+                  ? client.connect({
+                      optionalNamespaces: {
+                        solana: {
+                          chains: [WalletConnectService.CHAIN_CAIP[chain]],
+                          methods: ['solana_signMessage', 'solana_signTransaction'],
+                          events: [],
                         },
-                      })
-                    : client.connect({
-                        optionalNamespaces: {
-                          eip155: {
-                            chains: ['eip155:11155111'],
-                            methods: ['personal_sign', 'eth_sendTransaction'],
-                            events: [],
-                          },
+                      },
+                    })
+                  : client.connect({
+                      optionalNamespaces: {
+                        eip155: {
+                          chains: [WalletConnectService.CHAIN_CAIP[chain]],
+                          methods: ['personal_sign', 'eth_sendTransaction'],
+                          events: [],
                         },
-                      });
+                      },
+                    });
                 const { uri, approval } = await this.withTimeout(
                   connectPromise,
                   WalletConnectService.WC_CONNECT_TIMEOUT_MS,
@@ -357,10 +364,9 @@ export class WalletConnectService implements OnModuleInit {
     }
 
     if (session.status === WcSessionStatus.SIGNED) {
-      const addrOk =
-        chain === BlockchainNetwork.ETH_SEPOLIA
-          ? session.address?.toLowerCase() === address.toLowerCase()
-          : session.address === address;
+      const addrOk = WalletConnectService.isEvmWcChain(chain)
+        ? session.address?.toLowerCase() === address.toLowerCase()
+        : session.address === address;
       const sigOk = session.signature === signature;
       if (!addrOk || !sigOk) {
         throw new BadRequestException(
@@ -389,11 +395,7 @@ export class WalletConnectService implements OnModuleInit {
   }
 
   private useRealWcPairing(chain: BlockchainNetwork): boolean {
-    return (
-      (chain === BlockchainNetwork.ETH_SEPOLIA ||
-        chain === BlockchainNetwork.SOLANA_DEVNET) &&
-      Boolean(this.projectId)
-    );
+    return WalletConnectService.WC_PAIRING_CHAINS.includes(chain) && Boolean(this.projectId);
   }
 
   private async runLinkApprovalAndSign(
@@ -425,7 +427,7 @@ export class WalletConnectService implements OnModuleInit {
     let chainId: string;
     let signature: string;
 
-    if (chain === BlockchainNetwork.SOLANA_DEVNET) {
+    if (WalletConnectService.isSolanaWcChain(chain)) {
       const solAccounts = wcSession?.namespaces?.solana?.accounts ?? [];
       const fullSol = solAccounts[0];
       if (!fullSol) {
@@ -697,10 +699,23 @@ export class WalletConnectService implements OnModuleInit {
 
   // ============ Private Helpers ============
 
-  private assertEvmChain(chain: BlockchainNetwork): void {
-    if (!WalletConnectService.EVM_CHAINS.includes(chain)) {
+  private static isSolanaWcChain(chain: BlockchainNetwork): boolean {
+    return chain === BlockchainNetwork.SOLANA_MAINNET || chain === BlockchainNetwork.SOLANA_DEVNET;
+  }
+
+  private static isEvmWcChain(chain: BlockchainNetwork): boolean {
+    return (
+      chain === BlockchainNetwork.ETH_MAINNET ||
+      chain === BlockchainNetwork.ETH_SEPOLIA ||
+      chain === BlockchainNetwork.BSC_MAINNET ||
+      chain === BlockchainNetwork.BSC_CHAPEL
+    );
+  }
+
+  private assertWcInitChain(chain: BlockchainNetwork): void {
+    if (!WalletConnectService.CHAIN_CAIP[chain]) {
       throw new BadRequestException(
-        `Chain "${chain}" không được hỗ trợ qua WalletConnect. Chỉ hỗ trợ EVM chains: ${WalletConnectService.EVM_CHAINS.join(', ')}`,
+        `Chain "${chain}" không được hỗ trợ qua WalletConnect.`,
         'WC_CHAIN_NOT_SUPPORTED',
       );
     }

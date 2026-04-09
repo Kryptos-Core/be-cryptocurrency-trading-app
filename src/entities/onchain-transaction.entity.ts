@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { LinkedWallet } from './linked-wallet.entity';
+import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
 
 @Entity('onchain_transactions')
 @Index('uk_onchain_tx_hash', ['chain', 'tx_hash'], { unique: true })
@@ -33,15 +34,7 @@ export class OnchainTransaction {
 
   @Column({
     type: 'enum',
-    enum: [
-      'TRON_NILE',
-      'TRON_SHASTA',
-      'TRON_MAINNET',
-      'SOLANA_DEVNET',
-      'SOLANA_MAINNET',
-      'ETH_SEPOLIA',
-      'ETH_MAINNET',
-    ],
+    enum: [...BLOCKCHAIN_CHAIN_DB_VALUES],
   })
   chain!: string;
 

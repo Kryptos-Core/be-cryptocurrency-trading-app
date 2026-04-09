@@ -18,30 +18,26 @@ import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
-import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
+import {
+  TreasuryTransactionWalletRepository,
+  TRON_DEPOSIT_UI_CHAINS,
+  type TronDepositUiChain,
+} from './repositories/treasury-transaction-wallet.repository';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
 
 const LIST_CACHE_TTL_SECONDS = 60;
 /** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
 const BALANCE_CACHE_TTL_SECONDS = 12;
 
-type SupportedTreasuryChain =
-  | 'ETH_SEPOLIA'
-  | 'ETH_MAINNET'
-  | 'TRON_NILE'
-  | 'TRON_SHASTA'
-  | 'TRON_MAINNET'
-  | 'SOLANA_DEVNET'
-  | 'SOLANA_MAINNET';
+type SupportedTreasuryChain = BlockchainChainDbValue;
 
-const TRON_DEPOSIT_UI_CHAINS = ['TRON_NILE', 'TRON_SHASTA'] as const;
-type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
-
-/** Official / canonical USDT (TRC-20) contract per TRON network (6 decimals). */
-const TRON_USDT_CONTRACT: Record<'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA', string> = {
+/** Official USDT (TRC-20) on Tron mainnet (6 decimals). */
+const TRON_USDT_CONTRACT: Record<'TRON_MAINNET', string> = {
   TRON_MAINNET: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-  TRON_NILE: 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf',
-  TRON_SHASTA: 'TG3XXyExBkPp9nzdajDZsozEuVByaKQKzY',
 };
 
 const TRC20_BALANCE_OF_ABI = [
@@ -167,7 +163,7 @@ export class TransactionWalletService {
    * Poll until balance drops near the sweep reserve (0.1 TRX) or timeout, so UI cache is not primed with stale TRX.
    */
   async waitForTronBalanceReflectSweep(
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    chain: 'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA',
     address: string,
     reserveSun: number = 100_000,
   ): Promise<void> {
@@ -188,7 +184,7 @@ export class TransactionWalletService {
 
   /** Native TRX balance (sun) — snapshot before Fund for post-broadcast polling. */
   async getTronNativeBalanceSun(
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    chain: 'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA',
     address: string,
   ): Promise<number> {
     const tronWeb = await this.buildTronReadOnlyClient(chain);
@@ -200,7 +196,7 @@ export class TransactionWalletService {
    * rises above pre-tx snapshot so the next API read after cache invalidation is not re-primed wrong.
    */
   async waitForTronBalanceReflectFund(
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    chain: 'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA',
     address: string,
     balanceSunBeforeTx: number,
   ): Promise<void> {
@@ -243,16 +239,21 @@ export class TransactionWalletService {
   }
 
   async getBalanceByAddress(chain: SupportedTreasuryChain, address: string): Promise<TreasuryOnChainBalances> {
-    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+    if (
+      chain === 'ETH_MAINNET' ||
+      chain === 'ETH_SEPOLIA' ||
+      chain === 'BSC_MAINNET' ||
+      chain === 'BSC_CHAPEL'
+    ) {
       const provider = await this.buildEthereumProvider(chain);
       const wei = await provider.getBalance(address);
       return {
         balance: ethers.formatEther(wei),
-        symbol: 'ETH',
+        symbol: chain === 'BSC_MAINNET' || chain === 'BSC_CHAPEL' ? 'BNB' : 'ETH',
       };
     }
 
-    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+    if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
       const connection = await this.buildSolanaConnection(chain);
       const lamports = await connection.getBalance(new PublicKey(address));
       return {
@@ -261,28 +262,35 @@ export class TransactionWalletService {
       };
     }
 
-    const tronChain = chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET';
-    const tronWeb = await this.buildTronReadOnlyClient(tronChain);
-    const sun = await tronWeb.trx.getBalance(address);
-    let usdtTrc20Balance: string | undefined;
-    try {
-      usdtTrc20Balance = await this.readTronUsdtBalance(tronWeb, tronChain, address);
-    } catch (err) {
-      this.logger.warn(
-        `USDT TRC-20 balance skipped for ${address} on ${tronChain}: ${(err as Error).message}`,
-      );
-      usdtTrc20Balance = '0';
+    if (chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA') {
+      const tronWeb = await this.buildTronReadOnlyClient(chain);
+      const sun = await tronWeb.trx.getBalance(address);
+      let usdtTrc20Balance: string | undefined;
+      if (chain === 'TRON_MAINNET') {
+        try {
+          usdtTrc20Balance = await this.readTronUsdtBalance(tronWeb, chain, address);
+        } catch (err) {
+          this.logger.warn(
+            `USDT TRC-20 balance skipped for ${address} on ${chain}: ${(err as Error).message}`,
+          );
+          usdtTrc20Balance = '0';
+        }
+      } else {
+        usdtTrc20Balance = '0';
+      }
+      return {
+        balance: new Decimal(sun).div(1_000_000).toString(),
+        symbol: 'TRX',
+        usdtTrc20Balance,
+      };
     }
-    return {
-      balance: new Decimal(sun).div(1_000_000).toString(),
-      symbol: 'TRX',
-      usdtTrc20Balance,
-    };
+
+    throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', { chain });
   }
 
   private async readTronUsdtBalance(
     tronWeb: TronWeb,
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
+    chain: 'TRON_MAINNET',
     ownerBase58: string,
   ): Promise<string> {
     const contractAddress = TRON_USDT_CONTRACT[chain];
@@ -296,12 +304,17 @@ export class TransactionWalletService {
   }
 
   async getMainWalletAddress(chain: SupportedTreasuryChain): Promise<string> {
-    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+    if (
+      chain === 'ETH_MAINNET' ||
+      chain === 'ETH_SEPOLIA' ||
+      chain === 'BSC_MAINNET' ||
+      chain === 'BSC_CHAPEL'
+    ) {
       const key = await this.resolveMainWalletPrivateKey(chain);
       return new ethers.Wallet(key).address;
     }
 
-    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+    if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
       const key = await this.resolveMainWalletPrivateKey(chain);
       const decoded = bs58.decode(key);
       const keypair = Keypair.fromSecretKey(decoded);
@@ -341,7 +354,7 @@ export class TransactionWalletService {
   }
 
   /**
-   * Wallets that may receive user deposits (shown on deposit config UI): Tron testnets, DEPOSIT or BOTH.
+   * Wallets that may receive user deposits (shown on deposit config UI): Tron mainnet, DEPOSIT or BOTH.
    */
   async listWalletsForDepositConfiguration(): Promise<TransactionWallet[]> {
     return this.treasuryTransactionWalletRepository.findForDepositConfiguration();
@@ -370,7 +383,7 @@ export class TransactionWalletService {
     }
     if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
       throw new BadRequestException(
-        'User deposit default is only supported for Tron Nile/Shasta',
+        'User deposit default is only supported for Tron mainnet (TRC-20)',
         'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
       );
     }
@@ -398,7 +411,7 @@ export class TransactionWalletService {
     }
     if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
       throw new BadRequestException(
-        'User deposit default is only supported for Tron Nile/Shasta',
+        'User deposit default is only supported for Tron mainnet (TRC-20)',
         'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
       );
     }
@@ -527,9 +540,14 @@ export class TransactionWalletService {
     const chain = this.assertSupportedChain(wallet.chain);
     const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
 
-    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+    if (
+      chain === 'ETH_MAINNET' ||
+      chain === 'ETH_SEPOLIA' ||
+      chain === 'BSC_MAINNET' ||
+      chain === 'BSC_CHAPEL'
+    ) {
       if (!ethers.isAddress(toAddress)) {
-        throw new BadRequestException('Invalid ETH destination address', 'INVALID_ETH_ADDRESS');
+        throw new BadRequestException('Invalid EVM destination address', 'INVALID_EVM_ADDRESS');
       }
       const provider = await this.buildEthereumProvider(chain);
       const signer = new ethers.Wallet(pk, provider);
@@ -537,11 +555,11 @@ export class TransactionWalletService {
         to: toAddress,
         value: ethers.parseEther(amount),
       });
-      this.logger.log(`Withdrawal ETH sent from tx wallet ${wallet.wallet_id}: ${tx.hash}`);
+      this.logger.log(`Withdrawal EVM native sent from tx wallet ${wallet.wallet_id}: ${tx.hash}`);
       return tx.hash;
     }
 
-    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+    if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
       const connection = await this.buildSolanaConnection(chain);
       const decodedKey = bs58.decode(pk);
       const keypair = Keypair.fromSecretKey(decodedKey);
@@ -560,7 +578,7 @@ export class TransactionWalletService {
       return txHash;
     }
 
-    const tw = await this.buildTronWebWithPrivateKey(chain as 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET', pk);
+    const tw = await this.buildTronWebWithPrivateKey(chain, pk);
     if (!tw.isAddress(toAddress)) {
       throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
     }
@@ -577,41 +595,37 @@ export class TransactionWalletService {
   }
 
   private isTreasuryChain(chain: string): chain is SupportedTreasuryChain {
-    return ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'].includes(chain);
+    return (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(chain);
   }
 
-  private async resolveTronFullHost(
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
-  ): Promise<string> {
+  private async resolveTronFullHost(chain: string): Promise<string> {
+    if (chain === 'TRON_NILE') {
+      const v = await this.systemConfigService.get<string>('TRON_NILE_FULL_HOST');
+      if (v?.trim()) return v.trim();
+      return process.env.TRON_NILE_FULL_HOST?.trim() || 'https://nile.trongrid.io';
+    }
     if (chain === 'TRON_SHASTA') {
-      return this.systemConfigService.getEffectiveString('TRON_SHASTA_FULL_HOST');
+      const v = await this.systemConfigService.get<string>('TRON_SHASTA_FULL_HOST');
+      if (v?.trim()) return v.trim();
+      return process.env.TRON_SHASTA_FULL_HOST?.trim() || 'https://api.shasta.trongrid.io';
     }
-    if (chain === 'TRON_MAINNET') {
-      return (
-        this.configService.get<string>('app.blockchain.tron.mainnetFullHost') ?? 'https://api.trongrid.io'
-      );
-    }
-    return this.systemConfigService.getEffectiveString('TRON_NILE_FULL_HOST');
+    return this.systemConfigService.getEffectiveString('TRON_MAINNET_FULL_HOST');
   }
 
-  private async buildTronWebWithPrivateKey(
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
-    privateKey: string,
-  ): Promise<TronWeb> {
+  private async buildTronWebWithPrivateKey(chain: string, privateKey: string): Promise<TronWeb> {
     const fullHost = await this.resolveTronFullHost(chain);
     return new TronWeb({ fullHost, privateKey });
   }
 
   private assertSupportedChain(chain: string): SupportedTreasuryChain {
-    const supported = ['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'];
-    if (!supported.includes(chain)) {
+    if (!(BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(chain)) {
       throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', { chain });
     }
     return chain as SupportedTreasuryChain;
   }
 
   private async generateAccount(chain: SupportedTreasuryChain): Promise<{ address: string; privateKey: string }> {
-    if (chain === 'SOLANA_DEVNET' || chain === 'SOLANA_MAINNET') {
+    if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
       const keypair = Keypair.generate();
       return {
         address: keypair.publicKey.toBase58(),
@@ -619,7 +633,12 @@ export class TransactionWalletService {
       };
     }
 
-    if (chain === 'ETH_SEPOLIA' || chain === 'ETH_MAINNET') {
+    if (
+      chain === 'ETH_MAINNET' ||
+      chain === 'ETH_SEPOLIA' ||
+      chain === 'BSC_MAINNET' ||
+      chain === 'BSC_CHAPEL'
+    ) {
       const wallet = ethers.Wallet.createRandom();
       return {
         address: wallet.address,
@@ -634,31 +653,47 @@ export class TransactionWalletService {
     };
   }
 
-  private async buildEthereumProvider(chain: 'ETH_SEPOLIA' | 'ETH_MAINNET'): Promise<JsonRpcProvider> {
-    if (chain === 'ETH_MAINNET') {
-      const rpcUrl =
-        this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ?? 'https://eth.llamarpc.com';
-      return new JsonRpcProvider(rpcUrl);
+  private async buildEthereumProvider(
+    chain: 'ETH_MAINNET' | 'ETH_SEPOLIA' | 'BSC_MAINNET' | 'BSC_CHAPEL',
+  ): Promise<JsonRpcProvider> {
+    switch (chain) {
+      case 'ETH_MAINNET': {
+        const url = await this.systemConfigService.getEffectiveString('ETH_MAINNET_RPC_URL');
+        return new JsonRpcProvider(url);
+      }
+      case 'BSC_MAINNET': {
+        const url = await this.systemConfigService.getEffectiveString('BSC_MAINNET_RPC_URL');
+        return new JsonRpcProvider(url);
+      }
+      case 'ETH_SEPOLIA': {
+        const v = (await this.systemConfigService.get<string>('ETH_SEPOLIA_RPC_URL'))?.trim();
+        return new JsonRpcProvider(
+          v || process.env.ETH_SEPOLIA_RPC_URL?.trim() || 'https://rpc.sepolia.org',
+        );
+      }
+      case 'BSC_CHAPEL': {
+        const v = (await this.systemConfigService.get<string>('BSC_CHAPEL_RPC_URL'))?.trim();
+        return new JsonRpcProvider(
+          v ||
+            process.env.BSC_CHAPEL_RPC_URL?.trim() ||
+            'https://data-seed-prebsc-1-s1.binance.org:8545',
+        );
+      }
     }
-    const rpcUrl = await this.systemConfigService.getEffectiveString('ETH_SEPOLIA_RPC_URL');
-    return new JsonRpcProvider(rpcUrl);
   }
 
-  private async buildSolanaConnection(chain: 'SOLANA_DEVNET' | 'SOLANA_MAINNET'): Promise<Connection> {
-    const defaultUrl =
-      chain === 'SOLANA_MAINNET' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com';
-    const configPath =
-      chain === 'SOLANA_MAINNET' ? 'app.blockchain.solana.mainnetUrl' : 'app.blockchain.solana.devnetUrl';
-    const url =
-      chain === 'SOLANA_DEVNET'
-        ? await this.systemConfigService.getEffectiveString('SOLANA_DEVNET_URL')
-        : (this.configService.get<string>(configPath) ?? defaultUrl);
+  private async buildSolanaConnection(chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET'): Promise<Connection> {
+    if (chain === 'SOLANA_DEVNET') {
+      const v = await this.systemConfigService.get<string>('SOLANA_DEVNET_URL');
+      const url =
+        v?.trim() || process.env.SOLANA_DEVNET_URL?.trim() || 'https://api.devnet.solana.com';
+      return new Connection(url, 'confirmed');
+    }
+    const url = await this.systemConfigService.getEffectiveString('SOLANA_MAINNET_URL');
     return new Connection(url, 'confirmed');
   }
 
-  private async buildTronReadOnlyClient(
-    chain: 'TRON_NILE' | 'TRON_SHASTA' | 'TRON_MAINNET',
-  ): Promise<TronWeb> {
+  private async buildTronReadOnlyClient(chain: string): Promise<TronWeb> {
     const fullHost = await this.resolveTronFullHost(chain);
     return new TronWeb({ fullHost });
   }

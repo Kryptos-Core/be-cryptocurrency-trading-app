@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
+import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
 @Entity('transaction_wallets')
 @Index('uk_tx_wallet_chain_address', ['chain', 'address'], { unique: true })
@@ -17,16 +18,9 @@ export class TransactionWallet {
 
   @Column({
     type: 'enum',
-    enum: ['ETH_SEPOLIA', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'ETH_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'],
+    enum: [...BLOCKCHAIN_CHAIN_DB_VALUES],
   })
-  chain!:
-    | 'ETH_SEPOLIA'
-    | 'TRON_NILE'
-    | 'TRON_SHASTA'
-    | 'TRON_MAINNET'
-    | 'ETH_MAINNET'
-    | 'SOLANA_DEVNET'
-    | 'SOLANA_MAINNET';
+  chain!: BlockchainChainDbValue;
 
   @Column({ type: 'varchar', length: 255 })
   address!: string;

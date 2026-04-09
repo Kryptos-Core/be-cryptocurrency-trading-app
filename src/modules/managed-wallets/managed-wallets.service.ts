@@ -24,7 +24,13 @@ import {
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
-type SupportedManagedWalletChain = 'TRON_NILE' | 'TRON_SHASTA';
+const MANAGED_TRON_CHAINS = [
+  BlockchainNetwork.TRON_MAINNET,
+  BlockchainNetwork.TRON_NILE,
+  BlockchainNetwork.TRON_SHASTA,
+] as const;
+
+type SupportedManagedWalletChain = (typeof MANAGED_TRON_CHAINS)[number];
 
 export type ConfiguredDepositWalletResolution = {
   address: string;
@@ -46,10 +52,7 @@ type DepositMethodItem = {
 export class ManagedWalletsService {
   private readonly logger = new Logger(ManagedWalletsService.name);
   private static readonly RECOMMENDED_CHAIN_KEY = 'deposit.recommended_chain';
-  private static readonly SUPPORTED_CHAINS: SupportedManagedWalletChain[] = [
-    BlockchainNetwork.TRON_NILE,
-    BlockchainNetwork.TRON_SHASTA,
-  ];
+  private static readonly SUPPORTED_CHAINS: SupportedManagedWalletChain[] = [...MANAGED_TRON_CHAINS];
 
   constructor(
     private readonly dataSource: DataSource,
@@ -144,9 +147,9 @@ export class ManagedWalletsService {
     const w = await this.requireTransactionWalletForActor(userId, walletId, role);
     const amount = this.normalizePositiveAmount(dto.amount);
 
-    if (w.chain !== BlockchainNetwork.TRON_NILE && w.chain !== BlockchainNetwork.TRON_SHASTA) {
+    if (!(MANAGED_TRON_CHAINS as readonly string[]).includes(w.chain)) {
       throw new BadRequestException(
-        'Only Tron Nile/Shasta transaction wallets support this send endpoint',
+        'Only Tron family transaction wallets support this send endpoint',
         'UNSUPPORTED_SEND_CHAIN',
       );
     }
@@ -250,10 +253,7 @@ export class ManagedWalletsService {
 
   /** User-visible Tron deposit address from transaction_wallets only. */
   async getConfiguredDepositWallet(chain: string): Promise<ConfiguredDepositWalletResolution | null> {
-    if (
-      chain !== BlockchainNetwork.TRON_NILE &&
-      chain !== BlockchainNetwork.TRON_SHASTA
-    ) {
+    if (chain !== BlockchainNetwork.TRON_MAINNET) {
       return null;
     }
     const supportedChain = chain as SupportedManagedWalletChain;
@@ -307,10 +307,7 @@ export class ManagedWalletsService {
         const hasDefault = address.length > 0;
         return {
           chain,
-          label:
-            chain === BlockchainNetwork.TRON_NILE
-              ? 'Tron Network (Nile Testnet)'
-              : 'Tron Network (Shasta Testnet)',
+          label: ManagedWalletsService.depositLabelForChain(chain),
           deposit_address: address,
           is_recommended: chain === recommendedChain,
           deposit_enabled: (networkConfig?.deposit_enabled ?? true) && hasDefault,
@@ -331,7 +328,7 @@ export class ManagedWalletsService {
       where: { k: ManagedWalletsService.RECOMMENDED_CHAIN_KEY },
     });
 
-    return this.assertSupportedChain(setting?.v ?? BlockchainNetwork.TRON_NILE);
+    return this.assertSupportedChain(setting?.v ?? BlockchainNetwork.TRON_MAINNET);
   }
 
   private async requireTransactionWalletForActor(
@@ -371,15 +368,32 @@ export class ManagedWalletsService {
     };
   }
 
+  private static depositLabelForChain(chain: SupportedManagedWalletChain): string {
+    switch (chain) {
+      case BlockchainNetwork.TRON_NILE:
+        return 'Tron Nile (TRC-20 testnet)';
+      case BlockchainNetwork.TRON_SHASTA:
+        return 'Tron Shasta (TRC-20 testnet)';
+      default:
+        return 'Tron Network (TRC-20 Mainnet)';
+    }
+  }
+
   private async buildTronWeb(
     chain: SupportedManagedWalletChain,
     privateKey?: string,
   ): Promise<TronWeb> {
-    const fullHost =
-      chain === BlockchainNetwork.TRON_SHASTA
-        ? await this.systemConfigService.getEffectiveString('TRON_SHASTA_FULL_HOST')
-        : await this.systemConfigService.getEffectiveString('TRON_NILE_FULL_HOST');
-
+    let fullHost: string;
+    if (chain === BlockchainNetwork.TRON_NILE) {
+      const v = await this.systemConfigService.get<string>('TRON_NILE_FULL_HOST');
+      fullHost = v?.trim() || process.env.TRON_NILE_FULL_HOST?.trim() || 'https://nile.trongrid.io';
+    } else if (chain === BlockchainNetwork.TRON_SHASTA) {
+      const v = await this.systemConfigService.get<string>('TRON_SHASTA_FULL_HOST');
+      fullHost =
+        v?.trim() || process.env.TRON_SHASTA_FULL_HOST?.trim() || 'https://api.shasta.trongrid.io';
+    } else {
+      fullHost = await this.systemConfigService.getEffectiveString('TRON_MAINNET_FULL_HOST');
+    }
     return new TronWeb({
       fullHost,
       privateKey: privateKey || undefined,
@@ -402,16 +416,13 @@ export class ManagedWalletsService {
   }
 
   private assertSupportedChain(chain: string): SupportedManagedWalletChain {
-    if (
-      chain !== BlockchainNetwork.TRON_NILE &&
-      chain !== BlockchainNetwork.TRON_SHASTA
-    ) {
+    if (!(MANAGED_TRON_CHAINS as readonly string[]).includes(chain)) {
       throw new BadRequestException(
         `Unsupported managed wallet chain: ${chain}`,
         'UNSUPPORTED_MANAGED_WALLET_CHAIN',
       );
     }
 
-    return chain;
+    return chain as SupportedManagedWalletChain;
   }
 }

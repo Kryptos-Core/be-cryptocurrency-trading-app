@@ -51,17 +51,17 @@ export class OnchainTransferService {
   }
 
   /**
-   * Tron Nile/Shasta: chỉ chấp nhận nạp vào transaction wallet đang là default user deposit.
+   * Tron mainnet: chỉ chấp nhận nạp vào transaction wallet đang là default user deposit.
    * Không có default → từ chối; có default nhưng tx.to khác → từ chối.
    */
   private async assertTronDepositRecipientMatchesConfiguredDefault(
     chain: BlockchainNetwork,
     txRecipient: string,
   ): Promise<void> {
-    if (chain !== BlockchainNetwork.TRON_NILE && chain !== BlockchainNetwork.TRON_SHASTA) {
+    if (chain !== BlockchainNetwork.TRON_MAINNET) {
       return;
     }
-    const tw = await this.transactionWalletService.getDefaultUserDepositWallet(chain);
+    const tw = await this.transactionWalletService.getDefaultUserDepositWallet('TRON_MAINNET');
     if (!tw) {
       throw new BadRequestException(
         'Chưa có ví nạp mặc định cho mạng này. Nạp on-chain tạm dừng cho đến khi vận hành cấu hình.',
@@ -195,10 +195,16 @@ export class OnchainTransferService {
 
   private async getChainAssetSymbol(chain: BlockchainNetwork): Promise<string> {
     switch (chain) {
+      case BlockchainNetwork.ETH_MAINNET:
       case BlockchainNetwork.ETH_SEPOLIA:
         return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL'))?.trim().toUpperCase() || 'ETH';
+      case BlockchainNetwork.BSC_MAINNET:
+      case BlockchainNetwork.BSC_CHAPEL:
+        return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_BNB_SYMBOL'))?.trim().toUpperCase() || 'BNB';
+      case BlockchainNetwork.SOLANA_MAINNET:
       case BlockchainNetwork.SOLANA_DEVNET:
         return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL'))?.trim().toUpperCase() || 'SOL';
+      case BlockchainNetwork.TRON_MAINNET:
       case BlockchainNetwork.TRON_NILE:
       case BlockchainNetwork.TRON_SHASTA:
         return (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL'))?.trim().toUpperCase() || 'TRX';

@@ -3,16 +3,9 @@ import { DataSource, In, QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
+import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 import { ListTreasuryOperationsDto } from '../dto';
 
-type SupportedTreasuryChain =
-  | 'ETH_SEPOLIA'
-  | 'ETH_MAINNET'
-  | 'TRON_NILE'
-  | 'TRON_SHASTA'
-  | 'TRON_MAINNET'
-  | 'SOLANA_DEVNET'
-  | 'SOLANA_MAINNET';
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
 @Injectable()
@@ -21,7 +14,7 @@ export class TreasuryOperationRepository {
 
   async createPendingOperation(params: {
     type: TreasuryOperationType;
-    chain: SupportedTreasuryChain;
+    chain: TreasuryMainWalletChain;
     fromWalletId: string | null;
     toWalletId: string | null;
     amount: string;

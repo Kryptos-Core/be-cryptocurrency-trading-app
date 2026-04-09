@@ -14,7 +14,7 @@ export class WcAuthVerifyDto {
   @ApiProperty({
     description: 'Blockchain network (must match init)',
     enum: BlockchainNetwork,
-    example: 'ETH_SEPOLIA',
+    example: 'ETH_MAINNET',
   })
   @IsEnum(BlockchainNetwork, { message: 'Chain must be a supported blockchain network' })
   @IsNotEmpty()

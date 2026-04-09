@@ -4,9 +4,9 @@ import { BlockchainNetwork } from '@/common/enums';
 
 export class WalletNonceDto {
   @ApiProperty({
-    description: 'Blockchain network (e.g. ETH_SEPOLIA, TRON_NILE)',
+    description: 'Blockchain network (mainnet: ETH_MAINNET, BSC_MAINNET, TRON_MAINNET, SOLANA_MAINNET)',
     enum: BlockchainNetwork,
-    example: 'ETH_SEPOLIA',
+    example: 'ETH_MAINNET',
   })
   @IsEnum(BlockchainNetwork, { message: 'Chain must be a supported blockchain network' })
   @IsNotEmpty({ message: 'Chain is required' })

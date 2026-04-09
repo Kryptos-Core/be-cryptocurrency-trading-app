@@ -7,7 +7,7 @@ export class ManagedWalletResponseDto {
   @ApiProperty({ description: 'Owner user ID' })
   userId!: string;
 
-  @ApiProperty({ description: 'Blockchain network code', example: 'TRON_NILE' })
+  @ApiProperty({ description: 'Blockchain network code', example: 'TRON_MAINNET' })
   chain!: string;
 
   @ApiProperty({ description: 'Public wallet address' })

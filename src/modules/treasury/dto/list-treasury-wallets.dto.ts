@@ -1,14 +1,10 @@
-import { IsEnum, IsOptional } from 'class-validator';
+import { IsEnum, IsIn, IsOptional } from 'class-validator';
+import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
 export class ListTreasuryWalletsDto {
   @IsOptional()
-  @IsEnum(['ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'])
-  chain?:
-    | 'ETH_SEPOLIA'
-    | 'ETH_MAINNET'
-    | 'TRON_NILE'
-    | 'TRON_SHASTA'
-    | 'TRON_MAINNET';
+  @IsIn([...BLOCKCHAIN_CHAIN_DB_VALUES])
+  chain?: BlockchainChainDbValue;
 
   @IsOptional()
   @IsEnum(['DEPOSIT', 'WITHDRAWAL', 'BOTH'])

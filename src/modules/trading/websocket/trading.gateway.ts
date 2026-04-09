@@ -8,9 +8,9 @@ import {
   MessageBody,
   OnGatewayInit,
 } from '@nestjs/websockets';
-import { UseFilters, Logger } from '@nestjs/common';
+import { UseFilters, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { TradingSubscriptionService } from '../services/trading-subscription.service';
 import { BinancePriceFeedService } from '../services/binance-price-feed.service';
@@ -56,7 +56,12 @@ import { RedisService } from '@/common/services';
 })
 @UseFilters(WebSocketExceptionFilter)
 export class TradingGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  implements
+    OnGatewayInit,
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnApplicationBootstrap
+{
   @WebSocketServer()
   server!: Server;
 
@@ -71,16 +76,36 @@ export class TradingGateway
     private readonly redisService: RedisService,
   ) {}
 
+  /** Nest passes Namespace when @WebSocketGateway sets `namespace`; Namespace.adapter is an Adapter instance, not Server#adapter(). */
+  private isIoNamespace(x: Server | Namespace): x is Namespace {
+    return typeof x.adapter !== 'function';
+  }
+
+  private parentIoServer(nspOrServer: Server | Namespace): Server {
+    return this.isIoNamespace(nspOrServer) ? nspOrServer.server : nspOrServer;
+  }
+
   /**
-   * Attach Socket.IO Redis Adapter for horizontal scaling.
-   * Uses the existing pub/sub Redis clients from RedisService — no extra connections.
-   * Broadcasts (server.to(room).emit) will fan-out across all instances via Redis.
+   * WebSocket afterInit can run before RedisService.onModuleInit(), so pub/sub clients are undefined.
+   * Dashboard only needs the namespace reference here.
    */
   afterInit(server: Server) {
-    server.adapter(
-      createAdapter(this.redisService.getPublisher(), this.redisService.getSubscriber()),
-    );
     this.dashboardBroadcastService.setServer(server);
+  }
+
+  /**
+   * After all onModuleInit hooks (Redis clients created), attach Redis adapter for multi-instance fan-out.
+   */
+  onApplicationBootstrap() {
+    const pub = this.redisService.getPublisher();
+    const sub = this.redisService.getSubscriber();
+    if (!pub || !sub) {
+      this.logger.warn(
+        'Redis pub/sub clients unavailable; Socket.IO Redis adapter skipped (single-node / degraded).',
+      );
+      return;
+    }
+    this.parentIoServer(this.server as Server | Namespace).adapter(createAdapter(pub, sub));
   }
 
   /**

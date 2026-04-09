@@ -11,7 +11,7 @@ Backend sử dụng:
 ## Thiết lập nhanh
 
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 Sau đó điền thông tin và chạy ứng dụng.
@@ -54,25 +54,37 @@ Sau đó điền thông tin và chạy ứng dụng.
 | WALLET_SYNC_INTERVAL | Chu kỳ đồng bộ ví (ms) |
 | WALLET_RECONCILIATION_THRESHOLD | Ngưỡng lệch cho việc đối soát (reconcile) |
 
-### Blockchain testnet
+### Blockchain (on-chain)
 
 | Biến | Mô tả |
 |---|---|
-| TRON_NILE_FULL_HOST | RPC TRON Nile |
-| TRON_SHASTA_FULL_HOST | RPC TRON Shasta |
-| TRON_DEFAULT_NETWORK | `TRON_NILE` hoặc `TRON_SHASTA` |
-| SOLANA_DEVNET_URL | RPC Solana devnet |
-| ETH_SEPOLIA_RPC_URL | RPC Sepolia |
-| ETH_SEPOLIA_CHAIN_ID | ID chuỗi Sepolia |
-| ETH_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Ethereum |
+| ONCHAIN_OPERATOR_MODE | `production` (mặc định) hoặc `sandbox` — quyết định resolver họ mạng → mainnet vs testnet; khi `sandbox` thì validation bắt buộc đủ RPC sandbox (xem dưới). **Không** thay cho “PayOS sandbox” (hai khái niệm độc lập). |
+| TRON_MAINNET_FULL_HOST | RPC Tron mainnet (ví dụ TronGrid) |
+| SOLANA_MAINNET_URL | RPC Solana mainnet-beta |
+| ETH_MAINNET_RPC_URL | RPC Ethereum mainnet |
+| ETH_MAINNET_CHAIN_ID | Chuỗi Ethereum mainnet (thường `1`) |
+| BSC_MAINNET_RPC_URL | RPC BNB Smart Chain mainnet |
+| BSC_MAINNET_CHAIN_ID | Chuỗi BSC (thường `56`) |
+| TRON_NILE_FULL_HOST | RPC Tron Nile (bắt buộc URL hợp lệ khi `ONCHAIN_OPERATOR_MODE=sandbox`) |
+| TRON_SHASTA_FULL_HOST | RPC Tron Shasta (tùy chọn) |
+| SOLANA_DEVNET_URL | RPC Solana devnet (bắt buộc khi `ONCHAIN_OPERATOR_MODE=sandbox`) |
+| ETH_SEPOLIA_RPC_URL / ETH_SEPOLIA_CHAIN_ID | Sepolia (bắt buộc URL khi sandbox; chain id thường `11155111`) |
+| BSC_CHAPEL_RPC_URL / BSC_CHAPEL_CHAIN_ID | BSC testnet Chapel (bắt buộc URL khi sandbox; chain id thường `97`) |
+| ETH_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng EVM (nếu dùng) |
 | TRON_HOT_WALLET_PRIVATE_KEY | Khóa bí mật ví nóng Tron |
 | BLOCKCHAIN_ALLOW_TEST_SIGNATURE | Chỉ dùng cho phát triển, mặc định là false |
 | ALLOW_UI_TEST_SIGNATURE | `true` trên production để cho phép sửa `BLOCKCHAIN_ALLOW_TEST_SIGNATURE` qua API/UI (rất rủi ro) |
 | `WALLETCONNECT_PROJECT_ID`, `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `WALLETCONNECT_WEBHOOK_SECRET` | WalletConnect / Reown — desktop SignClient + liên kết ví; bảng đầy đủ và luồng: **[WALLETCONNECT.md](WALLETCONNECT.md)** |
 
-**Cấu hình runtime (UI):** Các biến ví dụ `WALLET_SYNC_INTERVAL`, `TRON_*_FULL_HOST`, `BLOCKCHAIN_WITHDRAW_*`, `PLATFORM_CASH_CURRENCY_SYMBOL`, `BLOCKCHAIN_DEPOSIT_*_TO_USDT_RATE`, … được seed vào bảng `system_configs` khi khởi động (nếu thiếu) và có thể chỉnh qua **GET/PATCH `/api/v1/system-configs/runtime`** (JWT + `FINANCE_MANAGER`/`ADMIN` + `PAYMENT_CONFIGS_MANAGE`). Giá trị đọc thực tế: **Redis cache → MySQL → fallback `.env`**. Tab **Platform** trên màn **Payment Configuration** (Flutter) gọi các endpoint này.
+**Cấu hình runtime (UI):** Các biến ví dụ `WALLET_SYNC_INTERVAL`, `TRON_MAINNET_FULL_HOST`, `SOLANA_MAINNET_URL`, `ETH_MAINNET_RPC_URL`, `BSC_MAINNET_RPC_URL`, `BLOCKCHAIN_WITHDRAW_*`, `PLATFORM_CASH_CURRENCY_SYMBOL`, `BLOCKCHAIN_DEPOSIT_*_TO_USDT_RATE`, … được seed vào bảng `system_configs` khi khởi động (nếu thiếu) và có thể chỉnh qua **GET/PATCH `/api/v1/system-configs/runtime`** (JWT + `FINANCE_MANAGER`/`ADMIN` + `PAYMENT_CONFIGS_MANAGE`). Giá trị đọc thực tế: **Redis cache → MySQL → fallback `.env`**. Tab **Platform** trên màn **Payment Configuration** (Flutter) gọi các endpoint này.
 
 ### PayOS
+
+Nguồn cấu hình **ưu tiên**: bản ghi **active** trong DB (`payment_method_configs`, loại `PAYOS`, network `MAINNET`) qua UI Payment Configuration. **`PAYOS_*` trong `.env` là fallback** khi chưa có cấu hình PayOS active trong DB (xem `DepositsService.resolvePayOSConfig`).
+
+**Khi nào cần điền `.env` PayOS:** triển khai mới chưa seed DB, môi trường dev/staging không dùng UI Payment Configuration, hoặc cố ý muốn một bộ credential mặc định trước khi bật bản ghi DB. Khi đã có PayOS active trong DB, `.env` không bắt buộc cho luồng nạp (trừ khi code đọc thêm key khác).
+
+**PayOS sandbox vs production** là tài khoản / dashboard merchant PayOS (API key khác nhau). **`ONCHAIN_OPERATOR_MODE`** chỉ điều khiển stack on-chain (mainnet vs Nile/Sepolia/Chapel/devnet) — hai trục này độc lập; có thể vừa PayOS production vừa on-chain sandbox trên một instance (không khuyến nghị cho tiền thật nếu không kiểm soát UI/badge).
 
 | Biến | Mô tả |
 |---|---|
@@ -81,17 +93,14 @@ Sau đó điền thông tin và chạy ứng dụng.
 | PAYOS_CHECKSUM_KEY | Khóa xác thực chữ ký/webhook |
 | PAYOS_RETURN_URL | URL chuyển hướng khi thanh toán xong |
 | PAYOS_CANCEL_URL | URL chuyển hướng khi hủy thanh toán |
+| PAYOS_DEPOSIT_CURRENCY_SYMBOL | Symbol ví được cộng sau khi thanh toán được xác nhận (ví dụ `USDT`) |
+| PAYOS_FIAT_SYMBOL | Đơn vị fiat mà số tiền PayOS thể hiện (ví dụ `VND`) |
+| PAYOS_FIAT_TO_QUOTE_RATE | Tỷ giá: 1 đơn vị fiat → bao nhiêu đơn vị quote (ví dụ USDT) |
+| PAYOS_FX_SPREAD_BPS | Spread chuyển đổi (basis points; 100 bps = 1 %) |
 
-## Quy tắc cho môi trường Production với PayOS
+## Production và PayOS
 
-Khi `NODE_ENV=production`, backend bắt buộc phải có đầy đủ 5 biến PayOS:
-- PAYOS_CLIENT_ID
-- PAYOS_API_KEY
-- PAYOS_CHECKSUM_KEY
-- PAYOS_RETURN_URL
-- PAYOS_CANCEL_URL
-
-Nếu thiếu, ứng dụng sẽ dừng khởi động ngay lập tức.
+`NODE_ENV=production` **không** còn bắt buộc đủ toàn bộ biến `PAYOS_*` lúc khởi động. Trước khi bật nạp PayOS trên production, vận hành cần đảm bảo **ít nhất một** nguồn (DB hoặc `.env`); nếu thiếu cả hai, lỗi sẽ phát sinh khi xử lý nạp (message rõ từ `resolvePayOSConfig`).
 
 ## Lưu ý thực tế
 

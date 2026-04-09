@@ -7,7 +7,7 @@ import {
   Index,
 } from 'typeorm';
 
-export type PaymentMethodType = 'PAYOS' | 'ETH' | 'TRON' | 'SOL';
+export type PaymentMethodType = 'PAYOS' | 'ETH' | 'TRON' | 'SOL' | 'BSC';
 export type PaymentMethodStatus = 'ACTIVE' | 'TRANSITIONING' | 'INACTIVE';
 
 /**
@@ -28,7 +28,7 @@ export class PaymentMethodConfig {
   @PrimaryColumn({ type: 'char', length: 36 })
   config_id!: string;
 
-  @Column({ type: 'enum', enum: ['PAYOS', 'ETH', 'TRON', 'SOL'] })
+  @Column({ type: 'enum', enum: ['PAYOS', 'ETH', 'TRON', 'SOL', 'BSC'] })
   type!: PaymentMethodType;
 
   /** Network identifier: MAINNET, TESTNET, NILE, SHASTA, SEPOLIA, DEVNET, etc. */

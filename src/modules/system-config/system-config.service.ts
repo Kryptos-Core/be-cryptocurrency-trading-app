@@ -162,42 +162,42 @@ export class SystemConfigService implements OnModuleInit {
         return app('app.wallet.syncInterval', 30000);
       case 'WALLET_RECONCILIATION_THRESHOLD':
         return app('app.wallet.reconciliationThreshold', '0.00000001');
-      case 'TRON_NILE_FULL_HOST':
-        return app('app.blockchain.tron.nileFullHost', 'https://nile.trongrid.io');
-      case 'TRON_SHASTA_FULL_HOST':
-        return app('app.blockchain.tron.shastaFullHost', 'https://api.shasta.trongrid.io');
-      case 'TRON_DEFAULT_NETWORK':
-        return app('app.blockchain.tron.defaultNetwork', 'TRON_NILE');
-      case 'SOLANA_DEVNET_URL':
-        return app('app.blockchain.solana.devnetUrl', 'https://api.devnet.solana.com');
-      case 'ETH_SEPOLIA_RPC_URL':
-        return app('app.blockchain.ethereum.sepoliaRpcUrl', 'https://rpc.sepolia.org');
-      case 'ETH_SEPOLIA_CHAIN_ID':
-        return app('app.blockchain.ethereum.chainId', 11155111);
+      case 'TRON_MAINNET_FULL_HOST':
+        return app('app.blockchain.tron.mainnetFullHost', 'https://api.trongrid.io');
+      case 'SOLANA_MAINNET_URL':
+        return app('app.blockchain.solana.mainnetUrl', 'https://api.mainnet-beta.solana.com');
+      case 'ETH_MAINNET_RPC_URL':
+        return app('app.blockchain.ethereum.mainnetRpcUrl', 'https://eth.llamarpc.com');
+      case 'ETH_MAINNET_CHAIN_ID':
+        return app('app.blockchain.ethereum.mainnetChainId', 1);
+      case 'BSC_MAINNET_RPC_URL':
+        return app('app.blockchain.bsc.mainnetRpcUrl', 'https://bsc-dataseed.binance.org');
+      case 'BSC_MAINNET_CHAIN_ID':
+        return app('app.blockchain.bsc.mainnetChainId', 56);
       case 'BLOCKCHAIN_ALLOW_TEST_SIGNATURE': {
         const a = (process.env.BLOCKCHAIN_ALLOW_TEST_SIGNATURE || '').toLowerCase();
         return ['true', '1', 'yes', 'on'].includes(a) ? 'true' : 'false';
       }
       case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX':
         return envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0');
-      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA':
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET':
         return envOr(
-          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET',
           envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
         );
-      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET':
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_BSC_MAINNET':
         return envOr(
-          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_BSC_MAINNET',
           envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
         );
-      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE':
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET':
         return envOr(
-          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE',
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET',
           envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
         );
-      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA':
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET':
         return envOr(
-          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA',
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET',
           envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'),
         );
       case 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL':

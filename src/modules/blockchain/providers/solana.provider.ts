@@ -12,6 +12,7 @@ import {
   sendAndConfirmTransaction,
 } from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
+import bs58 from 'bs58';
 import { BlockchainNetwork } from '@/common/enums';
 import {
   IBlockchainProvider,
@@ -20,64 +21,89 @@ import {
 } from '../interfaces';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 
-/**
- * Solana Blockchain Provider
- * Connects to Solana devnet / mainnet via @solana/web3.js.
- *
- * Hot wallet key resolution (Cache-Aside):
- *  1. PaymentConfigService.getActiveConfig('SOL', 'DEVNET' | 'MAINNET') — DB/Redis
- *  2. Fallback: SOLANA_HOT_WALLET_PRIVATE_KEY from .env (base64 encoded secret key)
- */
+export interface SolanaProviderBindings {
+  network: BlockchainNetwork;
+  rpcRuntimeKey: string;
+  /** Payment config network segment (legacy mainnet hot wallet path). */
+  paymentSolNetwork: 'MAINNET' | 'DEVNET';
+  /** When set, devnet signing uses treasury main wallet for this chain. */
+  treasuryChain: TreasuryMainWalletChain | null;
+}
+
 @Injectable()
 export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(SolanaProvider.name);
   private connection!: Connection;
-  private readonly networkKey: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly paymentConfigService: PaymentConfigService,
     private readonly systemConfigService: SystemConfigService,
+    private readonly treasuryMainWalletService: TreasuryMainWalletService,
+    private readonly bindings: SolanaProviderBindings,
   ) {
-    this.networkKey = 'DEVNET';
-    const bootstrap =
-      this.configService.get<string>('app.blockchain.solana.devnetUrl') ?? 'https://api.devnet.solana.com';
+    const bootstrap = this.defaultBootstrapRpc();
     this.connection = new Connection(bootstrap, 'confirmed');
   }
 
-  async onModuleInit() {
-    const rpcUrl = await this.resolveDevnetRpcUrl();
-    this.connection = new Connection(rpcUrl, 'confirmed');
-    this.logger.log(`SolanaProvider initialized: devnet → ${rpcUrl}`);
+  private defaultBootstrapRpc(): string {
+    if (this.bindings.network === BlockchainNetwork.SOLANA_DEVNET) {
+      return (
+        this.configService.get<string>('app.blockchain.solana.devnetUrl') ??
+        'https://api.devnet.solana.com'
+      );
+    }
+    return (
+      this.configService.get<string>('app.blockchain.solana.mainnetUrl') ??
+      'https://api.mainnet-beta.solana.com'
+    );
   }
 
-  private async resolveDevnetRpcUrl(): Promise<string> {
-    return (
-      (await this.systemConfigService.get<string>('SOLANA_DEVNET_URL')) ||
-      this.configService.get<string>('app.blockchain.solana.devnetUrl') ||
-      'https://api.devnet.solana.com'
-    );
+  async onModuleInit() {
+    const rpcUrl = await this.resolveRpcUrl();
+    this.connection = new Connection(rpcUrl, 'confirmed');
+    this.logger.log(`SolanaProvider initialized: ${this.bindings.network} → ${rpcUrl}`);
+  }
+
+  private async resolveRpcUrl(): Promise<string> {
+    const fromDb = await this.systemConfigService.get<string>(this.bindings.rpcRuntimeKey);
+    if (fromDb?.trim()) return fromDb.trim();
+    return this.defaultBootstrapRpc();
   }
 
   @OnEvent('system_config_updated')
   async handleConfigChanged(payload: { key: string; value: string }) {
-    if (payload.key !== 'SOLANA_DEVNET_URL') return;
-    const url =
-      payload.value?.trim() ||
-      (await this.resolveDevnetRpcUrl());
-    this.logger.log(`[Dynamic Config] Solana devnet RPC → ${url}`);
+    if (payload.key !== this.bindings.rpcRuntimeKey) return;
+    const url = payload.value?.trim() || (await this.resolveRpcUrl());
+    this.logger.log(`[Dynamic Config] ${this.bindings.rpcRuntimeKey} → ${url}`);
     this.connection = new Connection(url, 'confirmed');
   }
 
   getNetwork(): BlockchainNetwork {
-    return BlockchainNetwork.SOLANA_DEVNET;
+    return this.bindings.network;
   }
 
-  // ── Hot wallet key resolution ────────────────────────────────────────────
-
   private async resolveHotWallet(): Promise<Keypair> {
-    const dbConfig = await this.paymentConfigService.getActiveConfig('SOL', this.networkKey);
+    if (this.bindings.treasuryChain) {
+      const pk = await this.treasuryMainWalletService.resolveMainWalletPrivateKey(
+        this.bindings.treasuryChain,
+      );
+      try {
+        const decoded = bs58.decode(pk.trim());
+        return Keypair.fromSecretKey(decoded);
+      } catch {
+        const buf = Buffer.from(pk.trim(), 'base64');
+        return Keypair.fromSecretKey(buf);
+      }
+    }
+
+    const dbConfig = await this.paymentConfigService.getActiveConfig(
+      'SOL',
+      this.bindings.paymentSolNetwork,
+    );
     if (dbConfig) {
       const blockchainConfig = dbConfig as BlockchainGatewayConfig;
       if (blockchainConfig.hotWalletPrivateKey) {
@@ -88,14 +114,12 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
 
     const envKey = this.configService.get<string>('app.blockchain.solana.hotWalletPrivateKey') ?? '';
     if (!envKey) {
-      // Devnet: ephemeral keypair when no key is configured
-      this.logger.warn('SOL hot wallet key not configured — using ephemeral keypair (devnet only)');
-      return Keypair.generate();
+      throw new Error(
+        'Solana hot wallet not configured. Add SOL gateway in payment configs, treasury main wallet, or env hot key.',
+      );
     }
     return Keypair.fromSecretKey(Buffer.from(envKey, 'base64'));
   }
-
-  // ── IBlockchainProvider ──────────────────────────────────────────────────
 
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
     try {
@@ -103,7 +127,7 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
       const lamports = await this.connection.getBalance(pubkey);
       return {
         address,
-        network: BlockchainNetwork.SOLANA_DEVNET,
+        network: this.bindings.network,
         balance: (lamports / LAMPORTS_PER_SOL).toString(),
         symbol: 'SOL',
         timestamp: new Date(),
@@ -144,7 +168,7 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
 
       return {
         txHash,
-        network: BlockchainNetwork.SOLANA_DEVNET,
+        network: this.bindings.network,
         status: failed ? 'FAILED' : 'CONFIRMED',
         confirmations: 1,
         from: accountKeys?.[0]?.toBase58?.() ?? '',
@@ -200,7 +224,7 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
   private buildNotFound(txHash: string): BlockchainTxStatusDto {
     return {
       txHash,
-      network: BlockchainNetwork.SOLANA_DEVNET,
+      network: this.bindings.network,
       status: 'NOT_FOUND',
       confirmations: 0,
       from: '',

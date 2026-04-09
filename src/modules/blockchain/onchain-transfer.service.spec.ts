@@ -114,7 +114,7 @@ describe('OnchainTransferService', () => {
 
     walletLinkingService.findByLinkId.mockResolvedValue({
       link_id: 'link-1',
-      chain: BlockchainNetwork.ETH_SEPOLIA,
+      chain: BlockchainNetwork.ETH_MAINNET,
       address: '0xRecipient',
       status: 'VERIFIED',
     } as any);
@@ -138,7 +138,7 @@ describe('OnchainTransferService', () => {
 
     systemConfigService.get.mockImplementation(async (key: string) => {
       if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '10';
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA') return null;
+      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET') return null;
       if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
       return null;
     });
@@ -148,7 +148,7 @@ describe('OnchainTransferService', () => {
     provider.sendTransaction.mockResolvedValue('0xhash-ok');
 
     const result = await service.requestWithdrawal('user-1', {
-      chain: BlockchainNetwork.ETH_SEPOLIA,
+      chain: BlockchainNetwork.ETH_MAINNET,
       linkedWalletId: 'link-1',
       amount: '1',
       idempotencyKey: 'idem-1',
@@ -177,7 +177,7 @@ describe('OnchainTransferService', () => {
     provider.sendTransaction.mockRejectedValue(new Error('send failed'));
 
     const result = await service.requestWithdrawal('user-1', {
-      chain: BlockchainNetwork.ETH_SEPOLIA,
+      chain: BlockchainNetwork.ETH_MAINNET,
       linkedWalletId: 'link-1',
       amount: '1',
       idempotencyKey: 'idem-2',
@@ -205,13 +205,13 @@ describe('OnchainTransferService', () => {
     });
     systemConfigService.get.mockImplementation(async (key: string) => {
       if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '0.5';
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA') return null;
+      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET') return null;
       if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
       return null;
     });
 
     const result = await service.requestWithdrawal('user-1', {
-      chain: BlockchainNetwork.ETH_SEPOLIA,
+      chain: BlockchainNetwork.ETH_MAINNET,
       linkedWalletId: 'link-1',
       amount: '1',
       idempotencyKey: 'idem-3',
@@ -232,12 +232,12 @@ describe('OnchainTransferService', () => {
       txId: 'cached-tx',
       status: OnchainTxStatus.CONFIRMING,
       amount: '1',
-      chain: BlockchainNetwork.ETH_SEPOLIA,
+      chain: BlockchainNetwork.ETH_MAINNET,
       toAddress: '0xRecipient',
     } as never);
 
     const result = await service.requestWithdrawal('user-1', {
-      chain: BlockchainNetwork.ETH_SEPOLIA,
+      chain: BlockchainNetwork.ETH_MAINNET,
       linkedWalletId: 'link-1',
       amount: '1',
       idempotencyKey: 'idem-4',
@@ -256,7 +256,7 @@ describe('OnchainTransferService', () => {
           {
             tx_id: 'tx-manual-1',
             user_id: 'user-1',
-            chain: BlockchainNetwork.ETH_SEPOLIA,
+            chain: BlockchainNetwork.ETH_MAINNET,
             type: 'WITHDRAWAL',
             tx_hash: null,
             from_address: '0xHotWallet',
@@ -294,7 +294,7 @@ describe('OnchainTransferService', () => {
           {
             tx_id: 'tx-manual-2',
             user_id: 'user-1',
-            chain: BlockchainNetwork.ETH_SEPOLIA,
+            chain: BlockchainNetwork.ETH_MAINNET,
             type: 'WITHDRAWAL',
             tx_hash: null,
             amount: '0.75',
@@ -322,7 +322,7 @@ describe('OnchainTransferService', () => {
           {
             tx_id: 'tx-dep-1',
             user_id: 'user-1',
-            chain: BlockchainNetwork.ETH_SEPOLIA,
+            chain: BlockchainNetwork.ETH_MAINNET,
             type: 'DEPOSIT',
             tx_hash: '0xdep',
             amount: '2.5',
@@ -339,7 +339,7 @@ describe('OnchainTransferService', () => {
 
     provider.getTransactionStatus.mockResolvedValue({
       txHash: '0xdep',
-      network: BlockchainNetwork.ETH_SEPOLIA,
+      network: BlockchainNetwork.ETH_MAINNET,
       status: 'CONFIRMED',
       confirmations: 12,
       from: '0xSender',

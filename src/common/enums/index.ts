@@ -174,17 +174,34 @@ export enum Environment {
 // Blockchain Module Enums
 // ============================================
 
-/** Các mạng blockchain được hỗ trợ (testnet và mainnet) */
+/**
+ * On-chain networks (DB + API). Mainnets + canonical sandbox per family.
+ * TRON_SHASTA kept for legacy rows / advanced ops; UI resolver uses TRON_NILE for sandbox.
+ */
 export enum BlockchainNetwork {
-  // Testnets
+  TRON_MAINNET = 'TRON_MAINNET',
   TRON_NILE = 'TRON_NILE',
   TRON_SHASTA = 'TRON_SHASTA',
-  SOLANA_DEVNET = 'SOLANA_DEVNET',
-  ETH_SEPOLIA = 'ETH_SEPOLIA',
-  // Mainnets
-  TRON_MAINNET = 'TRON_MAINNET',
-  ETH_MAINNET = 'ETH_MAINNET',
   SOLANA_MAINNET = 'SOLANA_MAINNET',
+  SOLANA_DEVNET = 'SOLANA_DEVNET',
+  ETH_MAINNET = 'ETH_MAINNET',
+  ETH_SEPOLIA = 'ETH_SEPOLIA',
+  BSC_MAINNET = 'BSC_MAINNET',
+  BSC_CHAPEL = 'BSC_CHAPEL',
+}
+
+/** Deployment-wide on-chain stack: production mainnets vs sandbox testnets (see ONCHAIN_OPERATOR_MODE). */
+export enum OnChainOperatorMode {
+  PRODUCTION = 'production',
+  SANDBOX = 'sandbox',
+}
+
+/** Operator / UI network family — resolved to concrete BlockchainNetwork with mode. */
+export enum OnChainNetworkFamily {
+  TRON = 'TRON',
+  EVM_ETH = 'EVM_ETH',
+  EVM_BSC = 'EVM_BSC',
+  SOLANA = 'SOLANA',
 }
 
 /** Trạng thái liên kết ví */

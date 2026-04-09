@@ -10,82 +10,127 @@ import {
   BlockchainTxStatusDto,
 } from '../interfaces';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
+
+const EVM_PROVIDER_CHAINS = new Set<BlockchainNetwork>([
+  BlockchainNetwork.ETH_MAINNET,
+  BlockchainNetwork.ETH_SEPOLIA,
+  BlockchainNetwork.BSC_MAINNET,
+  BlockchainNetwork.BSC_CHAPEL,
+]);
 
 /**
- * Ethereum Blockchain Provider (Sepolia testnet / ETH Mainnet)
- * Compatible with MetaMask — uses EIP-191 personal_sign.
- *
- * Hot wallet key resolution (Single Source of Truth):
- *  treasury_main_wallets table (via TreasuryMainWalletService) — DB/Redis
- *  No .env fallback. Import via POST /treasury/main-wallets.
+ * EVM provider — one Nest instance per chain (mainnet or sandbox).
  */
 @Injectable()
 export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(EthereumProvider.name);
-
-  /** Read-only JsonRpcProvider — no signer, used for balance/tx queries */
   private provider!: JsonRpcProvider;
-  private readonly networkKey: string;
+  private readonly rpcConfigKey: string;
+  private readonly treasuryChain: TreasuryMainWalletChain;
+  private readonly nativeSymbol: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly systemConfigService: SystemConfigService,
+    private readonly evmChain: BlockchainNetwork,
   ) {
-    this.networkKey = 'SEPOLIA';
-    const bootstrap =
-      this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ?? 'https://rpc.sepolia.org';
+    if (!EVM_PROVIDER_CHAINS.has(evmChain)) {
+      throw new Error(`EthereumProvider: unsupported evmChain ${evmChain}`);
+    }
+    const { rpcKey, treasury, symbol } = EthereumProvider.resolveEvmBindings(evmChain);
+    this.treasuryChain = treasury;
+    this.rpcConfigKey = rpcKey;
+    this.nativeSymbol = symbol;
+    const bootstrap = this.defaultBootstrapRpc();
     this.provider = new JsonRpcProvider(bootstrap);
   }
 
-  async onModuleInit() {
-    const rpcUrl = await this.resolveSepoliaRpcUrl();
-    this.provider = new JsonRpcProvider(rpcUrl);
-    this.logger.log(`EthereumProvider initialized: Sepolia → ${rpcUrl}`);
+  private static resolveEvmBindings(chain: BlockchainNetwork): {
+    rpcKey: string;
+    treasury: TreasuryMainWalletChain;
+    symbol: string;
+  } {
+    switch (chain) {
+      case BlockchainNetwork.ETH_MAINNET:
+        return { rpcKey: 'ETH_MAINNET_RPC_URL', treasury: 'ETH_MAINNET', symbol: 'ETH' };
+      case BlockchainNetwork.ETH_SEPOLIA:
+        return { rpcKey: 'ETH_SEPOLIA_RPC_URL', treasury: 'ETH_SEPOLIA', symbol: 'ETH' };
+      case BlockchainNetwork.BSC_MAINNET:
+        return { rpcKey: 'BSC_MAINNET_RPC_URL', treasury: 'BSC_MAINNET', symbol: 'BNB' };
+      case BlockchainNetwork.BSC_CHAPEL:
+        return { rpcKey: 'BSC_CHAPEL_RPC_URL', treasury: 'BSC_CHAPEL', symbol: 'BNB' };
+      default:
+        throw new Error(`EthereumProvider: unsupported evmChain ${chain}`);
+    }
   }
 
-  private async resolveSepoliaRpcUrl(): Promise<string> {
-    return (
-      (await this.systemConfigService.get<string>('ETH_SEPOLIA_RPC_URL')) ||
-      this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ||
-      'https://rpc.sepolia.org'
-    );
+  private defaultBootstrapRpc(): string {
+    switch (this.evmChain) {
+      case BlockchainNetwork.BSC_MAINNET:
+        return (
+          this.configService.get<string>('app.blockchain.bsc.mainnetRpcUrl') ??
+          'https://bsc-dataseed.binance.org'
+        );
+      case BlockchainNetwork.BSC_CHAPEL:
+        return (
+          this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ??
+          'https://data-seed-prebsc-1-s1.binance.org:8545'
+        );
+      case BlockchainNetwork.ETH_SEPOLIA:
+        return (
+          this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ??
+          'https://rpc.sepolia.org'
+        );
+      default:
+        return (
+          this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ??
+          'https://eth.llamarpc.com'
+        );
+    }
+  }
+
+  async onModuleInit() {
+    const rpcUrl = await this.resolveRpcUrl();
+    this.provider = new JsonRpcProvider(rpcUrl);
+    this.logger.log(`${this.evmChain} provider initialized → ${rpcUrl}`);
+  }
+
+  private async resolveRpcUrl(): Promise<string> {
+    const fromDb = await this.systemConfigService.get<string>(this.rpcConfigKey);
+    if (fromDb?.trim()) return fromDb.trim();
+    return this.defaultBootstrapRpc();
   }
 
   @OnEvent('system_config_updated')
   async handleConfigChanged(payload: { key: string; value: string }) {
-    if (payload.key !== 'ETH_SEPOLIA_RPC_URL') return;
-    const url =
-      payload.value?.trim() ||
-      (await this.resolveSepoliaRpcUrl());
-    this.logger.log(`[Dynamic Config] Ethereum Sepolia RPC → ${url}`);
+    if (payload.key !== this.rpcConfigKey) return;
+    const url = payload.value?.trim() || (await this.resolveRpcUrl());
+    this.logger.log(`[Dynamic Config] ${this.rpcConfigKey} → ${url}`);
     this.provider = new JsonRpcProvider(url);
   }
 
   getNetwork(): BlockchainNetwork {
-    return BlockchainNetwork.ETH_SEPOLIA;
+    return this.evmChain;
   }
-
-  // ── Hot wallet key resolution ────────────────────────────────────────────
 
   private async resolveHotWalletKey(): Promise<string> {
-    return this.treasuryMainWalletService.resolveMainWalletPrivateKey('ETH_SEPOLIA');
+    return this.treasuryMainWalletService.resolveMainWalletPrivateKey(this.treasuryChain);
   }
-
-  // ── IBlockchainProvider ──────────────────────────────────────────────────
 
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
     try {
       const weiBalance = await this.provider.getBalance(address);
       return {
         address,
-        network: BlockchainNetwork.ETH_SEPOLIA,
+        network: this.evmChain,
         balance: ethers.formatEther(weiBalance),
-        symbol: 'ETH',
+        symbol: this.nativeSymbol,
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`Error getting ETH balance: ${address}`, error);
+      this.logger.error(`Error getting ${this.nativeSymbol} balance: ${address}`, error);
       throw error;
     }
   }
@@ -95,7 +140,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
       const recovered = ethers.verifyMessage(message, signature);
       return recovered.toLowerCase() === address.toLowerCase();
     } catch (error) {
-      this.logger.warn(`ETH signature verification failed: ${address}`, error);
+      this.logger.warn(`EVM signature verification failed: ${address}`, error);
       return false;
     }
   }
@@ -110,7 +155,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
       if (!receipt) {
         return {
           txHash,
-          network: BlockchainNetwork.ETH_SEPOLIA,
+          network: this.evmChain,
           status: 'PENDING',
           confirmations: 0,
           from: tx.from ?? '',
@@ -124,7 +169,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
 
       return {
         txHash,
-        network: BlockchainNetwork.ETH_SEPOLIA,
+        network: this.evmChain,
         status: receipt.status === 1 ? 'CONFIRMED' : 'FAILED',
         confirmations,
         from: receipt.from ?? '',
@@ -138,7 +183,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
           : undefined,
       };
     } catch (error) {
-      this.logger.error(`Error getting ETH tx: ${txHash}`, error);
+      this.logger.error(`Error getting EVM tx: ${txHash}`, error);
       return this.buildNotFound(txHash);
     }
   }
@@ -151,13 +196,13 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     const privateKey = await this.resolveHotWalletKey();
     const wallet = new ethers.Wallet(privateKey, this.provider);
 
-    this.logger.log(`Sending ${amount} ETH to ${to}...`);
+    this.logger.log(`Sending ${amount} ${this.nativeSymbol} to ${to}...`);
     const tx = await wallet.sendTransaction({
       to,
       value: ethers.parseEther(amount),
     });
 
-    this.logger.log(`ETH transaction sent: ${tx.hash}`);
+    this.logger.log(`EVM transaction sent: ${tx.hash}`);
     return tx.hash;
   }
 
@@ -170,7 +215,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   private buildNotFound(txHash: string): BlockchainTxStatusDto {
     return {
       txHash,
-      network: BlockchainNetwork.ETH_SEPOLIA,
+      network: this.evmChain,
       status: 'NOT_FOUND',
       confirmations: 0,
       from: '',

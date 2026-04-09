@@ -1,10 +1,11 @@
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
 export class ListTreasuryTransactionsDto {
   @IsOptional()
-  @IsEnum(['ETH_SEPOLIA', 'TRON_NILE', 'TRON_SHASTA'])
-  chain?: 'ETH_SEPOLIA' | 'TRON_NILE' | 'TRON_SHASTA';
+  @IsIn([...BLOCKCHAIN_CHAIN_DB_VALUES])
+  chain?: BlockchainChainDbValue;
 
   @IsOptional()
   @IsEnum(['SWEEP', 'FUND'])

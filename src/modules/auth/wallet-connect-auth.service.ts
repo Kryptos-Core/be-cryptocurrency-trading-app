@@ -46,7 +46,7 @@ function agentWcAuthDebugLog(payload: {
  * Public WalletConnect login session (no JWT để init).
  * Redis key: wc:auth:session:{sessionId}
  *
- * ETH_SEPOLIA hoặc SOLANA_DEVNET + project id: URI thật từ SignClient + relay;
+ * ETH_MAINNET / BSC_MAINNET / SOLANA_MAINNET + project id: URI thật từ SignClient + relay;
  * BE chờ approval rồi `personal_sign` (EVM) hoặc `solana_signMessage` (Solana), FE poll rồi POST verify.
  *
  * Thiếu projectId: URI ghép (legacy) — user dán address + signature.
@@ -70,14 +70,25 @@ export class WalletConnectAuthService implements OnModuleInit {
   private static readonly SESSION_TTL = 300;
   private static readonly AUTH_SESSION_PREFIX = 'wc:auth:session:';
 
-  private static readonly EVM_CHAINS: BlockchainNetwork[] = [
+  private static readonly WC_PAIRING_CHAINS: BlockchainNetwork[] = [
+    BlockchainNetwork.ETH_MAINNET,
     BlockchainNetwork.ETH_SEPOLIA,
+    BlockchainNetwork.BSC_MAINNET,
+    BlockchainNetwork.BSC_CHAPEL,
+    BlockchainNetwork.SOLANA_MAINNET,
     BlockchainNetwork.SOLANA_DEVNET,
   ];
 
-  private static readonly CHAIN_CAIP: Record<string, string> = {
+  private static readonly CHAIN_CAIP: Record<BlockchainNetwork, string> = {
+    [BlockchainNetwork.ETH_MAINNET]: 'eip155:1',
     [BlockchainNetwork.ETH_SEPOLIA]: 'eip155:11155111',
-    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+    [BlockchainNetwork.BSC_MAINNET]: 'eip155:56',
+    [BlockchainNetwork.BSC_CHAPEL]: 'eip155:97',
+    [BlockchainNetwork.SOLANA_MAINNET]: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRAB9YDFxGeBnSP6rg6DhzZZHc7yBtomxv2kXyPwb',
+    [BlockchainNetwork.TRON_MAINNET]: 'tron:0x2b6653dc',
+    [BlockchainNetwork.TRON_NILE]: 'tron:0xcd8690dc',
+    [BlockchainNetwork.TRON_SHASTA]: 'tron:0x94a8759',
   };
 
   /** Tránh POST /wc/init chờ connect() vô hạn khi relay treo. */
@@ -100,7 +111,7 @@ export class WalletConnectAuthService implements OnModuleInit {
     );
     if (!this.projectId) {
       this.logger.warn(
-        '[WC-Auth] Chưa có WALLETCONNECT_PROJECT_ID hoặc REOWN_PROJECT_ID — Sepolia dùng URI giả + dán tay (QR không nối relay).',
+        '[WC-Auth] Chưa có WALLETCONNECT_PROJECT_ID hoặc REOWN_PROJECT_ID — mainnet dùng URI giả + dán tay (QR không nối relay).',
       );
     }
   }
@@ -118,7 +129,7 @@ export class WalletConnectAuthService implements OnModuleInit {
     message: string;
     expiresIn: number;
     caip2Chain: string;
-    /** true khi BE dùng SignClient + relay thật (Sepolia hoặc Solana devnet + có project id). */
+    /** true khi BE dùng SignClient + relay thật (mainnet + có project id). */
     relayPairing: boolean;
   }> {
     this.assertWcChain(chain);
@@ -137,28 +148,25 @@ export class WalletConnectAuthService implements OnModuleInit {
             { projectId: this.projectId, relayUrl: this.relayUrl },
             async (client) => {
               try {
-                const connectPromise =
-                  chain === BlockchainNetwork.SOLANA_DEVNET
-                    ? client.connect({
-                        optionalNamespaces: {
-                          solana: {
-                            chains: [
-                              WalletConnectAuthService.CHAIN_CAIP[BlockchainNetwork.SOLANA_DEVNET],
-                            ],
-                            methods: ['solana_signMessage', 'solana_signTransaction'],
-                            events: [],
-                          },
+                const connectPromise = WalletConnectAuthService.isSolanaWcChain(chain)
+                  ? client.connect({
+                      optionalNamespaces: {
+                        solana: {
+                          chains: [WalletConnectAuthService.CHAIN_CAIP[chain]],
+                          methods: ['solana_signMessage', 'solana_signTransaction'],
+                          events: [],
                         },
-                      })
-                    : client.connect({
-                        optionalNamespaces: {
-                          eip155: {
-                            chains: ['eip155:11155111'],
-                            methods: ['personal_sign', 'eth_sendTransaction'],
-                            events: [],
-                          },
+                      },
+                    })
+                  : client.connect({
+                      optionalNamespaces: {
+                        eip155: {
+                          chains: [WalletConnectAuthService.CHAIN_CAIP[chain]],
+                          methods: ['personal_sign', 'eth_sendTransaction'],
+                          events: [],
                         },
-                      });
+                      },
+                    });
                 const { uri, approval } = await this.withTimeout(
                   connectPromise,
                   WalletConnectAuthService.WC_CONNECT_TIMEOUT_MS,
@@ -333,11 +341,7 @@ export class WalletConnectAuthService implements OnModuleInit {
   }
 
   private useRealWcPairing(chain: BlockchainNetwork): boolean {
-    return (
-      (chain === BlockchainNetwork.ETH_SEPOLIA ||
-        chain === BlockchainNetwork.SOLANA_DEVNET) &&
-      Boolean(this.projectId)
-    );
+    return WalletConnectAuthService.WC_PAIRING_CHAINS.includes(chain) && Boolean(this.projectId);
   }
 
   private async runApprovalAndSign(
@@ -375,7 +379,7 @@ export class WalletConnectAuthService implements OnModuleInit {
     let address: string;
     let signature: string;
 
-    if (chain === BlockchainNetwork.SOLANA_DEVNET) {
+    if (WalletConnectAuthService.isSolanaWcChain(chain)) {
       const solAccounts = wcSession?.namespaces?.solana?.accounts ?? [];
       const fullSol = solAccounts[0];
       if (!fullSol) {
@@ -574,8 +578,12 @@ export class WalletConnectAuthService implements OnModuleInit {
     });
   }
 
+  private static isSolanaWcChain(chain: BlockchainNetwork): boolean {
+    return chain === BlockchainNetwork.SOLANA_MAINNET || chain === BlockchainNetwork.SOLANA_DEVNET;
+  }
+
   private assertWcChain(chain: BlockchainNetwork): void {
-    if (!WalletConnectAuthService.EVM_CHAINS.includes(chain)) {
+    if (!WalletConnectAuthService.CHAIN_CAIP[chain]) {
       throw new BadRequestException(
         `Chain "${chain}" không được hỗ trợ cho WalletConnect đăng nhập công khai`,
         'WC_AUTH_CHAIN_NOT_SUPPORTED',
