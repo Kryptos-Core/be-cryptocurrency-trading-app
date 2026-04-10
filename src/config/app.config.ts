@@ -105,13 +105,6 @@ export interface AppConfig {
       chapelChainId: number;
     };
   };
-  /** Price oracle: on-demand OHLCV. App uses Binance only (no DB persist). UNISWAP_* env not used. */
-  priceOracle?: {
-    uniswap: {
-      subgraphUrl: string;
-      symbolToPoolId: Record<string, string>;
-    };
-  };
 }
 
 /**
@@ -276,19 +269,6 @@ export class AppConfigBuilder {
     return this;
   }
 
-  setPriceOracle(
-    uniswapSubgraphUrl: string,
-    uniswapSymbolToPoolId: Record<string, string>,
-  ): this {
-    this.config.priceOracle = {
-      uniswap: {
-        subgraphUrl: uniswapSubgraphUrl,
-        symbolToPoolId: uniswapSymbolToPoolId || {},
-      },
-    };
-    return this;
-  }
-
   build(): AppConfig {
     // Validate required fields
     if (!this.config.app) {
@@ -386,22 +366,7 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
         bscChapelChainId: env.BSC_CHAPEL_CHAIN_ID ?? 97,
       },
     )
-    .setPriceOracle(
-      (env as any).UNISWAP_SUBGRAPH_URL ||
-        'https://gateway.thegraph.com/api/subgraphs/id/DiYPVdygkfjDWhbxGSqAQxwBKmfKnkWQojqeM2rkLb3G',
-      parseUniswapSymbolToPoolId((env as any).UNISWAP_SYMBOL_POOL_MAP),
-    )
     .build();
-}
-
-function parseUniswapSymbolToPoolId(json?: string): Record<string, string> {
-  if (!json || typeof json !== 'string') return {};
-  try {
-    const o = JSON.parse(json);
-    return o && typeof o === 'object' ? o : {};
-  } catch {
-    return {};
-  }
 }
 
 /**

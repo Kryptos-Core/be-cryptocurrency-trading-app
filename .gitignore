@@ -2,7 +2,10 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Environment (do not commit secrets)
 .env
+.env.*
 
 # Local seed users (copy from src/seed/data/users.json.example)
 src/seed/data/users.json

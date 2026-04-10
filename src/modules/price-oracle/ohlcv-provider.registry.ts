@@ -3,7 +3,7 @@ import { IOHLCVProvider, OHLCVCandleDto } from './interfaces/ohlcv-provider.inte
 import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
 
 /**
- * Registry of OHLCV providers. Binance-only for free demo (no Uniswap/The Graph).
+ * Registry of OHLCV providers. Binance-only for on-demand candles.
  * Dependency Inversion: depends on IOHLCVProvider abstraction.
  */
 @Injectable()

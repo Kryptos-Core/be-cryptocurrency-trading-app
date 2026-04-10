@@ -15,7 +15,7 @@ export interface OHLCVCandleDto {
 
 /**
  * Oracle interface for OHLCV data by time range.
- * Strategy pattern: Binance, Uniswap V4, or other providers implement this.
+ * Strategy pattern: Binance or other providers implement this.
  * Single Responsibility: one way to get historical candles.
  */
 export interface IOHLCVProvider {
@@ -24,7 +24,7 @@ export interface IOHLCVProvider {
   /**
    * Fetch OHLCV candles for a pair in the given time range.
    * @param pairId - Internal pair id (for response shape)
-   * @param symbol - Trading symbol (e.g. BTCUSDT or ETH/USDC for Uniswap)
+   * @param symbol - Trading symbol (e.g. BTCUSDT)
    * @param intervalSec - Candle interval in seconds (60, 300, 900, 3600, 86400, ...)
    * @param fromDate - Start of range (inclusive)
    * @param toDate - End of range (inclusive)

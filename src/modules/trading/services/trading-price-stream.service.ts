@@ -19,7 +19,7 @@ const PUBLISH_RETRY_DELAY_MS = 100;
  * Trading Price Stream Service
  * Manages real-time price data streaming; uses Redis Pub/Sub for scalability.
  * OHLCV is no longer persisted to DB: chart/ticker data is fetched on-demand via
- * Price Oracle (Binance / Uniswap V4 time-range APIs).
+ * Price Oracle (Binance time-range APIs).
  */
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {

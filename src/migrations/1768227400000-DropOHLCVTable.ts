@@ -2,7 +2,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: Drop OHLCV table and related stored procedures.
- * OHLCV data is now provided on-demand by Price Oracle (Binance/Uniswap); no DB persist.
+ * OHLCV data is now provided on-demand by Price Oracle (Binance); no DB persist.
  */
 export class DropOHLCVTable1768227400000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

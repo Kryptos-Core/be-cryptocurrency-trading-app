@@ -6,7 +6,7 @@ import { OHLCVProviderRegistry } from './ohlcv-provider.registry';
 /**
  * Price Oracle Module
  * Provides on-demand OHLCV by time range (no DB persist).
- * Binance only – free demo, no Uniswap/The Graph.
+ * Binance only – on-demand OHLCV by time range.
  */
 @Module({
   imports: [ConfigModule],

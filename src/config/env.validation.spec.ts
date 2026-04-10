@@ -33,14 +33,16 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment(minimalValidConfig())).not.toThrow();
   });
 
-  it('requires all sandbox RPC URLs when ONCHAIN_OPERATOR_MODE=sandbox', () => {
-    expect(() =>
-      validateEnvironment(
-        minimalValidConfig({
-          ONCHAIN_OPERATOR_MODE: 'sandbox',
-        }),
-      ),
-    ).toThrow(/TRON_NILE_FULL_HOST/);
+  it('applies public sandbox RPC defaults when ONCHAIN_OPERATOR_MODE=sandbox and URLs omitted', () => {
+    const v = validateEnvironment(
+      minimalValidConfig({
+        ONCHAIN_OPERATOR_MODE: 'sandbox',
+      }),
+    );
+    expect(v.TRON_NILE_FULL_HOST).toBe('https://nile.trongrid.io');
+    expect(v.SOLANA_DEVNET_URL).toBe('https://api.devnet.solana.com');
+    expect(v.ETH_SEPOLIA_RPC_URL).toBe('https://rpc.sepolia.org');
+    expect(v.BSC_CHAPEL_RPC_URL).toBe('https://data-seed-prebsc-1-s1.binance.org:8545');
   });
 
   it('passes when sandbox mode and all sandbox RPC URLs are set', () => {

@@ -559,12 +559,36 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
   // PayOS: optional at startup — active credentials may live in payment_method_configs (UI).
   // DepositsService falls back to PAYOS_* from .env when no active DB config exists.
 
+  applyOnchainSandboxRpcDefaults(validatedConfig);
   assertOnchainSandboxRpcOrThrow(validatedConfig);
 
   return validatedConfig;
 }
 
-/** When ONCHAIN_OPERATOR_MODE=sandbox, require canonical sandbox RPC endpoints (resolver families). */
+/** Public testnet RPC fallbacks — aligned with createAppConfig blockchain extras. */
+const DEFAULT_SANDBOX_RPC_URLS: Partial<Record<keyof EnvironmentVariables, string>> = {
+  TRON_NILE_FULL_HOST: 'https://nile.trongrid.io',
+  SOLANA_DEVNET_URL: 'https://api.devnet.solana.com',
+  ETH_SEPOLIA_RPC_URL: 'https://rpc.sepolia.org',
+  BSC_CHAPEL_RPC_URL: 'https://data-seed-prebsc-1-s1.binance.org:8545',
+};
+
+/** When ONCHAIN_OPERATOR_MODE=sandbox, fill missing sandbox RPC vars so bootstrap matches app.config defaults. */
+export function applyOnchainSandboxRpcDefaults(config: EnvironmentVariables): void {
+  const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production').toLowerCase().trim();
+  if (mode !== 'sandbox') return;
+
+  for (const key of Object.keys(DEFAULT_SANDBOX_RPC_URLS) as Array<keyof EnvironmentVariables>) {
+    const def = DEFAULT_SANDBOX_RPC_URLS[key];
+    if (def === undefined) continue;
+    const cur = config[key];
+    if (typeof cur !== 'string' || !cur.trim()) {
+      (config as unknown as Record<string, string>)[key] = def;
+    }
+  }
+}
+
+/** When ONCHAIN_OPERATOR_MODE=sandbox, require sandbox RPC endpoints (after defaults). */
 export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): void {
   const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production').toLowerCase().trim();
   if (mode !== 'sandbox') return;
