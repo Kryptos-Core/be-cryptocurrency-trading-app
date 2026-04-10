@@ -163,7 +163,6 @@ export class DepositFxService {
   private async getNativeSymbol(chain: BlockchainNetwork): Promise<string> {
     switch (chain) {
       case BlockchainNetwork.ETH_MAINNET:
-      case BlockchainNetwork.ETH_SEPOLIA:
         return (
           (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL'))?.trim().toUpperCase() ||
           'ETH'

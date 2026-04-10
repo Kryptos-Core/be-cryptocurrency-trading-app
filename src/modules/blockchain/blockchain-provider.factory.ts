@@ -14,7 +14,6 @@ import {
   EVM_BSC_CHAPEL_PROVIDER,
   EVM_BSC_MAINNET_PROVIDER,
   EVM_ETH_MAINNET_PROVIDER,
-  EVM_ETH_SEPOLIA_PROVIDER,
 } from './blockchain.tokens';
 
 @Injectable()
@@ -29,7 +28,6 @@ export class BlockchainProviderFactory {
     @Inject(BC_SOLANA_MAINNET) private readonly solanaMainnet: SolanaProvider,
     @Inject(BC_SOLANA_DEVNET) private readonly solanaDevnet: SolanaProvider,
     @Inject(EVM_ETH_MAINNET_PROVIDER) private readonly ethMainnetProvider: EthereumProvider,
-    @Inject(EVM_ETH_SEPOLIA_PROVIDER) private readonly ethSepoliaProvider: EthereumProvider,
     @Inject(EVM_BSC_MAINNET_PROVIDER) private readonly bscMainnetProvider: EthereumProvider,
     @Inject(EVM_BSC_CHAPEL_PROVIDER) private readonly bscChapelProvider: EthereumProvider,
   ) {
@@ -40,7 +38,6 @@ export class BlockchainProviderFactory {
       [BlockchainNetwork.SOLANA_MAINNET, this.solanaMainnet],
       [BlockchainNetwork.SOLANA_DEVNET, this.solanaDevnet],
       [BlockchainNetwork.ETH_MAINNET, this.ethMainnetProvider],
-      [BlockchainNetwork.ETH_SEPOLIA, this.ethSepoliaProvider],
       [BlockchainNetwork.BSC_MAINNET, this.bscMainnetProvider],
       [BlockchainNetwork.BSC_CHAPEL, this.bscChapelProvider],
     ]);

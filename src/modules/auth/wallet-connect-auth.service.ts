@@ -72,7 +72,6 @@ export class WalletConnectAuthService implements OnModuleInit {
 
   private static readonly WC_PAIRING_CHAINS: BlockchainNetwork[] = [
     BlockchainNetwork.ETH_MAINNET,
-    BlockchainNetwork.ETH_SEPOLIA,
     BlockchainNetwork.BSC_MAINNET,
     BlockchainNetwork.BSC_CHAPEL,
     BlockchainNetwork.SOLANA_MAINNET,
@@ -81,7 +80,6 @@ export class WalletConnectAuthService implements OnModuleInit {
 
   private static readonly CHAIN_CAIP: Record<BlockchainNetwork, string> = {
     [BlockchainNetwork.ETH_MAINNET]: 'eip155:1',
-    [BlockchainNetwork.ETH_SEPOLIA]: 'eip155:11155111',
     [BlockchainNetwork.BSC_MAINNET]: 'eip155:56',
     [BlockchainNetwork.BSC_CHAPEL]: 'eip155:97',
     [BlockchainNetwork.SOLANA_MAINNET]: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
@@ -186,11 +184,11 @@ export class WalletConnectAuthService implements OnModuleInit {
                 };
                 await this.saveSession(sessionId, sessionData);
                 resolveHttp({ wcUri: uri });
-                try {
-                  await this.runApprovalAndSign(sessionId, chain, message, approval, client);
-                } catch (e) {
-                  this.logger.error(`[WC-Auth] background pairing error sessionId=${sessionId}`, e);
-                }
+                void this.runApprovalAndSign(sessionId, chain, message, approval, client).catch(
+                  (e) => {
+                    this.logger.error(`[WC-Auth] background pairing error sessionId=${sessionId}`, e);
+                  },
+                );
               } catch (e) {
                 rejectHttp(e);
                 throw e;

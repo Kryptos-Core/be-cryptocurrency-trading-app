@@ -19,6 +19,7 @@ import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-r
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
 import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
+import { OnchainChainPickerService } from './onchain-chain-picker.service';
 
 @Module({
   imports: [
@@ -46,7 +47,13 @@ import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
     TreasuryOperationsService,
     TreasuryProcessor,
     MainWalletRotationScheduler,
+    OnchainChainPickerService,
   ],
-  exports: [TransactionWalletService, TreasuryMainWalletService, TreasuryOperationsService],
+  exports: [
+    TransactionWalletService,
+    TreasuryMainWalletService,
+    TreasuryOperationsService,
+    OnchainChainPickerService,
+  ],
 })
 export class TreasuryModule {}

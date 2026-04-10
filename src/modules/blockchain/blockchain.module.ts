@@ -16,7 +16,6 @@ import {
   EVM_BSC_CHAPEL_PROVIDER,
   EVM_BSC_MAINNET_PROVIDER,
   EVM_ETH_MAINNET_PROVIDER,
-  EVM_ETH_SEPOLIA_PROVIDER,
 } from './blockchain.tokens';
 import { BlockchainNetwork } from '@/common/enums';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
@@ -134,15 +133,6 @@ import { PaymentConfigService } from '@/modules/payment-config/payment-config.se
         treasury: TreasuryMainWalletService,
         sys: SystemConfigService,
       ) => new EthereumProvider(config, treasury, sys, BlockchainNetwork.ETH_MAINNET),
-      inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
-    },
-    {
-      provide: EVM_ETH_SEPOLIA_PROVIDER,
-      useFactory: (
-        config: ConfigService,
-        treasury: TreasuryMainWalletService,
-        sys: SystemConfigService,
-      ) => new EthereumProvider(config, treasury, sys, BlockchainNetwork.ETH_SEPOLIA),
       inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
     },
     {

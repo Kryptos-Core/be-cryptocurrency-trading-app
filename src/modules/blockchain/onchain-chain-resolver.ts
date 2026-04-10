@@ -32,7 +32,7 @@ export function resolveBlockchainNetwork(
     case OnChainNetworkFamily.TRON:
       return BlockchainNetwork.TRON_NILE;
     case OnChainNetworkFamily.EVM_ETH:
-      return BlockchainNetwork.ETH_SEPOLIA;
+      return BlockchainNetwork.BSC_CHAPEL;
     case OnChainNetworkFamily.EVM_BSC:
       return BlockchainNetwork.BSC_CHAPEL;
     case OnChainNetworkFamily.SOLANA:

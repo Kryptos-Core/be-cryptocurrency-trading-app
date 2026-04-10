@@ -2,8 +2,9 @@ import type SignClient from '@walletconnect/sign-client';
 import { getWalletConnectDappClient } from './walletconnect-dapp-client.factory';
 
 /**
- * Chuỗi toàn bộ thao tác trên SignClient singleton (connect → approval → request → disconnect).
- * Tránh race khi nhiều POST /wc/init đồng thời và giảm lỗi relay/topic nội bộ SDK.
+ * Serialize các lần gọi SignClient (chủ yếu `connect()` sinh URI).
+ * Pairing/sign chạy **ngoài** lock (void .then) để POST /wc/init tiếp theo không bị treo
+ * khi phiên trước vẫn chờ user quét QR.
  */
 let signClientOpChain: Promise<unknown> = Promise.resolve();
 

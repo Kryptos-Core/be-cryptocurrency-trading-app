@@ -62,7 +62,6 @@ export class WalletConnectService implements OnModuleInit {
   /** Chains dùng SignClient relay (EVM + Solana mainnet/sandbox). Tron: URI legacy, không pairing relay ở đây. */
   private static readonly WC_PAIRING_CHAINS: BlockchainNetwork[] = [
     BlockchainNetwork.ETH_MAINNET,
-    BlockchainNetwork.ETH_SEPOLIA,
     BlockchainNetwork.BSC_MAINNET,
     BlockchainNetwork.BSC_CHAPEL,
     BlockchainNetwork.SOLANA_MAINNET,
@@ -71,7 +70,6 @@ export class WalletConnectService implements OnModuleInit {
   /** CAIP-2 cho init / QR (đủ mạng enum backend). */
   private static readonly CHAIN_CAIP: Record<BlockchainNetwork, string> = {
     [BlockchainNetwork.ETH_MAINNET]: 'eip155:1',
-    [BlockchainNetwork.ETH_SEPOLIA]: 'eip155:11155111',
     [BlockchainNetwork.BSC_MAINNET]: 'eip155:56',
     [BlockchainNetwork.BSC_CHAPEL]: 'eip155:97',
     [BlockchainNetwork.SOLANA_MAINNET]: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
@@ -181,21 +179,21 @@ export class WalletConnectService implements OnModuleInit {
                 };
                 await this.saveSession(userId, sessionId, sessionData);
                 resolveHttp({ wcUri: uri });
-                try {
-                  await this.runLinkApprovalAndSign(
-                    userId,
-                    sessionId,
-                    chain,
-                    message,
-                    approval,
-                    client,
-                  );
-                } catch (e) {
+                // Không await — giữ lock chỉ trong lúc connect(); nếu await pairing/sign
+                // thì mọi POST /wc/init khác (đổi sang BSC/Solana) bị treo hàng chục phút.
+                void this.runLinkApprovalAndSign(
+                  userId,
+                  sessionId,
+                  chain,
+                  message,
+                  approval,
+                  client,
+                ).catch((e) => {
                   this.logger.error(
                     `[WC] background pairing/sign error userId=${userId} sessionId=${sessionId}`,
                     e,
                   );
-                }
+                });
               } catch (e) {
                 rejectHttp(e);
                 throw e;
@@ -706,7 +704,6 @@ export class WalletConnectService implements OnModuleInit {
   private static isEvmWcChain(chain: BlockchainNetwork): boolean {
     return (
       chain === BlockchainNetwork.ETH_MAINNET ||
-      chain === BlockchainNetwork.ETH_SEPOLIA ||
       chain === BlockchainNetwork.BSC_MAINNET ||
       chain === BlockchainNetwork.BSC_CHAPEL
     );

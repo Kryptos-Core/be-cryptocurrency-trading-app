@@ -312,14 +312,6 @@ export class EnvironmentVariables {
 
   @IsUrl()
   @IsOptional()
-  ETH_SEPOLIA_RPC_URL?: string;
-
-  @IsInt()
-  @IsOptional()
-  ETH_SEPOLIA_CHAIN_ID?: number;
-
-  @IsUrl()
-  @IsOptional()
   BSC_CHAPEL_RPC_URL?: string;
 
   @IsInt()
@@ -496,8 +488,6 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'TRON_NILE_FULL_HOST',
     'TRON_SHASTA_FULL_HOST',
     'SOLANA_DEVNET_URL',
-    'ETH_SEPOLIA_RPC_URL',
-    'ETH_SEPOLIA_CHAIN_ID',
     'BSC_CHAPEL_RPC_URL',
     'BSC_CHAPEL_CHAIN_ID',
     'PAYOS_CLIENT_ID',
@@ -569,7 +559,6 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
 const DEFAULT_SANDBOX_RPC_URLS: Partial<Record<keyof EnvironmentVariables, string>> = {
   TRON_NILE_FULL_HOST: 'https://nile.trongrid.io',
   SOLANA_DEVNET_URL: 'https://api.devnet.solana.com',
-  ETH_SEPOLIA_RPC_URL: 'https://rpc.sepolia.org',
   BSC_CHAPEL_RPC_URL: 'https://data-seed-prebsc-1-s1.binance.org:8545',
 };
 
@@ -596,7 +585,6 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
   const required: Array<{ key: keyof EnvironmentVariables; label: string }> = [
     { key: 'TRON_NILE_FULL_HOST', label: 'TRON_NILE_FULL_HOST' },
     { key: 'SOLANA_DEVNET_URL', label: 'SOLANA_DEVNET_URL' },
-    { key: 'ETH_SEPOLIA_RPC_URL', label: 'ETH_SEPOLIA_RPC_URL' },
     { key: 'BSC_CHAPEL_RPC_URL', label: 'BSC_CHAPEL_RPC_URL' },
   ];
 

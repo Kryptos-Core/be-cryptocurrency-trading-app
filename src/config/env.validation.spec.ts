@@ -41,7 +41,6 @@ describe('validateEnvironment', () => {
     );
     expect(v.TRON_NILE_FULL_HOST).toBe('https://nile.trongrid.io');
     expect(v.SOLANA_DEVNET_URL).toBe('https://api.devnet.solana.com');
-    expect(v.ETH_SEPOLIA_RPC_URL).toBe('https://rpc.sepolia.org');
     expect(v.BSC_CHAPEL_RPC_URL).toBe('https://data-seed-prebsc-1-s1.binance.org:8545');
   });
 
@@ -52,7 +51,6 @@ describe('validateEnvironment', () => {
           ONCHAIN_OPERATOR_MODE: 'sandbox',
           TRON_NILE_FULL_HOST: 'https://nile.trongrid.io',
           SOLANA_DEVNET_URL: 'https://api.devnet.solana.com',
-          ETH_SEPOLIA_RPC_URL: 'https://rpc.sepolia.org',
           BSC_CHAPEL_RPC_URL: 'https://data-seed-prebsc-1-s1.binance.org:8545',
         }),
       ),

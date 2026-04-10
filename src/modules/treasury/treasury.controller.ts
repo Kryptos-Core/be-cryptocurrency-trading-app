@@ -30,6 +30,7 @@ import {
 import { SupportedTreasuryChain, TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
+import { OnchainChainPickerService } from './onchain-chain-picker.service';
 
 @ApiTags('treasury')
 @ApiBearerAuth('JWT-auth')
@@ -41,7 +42,21 @@ export class TreasuryController {
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly treasuryOperationsService: TreasuryOperationsService,
     private readonly twoFaService: TwoFaService,
+    private readonly onchainChainPickerService: OnchainChainPickerService,
   ) {}
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Chain picker (admin UI — mirrors server env; Flutter consumes as single source of truth)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  @Get('chain-picker-options')
+  @ApiOperation({
+    summary:
+      'Chain codes for treasury / hot-wallet / withdrawal / managed-wallet / user on-chain deposit-withdraw pickers (ONCHAIN_OPERATOR_MODE, TRON_DEFAULT_NETWORK, ENV)',
+  })
+  getChainPickerOptions() {
+    return this.onchainChainPickerService.getChainPickerOptions();
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Transaction Wallets (ví giao dịch)
@@ -143,18 +158,20 @@ export class TreasuryController {
    * Import a new main wallet by private key.
    * Requires: ADMIN or FINANCE_MANAGER + PAYMENT_CONFIGS_MANAGE
    * MFA: verifies the mfaCode (email OTP) before processing.
-   * Result: wallet created in PENDING_APPROVAL status — awaits Risk Officer approval.
+   * Result: ACTIVE immediately for Finance/Admin (no Risk approval). Risk approve/reject remains for any legacy PENDING rows.
    */
   @Post('main-wallets')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({
-    summary: 'Import a main wallet from private key (MFA required). Creates PENDING_APPROVAL record.',
+    summary:
+      'Import a main wallet from private key (MFA required). Finance/Admin: wallet is ACTIVE immediately.',
   })
   async importMainWallet(
     @Body() dto: ImportMainWalletDto,
     @CurrentUser('userId') actorUserId: string,
+    @CurrentUser('role') actorRole: UserRole,
   ) {
     // ── MFA verification (consumes OTP) ──────────────────────────────────
     const mfaValid = await this.twoFaService.verifyOtp(actorUserId, dto.mfaCode);
@@ -165,7 +182,7 @@ export class TreasuryController {
       );
     }
 
-    return this.treasuryMainWalletService.importMainWallet(dto, actorUserId);
+    return this.treasuryMainWalletService.importMainWallet(dto, actorUserId, actorRole);
   }
 
   /**
@@ -175,8 +192,8 @@ export class TreasuryController {
    */
   @Patch('main-wallets/:mainWalletId/approve')
   @UseGuards(RoleGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
-  @ApiOperation({ summary: 'Risk Officer: approve a pending main wallet import' })
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @ApiOperation({ summary: 'Admin or Risk Officer: approve a pending main wallet import' })
   async approveMainWallet(
     @Param('mainWalletId') mainWalletId: string,
     @Body() _dto: ReviewMainWalletDto,
@@ -191,8 +208,8 @@ export class TreasuryController {
    */
   @Patch('main-wallets/:mainWalletId/reject')
   @UseGuards(RoleGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
-  @ApiOperation({ summary: 'Risk Officer: reject a pending main wallet import' })
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @ApiOperation({ summary: 'Admin or Risk Officer: reject a pending main wallet import' })
   async rejectMainWallet(
     @Param('mainWalletId') mainWalletId: string,
     @Body() _dto: ReviewMainWalletDto,
@@ -284,8 +301,8 @@ export class TreasuryController {
    */
   @Patch('main-wallets/:mainWalletId/approve-deletion')
   @UseGuards(RoleGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
-  @ApiOperation({ summary: 'Risk Officer: approve pending main wallet deletion' })
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @ApiOperation({ summary: 'Admin or Risk Officer: approve pending main wallet deletion' })
   async approveMainWalletDeletion(
     @Param('mainWalletId') mainWalletId: string,
     @Body() _dto: ReviewMainWalletDto,
@@ -301,8 +318,8 @@ export class TreasuryController {
    */
   @Patch('main-wallets/:mainWalletId/reject-deletion')
   @UseGuards(RoleGuard)
-  @RequireRoles(UserRole.RISK_OFFICER)
-  @ApiOperation({ summary: 'Risk Officer: reject pending main wallet deletion' })
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @ApiOperation({ summary: 'Admin or Risk Officer: reject pending main wallet deletion' })
   async rejectMainWalletDeletion(
     @Param('mainWalletId') mainWalletId: string,
     @Body() _dto: ReviewMainWalletDto,

@@ -23,6 +23,16 @@ import {
 } from './dto';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
+import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
+import {
+  type TronDepositUiChain,
+} from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
 
 const MANAGED_TRON_CHAINS = [
   BlockchainNetwork.TRON_MAINNET,
@@ -39,7 +49,8 @@ export type ConfiguredDepositWalletResolution = {
 };
 
 type DepositMethodItem = {
-  chain: SupportedManagedWalletChain;
+  /** API chain code — same universe as GET /treasury/chain-picker-options `onchain_deposit_withdraw`. */
+  chain: string;
   label: string;
   deposit_address: string;
   is_recommended: boolean;
@@ -59,6 +70,8 @@ export class ManagedWalletsService {
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly transactionWalletService: TransactionWalletService,
     private readonly systemConfigService: SystemConfigService,
+    private readonly onchainChainPickerService: OnchainChainPickerService,
+    private readonly treasuryMainWalletService: TreasuryMainWalletService,
   ) {}
 
   async createWallet(
@@ -269,22 +282,35 @@ export class ManagedWalletsService {
   }
 
   async getDepositMethods(): Promise<{
-    recommended_chain: SupportedManagedWalletChain;
+    /** Effective recommended row for public deposit UI — always a chain from `onchain_deposit_withdraw`. */
+    recommended_chain: string;
     methods: DepositMethodItem[];
   }> {
-    const recommendedChain = await this.getRecommendedChain();
+    const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
+    const pickerList = pickerDto.pickers.onchain_deposit_withdraw ?? [];
+    const fromPicker = pickerList.filter((c): c is BlockchainChainDbValue =>
+      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    );
+    const chains: string[] =
+      fromPicker.length > 0 ? fromPicker : [...ManagedWalletsService.SUPPORTED_CHAINS];
+
+    const settingRecommended = await this.getRecommendedChain();
+    const recommendedChain = resolveRecommendedChainForDepositPicker(
+      settingRecommended,
+      chains,
+      pickerDto.tronDefaultNetwork,
+    );
+
     const networkRows = await this.dataSource
       .getRepository(CurrencyNetwork)
       .createQueryBuilder('network')
       .select('network.network_code', 'network_code')
       .addSelect('MAX(CASE WHEN network.deposit_enabled THEN 1 ELSE 0 END)', 'deposit_enabled')
       .addSelect('MAX(network.min_confirmations)', 'min_confirmations')
-      .where('network.network_code IN (:...codes)', {
-        codes: ManagedWalletsService.SUPPORTED_CHAINS,
-      })
+      .where('network.network_code IN (:...codes)', { codes: chains })
       .groupBy('network.network_code')
       .getRawMany<{
-        network_code: SupportedManagedWalletChain;
+        network_code: string;
         deposit_enabled: number | string;
         min_confirmations: number | string;
       }>();
@@ -300,10 +326,9 @@ export class ManagedWalletsService {
     );
 
     const methods = await Promise.all(
-      ManagedWalletsService.SUPPORTED_CHAINS.map(async (chain) => {
-        const configuredWallet = await this.getConfiguredDepositWallet(chain);
+      chains.map(async (chain) => {
+        const address = await this.resolveDepositMethodDisplayAddress(chain);
         const networkConfig = networkMap.get(chain);
-        const address = configuredWallet?.address ?? '';
         const hasDefault = address.length > 0;
         return {
           chain,
@@ -368,14 +393,47 @@ export class ManagedWalletsService {
     };
   }
 
-  private static depositLabelForChain(chain: SupportedManagedWalletChain): string {
+  /**
+   * Tron mainnet: default user-deposit transaction wallet only (same as GET /blockchain/deposit/address).
+   * Tron testnets: transaction default, else treasury main wallet.
+   * EVM / Solana: treasury main wallet address when configured.
+   */
+  private async resolveDepositMethodDisplayAddress(chain: string): Promise<string> {
+    const c = chain as BlockchainNetwork;
+    if (c === BlockchainNetwork.TRON_MAINNET) {
+      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(BlockchainNetwork.TRON_MAINNET);
+      return tw?.address ?? '';
+    }
+    if (c === BlockchainNetwork.TRON_NILE || c === BlockchainNetwork.TRON_SHASTA) {
+      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(c as TronDepositUiChain);
+      if (tw?.address) {
+        return tw.address;
+      }
+      return (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? '';
+    }
+    return (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? '';
+  }
+
+  private static depositLabelForChain(chain: string): string {
     switch (chain) {
       case BlockchainNetwork.TRON_NILE:
         return 'Tron Nile (TRC-20 testnet)';
       case BlockchainNetwork.TRON_SHASTA:
         return 'Tron Shasta (TRC-20 testnet)';
-      default:
+      case BlockchainNetwork.TRON_MAINNET:
         return 'Tron Network (TRC-20 Mainnet)';
+      case BlockchainNetwork.ETH_MAINNET:
+        return 'Ethereum (mainnet)';
+      case BlockchainNetwork.BSC_CHAPEL:
+        return 'BNB Smart Chain (Chapel testnet)';
+      case BlockchainNetwork.BSC_MAINNET:
+        return 'BNB Smart Chain (mainnet)';
+      case BlockchainNetwork.SOLANA_DEVNET:
+        return 'Solana (devnet)';
+      case BlockchainNetwork.SOLANA_MAINNET:
+        return 'Solana (mainnet)';
+      default:
+        return chain;
     }
   }
 

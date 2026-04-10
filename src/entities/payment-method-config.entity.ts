@@ -31,7 +31,7 @@ export class PaymentMethodConfig {
   @Column({ type: 'enum', enum: ['PAYOS', 'ETH', 'TRON', 'SOL', 'BSC'] })
   type!: PaymentMethodType;
 
-  /** Network identifier: MAINNET, TESTNET, NILE, SHASTA, SEPOLIA, DEVNET, etc. */
+  /** Network identifier: MAINNET, TESTNET, NILE, SHASTA, DEVNET, CHAPEL, etc. */
   @Column({ type: 'varchar', length: 64 })
   network!: string;
 

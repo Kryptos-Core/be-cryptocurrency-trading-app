@@ -1,6 +1,6 @@
 /**
- * Truncate all tables in the configured MySQL database (application data only).
- * Keeps the `migrations` table so TypeORM migration history is preserved (schema unchanged).
+ * Truncate every BASE TABLE in the configured MySQL schema (all rows, all tables).
+ * Includes `migrations` — TypeORM migration history is cleared; run `npm run migration:run` after if needed.
  *
  * Usage: npm run db:clean
  *
@@ -12,8 +12,6 @@ import * as path from 'path';
 import { DataSource } from 'typeorm';
 
 dotenv.config();
-
-const SKIP_TABLES = new Set(['migrations']);
 
 async function run() {
   if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DB_CLEAN !== 'true') {
@@ -55,14 +53,14 @@ async function run() {
       [database],
     )) as Array<{ name: string }>;
 
-    const toTruncate = rows.map((r) => r.name).filter((name) => !SKIP_TABLES.has(name));
+    const toTruncate = rows.map((r) => r.name);
 
     if (toTruncate.length === 0) {
       console.log('No tables to truncate (empty schema?).');
       return;
     }
 
-    console.log(`🗑️  Truncating ${toTruncate.length} table(s) in "${database}" (skipping: ${[...SKIP_TABLES].join(', ')})...`);
+    console.log(`🗑️  Truncating all ${toTruncate.length} table(s) in "${database}"...`);
 
     await q.query('SET FOREIGN_KEY_CHECKS = 0');
     for (const table of toTruncate) {
@@ -70,8 +68,8 @@ async function run() {
     }
     await q.query('SET FOREIGN_KEY_CHECKS = 1');
 
-    console.log('✅ Database cleaned (schema + migrations history kept).');
-    console.log('   Run npm run db:seed if you need default users again.');
+    console.log('✅ All tables truncated (including migrations).');
+    console.log('   Run npm run migration:run if you need migration rows back, then npm run db:seed if you use seed data.');
   } catch (err) {
     console.error('db:clean failed:', err);
     process.exit(1);

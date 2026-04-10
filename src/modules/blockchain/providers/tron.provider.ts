@@ -12,6 +12,10 @@ import { TronWeb, Trx } from 'tronweb';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
+import {
+  extractTronFirstContractOwnerBase58,
+  extractTronNativeTransferMeta,
+} from '../utils/tron-native-transfer.util';
 
 export interface TronProviderBindings {
   network: BlockchainNetwork;
@@ -113,18 +117,29 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
       }
       const receipt = await this.tronWeb.trx.getTransactionInfo(txHash);
       const confirmed = receipt?.blockNumber != null;
+
+      const transfer = extractTronNativeTransferMeta(this.tronWeb, tx);
+      const fallbackFrom = extractTronFirstContractOwnerBase58(this.tronWeb, tx);
+      const from = transfer?.from ?? fallbackFrom;
+      const to = transfer?.to ?? '';
+      const value = transfer?.value ?? '0';
+
+      let status: 'PENDING' | 'CONFIRMED' | 'FAILED' = 'PENDING';
+      if (confirmed) {
+        const rawResult = receipt?.result as string | undefined;
+        const ok =
+          rawResult == null || String(rawResult).toUpperCase() === 'SUCCESS';
+        status = ok ? 'CONFIRMED' : 'FAILED';
+      }
+
       return {
         txHash,
         network: this.bindings.network,
-        status: confirmed ? 'CONFIRMED' : 'PENDING',
+        status,
         confirmations: confirmed ? 1 : 0,
-        from: tx.raw_data?.contract?.[0]?.parameter?.value?.owner_address
-          ? this.tronWeb.address.fromHex(
-              tx.raw_data.contract[0].parameter.value.owner_address,
-            )
-          : '',
-        to: '',
-        value: '0',
+        from,
+        to,
+        value,
         blockNumber: receipt?.blockNumber,
       };
     } catch (error) {

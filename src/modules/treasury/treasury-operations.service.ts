@@ -313,7 +313,6 @@ export class TreasuryOperationsService {
 
     if (
       wallet.chain === 'ETH_MAINNET' ||
-      wallet.chain === 'ETH_SEPOLIA' ||
       wallet.chain === 'BSC_MAINNET' ||
       wallet.chain === 'BSC_CHAPEL'
     ) {
@@ -405,7 +404,6 @@ export class TreasuryOperationsService {
 
     if (
       chain === 'ETH_MAINNET' ||
-      chain === 'ETH_SEPOLIA' ||
       chain === 'BSC_MAINNET' ||
       chain === 'BSC_CHAPEL'
     ) {
@@ -484,7 +482,7 @@ export class TreasuryOperationsService {
   }
 
   private async buildEthereumProvider(
-    chain: 'ETH_MAINNET' | 'ETH_SEPOLIA' | 'BSC_MAINNET' | 'BSC_CHAPEL',
+    chain: 'ETH_MAINNET' | 'BSC_MAINNET' | 'BSC_CHAPEL',
   ): Promise<JsonRpcProvider> {
     switch (chain) {
       case 'ETH_MAINNET': {
@@ -494,12 +492,6 @@ export class TreasuryOperationsService {
       case 'BSC_MAINNET': {
         const url = await this.systemConfigService.getEffectiveString('BSC_MAINNET_RPC_URL');
         return new JsonRpcProvider(url);
-      }
-      case 'ETH_SEPOLIA': {
-        const v = (await this.systemConfigService.get<string>('ETH_SEPOLIA_RPC_URL'))?.trim();
-        return new JsonRpcProvider(
-          v || process.env.ETH_SEPOLIA_RPC_URL?.trim() || 'https://rpc.sepolia.org',
-        );
       }
       case 'BSC_CHAPEL': {
         const v = (await this.systemConfigService.get<string>('BSC_CHAPEL_RPC_URL'))?.trim();

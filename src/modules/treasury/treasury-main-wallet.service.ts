@@ -23,7 +23,11 @@ import {
 } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { ImportMainWalletDto } from './dto';
-import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
+import { UserRole } from '@/common/enums';
 
 export type SupportedTreasuryChain = TreasuryMainWalletChain;
 
@@ -107,6 +111,22 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
   }
 
+  /** Public address only — no throw when no default ACTIVE wallet (e.g. deposit methods list). */
+  async getDefaultActiveMainWalletAddressOrNull(chain: string): Promise<string | null> {
+    if (!BLOCKCHAIN_CHAIN_DB_VALUES.includes(chain as BlockchainChainDbValue)) {
+      return null;
+    }
+    const repo = this.dataSource.getRepository(TreasuryMainWallet);
+    const defaultWallet = await repo.findOne({
+      where: {
+        chain: chain as TreasuryMainWalletChain,
+        is_default: true,
+        status: 'ACTIVE',
+      },
+    });
+    return defaultWallet?.address ?? null;
+  }
+
   async getMainWalletAddress(
     chain: SupportedTreasuryChain,
     mainWalletId?: string,
@@ -144,7 +164,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     if (!wallet) {
       throw new BusinessException(
         `No active default main wallet configured for chain ${chain}. `
-        + `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
+        + `Import via POST /treasury/main-wallets (Finance/Admin activates immediately).`,
         'TREASURY_MAIN_WALLET_NOT_CONFIGURED',
       );
     }
@@ -159,11 +179,13 @@ export class TreasuryMainWalletService implements OnModuleInit {
   /**
    * Import a main wallet from private key.
    * MFA code is verified by the controller BEFORE calling this method.
-   * Status = PENDING_APPROVAL (requires Risk Officer approval before use).
+   * Finance Manager and Admin: ACTIVE immediately (self-approved, same default rules as Risk approve).
+   * Other roles (if ever allowed): PENDING_APPROVAL.
    */
   async importMainWallet(
     dto: ImportMainWalletDto,
     createdByUserId: string,
+    actorRole: UserRole,
   ): Promise<MainWalletDto> {
     const chain = this.assertSupportedChain(dto.chain);
     const address = this.deriveAddress(chain, dto.privateKey.trim());
@@ -180,33 +202,70 @@ export class TreasuryMainWalletService implements OnModuleInit {
       );
     }
 
+    const selfActivate =
+      actorRole === UserRole.FINANCE_MANAGER || actorRole === UserRole.ADMIN;
+
+    let status: TreasuryMainWalletStatus;
+    let approvedBy: string | null;
+    let approvedAt: Date | null;
+    let isDefault = false;
+
+    if (selfActivate) {
+      const hasActiveDefault = await repo.findOne({
+        where: { chain, is_default: true, status: 'ACTIVE' },
+      });
+      status = 'ACTIVE';
+      approvedBy = createdByUserId;
+      approvedAt = new Date();
+      if (!hasActiveDefault) {
+        isDefault = true;
+        this.logger.log(`Auto-set as default for chain ${chain} on import (self-activate)`);
+      }
+    } else {
+      status = 'PENDING_APPROVAL';
+      approvedBy = null;
+      approvedAt = null;
+    }
+
     const created = await repo.save({
       main_wallet_id: uuidv7(),
       chain,
       address,
       encrypted_private_key: encrypted,
       label: dto.label?.trim() ?? null,
-      is_default: false,
-      status: 'PENDING_APPROVAL' as TreasuryMainWalletStatus,
+      is_default: isDefault,
+      status,
       created_by: createdByUserId,
-      approved_by: null,
-      approved_at: null,
+      approved_by: approvedBy,
+      approved_at: approvedAt,
       rejected_by: null,
       rejected_at: null,
       last_rotated_at: null,
       rotation_interval_days: null,
     });
 
-    this.logger.log(
-      `Main wallet PENDING_APPROVAL: chain=${chain}, address=${address}, createdBy=${createdByUserId}`,
-    );
-
-    await this.publishEvent('main_wallet.pending_approval', {
-      mainWalletId: created.main_wallet_id,
-      chain,
-      address,
-      createdBy: createdByUserId,
-    });
+    if (selfActivate) {
+      this.logger.log(
+        `Main wallet ACTIVE (import, self-approved): chain=${chain}, address=${address}, createdBy=${createdByUserId}`,
+      );
+      await this.publishEvent('main_wallet.approved', {
+        mainWalletId: created.main_wallet_id,
+        chain,
+        address,
+        approvedBy: createdByUserId,
+        isDefault: created.is_default,
+      });
+    } else {
+      this.logger.log(
+        `Main wallet PENDING_APPROVAL: chain=${chain}, address=${address}, createdBy=${createdByUserId}`,
+      );
+      await this.publishEvent('main_wallet.pending_approval', {
+        mainWalletId: created.main_wallet_id,
+        chain,
+        address,
+        createdBy: createdByUserId,
+      });
+    }
 
     return this.toDto(created);
   }
@@ -652,7 +711,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
 
     if (
       chain === 'ETH_MAINNET' ||
-      chain === 'ETH_SEPOLIA' ||
       chain === 'BSC_MAINNET' ||
       chain === 'BSC_CHAPEL'
     ) {

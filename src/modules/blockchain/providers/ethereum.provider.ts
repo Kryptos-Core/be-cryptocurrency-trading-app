@@ -14,7 +14,6 @@ import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity'
 
 const EVM_PROVIDER_CHAINS = new Set<BlockchainNetwork>([
   BlockchainNetwork.ETH_MAINNET,
-  BlockchainNetwork.ETH_SEPOLIA,
   BlockchainNetwork.BSC_MAINNET,
   BlockchainNetwork.BSC_CHAPEL,
 ]);
@@ -55,8 +54,6 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     switch (chain) {
       case BlockchainNetwork.ETH_MAINNET:
         return { rpcKey: 'ETH_MAINNET_RPC_URL', treasury: 'ETH_MAINNET', symbol: 'ETH' };
-      case BlockchainNetwork.ETH_SEPOLIA:
-        return { rpcKey: 'ETH_SEPOLIA_RPC_URL', treasury: 'ETH_SEPOLIA', symbol: 'ETH' };
       case BlockchainNetwork.BSC_MAINNET:
         return { rpcKey: 'BSC_MAINNET_RPC_URL', treasury: 'BSC_MAINNET', symbol: 'BNB' };
       case BlockchainNetwork.BSC_CHAPEL:
@@ -77,11 +74,6 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
         return (
           this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ??
           'https://data-seed-prebsc-1-s1.binance.org:8545'
-        );
-      case BlockchainNetwork.ETH_SEPOLIA:
-        return (
-          this.configService.get<string>('app.blockchain.ethereum.sepoliaRpcUrl') ??
-          'https://rpc.sepolia.org'
         );
       default:
         return (

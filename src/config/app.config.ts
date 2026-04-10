@@ -95,8 +95,6 @@ export interface AppConfig {
     ethereum: {
       mainnetRpcUrl: string;
       mainnetChainId: number;
-      sepoliaRpcUrl: string;
-      sepoliaChainId: number;
     };
     bsc: {
       mainnetRpcUrl: string;
@@ -235,8 +233,6 @@ export class AppConfigBuilder {
       tronNileFullHost: string;
       tronShastaFullHost: string;
       solanaDevnetUrl: string;
-      ethSepoliaRpcUrl: string;
-      ethSepoliaChainId: number;
       bscChapelRpcUrl: string;
       bscChapelChainId: number;
     },
@@ -256,8 +252,6 @@ export class AppConfigBuilder {
       ethereum: {
         mainnetRpcUrl: ethMainnetRpcUrl,
         mainnetChainId: ethMainnetChainId,
-        sepoliaRpcUrl: extras?.ethSepoliaRpcUrl ?? 'https://rpc.sepolia.org',
-        sepoliaChainId: extras?.ethSepoliaChainId ?? 11155111,
       },
       bsc: {
         mainnetRpcUrl: bscMainnetRpcUrl,
@@ -360,8 +354,6 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
         tronNileFullHost: env.TRON_NILE_FULL_HOST || 'https://nile.trongrid.io',
         tronShastaFullHost: env.TRON_SHASTA_FULL_HOST || 'https://api.shasta.trongrid.io',
         solanaDevnetUrl: env.SOLANA_DEVNET_URL || 'https://api.devnet.solana.com',
-        ethSepoliaRpcUrl: env.ETH_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
-        ethSepoliaChainId: env.ETH_SEPOLIA_CHAIN_ID ?? 11155111,
         bscChapelRpcUrl: env.BSC_CHAPEL_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545',
         bscChapelChainId: env.BSC_CHAPEL_CHAIN_ID ?? 97,
       },
