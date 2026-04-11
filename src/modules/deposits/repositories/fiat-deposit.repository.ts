@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { FIAT_DEPOSIT_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { FiatDeposit } from '@/entities/fiat-deposit.entity';
 
@@ -18,7 +19,7 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
     manager?: EntityManager,
   ): Promise<FiatDeposit> {
     const result = await (manager ?? this.dataSource).query(
-      'CALL sp_fiat_deposit_create(?, ?, ?, ?, ?)',
+      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?)`,
       [depositId, userId, amount, orderCode, checkoutUrl],
     );
     const row = result?.[0]?.[0];
@@ -32,7 +33,7 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
     manager?: EntityManager,
   ): Promise<FiatDeposit> {
     const result = await (manager ?? this.dataSource).query(
-      'CALL sp_fiat_deposit_update_status(?, ?)',
+      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.UPDATE_STATUS}(?, ?)`,
       [orderCode, status],
     );
     const row = result?.[0]?.[0];
@@ -42,7 +43,7 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
 
   async findByOrderCode(orderCode: number): Promise<FiatDeposit | null> {
     const result = await this.dataSource.query(
-      'CALL sp_fiat_deposit_find_by_order_code(?)',
+      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.FIND_BY_ORDER_CODE}(?)`,
       [orderCode],
     );
     const row = result?.[0]?.[0];
@@ -52,7 +53,7 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
 
   async findByUser(userId: string): Promise<FiatDeposit[]> {
     const rows = await this.dataSource.query(
-      'CALL sp_fiat_deposit_find_by_user(?)',
+      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.FIND_BY_USER}(?)`,
       [userId],
     );
     return (rows?.[0] || []).map(this.mapRow);

@@ -5,7 +5,7 @@ export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE \`fiat_deposits\` (
+      CREATE TABLE IF NOT EXISTS \`fiat_deposits\` (
         \`deposit_id\` char(36) NOT NULL,
         \`user_id\` char(36) NOT NULL,
         \`amount\` decimal(36,18) NOT NULL,
@@ -21,6 +21,7 @@ export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
     `);
 
     // Create SP: Create
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_create`);
     await queryRunner.query(`
       CREATE PROCEDURE sp_fiat_deposit_create(
         IN p_deposit_id CHAR(36),
@@ -38,6 +39,7 @@ export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
     `);
 
     // Create SP: Status Update
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_update_status`);
     await queryRunner.query(`
       CREATE PROCEDURE sp_fiat_deposit_update_status(
         IN p_order_code BIGINT,
@@ -53,6 +55,7 @@ export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
     `);
 
     // Create SP: Find all for User
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_find_by_user`);
     await queryRunner.query(`
       CREATE PROCEDURE sp_fiat_deposit_find_by_user(
         IN p_user_id CHAR(36)
@@ -63,6 +66,7 @@ export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
     `);
 
     // Create SP: Find by Order Code
+    await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_find_by_order_code`);
     await queryRunner.query(`
       CREATE PROCEDURE sp_fiat_deposit_find_by_order_code(
         IN p_order_code BIGINT

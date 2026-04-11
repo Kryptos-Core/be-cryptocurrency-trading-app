@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { AdminWalletAdjustment } from '@/entities/admin-wallet-adjustment.entity';
 import { AdminAdjustWalletResponseDto } from '../dto/admin-adjust-wallet.dto';
@@ -35,7 +36,7 @@ export class AdminWalletAdjustmentRepository extends BaseRepository<AdminWalletA
   ): Promise<AdminAdjustWalletResponseDto> {
     try {
       const result = await (manager ?? this.dataSource).query(
-        'CALL sp_admin_wallet_adjustment_create(?, ?, ?, ?, ?, ?, ?)',
+        `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
         [
           params.adjustmentId,
           params.actorUserId,
@@ -70,7 +71,7 @@ export class AdminWalletAdjustmentRepository extends BaseRepository<AdminWalletA
       const safeLimit = Math.min(Math.max(limit, 1), 200);
       const safeOffset = Math.max(offset, 0);
       const result = await this.dataSource.query(
-        'CALL sp_admin_wallet_adjustment_find_by_target(?, ?, ?)',
+        `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.FIND_BY_TARGET}(?, ?, ?)`,
         [targetUserId, safeLimit, safeOffset],
       );
       const rows: any[] = result?.[0] ?? [];

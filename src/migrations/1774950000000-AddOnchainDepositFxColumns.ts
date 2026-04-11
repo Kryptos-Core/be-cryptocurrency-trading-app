@@ -14,12 +14,43 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class AddOnchainDepositFxColumns1774950000000 implements MigrationInterface {
   name = 'AddOnchainDepositFxColumns1774950000000';
 
+  private async addColumnIfNotExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    columnName: string,
+    columnDefinitionSql: string,
+  ): Promise<void> {
+    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
+    const schema = dbRows[0]?.db;
+    if (!schema) return;
+    const rows: unknown[] = await queryRunner.query(
+      `SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+      [schema, tableName, columnName],
+    );
+    if (rows.length === 0) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` ADD COLUMN ${columnDefinitionSql}`);
+    }
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE \`onchain_transactions\`
-       ADD COLUMN \`credited_currency_id\` char(36) NULL COMMENT 'ID của currency được credit vào ví (thường là USDT)',
-       ADD COLUMN \`credited_amount\` decimal(36,18) NULL COMMENT 'Số lượng cash currency (USDT) thực tế được credit',
-       ADD COLUMN \`conversion_rate\` decimal(36,18) NULL COMMENT 'Tỷ giá quy đổi: 1 native coin = X USDT tại thời điểm giao dịch'`,
+    const table = 'onchain_transactions';
+    await this.addColumnIfNotExists(
+      queryRunner,
+      table,
+      'credited_currency_id',
+      `\`credited_currency_id\` char(36) NULL COMMENT 'ID của currency được credit vào ví (thường là USDT)'`,
+    );
+    await this.addColumnIfNotExists(
+      queryRunner,
+      table,
+      'credited_amount',
+      `\`credited_amount\` decimal(36,18) NULL COMMENT 'Số lượng cash currency (USDT) thực tế được credit'`,
+    );
+    await this.addColumnIfNotExists(
+      queryRunner,
+      table,
+      'conversion_rate',
+      `\`conversion_rate\` decimal(36,18) NULL COMMENT 'Tỷ giá quy đổi: 1 native coin = X USDT tại thời điểm giao dịch'`,
     );
   }
 

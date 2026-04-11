@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { WALLET_LEDGER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
 
@@ -44,7 +45,7 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
   ): Promise<WalletLedger> {
     const runner = manager ?? this.dataSource;
     const result = await runner.query(
-      'CALL sp_wallet_ledger_create(?, ?, ?, ?, ?, ?, ?)',
+      `CALL ${WALLET_LEDGER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
       [
         entry.userId,
         entry.currencyId,

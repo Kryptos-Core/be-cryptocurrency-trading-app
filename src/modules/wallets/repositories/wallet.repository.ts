@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { WALLET_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Wallet } from '@/entities/wallet.entity';
@@ -55,7 +56,7 @@ export class WalletRepository extends BaseRepository<Wallet> {
   ): Promise<Wallet | null> {
     try {
       const result = await (manager ?? this.dataSource).query(
-        'CALL sp_wallet_find_by_user_currency(?, ?)',
+        `CALL ${WALLET_STORE_PROCEDURE.FIND_BY_USER_CURRENCY}(?, ?)`,
         [userId, currencyId],
       );
       const row = result?.[0]?.[0];
@@ -131,11 +132,10 @@ export class WalletRepository extends BaseRepository<Wallet> {
     deltaFrozen: string,
     manager: EntityManager,
   ): Promise<Wallet> {
-    const result = await manager.query('CALL sp_wallet_apply_balance_delta(?, ?, ?)', [
-      walletId,
-      deltaAvailable,
-      deltaFrozen,
-    ]);
+    const result = await manager.query(
+      `CALL ${WALLET_STORE_PROCEDURE.APPLY_BALANCE_DELTA}(?, ?, ?)`,
+      [walletId, deltaAvailable, deltaFrozen],
+    );
 
     const affected = result?.[0]?.[0]?.affected ?? 0;
     const updated = result?.[1]?.[0] as Wallet | undefined;

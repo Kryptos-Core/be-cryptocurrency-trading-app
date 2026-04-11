@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
 import { UserRole } from '@/common/enums';
@@ -20,7 +21,7 @@ export class AuthRepository {
   async findByEmail(email: string): Promise<User | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_find_by_email(?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`,
         [email.toLowerCase()],
       );
 
@@ -37,7 +38,7 @@ export class AuthRepository {
   async findById(userId: string): Promise<User | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_find_by_id(?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
         [userId],
       );
       return result[0]?.[0] || null;
@@ -61,13 +62,13 @@ export class AuthRepository {
     try {
       const userId = newUuid();
       await this.dataSource.query(
-        'CALL sp_user_create(?, ?, ?, ?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`,
         [userId, email.toLowerCase(), passwordHash, firstName || null, lastName || null, role],
       );
 
       // Fetch and return created user
       const userResult = await this.dataSource.query(
-        'CALL sp_user_find_by_id(?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
         [userId],
       );
 
@@ -84,7 +85,7 @@ export class AuthRepository {
   async emailExists(email: string): Promise<boolean> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_email_exists(?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.EMAIL_EXISTS}(?, ?)`,
         [email.toLowerCase(), null],
       );
 
@@ -102,7 +103,7 @@ export class AuthRepository {
   async findByLinkedWallet(chain: string, address: string): Promise<User | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_find_by_linked_wallet(?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_LINKED_WALLET}(?, ?)`,
         [chain, address],
       );
       return result[0]?.[0] || null;
@@ -124,11 +125,11 @@ export class AuthRepository {
   ): Promise<User> {
     try {
       await this.dataSource.query(
-        'CALL sp_user_create_wallet_only(?, ?, ?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.CREATE_WALLET_ONLY}(?, ?, ?, ?, ?)`,
         [userId, email, passwordHash, chain, address],
       );
       const userResult = await this.dataSource.query(
-        'CALL sp_user_find_by_id(?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
         [userId],
       );
       return userResult[0]?.[0];
@@ -159,7 +160,7 @@ export class AuthRepository {
   async setTwoFaEnabled(userId: string, enabled: boolean): Promise<number> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_set_two_fa(?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.SET_TWO_FA}(?, ?)`,
         [userId, enabled ? 1 : 0],
       );
       return Number(result[0]?.[0]?.affected ?? 0);

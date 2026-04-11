@@ -5,12 +5,30 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * OHLCV data is now provided on-demand by Price Oracle (Binance); no DB persist.
  */
 export class DropOHLCVTable1768227400000 implements MigrationInterface {
+  /** FK may be absent when InitialSchema skipped ADD CONSTRAINT (legacy type mismatch). */
+  private async dropForeignKeyIfExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    constraintName: string,
+  ): Promise<void> {
+    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
+    const schema = dbRows[0]?.db;
+    if (!schema) return;
+    const rows: unknown[] = await queryRunner.query(
+      `SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY' LIMIT 1`,
+      [schema, tableName, constraintName],
+    );
+    if (rows.length > 0) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` DROP FOREIGN KEY \`${constraintName}\``);
+    }
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_ohlcv_upsert`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_ohlcv_get_by_pair_interval`);
 
-    await queryRunner.query(`ALTER TABLE \`ohlcv\` DROP FOREIGN KEY \`FK_e3ac86a0caa8709a74c0ed0d081\``);
-    await queryRunner.query(`ALTER TABLE \`ohlcv\` DROP FOREIGN KEY \`FK_c3418ff3d769b0524947d394c83\``);
+    await this.dropForeignKeyIfExists(queryRunner, 'ohlcv', 'FK_e3ac86a0caa8709a74c0ed0d081');
+    await this.dropForeignKeyIfExists(queryRunner, 'ohlcv', 'FK_c3418ff3d769b0524947d394c83');
     await queryRunner.query(`DROP INDEX \`idx_ohlcv_time\` ON \`ohlcv\``);
     await queryRunner.query(`DROP TABLE \`ohlcv\``);
   }

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { MATCHING_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { OrderBookOrder } from '../interfaces';
 
 export interface TradeExecuteResult {
@@ -23,7 +24,7 @@ export class MatchingRepository {
     side: 'BUY' | 'SELL',
   ): Promise<OrderBookOrder[]> {
     const result = await this.dataSource.query(
-      'CALL sp_orders_open_for_pair(?, ?)',
+      `CALL ${MATCHING_STORE_PROCEDURE.ORDERS_OPEN_FOR_PAIR}(?, ?)`,
       [pairId, side],
     );
     const rows = result?.[0] ?? [];
@@ -41,7 +42,7 @@ export class MatchingRepository {
     makerFee: string;
   }): Promise<TradeExecuteResult> {
     await this.dataSource.query(
-      'CALL sp_trade_execute(?, ?, ?, ?, ?, ?, ?, ?, @p_trade_id, @p_error_code, @p_error_message)',
+      `CALL ${MATCHING_STORE_PROCEDURE.TRADE_EXECUTE}(?, ?, ?, ?, ?, ?, ?, ?, @p_trade_id, @p_error_code, @p_error_message)`,
       [
         params.pairId,
         params.makerOrderId,
@@ -65,7 +66,7 @@ export class MatchingRepository {
 
   async cancelIocRemainder(orderId: string, userId: string): Promise<void> {
     await this.dataSource.query(
-      'CALL sp_order_cancel(?, ?, @p_cancelled, @p_error_code, @p_error_message)',
+      `CALL ${MATCHING_STORE_PROCEDURE.ORDER_CANCEL}(?, ?, @p_cancelled, @p_error_code, @p_error_message)`,
       [orderId, userId],
     );
     const [out] = await this.dataSource.query(

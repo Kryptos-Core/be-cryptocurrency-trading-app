@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { PAYMENT_CONFIG_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { PaymentMethodConfig, PaymentMethodStatus, PaymentMethodType } from '@/entities/payment-method-config.entity';
 
@@ -11,7 +12,7 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
 
   async findActive(type: PaymentMethodType, network: string): Promise<PaymentMethodConfig | null> {
     const rows = await this.dataSource.query<PaymentMethodConfig[]>(
-      'CALL sp_payment_config_find_active(?, ?)',
+      `CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.FIND_ACTIVE}(?, ?)`,
       [type, network],
     );
     const result = Array.isArray(rows[0]) ? rows[0][0] : rows[0];
@@ -20,7 +21,7 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
 
   async findAll(): Promise<Omit<PaymentMethodConfig, 'encrypted_config'>[]> {
     const rows = await this.dataSource.query<PaymentMethodConfig[]>(
-      'CALL sp_payment_config_list()',
+      `CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.LIST}()`,
     );
     return Array.isArray(rows[0]) ? rows[0] : rows;
   }
@@ -36,7 +37,7 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
     userId: string,
   ): Promise<PaymentMethodConfig> {
     const rows = await this.dataSource.query(
-      'CALL sp_payment_config_upsert(?, ?, ?, ?, ?, ?, ?, ?)',
+      `CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.UPSERT}(?, ?, ?, ?, ?, ?, ?, ?)`,
       [configId, type, network, displayName, encryptedConfig, gracePeriodMinutes, sortOrder, userId],
     );
     const result = Array.isArray(rows[0]) ? rows[0][0] : rows[0];
@@ -51,7 +52,7 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
   ): Promise<PaymentMethodConfig> {
     const exec = manager ?? this.dataSource.manager;
     const rows = await exec.query(
-      'CALL sp_payment_config_set_status(?, ?, ?)',
+      `CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.SET_STATUS}(?, ?, ?)`,
       [configId, status, userId],
     );
     const result = Array.isArray(rows[0]) ? rows[0][0] : rows[0];

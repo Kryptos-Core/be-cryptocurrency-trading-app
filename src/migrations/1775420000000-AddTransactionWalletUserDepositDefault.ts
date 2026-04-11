@@ -8,15 +8,39 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class AddTransactionWalletUserDepositDefault1775420000000
   implements MigrationInterface
 {
+  name = 'AddTransactionWalletUserDepositDefault1775420000000';
+
+  private async addColumnIfNotExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    columnName: string,
+    columnDefinitionSql: string,
+  ): Promise<void> {
+    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
+    const schema = dbRows[0]?.db;
+    if (!schema) return;
+    const rows: unknown[] = await queryRunner.query(
+      `SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+      [schema, tableName, columnName],
+    );
+    if (rows.length === 0) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` ADD COLUMN ${columnDefinitionSql}`);
+    }
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE \`transaction_wallets\`
-      ADD COLUMN \`is_default_user_deposit\` tinyint NOT NULL DEFAULT 0
-    `);
-    await queryRunner.query(`
-      ALTER TABLE \`transaction_wallets\`
-      ADD COLUMN \`default_set_at\` datetime(6) NULL
-    `);
+    await this.addColumnIfNotExists(
+      queryRunner,
+      'transaction_wallets',
+      'is_default_user_deposit',
+      `\`is_default_user_deposit\` tinyint NOT NULL DEFAULT 0`,
+    );
+    await this.addColumnIfNotExists(
+      queryRunner,
+      'transaction_wallets',
+      'default_set_at',
+      `\`default_set_at\` datetime(6) NULL`,
+    );
 
     await queryRunner.query(`
       UPDATE \`transaction_wallets\`

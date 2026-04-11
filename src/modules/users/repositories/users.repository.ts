@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
 import { UserRole } from '@/common/enums';
@@ -26,7 +27,7 @@ export class UsersRepository {
   async findById(userId: string): Promise<User | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_find_by_id(?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
         [userId],
       );
       
@@ -45,7 +46,7 @@ export class UsersRepository {
   async findByEmail(email: string): Promise<User | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_find_by_email(?)',
+        `CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`,
         [email.toLowerCase()],
       );
 
@@ -175,7 +176,7 @@ export class UsersRepository {
     try {
       const userId = newUuid();
       await this.dataSource.query(
-        'CALL sp_user_create(?, ?, ?, ?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`,
         [userId, email.toLowerCase(), passwordHash, null, null, UserRole.TRADER],
       );
       return this.findById(userId) as Promise<User>;
@@ -196,7 +197,7 @@ export class UsersRepository {
       const idvArg =
         updates.identityVerified === undefined ? null : updates.identityVerified ? 1 : 0;
       await this.dataSource.query(
-        'CALL sp_user_update(?, ?, ?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?)`,
         [
           userId,
           updates.email ? updates.email.toLowerCase() : null,
@@ -218,7 +219,10 @@ export class UsersRepository {
    */
   async delete(userId: string): Promise<void> {
     try {
-      await this.dataSource.query('CALL sp_user_delete(?)', [userId]);
+      await this.dataSource.query(
+        `CALL ${USER_STORE_PROCEDURE.DELETE}(?)`,
+        [userId],
+      );
       this.logger.log(`User deleted (soft): ${userId}`);
     } catch (error) {
       this.logger.error(`Error deleting user: ${userId}`, error);
@@ -237,7 +241,7 @@ export class UsersRepository {
   }> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_get_statistics()',
+        `CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`,
       );
 
       const stats = result[0]?.[0] || {
@@ -260,7 +264,7 @@ export class UsersRepository {
   async emailExists(email: string, excludeUserId?: string): Promise<boolean> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_email_exists(?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.EMAIL_EXISTS}(?, ?)`,
         [email.toLowerCase(), excludeUserId || null],
       );
 
@@ -290,7 +294,7 @@ export class UsersRepository {
   ): Promise<number> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_update_profile_basic(?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.UPDATE_PROFILE_BASIC}(?, ?, ?)`,
         [userId, firstName ?? null, lastName ?? null],
       );
       const affected = result[0]?.[0]?.affected ?? 0;
@@ -311,7 +315,7 @@ export class UsersRepository {
   ): Promise<number> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_update_avatar(?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.UPDATE_AVATAR}(?, ?, ?)`,
         [userId, avatarUrl ?? null, avatarPublicId ?? null],
       );
       const affected = result[0]?.[0]?.affected ?? 0;
@@ -333,7 +337,7 @@ export class UsersRepository {
   ): Promise<string> {
     try {
       await this.dataSource.query(
-        'CALL sp_user_security_change_request_create(?, ?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_CREATE}(?, ?, ?, ?)`,
         [requestId, userId, changeType, JSON.stringify(payload)],
       );
       return requestId;
@@ -360,7 +364,7 @@ export class UsersRepository {
   > {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_security_change_request_find_pending()',
+        `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_FIND_PENDING}()`,
       );
       return result[0] ?? [];
     } catch (error) {
@@ -380,7 +384,7 @@ export class UsersRepository {
   ): Promise<{ request_id: string; user_id: string; status: string } | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_user_security_change_request_review(?, ?, ?, ?)',
+        `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_REVIEW}(?, ?, ?, ?)`,
         [requestId, reviewedBy, approve ? 1 : 0, reviewNote ?? null],
       );
       return result[0]?.[0] ?? null;

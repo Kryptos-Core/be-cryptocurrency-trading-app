@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { NOTIFICATION_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { Notification } from '@/entities/notification.entity';
 
@@ -38,7 +39,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
   }): Promise<Notification | null> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_notification_create(?, ?, ?, ?, ?, ?)',
+        `CALL ${NOTIFICATION_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`,
         [
           params.notificationId,
           params.title,
@@ -62,7 +63,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
   ): Promise<NotificationRow[]> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_notification_find_by_user(?, ?, ?)',
+        `CALL ${NOTIFICATION_STORE_PROCEDURE.FIND_BY_USER}(?, ?, ?)`,
         [userId, limit, offset],
       );
       return result?.[0] ?? [];
@@ -75,7 +76,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
   async countUnread(userId: string): Promise<number> {
     try {
       const result = await this.dataSource.query(
-        'CALL sp_notification_count_unread(?)',
+        `CALL ${NOTIFICATION_STORE_PROCEDURE.COUNT_UNREAD}(?)`,
         [userId],
       );
       return Number(result?.[0]?.[0]?.unread_count ?? 0);
@@ -88,7 +89,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
   async markRead(notificationId: string, userId: string): Promise<void> {
     try {
       await this.dataSource.query(
-        'CALL sp_notification_mark_read(?, ?)',
+        `CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_READ}(?, ?)`,
         [notificationId, userId],
       );
     } catch (error) {
@@ -102,7 +103,10 @@ export class NotificationRepository extends BaseRepository<Notification> {
 
   async markAllRead(userId: string): Promise<void> {
     try {
-      await this.dataSource.query('CALL sp_notification_mark_all_read(?)', [userId]);
+      await this.dataSource.query(
+        `CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_ALL_READ}(?)`,
+        [userId],
+      );
     } catch (error) {
       this.logger.error(`Error marking all notifications read for user: ${userId}`, error);
       throw error;
