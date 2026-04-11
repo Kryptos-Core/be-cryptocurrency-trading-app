@@ -3,7 +3,9 @@ import * as path from 'path';
 
 /**
  * Load `.env` then `.env.${NODE_ENV}` (latter overrides) for TypeORM CLI / seed scripts.
- * Set NODE_ENV before import (e.g. `cross-env NODE_ENV=staging npm run migration:run`).
+ *
+ * - `npm run migration:*`, `db:seed`, `db:clean` set `NODE_ENV=development` so `.env.development` is applied (see package.json).
+ * - Staging DB: `cross-env NODE_ENV=staging npm run typeorm -- migration:run -d src/config/data-source.ts`
  */
 export function loadEnvFilesForCli(cwd: string = process.cwd()): void {
   dotenv.config({ path: path.join(cwd, '.env') });

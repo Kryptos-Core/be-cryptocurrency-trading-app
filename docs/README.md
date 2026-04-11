@@ -10,6 +10,7 @@ Các file dưới đây mô tả **cấu hình, API và pattern kỹ thuật** �
 | [SWAGGER_USAGE.md](SWAGGER_USAGE.md) | Swagger / OpenAPI |
 | [BINANCE_TESTNET_SETUP.md](BINANCE_TESTNET_SETUP.md) | Binance testnet |
 | [DATA_ACCESS_PATTERNS.md](DATA_ACCESS_PATTERNS.md) | Truy cập dữ liệu |
+| [DATA_ACCESS_HYBRID_STRATEGY_PLAN.md](DATA_ACCESS_HYBRID_STRATEGY_PLAN.md) | Plan hybrid ORM / QB / raw / SP + gap & củng cố |
 | [BASE_REPOSITORY_USAGE.md](BASE_REPOSITORY_USAGE.md) | Base repository |
 | [BLOCKCHAIN_API_PURPOSE.md](BLOCKCHAIN_API_PURPOSE.md) | Mục đích API blockchain |
 | [DEPOSITS_API_PURPOSE.md](DEPOSITS_API_PURPOSE.md) | API nạp/rút |

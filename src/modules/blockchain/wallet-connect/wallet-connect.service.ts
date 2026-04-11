@@ -13,6 +13,11 @@ import { BadRequestException } from '@/common/exceptions';
 import { BlockchainNetwork } from '@/common/enums';
 import { WalletLinkingService } from '../wallet-linking.service';
 import { BlockchainProviderFactory } from '../blockchain-provider.factory';
+import {
+  WC_RELAY_PAIRING_CHAINS,
+  isWcEvmChain,
+  wcCaip2ForChain,
+} from '@/modules/blockchain/wallet-connect/wc-caip.util';
 import { WcSessionData, WcSessionStatus } from './dto';
 import { withWalletConnectSignClientLock } from './wallet-connect-sign-client-gate';
 
@@ -59,25 +64,6 @@ export class WalletConnectService implements OnModuleInit {
   private static readonly SESSION_TTL = 300; // 5 phút
   /** Tránh POST /wc/init treo khi relay không phản hồi */
   private static readonly WC_CONNECT_TIMEOUT_MS = 15_000;
-  /** Chains dùng SignClient relay (EVM + Solana mainnet/sandbox). Tron: URI legacy, không pairing relay ở đây. */
-  private static readonly WC_PAIRING_CHAINS: BlockchainNetwork[] = [
-    BlockchainNetwork.ETH_MAINNET,
-    BlockchainNetwork.BSC_MAINNET,
-    BlockchainNetwork.BSC_CHAPEL,
-    BlockchainNetwork.SOLANA_MAINNET,
-    BlockchainNetwork.SOLANA_DEVNET,
-  ];
-  /** CAIP-2 cho init / QR (đủ mạng enum backend). */
-  private static readonly CHAIN_CAIP: Record<BlockchainNetwork, string> = {
-    [BlockchainNetwork.ETH_MAINNET]: 'eip155:1',
-    [BlockchainNetwork.BSC_MAINNET]: 'eip155:56',
-    [BlockchainNetwork.BSC_CHAPEL]: 'eip155:97',
-    [BlockchainNetwork.SOLANA_MAINNET]: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
-    [BlockchainNetwork.SOLANA_DEVNET]: 'solana:EtWTRAB9YDFxGeBnSP6rg6DhzZZHc7yBtomxv2kXyPwb',
-    [BlockchainNetwork.TRON_MAINNET]: 'tron:0x2b6653dc',
-    [BlockchainNetwork.TRON_NILE]: 'tron:0xcd8690dc',
-    [BlockchainNetwork.TRON_SHASTA]: 'tron:0x94a8759',
-  };
 
   private projectId!: string;
   private relayUrl!: string;
@@ -129,7 +115,7 @@ export class WalletConnectService implements OnModuleInit {
     const sessionId = uuidv7();
     const nonce = uuidv7();
     const message = this.buildSigningMessage(nonce, chain);
-    const caip2 = WalletConnectService.CHAIN_CAIP[chain];
+    const caip2 = wcCaip2ForChain(chain);
 
     let wcUri: string;
 
@@ -144,7 +130,7 @@ export class WalletConnectService implements OnModuleInit {
                   ? client.connect({
                       optionalNamespaces: {
                         solana: {
-                          chains: [WalletConnectService.CHAIN_CAIP[chain]],
+                          chains: [wcCaip2ForChain(chain)],
                           methods: ['solana_signMessage', 'solana_signTransaction'],
                           events: [],
                         },
@@ -153,7 +139,7 @@ export class WalletConnectService implements OnModuleInit {
                   : client.connect({
                       optionalNamespaces: {
                         eip155: {
-                          chains: [WalletConnectService.CHAIN_CAIP[chain]],
+                          chains: [wcCaip2ForChain(chain)],
                           methods: ['personal_sign', 'eth_sendTransaction'],
                           events: [],
                         },
@@ -393,7 +379,7 @@ export class WalletConnectService implements OnModuleInit {
   }
 
   private useRealWcPairing(chain: BlockchainNetwork): boolean {
-    return WalletConnectService.WC_PAIRING_CHAINS.includes(chain) && Boolean(this.projectId);
+    return WC_RELAY_PAIRING_CHAINS.includes(chain) && Boolean(this.projectId);
   }
 
   private async runLinkApprovalAndSign(
@@ -419,7 +405,7 @@ export class WalletConnectService implements OnModuleInit {
       return;
     }
 
-    const expectedCaip2 = WalletConnectService.CHAIN_CAIP[chain];
+    const expectedCaip2 = wcCaip2ForChain(chain);
 
     let address: string;
     let chainId: string;
@@ -702,20 +688,11 @@ export class WalletConnectService implements OnModuleInit {
   }
 
   private static isEvmWcChain(chain: BlockchainNetwork): boolean {
-    return (
-      chain === BlockchainNetwork.ETH_MAINNET ||
-      chain === BlockchainNetwork.BSC_MAINNET ||
-      chain === BlockchainNetwork.BSC_CHAPEL
-    );
+    return isWcEvmChain(chain);
   }
 
   private assertWcInitChain(chain: BlockchainNetwork): void {
-    if (!WalletConnectService.CHAIN_CAIP[chain]) {
-      throw new BadRequestException(
-        `Chain "${chain}" không được hỗ trợ qua WalletConnect.`,
-        'WC_CHAIN_NOT_SUPPORTED',
-      );
-    }
+    wcCaip2ForChain(chain);
   }
 
   private buildSigningMessage(nonce: string, chain: BlockchainNetwork): string {

@@ -4,6 +4,7 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import { ConfigService } from '@nestjs/config';
 import { ethers, JsonRpcProvider } from 'ethers';
 import { BlockchainNetwork } from '@/common/enums';
+import type { EvmChainDefinition } from '@/common/constants/evm-chain-definitions';
 import {
   IBlockchainProvider,
   BlockchainBalanceDto,
@@ -12,14 +13,8 @@ import {
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 
-const EVM_PROVIDER_CHAINS = new Set<BlockchainNetwork>([
-  BlockchainNetwork.ETH_MAINNET,
-  BlockchainNetwork.BSC_MAINNET,
-  BlockchainNetwork.BSC_CHAPEL,
-]);
-
 /**
- * EVM provider — one Nest instance per chain (mainnet or sandbox).
+ * EVM provider — one Nest instance per chain (JsonRpcProvider + fixed chainId).
  */
 @Injectable()
 export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
@@ -28,65 +23,60 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   private readonly rpcConfigKey: string;
   private readonly treasuryChain: TreasuryMainWalletChain;
   private readonly nativeSymbol: string;
+  private readonly evmChain: BlockchainNetwork;
+  private readonly expectedChainId: number;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
     private readonly systemConfigService: SystemConfigService,
-    private readonly evmChain: BlockchainNetwork,
+    private readonly spec: EvmChainDefinition,
   ) {
-    if (!EVM_PROVIDER_CHAINS.has(evmChain)) {
-      throw new Error(`EthereumProvider: unsupported evmChain ${evmChain}`);
-    }
-    const { rpcKey, treasury, symbol } = EthereumProvider.resolveEvmBindings(evmChain);
-    this.treasuryChain = treasury;
-    this.rpcConfigKey = rpcKey;
-    this.nativeSymbol = symbol;
+    this.evmChain = spec.network;
+    this.expectedChainId = spec.chainId;
+    this.treasuryChain = spec.treasuryChain;
+    this.rpcConfigKey = spec.rpcConfigKey;
+    this.nativeSymbol = spec.nativeSymbol;
     const bootstrap = this.defaultBootstrapRpc();
     this.provider = new JsonRpcProvider(bootstrap);
   }
 
-  private static resolveEvmBindings(chain: BlockchainNetwork): {
-    rpcKey: string;
-    treasury: TreasuryMainWalletChain;
-    symbol: string;
-  } {
-    switch (chain) {
-      case BlockchainNetwork.ETH_MAINNET:
-        return { rpcKey: 'ETH_MAINNET_RPC_URL', treasury: 'ETH_MAINNET', symbol: 'ETH' };
-      case BlockchainNetwork.BSC_MAINNET:
-        return { rpcKey: 'BSC_MAINNET_RPC_URL', treasury: 'BSC_MAINNET', symbol: 'BNB' };
-      case BlockchainNetwork.BSC_CHAPEL:
-        return { rpcKey: 'BSC_CHAPEL_RPC_URL', treasury: 'BSC_CHAPEL', symbol: 'BNB' };
-      default:
-        throw new Error(`EthereumProvider: unsupported evmChain ${chain}`);
-    }
-  }
-
   private defaultBootstrapRpc(): string {
-    switch (this.evmChain) {
-      case BlockchainNetwork.BSC_MAINNET:
-        return (
-          this.configService.get<string>('app.blockchain.bsc.mainnetRpcUrl') ??
-          'https://bsc-dataseed.binance.org'
-        );
-      case BlockchainNetwork.BSC_CHAPEL:
-        return (
-          this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ??
-          'https://data-seed-prebsc-1-s1.binance.org:8545'
-        );
-      default:
-        return (
-          this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ??
-          'https://eth.llamarpc.com'
-        );
+    if (this.spec.network === BlockchainNetwork.ETH_MAINNET) {
+      return (
+        this.configService.get<string>('app.blockchain.ethereum.mainnetRpcUrl') ??
+        this.spec.defaultRpcUrl
+      );
     }
+    if (this.spec.network === BlockchainNetwork.BSC_MAINNET) {
+      return (
+        this.configService.get<string>('app.blockchain.bsc.mainnetRpcUrl') ??
+        this.spec.defaultRpcUrl
+      );
+    }
+    if (this.spec.network === BlockchainNetwork.BSC_CHAPEL) {
+      return (
+        this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ??
+        this.spec.defaultRpcUrl
+      );
+    }
+    return this.spec.defaultRpcUrl;
   }
 
   async onModuleInit() {
     const rpcUrl = await this.resolveRpcUrl();
     this.provider = new JsonRpcProvider(rpcUrl);
     this.logger.log(`${this.evmChain} provider initialized → ${rpcUrl}`);
+    try {
+      const nw = await this.provider.getNetwork();
+      if (nw.chainId !== BigInt(this.expectedChainId)) {
+        this.logger.warn(
+          `${this.evmChain}: RPC chainId ${nw.chainId} !== expected ${this.expectedChainId}`,
+        );
+      }
+    } catch (e) {
+      this.logger.warn(`${this.evmChain}: could not verify chainId`, e);
+    }
   }
 
   private async resolveRpcUrl(): Promise<string> {

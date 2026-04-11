@@ -4,6 +4,7 @@ import { CacheService } from '@/common/services';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { BlockchainNetwork } from '@/common/enums';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 
 export interface DepositConversionResult {
   /** ID của currency platform cash (USDT) sẽ được credit vào ví user (UUID) */
@@ -161,34 +162,23 @@ export class DepositFxService {
   }
 
   private async getNativeSymbol(chain: BlockchainNetwork): Promise<string> {
-    switch (chain) {
-      case BlockchainNetwork.ETH_MAINNET:
-        return (
-          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL'))?.trim().toUpperCase() ||
-          'ETH'
-        );
-      case BlockchainNetwork.BSC_MAINNET:
-      case BlockchainNetwork.BSC_CHAPEL:
-        return (
-          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_BNB_SYMBOL'))?.trim().toUpperCase() ||
-          'BNB'
-        );
-      case BlockchainNetwork.SOLANA_MAINNET:
-      case BlockchainNetwork.SOLANA_DEVNET:
-        return (
-          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL'))?.trim().toUpperCase() ||
-          'SOL'
-        );
-      case BlockchainNetwork.TRON_MAINNET:
-      case BlockchainNetwork.TRON_NILE:
-      case BlockchainNetwork.TRON_SHASTA:
-        return (
-          (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL'))?.trim().toUpperCase() ||
-          'TRX'
-        );
-      default:
-        throw new Error(`Unsupported chain for deposit FX: ${chain}`);
+    const base = nativeSymbolForChain(chain);
+    const keyByBase: Record<string, string> = {
+      ETH: 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL',
+      BNB: 'BLOCKCHAIN_WITHDRAW_BNB_SYMBOL',
+      SOL: 'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL',
+      TRX: 'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL',
+      POL: 'BLOCKCHAIN_WITHDRAW_POL_SYMBOL',
+      AVAX: 'BLOCKCHAIN_WITHDRAW_AVAX_SYMBOL',
+      XDAI: 'BLOCKCHAIN_WITHDRAW_XDAI_SYMBOL',
+      FTM: 'BLOCKCHAIN_WITHDRAW_FTM_SYMBOL',
+    };
+    const cfgKey = keyByBase[base];
+    if (cfgKey) {
+      const o = (await this.systemConfigService.get<string>(cfgKey))?.trim().toUpperCase();
+      if (o) return o;
     }
+    return base;
   }
 
   private async resolveCashCurrencyId(cashCurrencySymbol: string): Promise<string> {

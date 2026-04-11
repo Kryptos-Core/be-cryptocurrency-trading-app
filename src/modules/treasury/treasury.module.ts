@@ -18,6 +18,7 @@ import { TreasuryProcessor } from './treasury.processor';
 import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
+import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
 import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
 import { OnchainChainPickerService } from './onchain-chain-picker.service';
 
@@ -40,6 +41,7 @@ import { OnchainChainPickerService } from './onchain-chain-picker.service';
   providers: [
     WalletEncryptionService,
     TreasuryTransactionWalletRepository,
+    TreasuryMainWalletRepository,
     TreasuryOperationRepository,
     TreasuryOnchainReadRepository,
     TransactionWalletService,
@@ -54,6 +56,7 @@ import { OnchainChainPickerService } from './onchain-chain-picker.service';
     TreasuryMainWalletService,
     TreasuryOperationsService,
     OnchainChainPickerService,
+    TreasuryTransactionWalletRepository,
   ],
 })
 export class TreasuryModule {}

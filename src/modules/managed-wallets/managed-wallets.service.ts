@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
 import { TronWeb } from 'tronweb';
@@ -12,9 +11,7 @@ import {
 } from '@/common/exceptions';
 import { BlockchainNetwork, UserRole } from '@/common/enums';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import { AppSetting } from '@/entities/app-setting.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import { CurrencyNetwork } from '@/entities/currency-network.entity';
 import {
   CreateManagedWalletDto,
   ManagedWalletResponseDto,
@@ -31,8 +28,10 @@ import {
   type BlockchainChainDbValue,
 } from '@/common/constants/blockchain-chain-db';
 import {
+  TreasuryTransactionWalletRepository,
   type TronDepositUiChain,
 } from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
+import { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
 
 const MANAGED_TRON_CHAINS = [
   BlockchainNetwork.TRON_MAINNET,
@@ -66,7 +65,8 @@ export class ManagedWalletsService {
   private static readonly SUPPORTED_CHAINS: SupportedManagedWalletChain[] = [...MANAGED_TRON_CHAINS];
 
   constructor(
-    private readonly dataSource: DataSource,
+    private readonly managedWalletsDataRepository: ManagedWalletsDataRepository,
+    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepository,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly transactionWalletService: TransactionWalletService,
     private readonly systemConfigService: SystemConfigService,
@@ -131,16 +131,11 @@ export class ManagedWalletsService {
     const wallet = await this.requireTransactionWalletForActor(userId, walletId, role);
     const { chain, address } = wallet;
 
-    return this.dataSource
-      .getRepository(OnchainTransaction)
-      .createQueryBuilder('tx')
-      .where('tx.chain = :chain', { chain })
-      .andWhere('(tx.from_address = :address OR tx.to_address = :address)', {
-        address,
-      })
-      .orderBy('tx.created_at', 'DESC')
-      .limit(Math.max(1, Math.min(limit, 200)))
-      .getMany();
+    return this.managedWalletsDataRepository.listOnchainTransactionsForAddress(
+      chain,
+      address,
+      Math.max(1, Math.min(limit, 200)),
+    );
   }
 
   async sendTransaction(
@@ -186,7 +181,7 @@ export class ManagedWalletsService {
     }
 
     const txId = uuidv7();
-    await this.dataSource.getRepository(OnchainTransaction).save({
+    await this.managedWalletsDataRepository.saveOnchainTransaction({
       tx_id: txId,
       user_id: userId,
       linked_wallet_id: null,
@@ -223,9 +218,7 @@ export class ManagedWalletsService {
   ): Promise<ManagedWalletResponseDto> {
     await this.requireTransactionWalletForActor(userId, walletId, role);
     await this.transactionWalletService.setDefaultUserDeposit(walletId);
-    const updated = await this.dataSource.getRepository(TransactionWallet).findOne({
-      where: { wallet_id: walletId },
-    });
+    const updated = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
     if (!updated) {
       throw new NotFoundException('Transaction wallet', walletId);
     }
@@ -246,10 +239,10 @@ export class ManagedWalletsService {
     dto: UpdateRecommendedChainDto,
   ): Promise<{ recommended_chain: SupportedManagedWalletChain }> {
     const chain = this.assertSupportedChain(dto.chain);
-    await this.dataSource.getRepository(AppSetting).save({
-      k: ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
-      v: chain,
-    });
+    await this.managedWalletsDataRepository.upsertAppSettingKeyValue(
+      ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
+      chain,
+    );
 
     return { recommended_chain: chain };
   }
@@ -301,29 +294,8 @@ export class ManagedWalletsService {
       pickerDto.tronDefaultNetwork,
     );
 
-    const networkRows = await this.dataSource
-      .getRepository(CurrencyNetwork)
-      .createQueryBuilder('network')
-      .select('network.network_code', 'network_code')
-      .addSelect('MAX(CASE WHEN network.deposit_enabled THEN 1 ELSE 0 END)', 'deposit_enabled')
-      .addSelect('MAX(network.min_confirmations)', 'min_confirmations')
-      .where('network.network_code IN (:...codes)', { codes: chains })
-      .groupBy('network.network_code')
-      .getRawMany<{
-        network_code: string;
-        deposit_enabled: number | string;
-        min_confirmations: number | string;
-      }>();
-
-    const networkMap = new Map(
-      networkRows.map((row) => [
-        row.network_code,
-        {
-          deposit_enabled: Number(row.deposit_enabled) === 1,
-          min_confirmations: Number(row.min_confirmations) || 12,
-        },
-      ]),
-    );
+    const networkMap =
+      await this.managedWalletsDataRepository.aggregateDepositFlagsByNetworkCodes(chains);
 
     const methods = await Promise.all(
       chains.map(async (chain) => {
@@ -349,11 +321,11 @@ export class ManagedWalletsService {
   }
 
   async getRecommendedChain(): Promise<SupportedManagedWalletChain> {
-    const setting = await this.dataSource.getRepository(AppSetting).findOne({
-      where: { k: ManagedWalletsService.RECOMMENDED_CHAIN_KEY },
-    });
+    const v = await this.managedWalletsDataRepository.findAppSettingValueByKey(
+      ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
+    );
 
-    return this.assertSupportedChain(setting?.v ?? BlockchainNetwork.TRON_MAINNET);
+    return this.assertSupportedChain(v ?? BlockchainNetwork.TRON_MAINNET);
   }
 
   private async requireTransactionWalletForActor(
@@ -368,9 +340,7 @@ export class ManagedWalletsService {
     ) {
       throw new ForbiddenException('Not allowed to access transaction wallets');
     }
-    const wallet = await this.dataSource.getRepository(TransactionWallet).findOne({
-      where: { wallet_id: walletId },
-    });
+    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
     }

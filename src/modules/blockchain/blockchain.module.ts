@@ -13,11 +13,10 @@ import {
   BC_TRON_SHASTA,
   BC_SOLANA_MAINNET,
   BC_SOLANA_DEVNET,
-  EVM_BSC_CHAPEL_PROVIDER,
-  EVM_BSC_MAINNET_PROVIDER,
-  EVM_ETH_MAINNET_PROVIDER,
+  EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
 import { BlockchainNetwork } from '@/common/enums';
+import { EVM_CHAIN_DEFINITIONS } from '@/common/constants/evm-chain-definitions';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { WalletLinkingService } from './wallet-linking.service';
@@ -127,30 +126,18 @@ import { PaymentConfigService } from '@/modules/payment-config/payment-config.se
       inject: [ConfigService, PaymentConfigService, SystemConfigService, TreasuryMainWalletService],
     },
     {
-      provide: EVM_ETH_MAINNET_PROVIDER,
+      provide: EVM_PROVIDERS_MAP,
       useFactory: (
         config: ConfigService,
         treasury: TreasuryMainWalletService,
         sys: SystemConfigService,
-      ) => new EthereumProvider(config, treasury, sys, BlockchainNetwork.ETH_MAINNET),
-      inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
-    },
-    {
-      provide: EVM_BSC_MAINNET_PROVIDER,
-      useFactory: (
-        config: ConfigService,
-        treasury: TreasuryMainWalletService,
-        sys: SystemConfigService,
-      ) => new EthereumProvider(config, treasury, sys, BlockchainNetwork.BSC_MAINNET),
-      inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
-    },
-    {
-      provide: EVM_BSC_CHAPEL_PROVIDER,
-      useFactory: (
-        config: ConfigService,
-        treasury: TreasuryMainWalletService,
-        sys: SystemConfigService,
-      ) => new EthereumProvider(config, treasury, sys, BlockchainNetwork.BSC_CHAPEL),
+      ) => {
+        const m = new Map<BlockchainNetwork, EthereumProvider>();
+        for (const def of EVM_CHAIN_DEFINITIONS) {
+          m.set(def.network, new EthereumProvider(config, treasury, sys, def));
+        }
+        return m;
+      },
       inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
     },
     BlockchainProviderFactory,

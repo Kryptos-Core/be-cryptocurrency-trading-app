@@ -4,6 +4,7 @@ import { AppSetting } from '@/entities/app-setting.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
 import { ManagedWalletsService } from './managed-wallets.service';
+import { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
 import { ManagedWalletsController } from './managed-wallets.controller';
 import { DepositMethodsController } from './deposit-methods.controller';
 import { WalletEncryptionService } from '@/common/services';
@@ -17,7 +18,7 @@ import { SystemConfigModule } from '@/modules/system-config/system-config.module
     SystemConfigModule,
   ],
   controllers: [ManagedWalletsController, DepositMethodsController],
-  providers: [ManagedWalletsService, WalletEncryptionService],
+  providers: [ManagedWalletsService, ManagedWalletsDataRepository, WalletEncryptionService],
   exports: [ManagedWalletsService],
 })
 export class ManagedWalletsModule {}

@@ -4,9 +4,10 @@ import {
   resolveSandboxTronDefaultNetwork,
   resolveTreasuryChainsUseMainnetOnly,
 } from './onchain-chain-picker.util';
+import { listActionableOnchainChainCodes } from '@/common/constants/chain-registry';
 
 describe('resolveRecommendedChainForDepositPicker', () => {
-  const sandboxChains = ['BSC_CHAPEL', 'SOLANA_DEVNET', 'TRON_NILE'];
+  const sandboxChains = listActionableOnchainChainCodes(false, 'TRON_NILE');
 
   it('keeps setting when it is in the on-chain deposit/withdraw picker list', () => {
     expect(
@@ -21,9 +22,9 @@ describe('resolveRecommendedChainForDepositPicker', () => {
   });
 
   it('maps TRON_MAINNET to TRON_SHASTA when that is the configured sandbox default', () => {
-    const shasta = ['BSC_CHAPEL', 'SOLANA_DEVNET', 'TRON_SHASTA'];
+    const shastaCodes = listActionableOnchainChainCodes(false, 'TRON_SHASTA');
     expect(
-      resolveRecommendedChainForDepositPicker('TRON_MAINNET', shasta, 'TRON_SHASTA'),
+      resolveRecommendedChainForDepositPicker('TRON_MAINNET', shastaCodes, 'TRON_SHASTA'),
     ).toBe('TRON_SHASTA');
   });
 
@@ -65,38 +66,39 @@ describe('resolveTreasuryChainsUseMainnetOnly', () => {
 });
 
 describe('buildChainPickerOptions', () => {
-  it('sandbox lists one Tron testnet + Solana + BSC Chapel (no Sepolia)', () => {
+  it('sandbox lists expanded testnets including ETH_SEPOLIA and excludes TON from actionable pickers', () => {
     const dto = buildChainPickerOptions({
       onchainOperatorMode: 'sandbox',
       env: 'development',
     });
     expect(dto.operatorMode).toBe('sandbox');
-    expect(dto.pickers.treasury_ops).toContain('SOLANA_DEVNET');
-    expect(dto.pickers.treasury_ops).toContain('BSC_CHAPEL');
-    expect(dto.pickers.treasury_ops).not.toContain('ETH_SEPOLIA');
-    expect(dto.pickers.treasury_ops.filter((c) => c === 'TRON_NILE' || c === 'TRON_SHASTA').length).toBe(
-      1,
-    );
-    expect(dto.pickers.treasury_ops).not.toContain('TRON_MAINNET');
+    expect(dto.pickers.onchain_deposit_withdraw).toContain('ETH_SEPOLIA');
+    expect(dto.pickers.onchain_deposit_withdraw).not.toContain('TON_TESTNET');
+    expect(dto.networkCatalog.map((c) => c.code)).toContain('TON_TESTNET');
+    expect(dto.pickers.treasury_ops).toEqual(dto.pickers.onchain_deposit_withdraw);
   });
 
-  it('TRON_DEFAULT_NETWORK=TRON_SHASTA picks Shasta for treasury_ops first row', () => {
+  it('TRON_DEFAULT_NETWORK=TRON_SHASTA ends actionable list with TRON_SHASTA', () => {
     const dto = buildChainPickerOptions({
       onchainOperatorMode: 'sandbox',
       tronDefaultNetwork: 'TRON_SHASTA',
     });
     expect(resolveSandboxTronDefaultNetwork('TRON_SHASTA')).toBe('TRON_SHASTA');
     expect(dto.tronDefaultNetwork).toBe('TRON_SHASTA');
-    expect(dto.pickers.treasury_ops[0]).toBe('TRON_SHASTA');
+    expect(dto.pickers.onchain_deposit_withdraw[dto.pickers.onchain_deposit_withdraw.length - 1]).toBe(
+      'TRON_SHASTA',
+    );
   });
 
-  it('production onchain mode keeps narrow mainnet treasury_ops list', () => {
+  it('production onchain mode lists all mainnet actionable chains', () => {
     const dto = buildChainPickerOptions({
       onchainOperatorMode: 'production',
       env: 'development',
     });
     expect(dto.operatorMode).toBe('production');
-    expect(dto.pickers.treasury_ops).toEqual(['TRON_MAINNET', 'ETH_MAINNET']);
+    expect(dto.pickers.onchain_deposit_withdraw).toContain('ETH_MAINNET');
+    expect(dto.pickers.onchain_deposit_withdraw).toContain('BASE_MAINNET');
+    expect(dto.pickers.onchain_deposit_withdraw).not.toContain('TON_MAINNET');
     expect(dto.tronDefaultNetwork).toBe('TRON_MAINNET');
   });
 
@@ -106,14 +108,9 @@ describe('buildChainPickerOptions', () => {
     expect(dto.pickers.treasury_history_filter).toEqual(dto.pickers.treasury_ops);
   });
 
-  it('withdrawal_admin_filter sandbox matches legacy FE list', () => {
+  it('withdrawal_admin_filter matches actionable on-chain list', () => {
     const dto = buildChainPickerOptions({ onchainOperatorMode: 'sandbox' });
-    expect(dto.pickers.withdrawal_admin_filter).toEqual([
-      'TRON_NILE',
-      'TRON_SHASTA',
-      'SOLANA_DEVNET',
-      'BSC_CHAPEL',
-    ]);
+    expect(dto.pickers.withdrawal_admin_filter).toEqual(dto.pickers.onchain_deposit_withdraw);
   });
 
   it('managed_wallets production is TRON_MAINNET only', () => {
@@ -121,34 +118,9 @@ describe('buildChainPickerOptions', () => {
     expect(dto.pickers.managed_wallets).toEqual(['TRON_MAINNET']);
   });
 
-  it('onchain_deposit_withdraw sandbox is Chapel, Solana devnet, default Tron testnet (no Sepolia)', () => {
-    const dto = buildChainPickerOptions({ onchainOperatorMode: 'sandbox' });
-    expect(dto.pickers.onchain_deposit_withdraw).toEqual([
-      'BSC_CHAPEL',
-      'SOLANA_DEVNET',
-      'TRON_NILE',
-    ]);
-  });
-
-  it('onchain_deposit_withdraw sandbox ends with Shasta when TRON_DEFAULT_NETWORK=TRON_SHASTA', () => {
-    const dto = buildChainPickerOptions({
-      onchainOperatorMode: 'sandbox',
-      tronDefaultNetwork: 'TRON_SHASTA',
-    });
-    expect(dto.pickers.onchain_deposit_withdraw).toEqual([
-      'BSC_CHAPEL',
-      'SOLANA_DEVNET',
-      'TRON_SHASTA',
-    ]);
-  });
-
-  it('onchain_deposit_withdraw production lists four mainnets (EVM / Solana / Tron)', () => {
+  it('networkCatalog first row is TON with deposit disabled in production', () => {
     const dto = buildChainPickerOptions({ onchainOperatorMode: 'production' });
-    expect(dto.pickers.onchain_deposit_withdraw).toEqual([
-      'ETH_MAINNET',
-      'BSC_MAINNET',
-      'SOLANA_MAINNET',
-      'TRON_MAINNET',
-    ]);
+    expect(dto.networkCatalog[0].code).toBe('TON_MAINNET');
+    expect(dto.networkCatalog[0].capabilities.deposit).toBe(false);
   });
 });

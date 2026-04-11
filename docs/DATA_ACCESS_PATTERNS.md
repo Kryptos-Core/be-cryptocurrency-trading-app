@@ -13,14 +13,56 @@ Tài liệu này mô tả **khi nào** dùng `BaseRepository`, **repository tùy
 | **Extend `BaseRepository<T>`** | CRUD / `QueryBuilder` đơn giản trên **một entity**, cần tái sử dụng `findById`, `transaction`, `query`, phân trang | `CurrencyRepository`, `WalletRepository`, `OrderRepository` |
 | **Repository tùy biến (không extend Base)** | Chủ yếu gọi **stored procedure** (`CALL sp_*`) hoặc SQL đặc thù; ít dùng `repository.save` trực tiếp | `UsersRepository`, `AuthRepository`, `MatchingRepository` |
 | **Repository class + `DataSource` / `getRepository`** | Đã tách lớp data access nhưng logic không map gọn vào `BaseRepository` (multi-entity transaction, QB phức tạp) | `TreasuryOperationRepository`, `TreasuryTransactionWalletRepository` |
-| **Service + `DataSource` trực tiếp** | Chỉ nên là **tạm thời** hoặc **legacy**; chuẩn dài hạn là đưa xuống repository | Đang loại bỏ dần tại các module treasury / managed-wallets |
+| **Service + `DataSource` trực tiếp** | Chỉ nên là **tạm thời** hoặc **legacy**; chuẩn dài hạn là đưa xuống repository | Ưu tiên refactor về repository (ví dụ `TreasuryMainWalletRepository`, `ManagedWalletsDataRepository`) |
+
+---
+
+## Ma trận hybrid: SP | ORM | QueryBuilder | Raw
+
+Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ SP ghi + QB đọc admin) phải có **lý do trong PR** hoặc **ADR** — xem [DATA_ACCESS_HYBRID_STRATEGY_PLAN.md](./DATA_ACCESS_HYBRID_STRATEGY_PLAN.md).
+
+| Loại thao tác | Stored procedure | ORM (`find` / `save`) | QueryBuilder | Raw (ngoài `CALL`) |
+|---------------|------------------|------------------------|--------------|---------------------|
+| **Ghi nghiệp vụ nhiều bước / invariant** | Ưu tiên | Tránh (trừ transaction đơn giản một bảng) | Hiếm | Hiếm |
+| **Đọc theo khóa / một dòng** | Tùy module | Thường dùng | Khi cần projection | Migration / seed |
+| **Danh sách admin, filter động** | Có thể (SP tham số) | `find` + `where` đơn | Thường dùng | Khi plan đã tối ưu |
+| **Migration / seed / DDL** | Không | Không | Không | Luôn |
+
+### Default theo module (tham chiếu nhanh)
+
+| Module / bounded context | Ghi chú ngắn |
+|--------------------------|--------------|
+| **Orders / Matching** | SP cho khớp lệnh / sổ lệnh; TS gọi qua repository + helper OUT param ([mysql-procedure-out-vars](../src/common/database/mysql-procedure-out-vars.ts)) |
+| **Users / Auth** | Chủ yếu SP + chỗ filter list dùng QueryBuilder (`UsersRepository`) |
+| **Markets / Currencies / Wallets** | SP + `BaseRepository` tùy endpoint |
+| **Treasury main wallet** | ORM qua `TreasuryMainWalletRepository`; service không `getRepository` |
+| **Managed wallets (deposit UI)** | `ManagedWalletsDataRepository` + `TreasuryTransactionWalletRepository` |
+| **Treasury operations / transaction wallets** | Repository + transaction nội bộ |
+
+---
+
+## Transaction: đặt ở đâu?
+
+| Vị trí | Khi nào |
+|--------|---------|
+| **Repository** (ưu tiên) | Một aggregate / một nhóm bảng cố định trong module; ví dụ `clearDefaultAndSetMainWallet`, `setDefaultUserDepositInTransaction`. |
+| **Service** (exception) | Orchestration **xuyên** nhiều repository không muốn gom transaction chung vào một “god repository”; phải **ghi rõ trong PR** và đảm bảo không trộn `CALL` + ORM trên hai connection khác nhau. |
+
+---
+
+## Hai cửa vào cùng aggregate (SP + QB/ORM) — danh sách kiểm
+
+| Vị trí | Mô tả | Hành động đề xuất |
+|--------|--------|-------------------|
+| **Fiat deposit** | Ghi/đọc user qua SP; admin list qua QueryBuilder | Giữ QB: document filter/quyền tương đương; hoặc sau này gom SP có tham số filter. |
+| *(bổ sung khi phát hiện thêm)* | … | ADR hoặc gom path |
 
 ---
 
 ## Database Procedure Pattern
 
 - **Stored procedures** được định nghĩa trong **migrations** (`src/migrations`).
-- **Repository** (hoặc lớp data access tương đương) gọi `dataSource.query('CALL sp_name(?, ?)', [params])`.
+- **Repository** (hoặc lớp data access tương đương) gọi `dataSource.query('CALL sp_name(?, ?)', [params])`. Với OUT qua biến session MySQL (`@p_*`), dùng `selectMysqlUserVars` từ `src/common/database/mysql-procedure-out-vars.ts` để đọc thống nhất.
 - **Service** không ghép chuỗi SQL động cho logic nghiệp vụ; tham số luôn bind qua placeholder.
 
 ---
@@ -40,7 +82,14 @@ Tài liệu này mô tả **khi nào** dùng `BaseRepository`, **repository tùy
 
 ---
 
+## Kiểm chứng contract SP (integration)
+
+- Spec ví dụ: `src/modules/matching/matching.ioc-fok.integration.spec.ts` — cần **MySQL đã chạy migration + procedure**, biến môi trường giống app. Dùng để bắt lệch contract TS ↔ SQL sau khi đổi SP.
+
+---
+
 ## Liên kết
 
+- [DATA_ACCESS_HYBRID_STRATEGY_PLAN.md](./DATA_ACCESS_HYBRID_STRATEGY_PLAN.md) — plan hybrid đầy đủ (kết luận, gap, lộ trình củng cố).
 - [BASE_REPOSITORY_USAGE.md](./BASE_REPOSITORY_USAGE.md) — method list của `BaseRepository`.
 - [REDIS_USAGE.md](./REDIS_USAGE.md) — cache / lock (không thay thế repository, bổ sung cho performance).

@@ -1,7 +1,14 @@
 /**
  * Chain picker lists for admin/treasury UIs — mirrors Flutter
- * `lib/presentation/constants/treasury_chains.dart` (single source of truth on server).
+ * `lib/presentation/constants/treasury_chains.dart` (server + `networkCatalog` is source of truth).
  */
+
+import {
+  buildNetworkCatalog,
+  listActionableOnchainChainCodes,
+  listTreasuryOpsChainCodes,
+} from '@/common/constants/chain-registry';
+import type { ChainNetworkCatalogItemDto } from '@/common/constants/chain-registry';
 
 export type ChainPickerContextKey =
   | 'treasury_ops'
@@ -23,18 +30,9 @@ export interface ChainPickerOptionsDto {
   /** Effective Tron row for sandbox (TRON_NILE | TRON_SHASTA); in production mode TRON_MAINNET. */
   tronDefaultNetwork: string;
   pickers: Record<ChainPickerContextKey, string[]>;
+  /** Full network sheet (includes TON with capabilities off until Phase 2). */
+  networkCatalog: ChainNetworkCatalogItemDto[];
 }
-
-const TREASURY_OPS_CHAIN_VALUES = [
-  'TRON_NILE',
-  'TRON_SHASTA',
-  'TRON_MAINNET',
-  'ETH_MAINNET',
-] as const;
-
-const TREASURY_OPS_MAINNET_ONLY = new Set<string>(['TRON_MAINNET', 'ETH_MAINNET']);
-
-const WITHDRAWAL_FILTER_TESTNET = ['TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'BSC_CHAPEL'] as const;
 
 const MANAGED_WALLETS_TESTNET = ['TRON_MAINNET', 'TRON_NILE', 'TRON_SHASTA'] as const;
 
@@ -54,54 +52,11 @@ export function resolveSandboxTronDefaultNetwork(tronDefaultNetwork?: string): '
   return 'TRON_NILE';
 }
 
-function treasuryOpsChainsForCurrentEnv(mainnetOnly: boolean): string[] {
-  if (mainnetOnly) {
-    return TREASURY_OPS_CHAIN_VALUES.filter((c) => TREASURY_OPS_MAINNET_ONLY.has(c));
-  }
-  return TREASURY_OPS_CHAIN_VALUES.filter((c) => !TREASURY_OPS_MAINNET_ONLY.has(c));
-}
-
-function treasuryOpsWalletCreationChainsForCurrentEnv(
-  mainnetOnly: boolean,
-  tronDefaultNetwork?: string,
-): string[] {
-  if (mainnetOnly) {
-    return treasuryOpsChainsForCurrentEnv(true);
-  }
-  return [
-    resolveSandboxTronDefaultNetwork(tronDefaultNetwork),
-    'SOLANA_DEVNET',
-    'BSC_CHAPEL',
-  ];
-}
-
-function withdrawalFilterChainsForCurrentEnv(mainnetOnly: boolean): string[] {
-  if (mainnetOnly) {
-    return ['TRON_MAINNET', 'ETH_MAINNET', 'SOLANA_MAINNET'];
-  }
-  return [...WITHDRAWAL_FILTER_TESTNET];
-}
-
 function managedWalletsChainsForCurrentEnv(mainnetOnly: boolean): string[] {
   if (mainnetOnly) {
     return ['TRON_MAINNET'];
   }
   return [...MANAGED_WALLETS_TESTNET];
-}
-
-/** EVM + Solana + one Tron row — matches Flutter user on-chain deposit/withdraw pickers. */
-function onchainDepositWithdrawChainsForCurrentEnv(
-  mainnetOnly: boolean,
-  tronDefaultNetwork?: string,
-): string[] {
-  if (mainnetOnly) {
-    return ['ETH_MAINNET', 'BSC_MAINNET', 'SOLANA_MAINNET', 'TRON_MAINNET'];
-  }
-  return [
-    'BSC_CHAPEL',
-    'SOLANA_DEVNET',
-    resolveSandboxTronDefaultNetwork(tronDefaultNetwork),
-  ];
 }
 
 /**
@@ -128,21 +83,21 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
   const sandboxTron = resolveSandboxTronDefaultNetwork(input.tronDefaultNetwork);
   const tronDefaultNetwork = mainnetOnly ? 'TRON_MAINNET' : sandboxTron;
 
-  const opsCreation = treasuryOpsWalletCreationChainsForCurrentEnv(mainnetOnly, input.tronDefaultNetwork);
+  const actionable = listActionableOnchainChainCodes(mainnetOnly, input.tronDefaultNetwork);
+  const treasuryList = listTreasuryOpsChainCodes(mainnetOnly, input.tronDefaultNetwork);
+  const catalog = buildNetworkCatalog(mainnetOnly, input.tronDefaultNetwork);
 
   return {
     operatorMode,
     tronDefaultNetwork,
+    networkCatalog: catalog,
     pickers: {
-      treasury_ops: [...opsCreation],
-      treasury_main_wallet: [...opsCreation],
-      treasury_history_filter: [...opsCreation],
-      withdrawal_admin_filter: withdrawalFilterChainsForCurrentEnv(mainnetOnly),
+      treasury_ops: [...treasuryList],
+      treasury_main_wallet: [...treasuryList],
+      treasury_history_filter: [...treasuryList],
+      withdrawal_admin_filter: [...actionable],
       managed_wallets: managedWalletsChainsForCurrentEnv(mainnetOnly),
-      onchain_deposit_withdraw: onchainDepositWithdrawChainsForCurrentEnv(
-        mainnetOnly,
-        input.tronDefaultNetwork,
-      ),
+      onchain_deposit_withdraw: [...actionable],
     },
   };
 }

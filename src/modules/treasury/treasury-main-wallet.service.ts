@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { DataSource, In, Not } from 'typeorm';
 import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
 import { Keypair } from '@solana/web3.js';
@@ -22,6 +21,7 @@ import {
   TreasuryMainWalletStatus,
 } from '@/entities/treasury-main-wallet.entity';
 import { TransactionWalletService } from './transaction-wallet.service';
+import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
 import { ImportMainWalletDto } from './dto';
 import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
@@ -60,7 +60,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
   private readonly logger = new Logger(TreasuryMainWalletService.name);
 
   constructor(
-    private readonly dataSource: DataSource,
+    private readonly mainWalletRepository: TreasuryMainWalletRepository,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly redisService: RedisService,
     private readonly paymentConfigService: PaymentConfigService,
@@ -76,11 +76,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   async listByChain(chain: SupportedTreasuryChain): Promise<MainWalletDto[]> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const wallets = await repo.find({
-      where: { chain, status: In(['ACTIVE', 'PENDING_DELETION']) },
-      order: { is_default: 'DESC', created_at: 'ASC' },
-    });
+    const wallets = await this.mainWalletRepository.findByChainForList(chain);
 
     if (wallets.length > 0) {
       return Promise.all(wallets.map((w) => this.toDto(w)));
@@ -90,17 +86,12 @@ export class TreasuryMainWalletService implements OnModuleInit {
   }
 
   async listPendingApproval(): Promise<MainWalletDto[]> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const wallets = await repo.find({
-      where: { status: In(['PENDING_APPROVAL', 'PENDING_DELETION']) },
-      order: { created_at: 'ASC' },
-    });
+    const wallets = await this.mainWalletRepository.findPendingApprovalList();
     return Promise.all(wallets.map((w) => this.toDto(w)));
   }
 
   async getById(mainWalletId: string): Promise<TreasuryMainWallet> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const wallet = await repo.findOne({ where: { main_wallet_id: mainWalletId } });
+    const wallet = await this.mainWalletRepository.findByMainWalletId(mainWalletId);
     if (!wallet) {
       throw new NotFoundException('Treasury main wallet', mainWalletId);
     }
@@ -116,14 +107,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
     if (!BLOCKCHAIN_CHAIN_DB_VALUES.includes(chain as BlockchainChainDbValue)) {
       return null;
     }
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const defaultWallet = await repo.findOne({
-      where: {
-        chain: chain as TreasuryMainWalletChain,
-        is_default: true,
-        status: 'ACTIVE',
-      },
-    });
+    const defaultWallet = await this.mainWalletRepository.findActiveDefaultOnChain(
+      chain as TreasuryMainWalletChain,
+    );
     return defaultWallet?.address ?? null;
   }
 
@@ -139,10 +125,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       return wallet.address;
     }
 
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const defaultWallet = await repo.findOne({
-      where: { chain, is_default: true, status: 'ACTIVE' },
-    });
+    const defaultWallet = await this.mainWalletRepository.findActiveDefaultOnChain(chain);
     if (defaultWallet) return defaultWallet.address;
 
     throw new BusinessException(
@@ -156,10 +139,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Used by sweep/fund operations. No .env fallback — DB is the single source of truth.
    */
   async resolveMainWalletPrivateKey(chain: SupportedTreasuryChain): Promise<string> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const wallet = await repo.findOne({
-      where: { chain, is_default: true, status: 'ACTIVE' },
-    });
+    const wallet = await this.mainWalletRepository.findActiveDefaultOnChain(chain);
 
     if (!wallet) {
       throw new BusinessException(
@@ -191,10 +171,8 @@ export class TreasuryMainWalletService implements OnModuleInit {
     const address = this.deriveAddress(chain, dto.privateKey.trim());
     const encrypted = this.walletEncryptionService.encrypt(dto.privateKey.trim());
 
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-
     // Check for duplicate address on this chain
-    const existing = await repo.findOne({ where: { chain, address } });
+    const existing = await this.mainWalletRepository.findByChainAndAddress(chain, address);
     if (existing) {
       throw new ConflictException(
         `A main wallet with address ${address} already exists for chain ${chain}`,
@@ -211,9 +189,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     let isDefault = false;
 
     if (selfActivate) {
-      const hasActiveDefault = await repo.findOne({
-        where: { chain, is_default: true, status: 'ACTIVE' },
-      });
+      const hasActiveDefault = await this.mainWalletRepository.findActiveDefaultOnChain(chain);
       status = 'ACTIVE';
       approvedBy = createdByUserId;
       approvedAt = new Date();
@@ -227,7 +203,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       approvedAt = null;
     }
 
-    const created = await repo.save({
+    const created = await this.mainWalletRepository.saveNew({
       main_wallet_id: uuidv7(),
       chain,
       address,
@@ -278,7 +254,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     mainWalletId: string,
     approverUserId: string,
   ): Promise<MainWalletDto> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'PENDING_APPROVAL') {
@@ -289,9 +264,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
 
     // Auto-set default if no active default exists for this chain
-    const hasActiveDefault = await repo.findOne({
-      where: { chain: wallet.chain, is_default: true, status: 'ACTIVE' },
-    });
+    const hasActiveDefault = await this.mainWalletRepository.findActiveDefaultOnChain(wallet.chain);
 
     wallet.status = 'ACTIVE';
     wallet.approved_by = approverUserId;
@@ -301,7 +274,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       this.logger.log(`Auto-set as default for chain ${wallet.chain}: ${wallet.main_wallet_id}`);
     }
 
-    const updated = await repo.save(wallet);
+    const updated = await this.mainWalletRepository.saveWallet(wallet);
 
     this.logger.log(`Main wallet APPROVED: ${mainWalletId} by ${approverUserId}`);
     await this.publishEvent('main_wallet.approved', {
@@ -322,7 +295,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     mainWalletId: string,
     rejectorUserId: string,
   ): Promise<MainWalletDto> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'PENDING_APPROVAL') {
@@ -336,7 +308,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     wallet.rejected_by = rejectorUserId;
     wallet.rejected_at = new Date();
 
-    const updated = await repo.save(wallet);
+    const updated = await this.mainWalletRepository.saveWallet(wallet);
 
     this.logger.log(`Main wallet REJECTED: ${mainWalletId} by ${rejectorUserId}`);
     await this.publishEvent('main_wallet.rejected', {
@@ -352,7 +324,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Set a specific ACTIVE main wallet as the default for its chain.
    */
   async setDefault(mainWalletId: string, actorUserId: string): Promise<MainWalletDto> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'ACTIVE') {
@@ -362,13 +333,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
       );
     }
 
-    // Use transaction: clear existing default → set new one
-    await this.dataSource.transaction(async (manager) => {
-      await manager.update(TreasuryMainWallet, { chain: wallet.chain, is_default: true }, { is_default: false });
-      await manager.update(TreasuryMainWallet, { main_wallet_id: mainWalletId }, { is_default: true });
-    });
+    await this.mainWalletRepository.clearDefaultAndSetMainWallet(wallet.chain, mainWalletId);
 
-    const updated = await repo.findOne({ where: { main_wallet_id: mainWalletId } });
+    const updated = await this.mainWalletRepository.findByMainWalletId(mainWalletId);
 
     this.logger.log(`Main wallet set as default: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
     await this.publishEvent('main_wallet.default_changed', {
@@ -396,13 +363,12 @@ export class TreasuryMainWalletService implements OnModuleInit {
     label: string | null | undefined,
     actorUserId: string,
   ): Promise<MainWalletDto> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const existing = await this.getById(mainWalletId);
     if (label === undefined) {
       return await this.toDto(existing);
     }
     const trimmed = label === null || label.trim() === '' ? null : label.trim();
-    await repo.update({ main_wallet_id: mainWalletId }, { label: trimmed });
+    await this.mainWalletRepository.updateLabel(mainWalletId, trimmed);
     const updated = await this.getById(mainWalletId);
     this.logger.log(`Main wallet label updated: ${mainWalletId} by ${actorUserId}`);
     return await this.toDto(updated);
@@ -413,7 +379,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Same default rule as hard delete: cannot request removal of default while other ACTIVE wallets exist.
    */
   async requestMainWalletDeletion(mainWalletId: string, actorUserId: string): Promise<MainWalletDto> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'ACTIVE') {
@@ -424,9 +389,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
 
     if (wallet.is_default) {
-      const othersCount = await repo.count({
-        where: { chain: wallet.chain, main_wallet_id: Not(mainWalletId), status: 'ACTIVE' },
-      });
+      const othersCount = await this.mainWalletRepository.countActiveOthersOnChainExcluding(
+        wallet.chain,
+        mainWalletId,
+      );
       if (othersCount > 0) {
         throw new ForbiddenException(
           'Cannot remove the current default main wallet while other active wallets exist for this chain. Set another as default first.',
@@ -435,7 +401,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
 
     wallet.status = 'PENDING_DELETION';
-    const updated = await repo.save(wallet);
+    const updated = await this.mainWalletRepository.saveWallet(wallet);
 
     this.logger.log(`Main wallet PENDING_DELETION: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
     await this.publishEvent('main_wallet.deletion_pending', {
@@ -466,7 +432,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Risk Officer: reject deletion request — wallet back to ACTIVE.
    */
   async rejectMainWalletDeletion(mainWalletId: string, rejectorUserId: string): Promise<MainWalletDto> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
     const wallet = await this.getById(mainWalletId);
     if (wallet.status !== 'PENDING_DELETION') {
       throw new BadRequestException(
@@ -476,7 +441,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
 
     wallet.status = 'ACTIVE';
-    const updated = await repo.save(wallet);
+    const updated = await this.mainWalletRepository.saveWallet(wallet);
 
     this.logger.log(`Main wallet deletion REJECTED (restored ACTIVE): ${mainWalletId} by ${rejectorUserId}`);
     await this.publishEvent('main_wallet.deletion_rejected', {
@@ -496,12 +461,11 @@ export class TreasuryMainWalletService implements OnModuleInit {
     actorUserId: string,
     wallet: TreasuryMainWallet,
   ): Promise<void> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-
     if (wallet.is_default) {
-      const othersCount = await repo.count({
-        where: { chain: wallet.chain, main_wallet_id: Not(mainWalletId), status: 'ACTIVE' },
-      });
+      const othersCount = await this.mainWalletRepository.countActiveOthersOnChainExcluding(
+        wallet.chain,
+        mainWalletId,
+      );
       if (othersCount > 0) {
         throw new ForbiddenException(
           'Cannot delete the current default main wallet while other active wallets exist for this chain. Set another as default first.',
@@ -509,7 +473,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       }
     }
 
-    await repo.delete({ main_wallet_id: mainWalletId });
+    await this.mainWalletRepository.deleteByMainWalletId(mainWalletId);
 
     this.logger.log(`Main wallet deleted: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
     await this.publishEvent('main_wallet.deleted', {
@@ -529,10 +493,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Called after rotation sweep completes.
    */
   async markRotated(mainWalletId: string): Promise<void> {
-    await this.dataSource.getRepository(TreasuryMainWallet).update(
-      { main_wallet_id: mainWalletId },
-      { last_rotated_at: new Date() },
-    );
+    await this.mainWalletRepository.updateLastRotatedAt(mainWalletId, new Date());
   }
 
   /**
@@ -540,10 +501,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * `rotation_interval_days` (or the globalIntervalDays fallback).
    */
   async getWalletsDueForRotation(globalIntervalDays: number): Promise<TreasuryMainWallet[]> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const allDefaults = await repo.find({
-      where: { is_default: true, status: 'ACTIVE' },
-    });
+    const allDefaults = await this.mainWalletRepository.findAllActiveDefaults();
 
     const now = new Date();
     return allDefaults.filter((w) => {
@@ -637,8 +595,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * import from PaymentConfig (backward compatible with existing deployments).
    */
   private async seedFromPaymentConfigIfEmpty(): Promise<void> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const count = await repo.count();
+    const count = await this.mainWalletRepository.countAll();
     if (count > 0) return;
 
     const chains: SupportedTreasuryChain[] = [
@@ -656,7 +613,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
         const address = this.deriveAddress(chain, config.hotWalletPrivateKey);
         const encrypted = this.walletEncryptionService.encrypt(config.hotWalletPrivateKey);
 
-        await repo.save({
+        await this.mainWalletRepository.saveNew({
           main_wallet_id: uuidv7(),
           chain,
           address,

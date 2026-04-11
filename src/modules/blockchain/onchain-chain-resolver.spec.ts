@@ -19,6 +19,8 @@ describe('resolveBlockchainNetwork', () => {
     { family: OnChainNetworkFamily.EVM_BSC, mode: OnChainOperatorMode.SANDBOX, expected: BlockchainNetwork.BSC_CHAPEL },
     { family: OnChainNetworkFamily.SOLANA, mode: OnChainOperatorMode.PRODUCTION, expected: BlockchainNetwork.SOLANA_MAINNET },
     { family: OnChainNetworkFamily.SOLANA, mode: OnChainOperatorMode.SANDBOX, expected: BlockchainNetwork.SOLANA_DEVNET },
+    { family: OnChainNetworkFamily.TON, mode: OnChainOperatorMode.PRODUCTION, expected: BlockchainNetwork.TON_MAINNET },
+    { family: OnChainNetworkFamily.TON, mode: OnChainOperatorMode.SANDBOX, expected: BlockchainNetwork.TON_TESTNET },
   ];
 
   it.each(cases)(

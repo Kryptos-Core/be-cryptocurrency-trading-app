@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { selectMysqlUserVars } from '@/common/database/mysql-procedure-out-vars';
 import { MATCHING_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { OrderBookOrder } from '../interfaces';
 
@@ -54,13 +55,15 @@ export class MatchingRepository {
         params.makerFee,
       ],
     );
-    const [out] = await this.dataSource.query(
-      'SELECT @p_trade_id AS trade_id, @p_error_code AS error_code, @p_error_message AS error_message',
-    );
+    const out = await selectMysqlUserVars(this.dataSource, {
+      trade_id: 'p_trade_id',
+      error_code: 'p_error_code',
+      error_message: 'p_error_message',
+    });
     return {
-      trade_id: out?.trade_id ?? null,
-      error_code: out?.error_code ?? null,
-      error_message: out?.error_message ?? null,
+      trade_id: (out.trade_id as string | null | undefined) ?? null,
+      error_code: (out.error_code as string | null | undefined) ?? null,
+      error_message: (out.error_message as string | null | undefined) ?? null,
     };
   }
 
@@ -69,9 +72,11 @@ export class MatchingRepository {
       `CALL ${MATCHING_STORE_PROCEDURE.ORDER_CANCEL}(?, ?, @p_cancelled, @p_error_code, @p_error_message)`,
       [orderId, userId],
     );
-    const [out] = await this.dataSource.query(
-      'SELECT @p_cancelled AS cancelled, @p_error_code AS error_code, @p_error_message AS error_message',
-    );
+    const out = await selectMysqlUserVars(this.dataSource, {
+      cancelled: 'p_cancelled',
+      error_code: 'p_error_code',
+      error_message: 'p_error_message',
+    });
     if (!out?.cancelled) {
       this.logger.warn(
         `cancelIocRemainder noop for ${orderId}: ${out?.error_code ?? 'UNKNOWN'} — ${out?.error_message ?? ''}`,

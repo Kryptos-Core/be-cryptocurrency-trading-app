@@ -21,6 +21,8 @@ export function resolveBlockchainNetwork(
         return BlockchainNetwork.BSC_MAINNET;
       case OnChainNetworkFamily.SOLANA:
         return BlockchainNetwork.SOLANA_MAINNET;
+      case OnChainNetworkFamily.TON:
+        return BlockchainNetwork.TON_MAINNET;
       default: {
         const _exhaustive: never = family;
         return _exhaustive;
@@ -37,6 +39,8 @@ export function resolveBlockchainNetwork(
       return BlockchainNetwork.BSC_CHAPEL;
     case OnChainNetworkFamily.SOLANA:
       return BlockchainNetwork.SOLANA_DEVNET;
+    case OnChainNetworkFamily.TON:
+      return BlockchainNetwork.TON_TESTNET;
     default: {
       const _exhaustive: never = family;
       return _exhaustive;
