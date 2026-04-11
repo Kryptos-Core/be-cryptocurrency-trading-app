@@ -5,6 +5,7 @@ import { OrdersService } from '@/modules/orders/orders.service';
 import { MarketMakerConfigRepository } from './repositories';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 import { MarketMakerService } from './market-maker.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 describe('MarketMakerService + MmOrderStrategyService Integration', () => {
   let marketMakerService: MarketMakerService;
@@ -34,6 +35,10 @@ describe('MarketMakerService + MmOrderStrategyService Integration', () => {
     getTicker: jest.fn(),
   };
 
+  const systemConfigMock = {
+    get: jest.fn(),
+  };
+
   beforeEach(async () => {
     cacheStore.clear();
     jest.clearAllMocks();
@@ -46,6 +51,7 @@ describe('MarketMakerService + MmOrderStrategyService Integration', () => {
         { provide: MarketMakerConfigRepository, useValue: configRepoMock },
         { provide: OrdersService, useValue: ordersServiceMock },
         { provide: MarketsService, useValue: marketsServiceMock },
+        { provide: SystemConfigService, useValue: systemConfigMock },
       ],
     }).compile();
 

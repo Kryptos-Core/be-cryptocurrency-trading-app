@@ -6,6 +6,10 @@ import { RedisService } from '@/common/services';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SystemConfig, ConfigCategory, ConfigDataType } from '@/entities/system-config.entity';
 import {
+  EVM_CHAIN_DEFINITIONS,
+  getEvmDefinitionByTreasuryChain,
+} from '@/common/constants/evm-chain-definitions';
+import {
   RUNTIME_SETTING_KEY_SET,
   RUNTIME_SETTING_SEEDS,
   RuntimeSettingKey,
@@ -144,6 +148,20 @@ export class SystemConfigService implements OnModuleInit {
     return v ?? this.resolveEnvFallback(key);
   }
 
+  /**
+   * RPC URL for treasury EVM chain codes (POLYGON_MAINNET, …) from DB/env via `*_RPC_URL` keys.
+   */
+  async resolveEvmRpcUrlForTreasuryChain(treasuryChain: string): Promise<string> {
+    const def = getEvmDefinitionByTreasuryChain(treasuryChain);
+    if (!def) {
+      throw new BadRequestException(
+        `Not an EVM treasury chain: ${treasuryChain}`,
+        'TREASURY_CHAIN_NOT_EVM',
+      );
+    }
+    return this.getEffectiveString(def.rpcConfigKey as RuntimeSettingKey);
+  }
+
   resolveEnvFallback(key: string): string {
     const app = (path: string, def: string | number): string => {
       const v = this.configService.get<string | number>(path);
@@ -202,10 +220,20 @@ export class SystemConfigService implements OnModuleInit {
         );
       case 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL':
         return envOr('BLOCKCHAIN_WITHDRAW_ETH_SYMBOL', 'ETH');
+      case 'BLOCKCHAIN_WITHDRAW_BNB_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_BNB_SYMBOL', 'BNB');
       case 'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL':
         return envOr('BLOCKCHAIN_WITHDRAW_SOL_SYMBOL', 'SOL');
       case 'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL':
         return envOr('BLOCKCHAIN_WITHDRAW_TRON_SYMBOL', 'TRX');
+      case 'BLOCKCHAIN_WITHDRAW_POL_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_POL_SYMBOL', 'POL');
+      case 'BLOCKCHAIN_WITHDRAW_AVAX_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_AVAX_SYMBOL', 'AVAX');
+      case 'BLOCKCHAIN_WITHDRAW_XDAI_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_XDAI_SYMBOL', 'XDAI');
+      case 'BLOCKCHAIN_WITHDRAW_FTM_SYMBOL':
+        return envOr('BLOCKCHAIN_WITHDRAW_FTM_SYMBOL', 'FTM');
       case 'PLATFORM_CASH_CURRENCY_SYMBOL': {
         const p = process.env.PLATFORM_CASH_CURRENCY_SYMBOL?.trim();
         if (p) return p;
@@ -218,8 +246,33 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('BLOCKCHAIN_DEPOSIT_ETH_TO_USDT_RATE', '0');
       case 'BLOCKCHAIN_DEPOSIT_SOL_TO_USDT_RATE':
         return envOr('BLOCKCHAIN_DEPOSIT_SOL_TO_USDT_RATE', '0');
-      default:
+      case 'BLOCKCHAIN_DEPOSIT_POL_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_POL_TO_USDT_RATE', '0');
+      case 'BLOCKCHAIN_DEPOSIT_AVAX_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_AVAX_TO_USDT_RATE', '0');
+      case 'BLOCKCHAIN_DEPOSIT_XDAI_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_XDAI_TO_USDT_RATE', '0');
+      case 'BLOCKCHAIN_DEPOSIT_FTM_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_FTM_TO_USDT_RATE', '0');
+      case 'MM_DEFAULT_SPREAD_BPS':
+        return envOr('MM_DEFAULT_SPREAD_BPS', '10');
+      case 'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS':
+        return envOr('MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS', '20');
+      case 'MM_DEFAULT_ORDER_AMOUNT':
+        return envOr('MM_DEFAULT_ORDER_AMOUNT', '0.001');
+      default: {
+        const rpcDef = EVM_CHAIN_DEFINITIONS.find((d) => d.rpcConfigKey === key);
+        if (rpcDef) {
+          return envOr(key, rpcDef.defaultRpcUrl);
+        }
+        if (key.startsWith('BLOCKCHAIN_WITHDRAW_AUTO_MAX_')) {
+          return envOr(key, envOr('BLOCKCHAIN_WITHDRAW_AUTO_MAX', '0'));
+        }
+        if (/^BLOCKCHAIN_DEPOSIT_[A-Z0-9]+_TO_USDT_RATE$/.test(key)) {
+          return envOr(key, '0');
+        }
         return '';
+      }
     }
   }
 

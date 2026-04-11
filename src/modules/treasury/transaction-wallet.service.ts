@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, FindOptionsWhere } from 'typeorm';
-import { ethers, JsonRpcProvider } from 'ethers';
+import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -28,6 +28,8 @@ import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
   type BlockchainChainDbValue,
 } from '@/common/constants/blockchain-chain-db';
+import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
+import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 
 const LIST_CACHE_TTL_SECONDS = 60;
 /** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
@@ -239,16 +241,13 @@ export class TransactionWalletService {
   }
 
   async getBalanceByAddress(chain: SupportedTreasuryChain, address: string): Promise<TreasuryOnChainBalances> {
-    if (
-      chain === 'ETH_MAINNET' ||
-      chain === 'BSC_MAINNET' ||
-      chain === 'BSC_CHAPEL'
-    ) {
-      const provider = await this.buildEthereumProvider(chain);
+    const evmDef = getEvmDefinitionByTreasuryChain(chain);
+    if (evmDef) {
+      const provider = await jsonRpcProviderForTreasuryEvmChain(chain, this.systemConfigService);
       const wei = await provider.getBalance(address);
       return {
         balance: ethers.formatEther(wei),
-        symbol: chain === 'BSC_MAINNET' || chain === 'BSC_CHAPEL' ? 'BNB' : 'ETH',
+        symbol: evmDef.nativeSymbol,
       };
     }
 
@@ -303,11 +302,7 @@ export class TransactionWalletService {
   }
 
   async getMainWalletAddress(chain: SupportedTreasuryChain): Promise<string> {
-    if (
-      chain === 'ETH_MAINNET' ||
-      chain === 'BSC_MAINNET' ||
-      chain === 'BSC_CHAPEL'
-    ) {
+    if (getEvmDefinitionByTreasuryChain(chain)) {
       const key = await this.resolveMainWalletPrivateKey(chain);
       return new ethers.Wallet(key).address;
     }
@@ -538,15 +533,11 @@ export class TransactionWalletService {
     const chain = this.assertSupportedChain(wallet.chain);
     const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
 
-    if (
-      chain === 'ETH_MAINNET' ||
-      chain === 'BSC_MAINNET' ||
-      chain === 'BSC_CHAPEL'
-    ) {
+    if (getEvmDefinitionByTreasuryChain(chain)) {
       if (!ethers.isAddress(toAddress)) {
         throw new BadRequestException('Invalid EVM destination address', 'INVALID_EVM_ADDRESS');
       }
-      const provider = await this.buildEthereumProvider(chain);
+      const provider = await jsonRpcProviderForTreasuryEvmChain(chain, this.systemConfigService);
       const signer = new ethers.Wallet(pk, provider);
       const tx = await signer.sendTransaction({
         to: toAddress,
@@ -630,11 +621,7 @@ export class TransactionWalletService {
       };
     }
 
-    if (
-      chain === 'ETH_MAINNET' ||
-      chain === 'BSC_MAINNET' ||
-      chain === 'BSC_CHAPEL'
-    ) {
+    if (getEvmDefinitionByTreasuryChain(chain)) {
       const wallet = ethers.Wallet.createRandom();
       return {
         address: wallet.address,
@@ -647,29 +634,6 @@ export class TransactionWalletService {
       address: account.address.base58,
       privateKey: account.privateKey,
     };
-  }
-
-  private async buildEthereumProvider(
-    chain: 'ETH_MAINNET' | 'BSC_MAINNET' | 'BSC_CHAPEL',
-  ): Promise<JsonRpcProvider> {
-    switch (chain) {
-      case 'ETH_MAINNET': {
-        const url = await this.systemConfigService.getEffectiveString('ETH_MAINNET_RPC_URL');
-        return new JsonRpcProvider(url);
-      }
-      case 'BSC_MAINNET': {
-        const url = await this.systemConfigService.getEffectiveString('BSC_MAINNET_RPC_URL');
-        return new JsonRpcProvider(url);
-      }
-      case 'BSC_CHAPEL': {
-        const v = (await this.systemConfigService.get<string>('BSC_CHAPEL_RPC_URL'))?.trim();
-        return new JsonRpcProvider(
-          v ||
-            process.env.BSC_CHAPEL_RPC_URL?.trim() ||
-            'https://data-seed-prebsc-1-s1.binance.org:8545',
-        );
-      }
-    }
   }
 
   private async buildSolanaConnection(chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET'): Promise<Connection> {

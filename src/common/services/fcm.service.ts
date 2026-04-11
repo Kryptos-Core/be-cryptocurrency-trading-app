@@ -1,6 +1,8 @@
+import { existsSync } from 'fs';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
+import { isAbsolute, resolve } from 'path';
 
 /**
  * FCM Service
@@ -15,22 +17,32 @@ export class FcmService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
-    const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
-    const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+    const rawPath =
+      this.configService.get<string>('FIREBASE_SERVICE_ACCOUNT_PATH') ??
+      this.configService.get<string>('GOOGLE_APPLICATION_CREDENTIALS');
 
-    if (!projectId || !clientEmail || !privateKey) {
-      this.logger.warn('Firebase credentials not set — FCM push notifications disabled');
+    if (!rawPath?.trim()) {
+      this.logger.warn(
+        'Firebase service account path not set (FIREBASE_SERVICE_ACCOUNT_PATH or GOOGLE_APPLICATION_CREDENTIALS) — FCM push notifications disabled',
+      );
+      return;
+    }
+
+    const trimmed = rawPath.trim().replace(/^["']|["']$/g, '');
+    const accountPath = isAbsolute(trimmed)
+      ? resolve(trimmed)
+      : resolve(process.cwd(), trimmed);
+
+    if (!existsSync(accountPath)) {
+      this.logger.warn(
+        `Firebase credentials file not found: ${accountPath} — FCM push notifications disabled`,
+      );
       return;
     }
 
     if (admin.apps.length === 0) {
       admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey: privateKey.replace(/\\n/g, '\n'),
-        }),
+        credential: admin.credential.cert(accountPath),
       });
     }
 

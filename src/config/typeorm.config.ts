@@ -62,21 +62,31 @@ const ALL_ENTITIES = [
 
 export const getTypeOrmConfig = (
   configService: ConfigService,
-): TypeOrmModuleOptions => ({
-  type: 'mysql',
-  host: configService.get<string>('DB_HOST'),
-  port: configService.get<number>('DB_PORT'),
-  username: configService.get<string>('DB_USERNAME'),
-  password: configService.get<string>('DB_PASSWORD'),
-  database: configService.get<string>('DB_NAME'),
-  entities: ALL_ENTITIES,
-  migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
-  migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
-  synchronize: false,
-  logging: configService.get<string>('NODE_ENV') !== 'production',
-  connectTimeout: 30000,
-  extra: {
-    connectionLimit: 10,
+): TypeOrmModuleOptions => {
+  const nodeEnv = configService.get<string>('NODE_ENV') ?? 'development';
+  const isProduction = nodeEnv === 'production';
+  const debugSqlFlag = (configService.get<string>('TYPEORM_DEBUG_SQL') ?? '')
+    .trim()
+    .toLowerCase();
+  const debugSql =
+    !isProduction && ['true', '1', 'yes', 'on'].includes(debugSqlFlag);
+
+  return {
+    type: 'mysql',
+    host: configService.get<string>('DB_HOST'),
+    port: configService.get<number>('DB_PORT'),
+    username: configService.get<string>('DB_USERNAME'),
+    password: configService.get<string>('DB_PASSWORD'),
+    database: configService.get<string>('DB_NAME'),
+    entities: ALL_ENTITIES,
+    migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+    migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
+    synchronize: false,
+    logging: debugSql ? (['query', 'error'] as const) : false,
     connectTimeout: 30000,
-  },
-});
+    extra: {
+      connectionLimit: 10,
+      connectTimeout: 30000,
+    },
+  };
+};

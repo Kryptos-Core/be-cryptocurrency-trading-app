@@ -182,6 +182,15 @@ export function getEvmChainDefinition(network: BlockchainNetwork): EvmChainDefin
   return byNetwork.get(network);
 }
 
+/** Resolve static EVM metadata by treasury / DB chain code (e.g. POLYGON_MAINNET). */
+export function getEvmDefinitionByTreasuryChain(treasuryChain: string): EvmChainDefinition | undefined {
+  return EVM_CHAIN_DEFINITIONS.find((d) => d.treasuryChain === treasuryChain);
+}
+
+export function isEvmTreasuryChain(treasuryChain: string): boolean {
+  return getEvmDefinitionByTreasuryChain(treasuryChain) !== undefined;
+}
+
 export function isEvmBlockchainNetwork(network: BlockchainNetwork): boolean {
   return byNetwork.has(network);
 }

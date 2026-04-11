@@ -3,6 +3,7 @@ import {
   Logger,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
@@ -14,6 +15,7 @@ import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { FiatDeposit } from '@/entities/fiat-deposit.entity';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { resolvePayosFiatDepositLimits } from './payos-fiat-limits.util';
 // @ts-ignore
 const { PayOS } = require('@payos/node');
 
@@ -82,6 +84,8 @@ export class DepositsService {
       fiatToQuoteRate:
         this.configService.get<string>('PAYOS_FIAT_TO_QUOTE_RATE') ?? '1',
       fxSpreadBps: this.configService.get<string>('PAYOS_FX_SPREAD_BPS') ?? '0',
+      minDepositAmountFiat: this.configService.get<string>('PAYOS_MIN_DEPOSIT_AMOUNT'),
+      maxDepositAmountFiat: this.configService.get<string>('PAYOS_MAX_DEPOSIT_AMOUNT'),
     };
   }
 
@@ -193,6 +197,26 @@ export class DepositsService {
 
   // ── Public API ───────────────────────────────────────────────────────────
 
+  private payosLimits(config: PayosGatewayConfig) {
+    return resolvePayosFiatDepositLimits(config, {
+      min: this.configService.get<string>('PAYOS_MIN_DEPOSIT_AMOUNT'),
+      max: this.configService.get<string>('PAYOS_MAX_DEPOSIT_AMOUNT'),
+    });
+  }
+
+  /**
+   * Fiat deposit bounds for the active PayOS config (for client validation UX).
+   */
+  async getCheckoutMeta() {
+    const { config } = await this.getPayOSInstance();
+    const { minAmount, maxAmount } = this.payosLimits(config);
+    return {
+      minAmount,
+      maxAmount,
+      fiatSymbol: config.fiatSymbol,
+    };
+  }
+
   async createPaymentLink(userId: string, amount: number) {
     const { payOS, config } = await this.getPayOSInstance();
 
@@ -200,6 +224,24 @@ export class DepositsService {
       throw new Error(
         'PayOS callback URLs not configured (returnUrl / cancelUrl)',
       );
+    }
+
+    const { minAmount, maxAmount } = this.payosLimits(config);
+    if (!Number.isFinite(amount) || amount < minAmount) {
+      throw new BadRequestException({
+        message: `Amount must be at least ${minAmount} ${config.fiatSymbol}`,
+        minAmount,
+        maxAmount,
+        fiatSymbol: config.fiatSymbol,
+      });
+    }
+    if (maxAmount != null && amount > maxAmount) {
+      throw new BadRequestException({
+        message: `Amount must not exceed ${maxAmount} ${config.fiatSymbol}`,
+        minAmount,
+        maxAmount,
+        fiatSymbol: config.fiatSymbol,
+      });
     }
 
     const orderCode = Number(
@@ -230,6 +272,9 @@ export class DepositsService {
         depositId: deposit.deposit_id,
         checkoutUrl: paymentLinkRes.checkoutUrl,
         orderCode: deposit.order_code,
+        minAmount,
+        maxAmount,
+        fiatSymbol: config.fiatSymbol,
       };
     } catch (error) {
       this.logger.error('Failed to create payment link using PayOS', error);

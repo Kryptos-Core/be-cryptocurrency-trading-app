@@ -60,6 +60,8 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
         this.spec.defaultRpcUrl
       );
     }
+    const fromEnv = process.env[this.spec.rpcConfigKey]?.trim();
+    if (fromEnv) return fromEnv;
     return this.spec.defaultRpcUrl;
   }
 

@@ -5,7 +5,11 @@ import {
   nativeSymbolForChain,
   resolveSandboxTronNetworkEnum,
 } from './chain-registry';
-import { EVM_CHAIN_DEFINITIONS, isEvmBlockchainNetwork } from './evm-chain-definitions';
+import {
+  EVM_CHAIN_DEFINITIONS,
+  getEvmDefinitionByTreasuryChain,
+  isEvmBlockchainNetwork,
+} from './evm-chain-definitions';
 
 describe('chain-registry', () => {
   it('lists TON first in production catalog with capabilities off', () => {
@@ -43,5 +47,16 @@ describe('evm-chain-definitions', () => {
   it('defines an entry for every EVM enum member', () => {
     const evmEnumMembers = Object.values(BlockchainNetwork).filter((n) => isEvmBlockchainNetwork(n));
     expect(new Set(evmEnumMembers).size).toBe(EVM_CHAIN_DEFINITIONS.length);
+  });
+
+  it('getEvmDefinitionByTreasuryChain maps POLYGON_MAINNET to POL + rpc key', () => {
+    const d = getEvmDefinitionByTreasuryChain('POLYGON_MAINNET');
+    expect(d?.nativeSymbol).toBe('POL');
+    expect(d?.rpcConfigKey).toBe('POLYGON_MAINNET_RPC_URL');
+  });
+
+  it('getEvmDefinitionByTreasuryChain maps GNOSIS_MAINNET to XDAI', () => {
+    const d = getEvmDefinitionByTreasuryChain('GNOSIS_MAINNET');
+    expect(d?.nativeSymbol).toBe('XDAI');
   });
 });

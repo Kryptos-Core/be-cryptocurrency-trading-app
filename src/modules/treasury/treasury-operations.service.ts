@@ -2,7 +2,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
-import { ethers, JsonRpcProvider } from 'ethers';
+import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -36,6 +36,8 @@ import {
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
+import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
+import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
@@ -311,19 +313,15 @@ export class TreasuryOperationsService {
   ): Promise<{ txHash: string; amount: string }> {
     const privateKey = this.transactionWalletService.decryptWalletPrivateKey(wallet);
 
-    if (
-      wallet.chain === 'ETH_MAINNET' ||
-      wallet.chain === 'BSC_MAINNET' ||
-      wallet.chain === 'BSC_CHAPEL'
-    ) {
-      const provider = await this.buildEthereumProvider(wallet.chain);
+    const evmSweepDef = getEvmDefinitionByTreasuryChain(wallet.chain);
+    if (evmSweepDef) {
+      const provider = await jsonRpcProviderForTreasuryEvmChain(wallet.chain, this.systemConfigService);
       const signer = new ethers.Wallet(privateKey, provider);
       const balanceWei = await provider.getBalance(wallet.address);
       const feeData = await provider.getFeeData();
       const gasPrice = feeData.gasPrice ?? ethers.parseUnits('2', 'gwei');
       const gasFee = gasPrice * 21000n;
-      const nativeLabel =
-        wallet.chain === 'BSC_MAINNET' || wallet.chain === 'BSC_CHAPEL' ? 'BNB' : 'ETH';
+      const nativeLabel = evmSweepDef.nativeSymbol;
 
       if (balanceWei <= gasFee) {
         throw new BusinessException(
@@ -402,12 +400,8 @@ export class TreasuryOperationsService {
   ): Promise<string> {
     const privateKey = await this.transactionWalletService.resolveMainWalletPrivateKey(chain);
 
-    if (
-      chain === 'ETH_MAINNET' ||
-      chain === 'BSC_MAINNET' ||
-      chain === 'BSC_CHAPEL'
-    ) {
-      const provider = await this.buildEthereumProvider(chain);
+    if (getEvmDefinitionByTreasuryChain(chain)) {
+      const provider = await jsonRpcProviderForTreasuryEvmChain(chain, this.systemConfigService);
       const signer = new ethers.Wallet(privateKey, provider);
       const tx = await signer.sendTransaction({
         to: toAddress,
@@ -479,29 +473,6 @@ export class TreasuryOperationsService {
 
   private static isTronChain(chain: string): chain is 'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA' {
     return chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA';
-  }
-
-  private async buildEthereumProvider(
-    chain: 'ETH_MAINNET' | 'BSC_MAINNET' | 'BSC_CHAPEL',
-  ): Promise<JsonRpcProvider> {
-    switch (chain) {
-      case 'ETH_MAINNET': {
-        const url = await this.systemConfigService.getEffectiveString('ETH_MAINNET_RPC_URL');
-        return new JsonRpcProvider(url);
-      }
-      case 'BSC_MAINNET': {
-        const url = await this.systemConfigService.getEffectiveString('BSC_MAINNET_RPC_URL');
-        return new JsonRpcProvider(url);
-      }
-      case 'BSC_CHAPEL': {
-        const v = (await this.systemConfigService.get<string>('BSC_CHAPEL_RPC_URL'))?.trim();
-        return new JsonRpcProvider(
-          v ||
-            process.env.BSC_CHAPEL_RPC_URL?.trim() ||
-            'https://data-seed-prebsc-1-s1.binance.org:8545',
-        );
-      }
-    }
   }
 
   private async buildSolanaConnection(chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET'): Promise<Connection> {

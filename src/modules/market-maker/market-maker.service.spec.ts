@@ -9,6 +9,7 @@ import { OrdersService } from '../orders/orders.service';
 import { MarketMakerConfigRepository } from './repositories';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 import { MarketMakerService } from './market-maker.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 describe('MarketMakerService', () => {
   let service: MarketMakerService;
@@ -16,6 +17,7 @@ describe('MarketMakerService', () => {
   let cacheService: jest.Mocked<CacheService>;
   let ordersService: jest.Mocked<OrdersService>;
   let strategyService: jest.Mocked<MmOrderStrategyService>;
+  let systemConfig: jest.Mocked<Pick<SystemConfigService, 'get'>>;
 
   const mockConfig = {
     config_id: 'cfg-1',
@@ -67,6 +69,12 @@ describe('MarketMakerService', () => {
             placeMakerOrders: jest.fn(),
           },
         },
+        {
+          provide: SystemConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -75,6 +83,25 @@ describe('MarketMakerService', () => {
     cacheService = module.get(CacheService);
     ordersService = module.get(OrdersService);
     strategyService = module.get(MmOrderStrategyService);
+    systemConfig = module.get(SystemConfigService);
+  });
+
+  it('getFormDefaults uses system config with app fallbacks', async () => {
+    (systemConfig.get as jest.Mock).mockImplementation(async (key: unknown) => {
+      const k = String(key);
+      if (k === 'MM_DEFAULT_SPREAD_BPS') return 15;
+      if (k === 'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS') return 25;
+      if (k === 'MM_DEFAULT_ORDER_AMOUNT') return '0.01';
+      return null;
+    });
+
+    const d = await service.getFormDefaults();
+
+    expect(d).toEqual({
+      spread_bps: 15,
+      spread_alert_threshold_bps: 25,
+      order_amount: '0.01',
+    });
   });
 
   it('throws NotFoundException when config for pair does not exist', async () => {

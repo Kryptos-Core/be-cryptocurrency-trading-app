@@ -4,6 +4,7 @@ import { NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { MarketsService } from '@/modules/markets/markets.service';
 import { OrdersService } from '@/modules/orders/orders.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
 import { UpsertMarketMakerConfigDto } from './dto';
 import { MarketMakerConfigRepository } from './repositories';
@@ -19,10 +20,30 @@ export class MarketMakerService {
     private readonly cacheService: CacheService,
     private readonly ordersService: OrdersService,
     private readonly mmOrderStrategyService: MmOrderStrategyService,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   async getConfigList(userId: string) {
     return this.configRepository.findByUser(userId);
+  }
+
+  /** Defaults for MM config form when no row exists (system_configs + env fallbacks). */
+  async getFormDefaults() {
+    const spread = await this.systemConfigService.get<number>('MM_DEFAULT_SPREAD_BPS');
+    const alert = await this.systemConfigService.get<number>('MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS');
+    const orderAmt = await this.systemConfigService.get<string>('MM_DEFAULT_ORDER_AMOUNT');
+    const spreadBps = spread != null && Number.isFinite(spread) ? spread : 10;
+    const alertBps =
+      alert != null && Number.isFinite(alert) ? alert : 20;
+    const order =
+      orderAmt != null && String(orderAmt).trim().length > 0
+        ? String(orderAmt).trim()
+        : '0.001';
+    return {
+      spread_bps: spreadBps,
+      spread_alert_threshold_bps: alertBps,
+      order_amount: order,
+    };
   }
 
   async getConfigByPair(userId: string, pairId: string) {

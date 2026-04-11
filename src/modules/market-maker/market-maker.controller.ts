@@ -13,6 +13,18 @@ import { PlaceMakerOrdersDto, RefreshMakerOrdersDto, UpsertMarketMakerConfigDto 
 export class MarketMakerController {
   constructor(private readonly marketMakerService: MarketMakerService) {}
 
+  @Get('defaults')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.MARKET_MAKER, UserRole.ADMIN)
+  @RequirePermissions(Permission.MARKET_MAKER_CONFIG)
+  @ApiOperation({
+    summary: 'Default MM form values',
+    description: 'Spread / alert / order amount from system_configs (or env MM_DEFAULT_*).',
+  })
+  getFormDefaults() {
+    return this.marketMakerService.getFormDefaults();
+  }
+
   @Get('config')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.MARKET_MAKER, UserRole.ADMIN)

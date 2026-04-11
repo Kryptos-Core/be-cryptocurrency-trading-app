@@ -17,6 +17,10 @@ export interface PayosGatewayConfig {
   fiatToQuoteRate: string;
   /** Basis points deducted from gross amount, e.g. '0' */
   fxSpreadBps: string;
+  /** Minimum fiat amount for a single deposit (e.g. '10000' for VND). Optional; server/env default applies. */
+  minDepositAmountFiat?: string;
+  /** Maximum fiat amount for a single deposit; optional. */
+  maxDepositAmountFiat?: string;
 }
 
 export interface BlockchainGatewayConfig {

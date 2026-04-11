@@ -106,6 +106,25 @@ export class PaymentConfigService {
   }
 
   /**
+   * Form metadata for admin payment-config UI (types × networks).
+   * Keeps a single source of truth with the DTO enum + product rules.
+   */
+  getFormOptions(): {
+    types: string[];
+    networksByType: Record<string, string[]>;
+  } {
+    return {
+      types: ['PAYOS', 'ETH', 'TRON', 'SOL'],
+      networksByType: {
+        PAYOS: ['MAINNET'],
+        ETH: ['SEPOLIA', 'MAINNET'],
+        TRON: ['NILE', 'SHASTA', 'MAINNET'],
+        SOL: ['DEVNET', 'MAINNET'],
+      },
+    };
+  }
+
+  /**
    * Admin UI: full row + decrypted credentials for edit form.
    * Same RBAC as list/update — never log [config] contents.
    */

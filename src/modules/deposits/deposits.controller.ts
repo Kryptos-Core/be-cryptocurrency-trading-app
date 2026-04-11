@@ -44,6 +44,16 @@ export class DepositsController {
     return this.depositsService.getMyDeposits(user.userId);
   }
 
+  @Get('checkout-meta')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'PayOS fiat deposit limits for checkout (min/max from active config)',
+  })
+  async getCheckoutMeta() {
+    return this.depositsService.getCheckoutMeta();
+  }
+
   @Get(':orderCode/sync-status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

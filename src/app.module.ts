@@ -26,6 +26,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { MarketMakerModule } from './modules/market-maker/market-maker.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
+import { MetadataModule } from './modules/metadata/metadata.module';
 
 import { validateEnvironment } from './config/env.validation';
 import { nestEnvFilePaths } from './config/load-env-files';
@@ -82,6 +83,7 @@ import appConfig from './config/app.config';
     PaymentConfigModule,
     TreasuryModule,
     SystemConfigModule,
+    MetadataModule,
 
   ],
 })

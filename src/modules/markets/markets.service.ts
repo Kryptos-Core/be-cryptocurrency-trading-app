@@ -768,6 +768,7 @@ export class MarketsService implements OnModuleInit {
     pairId: string,
     limit: number = 100,
     range?: string,
+    locale: string = 'en',
   ) {
     const pair = await this.findOne(pairId);
     const interval = this.resolveIntervalByRange(range);
@@ -791,6 +792,7 @@ export class MarketsService implements OnModuleInit {
       interval,
       interval_sec: intervalSec,
       range: range ?? null,
+      locale,
       candles: candles.map((c) => ({
         pair_id: c.pair_id,
         interval_sec: c.interval_sec,

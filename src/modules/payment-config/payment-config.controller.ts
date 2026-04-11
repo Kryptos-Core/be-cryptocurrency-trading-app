@@ -37,6 +37,12 @@ export class PaymentConfigController {
     return this.service.listConfigs();
   }
 
+  /** Types and networks for create/edit form (no secrets). */
+  @Get('options')
+  async formOptions() {
+    return this.service.getFormOptions();
+  }
+
   /** Single config for edit UI — includes decrypted `config` object (secrets). */
   @Get(':id')
   async getOne(@Param('id') configId: string) {

@@ -1,36 +1,8 @@
+import { EVM_CHAIN_DEFINITIONS } from '@/common/constants/evm-chain-definitions';
 import { ConfigCategory, ConfigDataType } from '@/entities/system-config.entity';
 
-/** Whitelisted keys manageable via UI / runtime settings (mirror .env names). */
-export const RUNTIME_SETTING_KEYS = [
-  'WALLET_SYNC_INTERVAL',
-  'WALLET_RECONCILIATION_THRESHOLD',
-  'TRON_MAINNET_FULL_HOST',
-  'SOLANA_MAINNET_URL',
-  'ETH_MAINNET_RPC_URL',
-  'ETH_MAINNET_CHAIN_ID',
-  'BSC_MAINNET_RPC_URL',
-  'BSC_MAINNET_CHAIN_ID',
-  'BLOCKCHAIN_ALLOW_TEST_SIGNATURE',
-  'BLOCKCHAIN_WITHDRAW_AUTO_MAX',
-  'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET',
-  'BLOCKCHAIN_WITHDRAW_AUTO_MAX_BSC_MAINNET',
-  'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET',
-  'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET',
-  'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL',
-  'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL',
-  'BLOCKCHAIN_WITHDRAW_TRON_SYMBOL',
-  'PLATFORM_CASH_CURRENCY_SYMBOL',
-  'BLOCKCHAIN_DEPOSIT_TRX_TO_USDT_RATE',
-  'BLOCKCHAIN_DEPOSIT_ETH_TO_USDT_RATE',
-  'BLOCKCHAIN_DEPOSIT_SOL_TO_USDT_RATE',
-] as const;
-
-export type RuntimeSettingKey = (typeof RUNTIME_SETTING_KEYS)[number];
-
-export const RUNTIME_SETTING_KEY_SET = new Set<string>(RUNTIME_SETTING_KEYS);
-
 export interface RuntimeSettingSeed {
-  key: RuntimeSettingKey;
+  key: string;
   type: ConfigDataType;
   category: ConfigCategory;
   name: string;
@@ -38,7 +10,8 @@ export interface RuntimeSettingSeed {
   isReadOnly?: boolean;
 }
 
-export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+/** Core + finance keys (non-EVM-dynamic). */
+const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'WALLET_SYNC_INTERVAL',
     type: ConfigDataType.INTEGER,
@@ -146,6 +119,13 @@ export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     description: 'Currency symbol used for ETH-family chains (must exist in DB).',
   },
   {
+    key: 'BLOCKCHAIN_WITHDRAW_BNB_SYMBOL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Withdraw symbol — BNB',
+    description: 'Currency symbol for BSC native (must exist in DB).',
+  },
+  {
     key: 'BLOCKCHAIN_WITHDRAW_SOL_SYMBOL',
     type: ConfigDataType.STRING,
     category: ConfigCategory.CORE,
@@ -158,6 +138,34 @@ export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     category: ConfigCategory.CORE,
     name: 'Withdraw symbol — Tron',
     description: 'Currency symbol used for Tron withdrawals (e.g. TRX).',
+  },
+  {
+    key: 'BLOCKCHAIN_WITHDRAW_POL_SYMBOL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Withdraw symbol — Polygon POL',
+    description: 'Currency symbol for Polygon native (must exist in DB).',
+  },
+  {
+    key: 'BLOCKCHAIN_WITHDRAW_AVAX_SYMBOL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Withdraw symbol — Avalanche',
+    description: 'Currency symbol for Avalanche C-Chain native (must exist in DB).',
+  },
+  {
+    key: 'BLOCKCHAIN_WITHDRAW_XDAI_SYMBOL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Withdraw symbol — Gnosis xDAI',
+    description: 'Currency symbol for Gnosis Chain native (must exist in DB).',
+  },
+  {
+    key: 'BLOCKCHAIN_WITHDRAW_FTM_SYMBOL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Withdraw symbol — Fantom',
+    description: 'Currency symbol for Fantom native (must exist in DB).',
   },
   {
     key: 'PLATFORM_CASH_CURRENCY_SYMBOL',
@@ -187,4 +195,94 @@ export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Fallback rate SOL → USDT',
     description: 'Used when price oracle unavailable.',
   },
+  {
+    key: 'BLOCKCHAIN_DEPOSIT_POL_TO_USDT_RATE',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'Fallback rate POL → USDT',
+    description: 'Used when price oracle unavailable.',
+  },
+  {
+    key: 'BLOCKCHAIN_DEPOSIT_AVAX_TO_USDT_RATE',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'Fallback rate AVAX → USDT',
+    description: 'Used when price oracle unavailable.',
+  },
+  {
+    key: 'BLOCKCHAIN_DEPOSIT_XDAI_TO_USDT_RATE',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'Fallback rate XDAI → USDT',
+    description: 'Used when price oracle unavailable.',
+  },
+  {
+    key: 'BLOCKCHAIN_DEPOSIT_FTM_TO_USDT_RATE',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'Fallback rate FTM → USDT',
+    description: 'Used when price oracle unavailable.',
+  },
+  {
+    key: 'MM_DEFAULT_SPREAD_BPS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.FINANCE,
+    name: 'Market maker default spread (bps)',
+    description: 'Default spread_bps for new MM config rows (form empty state).',
+  },
+  {
+    key: 'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.FINANCE,
+    name: 'Market maker default spread alert (bps)',
+    description: 'Default spread_alert_threshold_bps for new MM config.',
+  },
+  {
+    key: 'MM_DEFAULT_ORDER_AMOUNT',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.FINANCE,
+    name: 'Market maker default order amount',
+    description: 'Default order_amount string for new MM config (per pair).',
+  },
 ];
+
+function buildEvmRpcSeeds(baseKeys: Set<string>): RuntimeSettingSeed[] {
+  return EVM_CHAIN_DEFINITIONS.filter((d) => !baseKeys.has(d.rpcConfigKey)).map((d) => ({
+    key: d.rpcConfigKey,
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.TECH,
+    name: `${d.network} RPC URL`,
+    description: `JSON-RPC for ${d.treasuryChain} (chainId ${d.chainId}); mirrors env ${d.rpcConfigKey}.`,
+  }));
+}
+
+function buildEvmWithdrawAutoMaxSeeds(existingKeys: Set<string>): RuntimeSettingSeed[] {
+  return EVM_CHAIN_DEFINITIONS.map((d) => `BLOCKCHAIN_WITHDRAW_AUTO_MAX_${d.treasuryChain}`)
+    .filter((k) => !existingKeys.has(k))
+    .map((key) => ({
+      key,
+      type: ConfigDataType.STRING,
+      category: ConfigCategory.FINANCE,
+      name: `Auto max withdraw — ${key.replace('BLOCKCHAIN_WITHDRAW_AUTO_MAX_', '')}`,
+      description: 'Per-chain cap; falls back to BLOCKCHAIN_WITHDRAW_AUTO_MAX when empty.',
+    }));
+}
+
+const baseKeySet = new Set(BASE_RUNTIME_SETTING_SEEDS.map((s) => s.key));
+const evmRpcSeeds = buildEvmRpcSeeds(baseKeySet);
+const afterRpcKeys = new Set([...baseKeySet, ...evmRpcSeeds.map((s) => s.key)]);
+const evmAutoMaxSeeds = buildEvmWithdrawAutoMaxSeeds(afterRpcKeys);
+
+/** Full seed list: core + every `*_RPC_URL` from evm-chain-definitions + per-chain auto max (no duplicates). */
+export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+  ...BASE_RUNTIME_SETTING_SEEDS,
+  ...evmRpcSeeds,
+  ...evmAutoMaxSeeds,
+];
+
+/** Whitelisted keys manageable via UI / runtime settings (mirror .env names). */
+export const RUNTIME_SETTING_KEYS = RUNTIME_SETTING_SEEDS.map((s) => s.key);
+
+export type RuntimeSettingKey = (typeof RUNTIME_SETTING_KEYS)[number];
+
+export const RUNTIME_SETTING_KEY_SET = new Set<string>(RUNTIME_SETTING_KEYS);

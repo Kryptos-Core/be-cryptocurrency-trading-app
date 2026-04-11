@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  Headers,
   UseGuards,
   ParseIntPipe,
   ParseBoolPipe,
@@ -22,6 +23,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { MarketsService } from './markets.service';
+import { resolveOhlcvLocale } from './ohlcv-locale.util';
 import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { Public } from '@/common/decorators';
@@ -354,6 +356,13 @@ export class MarketsController {
     description: 'Time range: 1d, 1M, 3M, 1y, 5y',
     example: '1d',
   })
+  @ApiQuery({
+    name: 'locale',
+    required: false,
+    type: String,
+    description: 'Optional BCP 47 locale (e.g. vi-VN). Overrides Accept-Language for response metadata.',
+    example: 'vi-VN',
+  })
   @ApiSuccessResponse('OHLCV retrieved successfully')
   @ApiNotFoundResponse('Market pair not found')
   @ApiBadRequestResponse('Invalid range')
@@ -362,8 +371,11 @@ export class MarketsController {
     @Param('id') id: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
     @Query('range') range?: string,
+    @Query('locale') locale?: string,
+    @Headers('accept-language') acceptLanguage?: string,
   ) {
-    return this.marketsService.getOHLCV(id, limit, range);
+    const resolved = resolveOhlcvLocale(locale, acceptLanguage);
+    return this.marketsService.getOHLCV(id, limit, range, resolved);
   }
 
   /**

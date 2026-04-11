@@ -57,6 +57,25 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   DB_NAME!: string;
 
+  /**
+   * When true/1/yes/on: log SQL queries via TypeORM. Ignored when NODE_ENV=production.
+   */
+  @IsString()
+  @IsOptional()
+  TYPEORM_DEBUG_SQL?: string;
+
+  @IsString()
+  @IsOptional()
+  MM_DEFAULT_SPREAD_BPS?: string;
+
+  @IsString()
+  @IsOptional()
+  MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS?: string;
+
+  @IsString()
+  @IsOptional()
+  MM_DEFAULT_ORDER_AMOUNT?: string;
+
   // Redis Configuration
   @IsString()
   @IsOptional()
@@ -318,6 +337,111 @@ export class EnvironmentVariables {
   @IsOptional()
   BSC_CHAPEL_CHAIN_ID?: number;
 
+  /** EVM RPC URLs (optional; also overridable via system_configs / defaultRpcUrl in evm-chain-definitions). */
+  @IsUrl()
+  @IsOptional()
+  ETH_SEPOLIA_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  BASE_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  BASE_SEPOLIA_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  ARBITRUM_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  ARBITRUM_SEPOLIA_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  OPTIMISM_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  OPTIMISM_SEPOLIA_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  POLYGON_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  POLYGON_AMOY_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  AVALANCHE_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  AVALANCHE_FUJI_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  GNOSIS_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  GNOSIS_CHIADO_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  LINEA_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  LINEA_SEPOLIA_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  FANTOM_MAINNET_RPC_URL?: string;
+
+  @IsUrl()
+  @IsOptional()
+  FANTOM_TESTNET_RPC_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_BNB_SYMBOL?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_POL_SYMBOL?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_AVAX_SYMBOL?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_XDAI_SYMBOL?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_WITHDRAW_FTM_SYMBOL?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_DEPOSIT_POL_TO_USDT_RATE?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_DEPOSIT_AVAX_TO_USDT_RATE?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_DEPOSIT_XDAI_TO_USDT_RATE?: string;
+
+  @IsString()
+  @IsOptional()
+  BLOCKCHAIN_DEPOSIT_FTM_TO_USDT_RATE?: string;
+
   // PayOS Configuration
   @IsString()
   @IsOptional()
@@ -432,6 +556,10 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'DB_USERNAME',
     'DB_PASSWORD',
     'DB_NAME',
+    'TYPEORM_DEBUG_SQL',
+    'MM_DEFAULT_SPREAD_BPS',
+    'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',
+    'MM_DEFAULT_ORDER_AMOUNT',
     'REDIS_HOST',
     'REDIS_PORT',
     'REDIS_PASSWORD',
@@ -490,6 +618,32 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'SOLANA_DEVNET_URL',
     'BSC_CHAPEL_RPC_URL',
     'BSC_CHAPEL_CHAIN_ID',
+    'ETH_SEPOLIA_RPC_URL',
+    'BASE_MAINNET_RPC_URL',
+    'BASE_SEPOLIA_RPC_URL',
+    'ARBITRUM_MAINNET_RPC_URL',
+    'ARBITRUM_SEPOLIA_RPC_URL',
+    'OPTIMISM_MAINNET_RPC_URL',
+    'OPTIMISM_SEPOLIA_RPC_URL',
+    'POLYGON_MAINNET_RPC_URL',
+    'POLYGON_AMOY_RPC_URL',
+    'AVALANCHE_MAINNET_RPC_URL',
+    'AVALANCHE_FUJI_RPC_URL',
+    'GNOSIS_MAINNET_RPC_URL',
+    'GNOSIS_CHIADO_RPC_URL',
+    'LINEA_MAINNET_RPC_URL',
+    'LINEA_SEPOLIA_RPC_URL',
+    'FANTOM_MAINNET_RPC_URL',
+    'FANTOM_TESTNET_RPC_URL',
+    'BLOCKCHAIN_WITHDRAW_BNB_SYMBOL',
+    'BLOCKCHAIN_WITHDRAW_POL_SYMBOL',
+    'BLOCKCHAIN_WITHDRAW_AVAX_SYMBOL',
+    'BLOCKCHAIN_WITHDRAW_XDAI_SYMBOL',
+    'BLOCKCHAIN_WITHDRAW_FTM_SYMBOL',
+    'BLOCKCHAIN_DEPOSIT_POL_TO_USDT_RATE',
+    'BLOCKCHAIN_DEPOSIT_AVAX_TO_USDT_RATE',
+    'BLOCKCHAIN_DEPOSIT_XDAI_TO_USDT_RATE',
+    'BLOCKCHAIN_DEPOSIT_FTM_TO_USDT_RATE',
     'PAYOS_CLIENT_ID',
     'PAYOS_API_KEY',
     'PAYOS_CHECKSUM_KEY',
