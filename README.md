@@ -1,123 +1,77 @@
 # Kryptos Core — Backend API
 
-API backend cho nền tảng giao dịch tiền mã hóa, xây dựng bằng **NestJS**. Toàn bộ route REST nằm dưới prefix **`/api/v1`**.
+API backend cho nền tảng giao dịch tiền mã hóa (**NestJS**). Base path: **`/api/v1`**.
 
-## Tính năng chính
+## Tính năng (tổng quan)
 
-| Nhóm | Mô tả |
-|------|--------|
-| **Auth & người dùng** | JWT, đăng ký/đăng nhập, RBAC, 2FA (email OTP) |
-| **Thị trường** | Cặp giao dịch, đồng bộ catalog từ Binance (testnet/mainnet theo cấu hình) |
-| **Lệnh & sổ lệnh** | Đặt/hủy lệnh, order book, market maker batch |
-| **Khớp lệnh** | Engine price–time priority, Redis lock (Lua atomic), STP (self-trade prevention), incremental in-memory book, audit log persistent (`trade_audit_log`), market order slippage protection, circuit breaker per pair |
-| **Ví** | Số dư nội bộ, đối soát, đồng bộ ví ngoài (Binance) theo cấu hình |
-| **Nạp/rút** | Nạp fiat qua **PayOS**, nạp/rút on-chain (TRON, Ethereum, Solana testnet) |
-| **Liên kết ví & đăng nhập WC** | Đăng nhập public (QR + SignClient): `/auth/wallet/wc/*`. Liên kết ví (JWT): `/blockchain/wallets/wc/*` |
-| **Kho bạc (Treasury)** | Ví giao dịch, sweep, thao tác vận hành (RBAC) |
-| **Realtime** | WebSocket (Socket.IO) — giá, trading |
-| **Thông báo** | Firebase Admin (FCM) |
+- Đăng ký / đăng nhập, JWT, phân quyền theo vai trò, 2FA qua email  
+- Thị trường, lệnh, khớp lệnh, ví nội bộ và đồng bộ sàn (theo cấu hình)  
+- Nạp/rút (fiat qua PayOS, on-chain theo chain đã cấu hình)  
+- Liên kết ví & WalletConnect  
+- Kho bạc (treasury), thông báo push (Firebase), realtime WebSocket  
 
-OHLCV/ticker có thể lấy từ Binance public API theo cấu hình (`EXCHANGE_MODE`, testnet, v.v.).
+Chi tiết luồng nghiệp vụ, Redis, migration đặc biệt, v.v. nằm trong thư mục [`docs/`](docs/).
 
 ## Yêu cầu
 
-- Node.js + npm
-- MySQL 8 và Redis 7 (có thể chạy bằng Docker — xem mục chạy local bên dưới)
+- **Node.js** (khuyến nghị LTS 20+) và npm  
+- **MySQL 8** và **Redis 7** (có thể dùng Docker — xem bước dưới)
 
-## Công nghệ
+## Chạy local
 
-- **Runtime:** Node.js (khuyến nghị LTS 20+)
-- **Framework:** NestJS 10
-- **ORM:** TypeORM 0.3 + **MySQL 8**
-- **Cache / lock / queue:** Redis 7, **Bull** (hàng đợi)
-- **Realtime:** `@nestjs/websockets`, Socket.IO
-- **Khác:** JWT, PayOS, Ethers, TronWeb, Solana web3, Cloudinary, Nodemailer, Firebase Admin
+### 1. Biến môi trường
 
-## Chạy backend (local)
+- Copy `.env.example` → `.env` và điền giá trị phù hợp (DB, Redis, JWT, …). Có thể tham chiếu thêm `.env.staging.example` / `.env.production.example` khi tạo override theo môi trường.  
+- Tùy chọn: file **`.env.${NODE_ENV}`** ghi đè theo môi trường — ví dụ `.env.development`, `.env.staging`, `.env.production` (cùng thư mục với `.env`). Thứ tự load: `.env` trước, sau đó file theo `NODE_ENV`.  
+- Không commit file chứa secret thật.
 
-### 1. Hạ tầng (MySQL + Redis)
-
-Từ thư mục backend, tạo `.env` từ `env.example` và chỉnh `DB_*`, `REDIS_*` cho khớp với Docker (hoặc instance local của bạn).
+### 2. MySQL + Redis
 
 ```bash
 docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
 ```
 
-Compose khởi chạy **mysql:8.0** và **redis:7-alpine** (mật khẩu Redis qua `REDIS_PASSWORD` trong `.env`).
-
-### 2. Cài đặt và database
+### 3. Cài đặt, migration, seed, chạy dev
 
 ```bash
 npm install
-cp env.example .env
-# Chỉnh .env (DB, Redis, JWT, Binance, PayOS, blockchain, …)
-
 npm run migration:run
 npm run db:seed
 npm run start:dev
 ```
 
-## API, Health và Swagger
+`start:dev` / `dev` đặt **`NODE_ENV=development`** (qua `cross-env`). Các lệnh khác:
+
+| Script | Ý nghĩa ngắn |
+|--------|----------------|
+| `npm run start` | Chạy một lần, `NODE_ENV=development` |
+| `npm run start:debug` | Dev + debugger |
+| `npm run dev:staging` / `start:staging` | `NODE_ENV=staging` |
+| `npm run start:prod` | Production (cần `npm run build` trước) |
+| `npm run migration:run` / `migration:revert` / `migration:show` | TypeORM migrations |
+| `npm run db:seed` / `db:clean` | Seed / dọn dữ liệu seed |
+| `npm run test` | Jest |
+
+Production: `npm run build` rồi `npm run start:prod`.
+
+## Kiểm tra nhanh
 
 | | URL |
 |---|-----|
-| **Base API** | `http://127.0.0.1:3000/api/v1` |
-| **Health** | `GET http://127.0.0.1:3000/api/v1/health` |
-| **Swagger** | `http://127.0.0.1:3000/api/docs` (không bật khi `NODE_ENV=production`) |
+| API | `http://127.0.0.1:3000/api/v1` |
+| Health | `GET http://127.0.0.1:3000/api/v1/health` |
+| Swagger | `http://127.0.0.1:3000/api/docs` (thường tắt khi `NODE_ENV=production`) |
 
-## Biến môi trường
+## Tài khoản demo sau seed
 
-- Mẫu đầy đủ: `env.example` (copy thành `.env`).
-- **Không** commit `.env` hoặc khóa thật lên git.
+Seed dùng `src/seed/data/users.json` nếu có; không thì dùng `users.json.example` (copy thành `users.json` và đổi mật khẩu ngoài môi trường dev). Có thể trỏ `SEED_USERS_JSON` sang file khác.
 
-Các nhóm thường dùng: `DB_*`, `REDIS_*`, `JWT_*`, Binance testnet/mainnet, `PAYOS_*`, blockchain RPC & hot wallet keys, `WALLETCONNECT_PROJECT_ID` / `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `FIREBASE_*` (push), SMTP (2FA). Biến mà `ConfigService` đọc được phải khai báo trong whitelist `src/config/env.validation.ts`.
-
-### Matching engine (queue + sổ lệnh)
-
-- **Một worker** xử lý queue `matching` được khuyến nghị trong production; processor đã đặt `concurrency: 1` cho job khớp lệnh.
-- **`MATCHING_BOOK_FULL_REFRESH`**: đặt `true` / `1` / `yes` nếu nhiều process cùng consume queue — mỗi lần `runMatch` reload sổ từ DB (tải DB hơn, giảm lệch in-memory). Mặc định để trống (tắt).
-- **Migration `1775510000000`**: `npm run migration:revert` **không** hoàn tác migration này; cần backup hoặc tái tạo procedure/cột thủ công (xem JSDoc trong file migration).
-
-## Cấu trúc thư mục
-
-```
-be-cryptocurrency-trading-app/
-├── src/
-│   ├── main.ts
-│   ├── app.module.ts
-│   ├── common/          # guards, filters, interceptors, RBAC, …
-│   ├── config/
-│   ├── entities/
-│   ├── migrations/
-│   ├── modules/         # auth, users, currencies, markets, exchange,
-│   │                    # orders, matching, wallets, deposits, blockchain,
-│   │                    # trading, redis, price-oracle, dashboard,
-│   │                    # notifications, treasury, market-maker,
-│   │                    # managed-wallets, payment-config, …
-│   ├── seed/
-│   └── utils/
-├── docs/
-├── postman/
-├── scripts/
-├── env.example
-├── docker-compose.infrastructure.yml
-└── package.json
-```
-
-## Tài khoản sau seed
-
-Enum **`UserRole`** (cột `users.role`, claim `role` trong JWT): `ADMIN`, `TRADER`, `RISK_OFFICER`, `SUPPORT_AGENT`, `MARKET_MAKER`, `FINANCE_MANAGER` — định nghĩa tại `src/common/enums/index.ts`. **Không** có role `GUEST` trên server.
-
-Mặc định seed đọc `src/seed/data/users.json` nếu có; nếu không, dùng [`src/seed/data/users.json.example`](src/seed/data/users.json.example). Có thể đặt `SEED_USERS_JSON` trỏ tới file khác. Mỗi user **bắt buộc** có trường `role`. Copy `users.json.example` → `users.json`, đổi mật khẩu trước khi dùng ngoài dev (file `users.json` được gitignore).
-
-Sau `npm run db:seed`, mỗi giá trị `UserRole` trong file mẫu đều có ít nhất một user demo:
-
-| Email | Mật khẩu (mẫu) | `UserRole` |
-|-------|----------------|------------|
-| admin@example.com | ChangeMeAdmin! | `ADMIN` |
-| trader1@example.com | ChangeMeTrader! | `TRADER` |
-| trader2@example.com | ChangeMeTrader! | `TRADER` |
-| risk@example.com | ChangeMeRisk! | `RISK_OFFICER` |
-| support@example.com | ChangeMeSupport! | `SUPPORT_AGENT` |
-| maker@example.com | ChangeMeMaker! | `MARKET_MAKER` |
-| finance@example.com | ChangeMeFinance! | `FINANCE_MANAGER` |
+| Email (mẫu) | Mật khẩu (mẫu) | Vai trò |
+|-------------|----------------|---------|
+| admin@example.com | ChangeMeAdmin! | ADMIN |
+| trader1@example.com | ChangeMeTrader! | TRADER |
+| trader2@example.com | ChangeMeTrader! | TRADER |
+| risk@example.com | ChangeMeRisk! | RISK_OFFICER |
+| support@example.com | ChangeMeSupport! | SUPPORT_AGENT |
+| maker@example.com | ChangeMeMaker! | MARKET_MAKER |
+| finance@example.com | ChangeMeFinance! | FINANCE_MANAGER |
