@@ -7,11 +7,11 @@
  * Safety: blocked when NODE_ENV=production unless ALLOW_DB_CLEAN=true
  */
 
-import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
+import { loadEnvFilesForCli } from '@/config/load-env-files';
 
-dotenv.config();
+loadEnvFilesForCli();
 
 async function run() {
   if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DB_CLEAN !== 'true') {

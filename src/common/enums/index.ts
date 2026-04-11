@@ -166,6 +166,7 @@ export enum WalletLedgerDirection {
 /** Application environment */
 export enum Environment {
   Development = 'development',
+  Staging = 'staging',
   Production = 'production',
   Test = 'test',
 }

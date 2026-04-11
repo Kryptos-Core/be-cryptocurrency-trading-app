@@ -5,8 +5,8 @@
  * Usage: npm run db:seed   or   npm run db:reset
  */
 
-import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { loadEnvFilesForCli } from '@/config/load-env-files';
 import * as fs from 'fs';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
@@ -15,7 +15,7 @@ import { newUuid } from '@/common/utils/uuid.util';
 import { parseAndValidateSeedUsers } from '@/seed/seed-users-json.util';
 import { resolveSeedUsersJsonPath } from '@/seed/seed-users-path.util';
 
-dotenv.config();
+loadEnvFilesForCli();
 
 const SALT_ROUNDS = 10;
 

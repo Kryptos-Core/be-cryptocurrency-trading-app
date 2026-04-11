@@ -29,6 +29,14 @@ describe('validateEnvironment', () => {
     ).toThrow(/Environment validation failed/);
   });
 
+  it('accepts NODE_ENV=staging when required DB and JWT are present', () => {
+    expect(() =>
+      validateEnvironment(
+        minimalValidConfig({ NODE_ENV: Environment.Staging }),
+      ),
+    ).not.toThrow();
+  });
+
   it('does not require sandbox RPC URLs when ONCHAIN_OPERATOR_MODE is production (default)', () => {
     expect(() => validateEnvironment(minimalValidConfig())).not.toThrow();
   });

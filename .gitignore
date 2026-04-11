@@ -5,7 +5,7 @@ dist/
 
 # Environment (do not commit secrets)
 .env
-.env.*
+# .env.*
 
 # Local seed users (copy from src/seed/data/users.json.example)
 src/seed/data/users.json

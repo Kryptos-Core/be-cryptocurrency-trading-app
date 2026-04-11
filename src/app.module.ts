@@ -28,6 +28,7 @@ import { TreasuryModule } from './modules/treasury/treasury.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
 
 import { validateEnvironment } from './config/env.validation';
+import { nestEnvFilePaths } from './config/load-env-files';
 import appConfig from './config/app.config';
 
 @Module({
@@ -36,7 +37,7 @@ import appConfig from './config/app.config';
     ScheduleModule.forRoot(), // enables @Cron / @Interval decorators
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: nestEnvFilePaths(),
       validate: validateEnvironment, // Validate environment variables
       validationOptions: {
         allowUnknown: true, // Allow unknown env vars (system variables)
