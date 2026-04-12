@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
+import { DECIMAL_36_18_COLUMN } from '@/common/constants/column-types';
 
 /**
  * Immutable audit record for every fill executed by the matching engine.
@@ -20,16 +21,16 @@ export class TradeAuditLog {
   @Column({ type: 'char', length: 36 })
   taker_order_id!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   price!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   taker_fee!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   maker_fee!: string;
 
   @Column({ type: 'char', length: 36 })

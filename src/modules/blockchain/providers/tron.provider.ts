@@ -11,11 +11,11 @@ import type {
   BlockchainTxStatusDto,
   IBlockchainProvider,
 } from '../interfaces';
+import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
 import {
   extractTronFirstContractOwnerBase58,
   extractTronNativeTransferMeta,
 } from '../utils/tron-native-transfer.util';
-import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
 
 export interface TronProviderBindings {
   network: BlockchainNetwork;
@@ -83,20 +83,15 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
-    try {
-      const balanceSun = await this.tronWeb.trx.getBalance(address);
-      const balanceTrx = this.tronWeb.fromSun(balanceSun);
-      return {
-        address,
-        network: this.bindings.network,
-        balance: String(balanceTrx),
-        symbol: 'TRX',
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`Error getting TRX balance: ${address}`, error);
-      throw error;
-    }
+    const balanceSun = await this.tronWeb.trx.getBalance(address);
+    const balanceTrx = this.tronWeb.fromSun(balanceSun);
+    return {
+      address,
+      network: this.bindings.network,
+      balance: String(balanceTrx),
+      symbol: 'TRX',
+      timestamp: new Date(),
+    };
   }
 
   async verifySignature(address: string, message: string, signature: string): Promise<boolean> {

@@ -9,6 +9,10 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
+import {
+  DECIMAL_36_18_COLUMN,
+  DECIMAL_36_18_NULLABLE_COLUMN,
+} from '@/common/constants/column-types';
 import { LinkedWallet } from './linked-wallet.entity';
 import { User } from './user.entity';
 
@@ -53,7 +57,7 @@ export class OnchainTransaction {
   @Column({ type: 'varchar', length: 255 })
   to_address!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
   @Column({ type: 'int', default: 0 })
@@ -77,11 +81,11 @@ export class OnchainTransaction {
   credited_currency_id!: string | null;
 
   /** Số lượng cash currency (USDT) thực tế được credit sau khi quy đổi */
-  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   credited_amount!: string | null;
 
   /** Tỷ giá quy đổi: 1 native coin = X USDT tại thời điểm giao dịch */
-  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   conversion_rate!: string | null;
 
   @ManyToOne(

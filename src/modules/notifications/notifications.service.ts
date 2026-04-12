@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { calcSkip } from '@/common/utils/pagination.util';
 import type { CreateNotificationDto } from './dto/create-notification.dto';
@@ -19,6 +19,8 @@ export const NOTIFICATIONS_TARGETED_CHANNEL = 'notifications:targeted';
  */
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     private readonly notificationRepo: NotificationRepository,
     @Inject(NOTIFICATION_STRATEGIES) private readonly strategies: INotificationStrategy[],
@@ -44,7 +46,13 @@ export class NotificationsService {
       data: dto.data ?? null,
     });
 
-    const token = await this.notificationRepo.getFcmTokenByUserId(targetUserId);
+    let token: string | null = null;
+    try {
+      token = await this.notificationRepo.getFcmTokenByUserId(targetUserId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to load FCM token for user ${targetUserId}: ${reason}`);
+    }
 
     // Execute all registered strategies (Strategy Pattern)
     await Promise.all(

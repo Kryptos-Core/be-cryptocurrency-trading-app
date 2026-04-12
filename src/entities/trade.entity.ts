@@ -7,6 +7,10 @@ import {
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
+import {
+  DECIMAL_36_18_COLUMN,
+  DECIMAL_36_18_DEFAULT_0_COLUMN,
+} from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 import { MarketPair } from './market-pair.entity';
 import { Order } from './order.entity';
@@ -31,16 +35,16 @@ export class Trade {
   @ForeignKey(() => Order)
   maker_order_id!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   price!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   taker_fee!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   maker_fee!: string;
 
   @Column({ type: 'char', length: 36 })

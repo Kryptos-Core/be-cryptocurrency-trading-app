@@ -1,4 +1,5 @@
 import { Column, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
+import { DECIMAL_36_18_DEFAULT_0_COLUMN } from '@/common/constants/column-types';
 import { CurrencyNetwork } from './currency-network.entity';
 import { MarketPair } from './market-pair.entity';
 
@@ -17,7 +18,7 @@ export class Currency {
   @Column({ type: 'tinyint', default: 8 })
   precision_scale!: number;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   min_withdraw!: string;
 
   @Column({ type: 'boolean', default: true })

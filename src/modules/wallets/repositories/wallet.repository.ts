@@ -24,8 +24,7 @@ export class WalletRepository extends BaseRepository<Wallet> {
     userId: string,
     includeZero: boolean = true,
   ): Promise<Array<Wallet & { currency_symbol: string; currency_name: string }>> {
-    try {
-      const sql = `
+    const sql = `
         SELECT w.wallet_id, w.user_id, w.currency_id, w.available, w.frozen, w.updated_at,
                c.symbol AS currency_symbol, c.name AS currency_name
         FROM wallets w
@@ -34,16 +33,12 @@ export class WalletRepository extends BaseRepository<Wallet> {
         ${includeZero ? '' : 'AND (w.available > 0 OR w.frozen > 0)'}
         ORDER BY c.symbol
       `;
-      const rows = await this.dataSource.query(sql, [userId]);
-      return (rows || []).map((row: any) => ({
-        ...this.mapRowToWallet(row),
-        currency_symbol: row.currency_symbol ?? '',
-        currency_name: row.currency_name ?? '',
-      }));
-    } catch (error) {
-      this.logger.error(`Error finding wallets by user: ${userId}`, error);
-      throw error;
-    }
+    const rows = await this.dataSource.query(sql, [userId]);
+    return (rows || []).map((row: any) => ({
+      ...this.mapRowToWallet(row),
+      currency_symbol: row.currency_symbol ?? '',
+      currency_name: row.currency_name ?? '',
+    }));
   }
 
   /**
@@ -54,18 +49,13 @@ export class WalletRepository extends BaseRepository<Wallet> {
     currencyId: string,
     manager?: EntityManager,
   ): Promise<Wallet | null> {
-    try {
-      const result = await (manager ?? this.dataSource).query(
-        `CALL ${WALLET_STORE_PROCEDURE.FIND_BY_USER_CURRENCY}(?, ?)`,
-        [userId, currencyId],
-      );
-      const row = result?.[0]?.[0];
-      if (!row) return null;
-      return this.mapRowToWallet(row);
-    } catch (error) {
-      this.logger.error(`Error finding wallet by user ${userId} and currency ${currencyId}`, error);
-      throw error;
-    }
+    const result = await (manager ?? this.dataSource).query(
+      `CALL ${WALLET_STORE_PROCEDURE.FIND_BY_USER_CURRENCY}(?, ?)`,
+      [userId, currencyId],
+    );
+    const row = result?.[0]?.[0];
+    if (!row) return null;
+    return this.mapRowToWallet(row);
   }
 
   /**

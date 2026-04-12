@@ -23,15 +23,10 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    * Database Procedure Pattern: sp_currency_find_by_id
    */
   async findById(id: number | string): Promise<Currency | null> {
-    try {
-      const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-        id,
-      ]);
-      return this.mapProcedureResultToEntity(result[0][0]);
-    } catch (error) {
-      this.logger.error(`Error finding currency by ID: ${id}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+      id,
+    ]);
+    return this.mapProcedureResultToEntity(result[0][0]);
   }
 
   /**
@@ -39,16 +34,11 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    * Custom method specific to Currency entity
    */
   async findBySymbol(symbol: string): Promise<Currency | null> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.FIND_BY_SYMBOL}(?)`,
-        [symbol.toUpperCase()],
-      );
-      return this.mapProcedureResultToEntity(result[0][0]);
-    } catch (error) {
-      this.logger.error(`Error finding currency by symbol: ${symbol}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${CURRENCY_STORE_PROCEDURE.FIND_BY_SYMBOL}(?)`,
+      [symbol.toUpperCase()],
+    );
+    return this.mapProcedureResultToEntity(result[0][0]);
   }
 
   /**
@@ -56,121 +46,89 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    * Custom method with business logic
    */
   async findActive(): Promise<Currency[]> {
-    try {
-      const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_ACTIVE}()`);
-      return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
-    } catch (error) {
-      this.logger.error('Error finding active currencies', error);
-      throw error;
-    }
+    const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_ACTIVE}()`);
+    return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
   }
 
   /**
    * Find all tradable currencies
    */
   async findTradable(): Promise<Currency[]> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.FIND_TRADABLE}()`,
-      );
-      return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
-    } catch (error) {
-      this.logger.error('Error finding tradable currencies', error);
-      throw error;
-    }
+    const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_TRADABLE}()`);
+    return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
   }
 
   /**
    * Check if symbol exists
    */
   async symbolExists(symbol: string, excludeCurrencyId?: string): Promise<boolean> {
-    try {
-      if (excludeCurrencyId) {
-        const currency = await this.findById(excludeCurrencyId);
-        if (currency && currency.symbol === symbol.toUpperCase()) {
-          return false;
-        }
+    if (excludeCurrencyId) {
+      const currency = await this.findById(excludeCurrencyId);
+      if (currency && currency.symbol === symbol.toUpperCase()) {
+        return false;
       }
-
-      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`, [
-        symbol.toUpperCase(),
-        excludeCurrencyId || null,
-      ]);
-      const result = await this.dataSource.query('SELECT @exists as exists');
-      return result?.[0]?.exists === 1 || result?.[0]?.exists === true;
-    } catch (error) {
-      this.logger.error(`Error checking symbol existence: ${symbol}`, error);
-      throw error;
     }
+
+    await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`, [
+      symbol.toUpperCase(),
+      excludeCurrencyId || null,
+    ]);
+    const result = await this.dataSource.query('SELECT @exists as exists');
+    return result?.[0]?.exists === 1 || result?.[0]?.exists === true;
   }
 
   /**
    * Override create (UUID v7: currency_id passed IN)
    */
   async create(entity: Partial<Currency>): Promise<Currency> {
-    try {
-      const currencyId = entity.currency_id ?? newUuid();
-      const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+    const currencyId = entity.currency_id ?? newUuid();
+    const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`, [
-        currencyId,
-        symbol,
-        entity.name,
-        entity.precision_scale ?? 8,
-        entity.min_withdraw ?? '0',
-        (entity.is_tradable ?? true) ? 1 : 0,
-        (entity.is_active ?? true) ? 1 : 0,
-      ]);
+    await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`, [
+      currencyId,
+      symbol,
+      entity.name,
+      entity.precision_scale ?? 8,
+      entity.min_withdraw ?? '0',
+      (entity.is_tradable ?? true) ? 1 : 0,
+      (entity.is_active ?? true) ? 1 : 0,
+    ]);
 
-      const created = await this.findById(currencyId);
-      if (!created) {
-        throw new Error('Failed to fetch created currency');
-      }
-      return created;
-    } catch (error) {
-      this.logger.error('Error creating currency', error);
-      throw error;
+    const created = await this.findById(currencyId);
+    if (!created) {
+      throw new Error('Failed to fetch created currency');
     }
+    return created;
   }
 
   /**
    * Override update to normalize symbol to uppercase
    */
   async update(id: number | string, entity: Partial<Currency>): Promise<Currency> {
-    try {
-      const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+    const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?)`, [
-        id,
-        symbol,
-        entity.name ?? null,
-        entity.precision_scale ?? null,
-        entity.min_withdraw ?? null,
-        entity.is_tradable ?? null,
-        entity.is_active ?? null,
-      ]);
+    await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?)`, [
+      id,
+      symbol,
+      entity.name ?? null,
+      entity.precision_scale ?? null,
+      entity.min_withdraw ?? null,
+      entity.is_tradable ?? null,
+      entity.is_active ?? null,
+    ]);
 
-      const updated = await this.findById(id);
-      if (!updated) {
-        throw new Error(`Currency with ID ${id} not found after update`);
-      }
-      return updated;
-    } catch (error) {
-      this.logger.error(`Error updating currency with ID: ${id}`, error);
-      throw error;
+    const updated = await this.findById(id);
+    if (!updated) {
+      throw new Error(`Currency with ID ${id} not found after update`);
     }
+    return updated;
   }
 
   /**
    * Override delete to use stored procedure (soft delete)
    */
   async delete(id: number | string): Promise<void> {
-    try {
-      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.DELETE}(?)`, [id]);
-    } catch (error) {
-      this.logger.error(`Error deleting currency with ID: ${id}`, error);
-      throw error;
-    }
+    await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.DELETE}(?)`, [id]);
   }
 
   /**
@@ -181,31 +139,26 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     limit: number = 10,
     options?: any,
   ): Promise<{ data: Currency[]; total: number; page: number; limit: number }> {
-    try {
-      const skip = calcSkip(page, limit);
-      const includeInactive = options?.includeInactive ?? false;
+    const skip = calcSkip(page, limit);
+    const includeInactive = options?.includeInactive ?? false;
 
-      const result = await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`,
-        [skip, limit, includeInactive],
-      );
+    const result = await this.dataSource.query(
+      `CALL ${CURRENCY_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`,
+      [skip, limit, includeInactive],
+    );
 
-      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.COUNT}(?, @total)`, [
-        includeInactive,
-      ]);
-      const totalResult = await this.dataSource.query('SELECT @total as total');
-      const total = totalResult?.[0]?.total || 0;
+    await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.COUNT}(?, @total)`, [
+      includeInactive,
+    ]);
+    const totalResult = await this.dataSource.query('SELECT @total as total');
+    const total = totalResult?.[0]?.total || 0;
 
-      return {
-        data: result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [],
-        total,
-        page,
-        limit,
-      };
-    } catch (error) {
-      this.logger.error('Error finding currencies with pagination', error);
-      throw error;
-    }
+    return {
+      data: result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [],
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
@@ -225,43 +178,38 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     page: number;
     limit: number;
   }): Promise<{ currencies: Currency[]; total: number; page: number; limit: number }> {
-    try {
-      const skip = calcSkip(params.page, params.limit);
-      const qb = this.dataSource
-        .getRepository(Currency)
-        .createQueryBuilder('c')
-        .orderBy('c.symbol', 'ASC');
+    const skip = calcSkip(params.page, params.limit);
+    const qb = this.dataSource
+      .getRepository(Currency)
+      .createQueryBuilder('c')
+      .orderBy('c.symbol', 'ASC');
 
-      if (params.search?.trim()) {
-        const q = `%${params.search.trim().toUpperCase()}%`;
-        qb.andWhere('(UPPER(c.symbol) LIKE :q OR UPPER(c.name) LIKE :q)', { q });
-      }
-
-      if (params.isTradable !== undefined) {
-        qb.andWhere('c.is_tradable = :isTradable', { isTradable: params.isTradable });
-      }
-
-      if (params.isActive !== undefined) {
-        qb.andWhere('c.is_active = :isActive', { isActive: params.isActive });
-      } else if (!params.includeInactive) {
-        // Honour the same semantics as sp_currency_find_all:
-        // if includeInactive=false (default) and no explicit isActive filter,
-        // only return active currencies.
-        qb.andWhere('c.is_active = :isActive', { isActive: true });
-      }
-
-      const [rows, total] = await qb.skip(skip).take(params.limit).getManyAndCount();
-
-      return {
-        currencies: rows.map((row) => this.mapProcedureResultToEntity(row)!),
-        total,
-        page: params.page,
-        limit: params.limit,
-      };
-    } catch (error) {
-      this.logger.error('Error in findWithSearch', error);
-      throw error;
+    if (params.search?.trim()) {
+      const q = `%${params.search.trim().toUpperCase()}%`;
+      qb.andWhere('(UPPER(c.symbol) LIKE :q OR UPPER(c.name) LIKE :q)', { q });
     }
+
+    if (params.isTradable !== undefined) {
+      qb.andWhere('c.is_tradable = :isTradable', { isTradable: params.isTradable });
+    }
+
+    if (params.isActive !== undefined) {
+      qb.andWhere('c.is_active = :isActive', { isActive: params.isActive });
+    } else if (!params.includeInactive) {
+      // Honour the same semantics as sp_currency_find_all:
+      // if includeInactive=false (default) and no explicit isActive filter,
+      // only return active currencies.
+      qb.andWhere('c.is_active = :isActive', { isActive: true });
+    }
+
+    const [rows, total] = await qb.skip(skip).take(params.limit).getManyAndCount();
+
+    return {
+      currencies: rows.map((row) => this.mapProcedureResultToEntity(row)!),
+      total,
+      page: params.page,
+      limit: params.limit,
+    };
   }
 
   /**

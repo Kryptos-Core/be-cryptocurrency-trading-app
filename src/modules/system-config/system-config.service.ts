@@ -94,7 +94,7 @@ export class SystemConfigService implements OnModuleInit {
   private subscribeToPubSub() {
     const subscriber = this.redisService.getSubscriber();
     if (subscriber) {
-      subscriber.subscribe(this.UPDATE_EVENT, (err: Error | null) => {
+      subscriber.subscribe(this.UPDATE_EVENT, (err?: Error | null) => {
         if (err) {
           this.logger.error(`Failed to subscribe to ${this.UPDATE_EVENT}`, err.message);
         }

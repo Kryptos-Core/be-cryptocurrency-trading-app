@@ -27,34 +27,24 @@ export class UsersRepository {
    * Find user by ID using stored procedure (UUID string)
    */
   async findById(userId: string): Promise<User | null> {
-    try {
-      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-        userId,
-      ]);
+    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+      userId,
+    ]);
 
-      // Stored procedure returns array of results
-      // First element is the actual result set
-      return spFirstRow<User>(result);
-    } catch (error) {
-      this.logger.error(`Error finding user by ID: ${userId}`, error);
-      throw error;
-    }
+    // Stored procedure returns array of results
+    // First element is the actual result set
+    return spFirstRow<User>(result);
   }
 
   /**
    * Find user by email (used for login)
    */
   async findByEmail(email: string): Promise<User | null> {
-    try {
-      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`, [
-        email.toLowerCase(),
-      ]);
+    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`, [
+      email.toLowerCase(),
+    ]);
 
-      return spFirstRow<User>(result);
-    } catch (error) {
-      this.logger.error(`Error finding user by email: ${email}`, error);
-      throw error;
-    }
+    return spFirstRow<User>(result);
   }
 
   /**
@@ -70,56 +60,51 @@ export class UsersRepository {
   async findAllWithFilters(
     filters: UserFilterDto,
   ): Promise<{ users: User[]; total: number; page: number; limit: number }> {
-    try {
-      const page = filters.page ?? 1;
-      const limit = filters.limit ?? 20;
-      const skip = calcSkip(page, limit);
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = calcSkip(page, limit);
 
-      const qb = this.dataSource
-        .getRepository(User)
-        .createQueryBuilder('u')
-        .select([
-          'u.user_id',
-          'u.email',
-          'u.first_name',
-          'u.last_name',
-          'u.role',
-          'u.status',
-          'u.avatar_url',
-          'u.two_fa_enabled',
-          'u.identity_verified',
-          'u.email_verified',
-          'u.created_at',
-        ]);
+    const qb = this.dataSource
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .select([
+        'u.user_id',
+        'u.email',
+        'u.first_name',
+        'u.last_name',
+        'u.role',
+        'u.status',
+        'u.avatar_url',
+        'u.two_fa_enabled',
+        'u.identity_verified',
+        'u.email_verified',
+        'u.created_at',
+      ]);
 
-      if (filters.search) {
-        const s = `%${filters.search.trim()}%`;
-        qb.andWhere('(u.email LIKE :s OR u.first_name LIKE :s OR u.last_name LIKE :s)', { s });
-      }
-
-      if (filters.email) {
-        qb.andWhere('u.email = :email', { email: filters.email.toLowerCase().trim() });
-      }
-
-      if (filters.role) {
-        qb.andWhere('u.role = :role', { role: filters.role });
-      }
-
-      if (filters.status) {
-        qb.andWhere('u.status = :status', { status: filters.status });
-      }
-
-      const sortColumn = filters.sortBy ?? 'created_at';
-      const sortDir = filters.sortOrder ?? 'DESC';
-      qb.orderBy(`u.${sortColumn}`, sortDir);
-
-      const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
-
-      return { users, total, page, limit };
-    } catch (error) {
-      this.logger.error('Error finding users with filters', error);
-      throw error;
+    if (filters.search) {
+      const s = `%${filters.search.trim()}%`;
+      qb.andWhere('(u.email LIKE :s OR u.first_name LIKE :s OR u.last_name LIKE :s)', { s });
     }
+
+    if (filters.email) {
+      qb.andWhere('u.email = :email', { email: filters.email.toLowerCase().trim() });
+    }
+
+    if (filters.role) {
+      qb.andWhere('u.role = :role', { role: filters.role });
+    }
+
+    if (filters.status) {
+      qb.andWhere('u.status = :status', { status: filters.status });
+    }
+
+    const sortColumn = filters.sortBy ?? 'created_at';
+    const sortDir = filters.sortOrder ?? 'DESC';
+    qb.orderBy(`u.${sortColumn}`, sortDir);
+
+    const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
+
+    return { users, total, page, limit };
   }
 
   /**
@@ -141,26 +126,21 @@ export class UsersRepository {
     }>;
     total: number;
   }> {
-    try {
-      const skip = calcSkip(page, limit);
-      const rows = await this.dataSource.query(
-        `SELECT request_id, change_type, status, requested_at, reviewed_at, reviewed_by, review_note
+    const skip = calcSkip(page, limit);
+    const rows = await this.dataSource.query(
+      `SELECT request_id, change_type, status, requested_at, reviewed_at, reviewed_by, review_note
          FROM user_security_change_requests
          WHERE user_id = ?
          ORDER BY requested_at DESC
          LIMIT ? OFFSET ?`,
-        [userId, limit, skip],
-      );
-      const countResult = await this.dataSource.query(
-        'SELECT COUNT(*) AS total FROM user_security_change_requests WHERE user_id = ?',
-        [userId],
-      );
-      const total = Number(countResult[0]?.total ?? 0);
-      return { items: rows ?? [], total };
-    } catch (error) {
-      this.logger.error(`Error finding security changes for user: ${userId}`, error);
-      throw error;
-    }
+      [userId, limit, skip],
+    );
+    const countResult = await this.dataSource.query(
+      'SELECT COUNT(*) AS total FROM user_security_change_requests WHERE user_id = ?',
+      [userId],
+    );
+    const total = Number(countResult[0]?.total ?? 0);
+    return { items: rows ?? [], total };
   }
 
   /**
@@ -173,26 +153,21 @@ export class UsersRepository {
     lastName?: string | null,
     role: UserRole = UserRole.TRADER,
   ): Promise<User> {
-    try {
-      const userId = newUuid();
-      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
-        userId,
-        email.toLowerCase(),
-        passwordHash,
-        firstName ?? null,
-        lastName ?? null,
-        role,
-      ]);
+    const userId = newUuid();
+    await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
+      userId,
+      email.toLowerCase(),
+      passwordHash,
+      firstName ?? null,
+      lastName ?? null,
+      role,
+    ]);
 
-      const createdUser = await this.findById(userId);
-      if (!createdUser) {
-        throw new Error(`Created user ${userId} was not found`);
-      }
-      return createdUser;
-    } catch (error) {
-      this.logger.error(`Error creating user: ${email}`, error);
-      throw error;
+    const createdUser = await this.findById(userId);
+    if (!createdUser) {
+      throw new Error(`Created user ${userId} was not found`);
     }
+    return createdUser;
   }
 
   /**
@@ -209,35 +184,24 @@ export class UsersRepository {
     userId: string,
     updates: { email?: string; status?: string; role?: UserRole; identityVerified?: boolean },
   ): Promise<void> {
-    try {
-      const idvArg =
-        updates.identityVerified === undefined ? null : updates.identityVerified ? 1 : 0;
-      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?)`, [
-        userId,
-        updates.email ? updates.email.toLowerCase() : null,
-        updates.status || null,
-        updates.role || null,
-        idvArg,
-      ]);
+    const idvArg = updates.identityVerified === undefined ? null : updates.identityVerified ? 1 : 0;
+    await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?)`, [
+      userId,
+      updates.email ? updates.email.toLowerCase() : null,
+      updates.status || null,
+      updates.role || null,
+      idvArg,
+    ]);
 
-      this.logger.log(`User updated: ${userId}`);
-    } catch (error) {
-      this.logger.error(`Error updating user: ${userId}`, error);
-      throw error;
-    }
+    this.logger.log(`User updated: ${userId}`);
   }
 
   /**
    * Delete user (soft delete - set status to BANNED)
    */
   async delete(userId: string): Promise<void> {
-    try {
-      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.DELETE}(?)`, [userId]);
-      this.logger.log(`User deleted (soft): ${userId}`);
-    } catch (error) {
-      this.logger.error(`Error deleting user: ${userId}`, error);
-      throw error;
-    }
+    await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.DELETE}(?)`, [userId]);
+    this.logger.log(`User deleted (soft): ${userId}`);
   }
 
   /**
@@ -249,45 +213,34 @@ export class UsersRepository {
     banned: number;
     pending: number;
   }> {
-    try {
-      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`);
+    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`);
 
-      const stats =
-        spFirstRow<{
-          total: number;
-          active: number;
-          banned: number;
-          pending: number;
-        }>(result) || {
-        total: 0,
-        active: 0,
-        banned: 0,
-        pending: 0,
-      };
+    const stats = spFirstRow<{
+      total: number;
+      active: number;
+      banned: number;
+      pending: number;
+    }>(result) || {
+      total: 0,
+      active: 0,
+      banned: 0,
+      pending: 0,
+    };
 
-      return stats;
-    } catch (error) {
-      this.logger.error('Error getting user statistics', error);
-      throw error;
-    }
+    return stats;
   }
 
   /**
    * Check if email exists (excluding specific user ID)
    */
   async emailExists(email: string, excludeUserId?: string): Promise<boolean> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.EMAIL_EXISTS}(?, ?)`,
-        [email.toLowerCase(), excludeUserId || null],
-      );
+    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.EMAIL_EXISTS}(?, ?)`, [
+      email.toLowerCase(),
+      excludeUserId || null,
+    ]);
 
-      const count = Number(spFirstValue<number>(result, 'count') ?? 0);
-      return count > 0;
-    } catch (error) {
-      this.logger.error(`Error checking email: ${email}`, error);
-      throw error;
-    }
+    const count = Number(spFirstValue<number>(result, 'count') ?? 0);
+    return count > 0;
   }
 
   /** Đánh dấu đã xác minh inbox qua OTP (2FA / email liên hệ ví). */
@@ -306,17 +259,12 @@ export class UsersRepository {
     firstName: string | null,
     lastName: string | null,
   ): Promise<number> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.UPDATE_PROFILE_BASIC}(?, ?, ?)`,
-        [userId, firstName ?? null, lastName ?? null],
-      );
-      const affected = spFirstValue<number>(result, 'affected') ?? 0;
-      return Number(affected);
-    } catch (error) {
-      this.logger.error(`Error updating profile basic: ${userId}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${USER_STORE_PROCEDURE.UPDATE_PROFILE_BASIC}(?, ?, ?)`,
+      [userId, firstName ?? null, lastName ?? null],
+    );
+    const affected = spFirstValue<number>(result, 'affected') ?? 0;
+    return Number(affected);
   }
 
   /**
@@ -327,17 +275,12 @@ export class UsersRepository {
     avatarUrl: string | null,
     avatarPublicId: string | null,
   ): Promise<number> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.UPDATE_AVATAR}(?, ?, ?)`,
-        [userId, avatarUrl ?? null, avatarPublicId ?? null],
-      );
-      const affected = spFirstValue<number>(result, 'affected') ?? 0;
-      return Number(affected);
-    } catch (error) {
-      this.logger.error(`Error updating avatar: ${userId}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${USER_STORE_PROCEDURE.UPDATE_AVATAR}(?, ?, ?)`,
+      [userId, avatarUrl ?? null, avatarPublicId ?? null],
+    );
+    const affected = spFirstValue<number>(result, 'affected') ?? 0;
+    return Number(affected);
   }
 
   /**
@@ -349,16 +292,11 @@ export class UsersRepository {
     changeType: string,
     payload: Record<string, unknown>,
   ): Promise<string> {
-    try {
-      await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_CREATE}(?, ?, ?, ?)`,
-        [requestId, userId, changeType, JSON.stringify(payload)],
-      );
-      return requestId;
-    } catch (error) {
-      this.logger.error(`Error creating security change request: ${userId}`, error);
-      throw error;
-    }
+    await this.dataSource.query(
+      `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_CREATE}(?, ?, ?, ?)`,
+      [requestId, userId, changeType, JSON.stringify(payload)],
+    );
+    return requestId;
   }
 
   /**
@@ -376,15 +314,10 @@ export class UsersRepository {
       last_name: string | null;
     }>
   > {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_FIND_PENDING}()`,
-      );
-      return result[0] ?? [];
-    } catch (error) {
-      this.logger.error('Error finding pending security change requests', error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_FIND_PENDING}()`,
+    );
+    return result[0] ?? [];
   }
 
   /**
@@ -396,30 +329,20 @@ export class UsersRepository {
     approve: boolean,
     reviewNote: string | null,
   ): Promise<{ request_id: string; user_id: string; status: string } | null> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_REVIEW}(?, ?, ?, ?)`,
-        [requestId, reviewedBy, approve ? 1 : 0, reviewNote ?? null],
-      );
-      return spFirstRow<{ request_id: string; user_id: string; status: string }>(result);
-    } catch (error) {
-      this.logger.error(`Error reviewing security change request: ${requestId}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_REVIEW}(?, ?, ?, ?)`,
+      [requestId, reviewedBy, approve ? 1 : 0, reviewNote ?? null],
+    );
+    return spFirstRow<{ request_id: string; user_id: string; status: string }>(result);
   }
 
   /**
    * Save / clear FCM device token for push notifications
    */
   async saveFcmToken(userId: string, fcmToken: string | null): Promise<void> {
-    try {
-      await this.dataSource.query('UPDATE users SET fcm_token = ? WHERE user_id = ?', [
-        fcmToken,
-        userId,
-      ]);
-    } catch (error) {
-      this.logger.error(`Error saving FCM token for user: ${userId}`, error);
-      throw error;
-    }
+    await this.dataSource.query('UPDATE users SET fcm_token = ? WHERE user_id = ?', [
+      fcmToken,
+      userId,
+    ]);
   }
 }

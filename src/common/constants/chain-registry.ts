@@ -207,4 +207,3 @@ export function nativeSymbolForChain(network: BlockchainNetwork): string {
       throw new Error(`nativeSymbolForChain: unsupported ${network}`);
   }
 }
-

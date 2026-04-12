@@ -9,6 +9,10 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import {
+  DECIMAL_36_18_COLUMN,
+  DECIMAL_36_18_NULLABLE_COLUMN,
+} from '@/common/constants/column-types';
 import { MarketPair } from './market-pair.entity';
 import { User } from './user.entity';
 
@@ -33,7 +37,7 @@ export class MarketMakerConfig {
   @Column({ type: 'int', unsigned: true, default: 0 })
   spread_alert_threshold_bps!: number;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   order_amount!: string;
 
   @Column({ type: 'boolean', default: true })
@@ -42,7 +46,7 @@ export class MarketMakerConfig {
   @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
   stop_loss_pct!: string | null;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   max_position_base!: string | null;
 
   @CreateDateColumn()

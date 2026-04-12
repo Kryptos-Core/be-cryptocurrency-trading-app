@@ -87,134 +87,109 @@ export class BinanceExchangeService implements IExchangeProvider {
 
     this.logger.debug(`[Binance] ${method} ${endpoint}`);
 
-    try {
-      return await this.binanceRestClient.signedRequest({
-        baseUrl: this.baseUrl,
-        endpoint,
-        method,
-        apiKey: this.apiKey,
-        apiSecret: this.apiSecret,
-        params,
-        timestamp: this.getTimestamp(),
-        recvWindow: 60000,
-      });
-    } catch (error) {
-      this.logger.error(`Binance API request failed:`, error);
-      throw error;
-    }
+    return await this.binanceRestClient.signedRequest({
+      baseUrl: this.baseUrl,
+      endpoint,
+      method,
+      apiKey: this.apiKey,
+      apiSecret: this.apiSecret,
+      params,
+      timestamp: this.getTimestamp(),
+      recvWindow: 60000,
+    });
   }
 
   async getBalance(asset: string): Promise<ExchangeBalanceDto> {
     this.logger.debug(`Getting balance for ${asset}`);
 
-    try {
-      const response = await this.makeRequest('/api/v3/account', 'GET');
+    const response = await this.makeRequest('/api/v3/account', 'GET');
 
-      const balances = response?.balances || [];
-      const assetBalance = balances.find((b: any) => b.asset === asset);
+    const balances = response?.balances || [];
+    const assetBalance = balances.find((b: any) => b.asset === asset);
 
-      if (!assetBalance) {
-        return {
-          available: new Decimal(0),
-          frozen: new Decimal(0),
-          total: new Decimal(0),
-          currency: asset,
-          timestamp: new Date(),
-        };
-      }
-
-      const available = new Decimal(assetBalance.free || 0);
-      const frozen = new Decimal(assetBalance.locked || 0);
-
+    if (!assetBalance) {
       return {
-        available,
-        frozen,
-        total: available.plus(frozen),
+        available: new Decimal(0),
+        frozen: new Decimal(0),
+        total: new Decimal(0),
         currency: asset,
         timestamp: new Date(),
       };
-    } catch (error) {
-      this.logger.error(`Failed to get balance for ${asset}:`, error);
-      throw error;
     }
+
+    const available = new Decimal(assetBalance.free || 0);
+    const frozen = new Decimal(assetBalance.locked || 0);
+
+    return {
+      available,
+      frozen,
+      total: available.plus(frozen),
+      currency: asset,
+      timestamp: new Date(),
+    };
   }
 
   async createOrder(params: ExchangeOrderParams): Promise<ExchangeOrderResponse> {
     this.logger.debug(`Creating order:`, params);
 
-    try {
-      const orderParams: Record<string, any> = {
-        symbol: params.symbol,
-        side: params.side,
-        type: params.type,
-        quantity: params.quantity.toString(),
-      };
+    const orderParams: Record<string, any> = {
+      symbol: params.symbol,
+      side: params.side,
+      type: params.type,
+      quantity: params.quantity.toString(),
+    };
 
-      if (params.price) {
-        orderParams.price = params.price.toString();
-      }
-
-      if (params.timeInForce) {
-        orderParams.timeInForce = params.timeInForce;
-      }
-
-      const response = await this.makeRequest('/fapi/v1/order', 'POST', orderParams);
-
-      return {
-        orderId: response.orderId.toString(),
-        symbol: response.symbol,
-        status: response.status,
-        side: response.side,
-        type: response.type,
-        price: new Decimal(response.price || 0),
-        quantity: new Decimal(response.origQty || 0),
-        executedQty: new Decimal(response.executedQty || 0),
-        timestamp: new Date(response.updateTime),
-      };
-    } catch (error) {
-      this.logger.error(`Failed to create order:`, error);
-      throw error;
+    if (params.price) {
+      orderParams.price = params.price.toString();
     }
+
+    if (params.timeInForce) {
+      orderParams.timeInForce = params.timeInForce;
+    }
+
+    const response = await this.makeRequest('/fapi/v1/order', 'POST', orderParams);
+
+    return {
+      orderId: response.orderId.toString(),
+      symbol: response.symbol,
+      status: response.status,
+      side: response.side,
+      type: response.type,
+      price: new Decimal(response.price || 0),
+      quantity: new Decimal(response.origQty || 0),
+      executedQty: new Decimal(response.executedQty || 0),
+      timestamp: new Date(response.updateTime),
+    };
   }
 
   async cancelOrder(orderId: string, symbol: string): Promise<void> {
     this.logger.debug(`Canceling order ${orderId} for ${symbol}`);
 
-    try {
-      await this.makeRequest('/fapi/v1/order', 'DELETE', {
-        symbol,
-        orderId,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to cancel order ${orderId}:`, error);
-      throw error;
-    }
+    await this.makeRequest('/fapi/v1/order', 'DELETE', {
+      symbol,
+      orderId,
+    });
   }
 
   async getOrderStatus(orderId: string, symbol: string): Promise<ExchangeOrderResponse> {
     this.logger.debug(`Getting order status ${orderId}`);
 
-    try {
-      const response = await this.makeRequest('/fapi/v1/order', 'GET', {
-        symbol,
-        orderId,
-      });
+    const response = await this.makeRequest('/fapi/v1/order', 'GET', {
+      symbol,
+      orderId,
+    });
 
-      return {
-        orderId: response.orderId.toString(),
-        symbol: response.symbol,
-        status: response.status,
-        side: response.side,
-        type: response.type,
-        price: new Decimal(response.price || 0),
-        quantity: new Decimal(response.origQty || 0),
-        executedQty: new Decimal(response.executedQty || 0),
-        timestamp: new Date(response.updateTime),
-      };
-    } catch (error) {
-      this.logger.error(`Failed to get order status:`, error);
-      throw error;
-    }
+    return {
+      orderId: response.orderId.toString(),
+      symbol: response.symbol,
+      status: response.status,
+      side: response.side,
+      type: response.type,
+      price: new Decimal(response.price || 0),
+      quantity: new Decimal(response.origQty || 0),
+      executedQty: new Decimal(response.executedQty || 0),
+      timestamp: new Date(response.updateTime),
+    };
   }
 
   async verifyTransaction(txId: string, asset: string): Promise<boolean> {

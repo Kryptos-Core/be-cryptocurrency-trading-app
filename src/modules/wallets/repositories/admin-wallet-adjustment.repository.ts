@@ -34,28 +34,23 @@ export class AdminWalletAdjustmentRepository extends BaseRepository<AdminWalletA
     params: CreateAdjustmentParams,
     manager?: EntityManager,
   ): Promise<AdminAdjustWalletResponseDto> {
-    try {
-      const result = await (manager ?? this.dataSource).query(
-        `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
-        [
-          params.adjustmentId,
-          params.actorUserId,
-          params.targetUserId,
-          params.currencyId,
-          params.amount,
-          params.type,
-          params.note ?? null,
-        ],
-      );
-      const row = result?.[0]?.[0];
-      if (!row) {
-        throw new Error('sp_admin_wallet_adjustment_create returned no row');
-      }
-      return this.mapRow(row);
-    } catch (error) {
-      this.logger.error('Error creating admin wallet adjustment', error);
-      throw error;
+    const result = await (manager ?? this.dataSource).query(
+      `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
+      [
+        params.adjustmentId,
+        params.actorUserId,
+        params.targetUserId,
+        params.currencyId,
+        params.amount,
+        params.type,
+        params.note ?? null,
+      ],
+    );
+    const row = result?.[0]?.[0];
+    if (!row) {
+      throw new Error('sp_admin_wallet_adjustment_create returned no row');
     }
+    return this.mapRow(row);
   }
 
   /**
@@ -67,19 +62,14 @@ export class AdminWalletAdjustmentRepository extends BaseRepository<AdminWalletA
     limit: number = 50,
     offset: number = 0,
   ): Promise<AdminAdjustWalletResponseDto[]> {
-    try {
-      const safeLimit = Math.min(Math.max(limit, 1), 200);
-      const safeOffset = Math.max(offset, 0);
-      const result = await this.dataSource.query(
-        `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.FIND_BY_TARGET}(?, ?, ?)`,
-        [targetUserId, safeLimit, safeOffset],
-      );
-      const rows: any[] = result?.[0] ?? [];
-      return rows.map((row) => this.mapRow(row));
-    } catch (error) {
-      this.logger.error(`Error finding adjustments for target user ${targetUserId}`, error);
-      throw error;
-    }
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const safeOffset = Math.max(offset, 0);
+    const result = await this.dataSource.query(
+      `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.FIND_BY_TARGET}(?, ?, ?)`,
+      [targetUserId, safeLimit, safeOffset],
+    );
+    const rows: any[] = result?.[0] ?? [];
+    return rows.map((row) => this.mapRow(row));
   }
 
   private mapRow(row: any): AdminAdjustWalletResponseDto {

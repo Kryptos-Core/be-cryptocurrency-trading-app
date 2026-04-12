@@ -396,11 +396,7 @@ export class OnchainWithdrawalService {
       toAddress: linkedWallet.address,
     };
 
-    await this.cacheService.set(
-      idemCacheKey,
-      result,
-      OnchainWithdrawalService.WITHDRAWAL_IDEM_TTL,
-    );
+    await this.cacheService.set(idemCacheKey, result, OnchainWithdrawalService.WITHDRAWAL_IDEM_TTL);
 
     this.treasuryLog('withdraw.request.result', {
       userId,

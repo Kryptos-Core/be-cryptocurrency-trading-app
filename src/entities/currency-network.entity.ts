@@ -1,4 +1,5 @@
 import { Column, Entity, ForeignKey, Index, ManyToOne, OneToMany, PrimaryColumn } from 'typeorm';
+import { DECIMAL_36_18_DEFAULT_0_COLUMN } from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 
 @Entity('currency_networks')
@@ -25,7 +26,7 @@ export class CurrencyNetwork {
   @Column({ type: 'int', default: 12 })
   min_confirmations!: number;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   withdraw_fee!: string;
 
   @ManyToOne(

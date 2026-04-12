@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
+import { DECIMAL_36_18_COLUMN } from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 import { User } from './user.entity';
 import { Wallet } from './wallet.entity';
@@ -66,10 +67,10 @@ export class WalletLedger {
   @Column({ type: 'enum', enum: ['CREDIT', 'DEBIT'] })
   direction!: 'CREDIT' | 'DEBIT';
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   balance_after!: string;
 
   @CreateDateColumn()

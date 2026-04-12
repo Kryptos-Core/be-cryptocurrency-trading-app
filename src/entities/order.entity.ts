@@ -10,6 +10,11 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import {
+  DECIMAL_36_18_COLUMN,
+  DECIMAL_36_18_DEFAULT_0_COLUMN,
+  DECIMAL_36_18_NULLABLE_COLUMN,
+} from '@/common/constants/column-types';
 import { MarketPair } from './market-pair.entity';
 import { User } from './user.entity';
 
@@ -36,16 +41,16 @@ export class Order {
   @Column({ type: 'enum', enum: ['LIMIT', 'MARKET'] })
   type!: 'LIMIT' | 'MARKET';
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   price!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   filled_amount!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   avg_price!: string;
 
   @Column({
@@ -62,10 +67,10 @@ export class Order {
   })
   time_in_force!: 'GTC' | 'IOC' | 'FOK';
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   reserved_quote!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   reserved_base!: string;
 
   @Column({ type: 'varchar', length: 64, nullable: true })
@@ -74,7 +79,7 @@ export class Order {
   @Column({ type: 'varchar', length: 64 })
   idempotency_key!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
+  @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   slippage_tolerance!: string | null;
 
   @CreateDateColumn()

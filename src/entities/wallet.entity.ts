@@ -8,6 +8,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { DECIMAL_36_18_DEFAULT_0_COLUMN } from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 import { User } from './user.entity';
 
@@ -28,10 +29,10 @@ export class Wallet {
   @ForeignKey(() => Currency)
   currency_id!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   available!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   frozen!: string;
 
   @UpdateDateColumn()

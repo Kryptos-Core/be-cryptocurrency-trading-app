@@ -8,6 +8,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { DECIMAL_36_18_COLUMN } from '@/common/constants/column-types';
 import { User } from './user.entity';
 
 @Entity('fiat_deposits')
@@ -20,7 +21,7 @@ export class FiatDeposit {
   @Column({ type: 'char', length: 36 })
   user_id!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
   @Column({

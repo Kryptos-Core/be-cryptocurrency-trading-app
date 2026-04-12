@@ -64,40 +64,25 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Automatically uses the correct primary key field name
    */
   async findById(id: number | string): Promise<T | null> {
-    try {
-      const primaryKeyName = this.getPrimaryKeyName();
-      const whereClause = { [primaryKeyName]: id } as unknown as FindOptionsWhere<T>;
-      return await this.repository.findOne({
-        where: whereClause,
-      } as FindOneOptions<T>);
-    } catch (error) {
-      this.logger.error(`Error finding ${this.entity.toString()} by ID: ${id}`, error);
-      throw error;
-    }
+    const primaryKeyName = this.getPrimaryKeyName();
+    const whereClause = { [primaryKeyName]: id } as unknown as FindOptionsWhere<T>;
+    return await this.repository.findOne({
+      where: whereClause,
+    } as FindOneOptions<T>);
   }
 
   /**
    * Find one entity by options
    */
   async findOne(options: FindOneOptions<T>): Promise<T | null> {
-    try {
-      return await this.repository.findOne(options);
-    } catch (error) {
-      this.logger.error(`Error finding one ${this.entity.toString()}`, error);
-      throw error;
-    }
+    return await this.repository.findOne(options);
   }
 
   /**
    * Find entities by options
    */
   async find(options?: FindManyOptions<T>): Promise<T[]> {
-    try {
-      return await this.repository.find(options);
-    } catch (error) {
-      this.logger.error(`Error finding ${this.entity.toString()}`, error);
-      throw error;
-    }
+    return await this.repository.find(options);
   }
 
   /**
@@ -109,51 +94,36 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     limit: number = 10,
     options?: FindManyOptions<T>,
   ): Promise<{ data: T[]; total: number; page: number; limit: number }> {
-    try {
-      const skip = calcSkip(page, limit);
-      const take = limit;
+    const skip = calcSkip(page, limit);
+    const take = limit;
 
-      const [data, total] = await this.repository.findAndCount({
-        ...options,
-        skip,
-        take,
-      });
+    const [data, total] = await this.repository.findAndCount({
+      ...options,
+      skip,
+      take,
+    });
 
-      return {
-        data,
-        total,
-        page,
-        limit,
-      };
-    } catch (error) {
-      this.logger.error(`Error finding ${this.entity.toString()} with pagination`, error);
-      throw error;
-    }
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
    * Count entities
    */
   async count(options?: FindManyOptions<T>): Promise<number> {
-    try {
-      return await this.repository.count(options);
-    } catch (error) {
-      this.logger.error(`Error counting ${this.entity.toString()}`, error);
-      throw error;
-    }
+    return await this.repository.count(options);
   }
 
   /**
    * Check if entity exists
    */
   async exists(options: FindOptionsWhere<T>): Promise<boolean> {
-    try {
-      const count = await this.repository.count({ where: options });
-      return count > 0;
-    } catch (error) {
-      this.logger.error(`Error checking existence of ${this.entity.toString()}`, error);
-      throw error;
-    }
+    const count = await this.repository.count({ where: options });
+    return count > 0;
   }
 
   /**
@@ -161,26 +131,16 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Template Method: Base create implementation
    */
   async create(entity: DeepPartial<T>): Promise<T> {
-    try {
-      const newEntity = this.repository.create(entity);
-      return await this.repository.save(newEntity);
-    } catch (error) {
-      this.logger.error(`Error creating ${this.entity.toString()}`, error);
-      throw error;
-    }
+    const newEntity = this.repository.create(entity);
+    return await this.repository.save(newEntity);
   }
 
   /**
    * Create multiple entities
    */
   async createMany(entities: DeepPartial<T>[]): Promise<T[]> {
-    try {
-      const newEntities = this.repository.create(entities);
-      return await this.repository.save(newEntities);
-    } catch (error) {
-      this.logger.error(`Error creating multiple ${this.entity.toString()}`, error);
-      throw error;
-    }
+    const newEntities = this.repository.create(entities);
+    return await this.repository.save(newEntities);
   }
 
   /**
@@ -189,32 +149,22 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Automatically uses the correct primary key field name
    */
   async update(id: number | string, entity: DeepPartial<T>): Promise<T> {
-    try {
-      const primaryKeyName = this.getPrimaryKeyName();
-      const whereClause = { [primaryKeyName]: id } as any;
-      await this.repository.update(whereClause, entity as any);
-      const updated = await this.findById(id);
-      if (!updated) {
-        throw new Error(`Entity with ID ${id} not found after update`);
-      }
-      return updated;
-    } catch (error) {
-      this.logger.error(`Error updating ${this.entity.toString()} with ID: ${id}`, error);
-      throw error;
+    const primaryKeyName = this.getPrimaryKeyName();
+    const whereClause = { [primaryKeyName]: id } as any;
+    await this.repository.update(whereClause, entity as any);
+    const updated = await this.findById(id);
+    if (!updated) {
+      throw new Error(`Entity with ID ${id} not found after update`);
     }
+    return updated;
   }
 
   /**
    * Update entities by criteria
    */
   async updateMany(criteria: FindOptionsWhere<T>, entity: DeepPartial<T>): Promise<number> {
-    try {
-      const result = await this.repository.update(criteria, entity as any);
-      return result.affected || 0;
-    } catch (error) {
-      this.logger.error(`Error updating multiple ${this.entity.toString()}`, error);
-      throw error;
-    }
+    const result = await this.repository.update(criteria, entity as any);
+    return result.affected || 0;
   }
 
   /**
@@ -223,16 +173,11 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Automatically uses the correct primary key field name
    */
   async delete(id: number | string): Promise<void> {
-    try {
-      const primaryKeyName = this.getPrimaryKeyName();
-      const whereClause = { [primaryKeyName]: id } as any;
-      const result = await this.repository.delete(whereClause);
-      if (result.affected === 0) {
-        throw new Error(`Entity with ID ${id} not found`);
-      }
-    } catch (error) {
-      this.logger.error(`Error deleting ${this.entity.toString()} with ID: ${id}`, error);
-      throw error;
+    const primaryKeyName = this.getPrimaryKeyName();
+    const whereClause = { [primaryKeyName]: id } as any;
+    const result = await this.repository.delete(whereClause);
+    if (result.affected === 0) {
+      throw new Error(`Entity with ID ${id} not found`);
     }
   }
 
@@ -240,37 +185,22 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Delete entities by criteria
    */
   async deleteMany(criteria: FindOptionsWhere<T>): Promise<number> {
-    try {
-      const result = await this.repository.delete(criteria);
-      return result.affected || 0;
-    } catch (error) {
-      this.logger.error(`Error deleting multiple ${this.entity.toString()}`, error);
-      throw error;
-    }
+    const result = await this.repository.delete(criteria);
+    return result.affected || 0;
   }
 
   /**
    * Save entity (create or update)
    */
   async save(entity: DeepPartial<T>): Promise<T> {
-    try {
-      return await this.repository.save(entity);
-    } catch (error) {
-      this.logger.error(`Error saving ${this.entity.toString()}`, error);
-      throw error;
-    }
+    return await this.repository.save(entity);
   }
 
   /**
    * Save multiple entities
    */
   async saveMany(entities: DeepPartial<T>[]): Promise<T[]> {
-    try {
-      return await this.repository.save(entities);
-    } catch (error) {
-      this.logger.error(`Error saving multiple ${this.entity.toString()}`, error);
-      throw error;
-    }
+    return await this.repository.save(entities);
   }
 
   /**
@@ -294,12 +224,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Useful for stored procedures or complex queries
    */
   async query(sql: string, parameters?: any[]): Promise<any> {
-    try {
-      return await this.dataSource.query(sql, parameters);
-    } catch (error) {
-      this.logger.error(`Error executing query: ${sql}`, error);
-      throw error;
-    }
+    return await this.dataSource.query(sql, parameters);
   }
 
   /**
@@ -307,11 +232,6 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
    * Template Method: Transaction wrapper
    */
   async transaction<R>(fn: (manager: any) => Promise<R>): Promise<R> {
-    try {
-      return await this.dataSource.transaction(fn);
-    } catch (error) {
-      this.logger.error(`Error in transaction`, error);
-      throw error;
-    }
+    return await this.dataSource.transaction(fn);
   }
 }

@@ -11,9 +11,9 @@ import {
   ConflictException,
   UnauthorizedException,
 } from '@/common/exceptions';
+import { formatName } from '@/common/utils/name.util';
 import type { User } from '@/entities/user.entity';
 import { UsersRepository } from '@/modules/users/repositories';
-import { formatName } from '@/utils/helpers';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
 import { AuthRepository } from './repositories';
 import { TwoFaService } from './two-fa.service';

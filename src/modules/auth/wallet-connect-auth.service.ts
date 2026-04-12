@@ -9,6 +9,13 @@ import { BlockchainNetwork } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { WcSessionStatus } from '@/modules/blockchain/wallet-connect/dto';
+import {
+  formatWalletConnectInitError,
+  parseSolanaCaip10Account,
+  resolveWalletConnectProjectId,
+  solanaWcResultToBackendSignature,
+  withWalletConnectTimeout,
+} from '@/modules/blockchain/wallet-connect/wallet-connect-common.util';
 import { withWalletConnectSignClientLock } from '@/modules/blockchain/wallet-connect/wallet-connect-sign-client-gate';
 import {
   WC_RELAY_PAIRING_CHAINS,
@@ -17,13 +24,6 @@ import {
 import type { WcApprovedSession, WcConnectPairingResult } from '@/types/walletconnect-session';
 import type { WalletAuthResult } from './wallet-auth.service';
 import { WalletAuthService } from './wallet-auth.service';
-import {
-  formatWalletConnectInitError,
-  parseSolanaCaip10Account,
-  resolveWalletConnectProjectId,
-  solanaWcResultToBackendSignature,
-  withWalletConnectTimeout,
-} from '@/modules/blockchain/wallet-connect/wallet-connect-common.util';
 
 /**
  * Public WalletConnect login session (no JWT để init).

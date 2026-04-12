@@ -8,13 +8,6 @@ import { uuidv7 } from 'uuidv7';
 import { BlockchainNetwork } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import {
-  formatWalletConnectInitError,
-  parseSolanaCaip10Account,
-  resolveWalletConnectProjectId,
-  solanaWcResultToBackendSignature,
-  withWalletConnectTimeout,
-} from './wallet-connect-common.util';
-import {
   isWcEvmChain,
   WC_RELAY_PAIRING_CHAINS,
   wcCaip2ForChain,
@@ -23,6 +16,13 @@ import type { WcApprovedSession, WcConnectPairingResult } from '@/types/walletco
 import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { WalletLinkingService } from '../wallet-linking.service';
 import { type WcSessionData, WcSessionStatus } from './dto';
+import {
+  formatWalletConnectInitError,
+  parseSolanaCaip10Account,
+  resolveWalletConnectProjectId,
+  solanaWcResultToBackendSignature,
+  withWalletConnectTimeout,
+} from './wallet-connect-common.util';
 import { WalletConnectSessionManager } from './wallet-connect-session-manager.service';
 import { withWalletConnectSignClientLock } from './wallet-connect-sign-client-gate';
 
@@ -686,5 +686,4 @@ export class WalletConnectService implements OnModuleInit {
     const expected = createHmac('sha256', this.webhookSecret).update(body).digest('hex');
     return expected === signature;
   }
-
 }

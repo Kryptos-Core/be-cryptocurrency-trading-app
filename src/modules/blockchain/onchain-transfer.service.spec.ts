@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { BlockchainNetwork, OnchainTxStatus } from '@/common/enums';
 import { OnchainDepositService } from './onchain-deposit.service';
-import { OnchainTransferQueryService } from './onchain-transfer-query.service';
 import { OnchainTransferService } from './onchain-transfer.service';
+import { OnchainTransferQueryService } from './onchain-transfer-query.service';
 import { OnchainWithdrawalService } from './onchain-withdrawal.service';
 
 describe('OnchainTransferService', () => {
@@ -113,7 +113,10 @@ describe('OnchainTransferService', () => {
   });
 
   it('delegates rejectManualWithdrawal to withdrawal service', async () => {
-    withdrawalService.rejectManualWithdrawal.mockResolvedValue({ txId: 'tx-w-1', status: 'FAILED' });
+    withdrawalService.rejectManualWithdrawal.mockResolvedValue({
+      txId: 'tx-w-1',
+      status: 'FAILED',
+    });
 
     const result = await service.rejectManualWithdrawal('admin-1', 'tx-w-1', 'risk');
 
@@ -172,7 +175,10 @@ describe('OnchainTransferService', () => {
   });
 
   it('delegates getAdminWithdrawalStats to query service', async () => {
-    queryService.getAdminWithdrawalStats.mockResolvedValue({ pendingCount: 0, pendingTotalByChain: {} });
+    queryService.getAdminWithdrawalStats.mockResolvedValue({
+      pendingCount: 0,
+      pendingTotalByChain: {},
+    });
 
     const result = await service.getAdminWithdrawalStats();
 

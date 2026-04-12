@@ -7,6 +7,10 @@ import {
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
+import {
+  DECIMAL_36_18_COLUMN,
+  DECIMAL_36_18_DEFAULT_0_COLUMN,
+} from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 import { CurrencyNetwork } from './currency-network.entity';
 import { User } from './user.entity';
@@ -30,10 +34,10 @@ export class Withdrawal {
   @ForeignKey(() => CurrencyNetwork)
   network_id!: string | null;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
+  @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   fee!: string;
 
   @Column({ type: 'varchar', length: 255 })

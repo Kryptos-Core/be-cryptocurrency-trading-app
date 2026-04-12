@@ -34,33 +34,18 @@ export class OrderRepository extends BaseRepository<Order> {
   }
 
   override async findById(id: string): Promise<Order | null> {
-    try {
-      const result = await this.dataSource.query(`CALL ${ORDER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-        id,
-      ]);
-      if (!result?.[0]?.[0]) return null;
-      return this.mapRowToOrder(result[0][0]);
-    } catch (error) {
-      this.logger.error(`Error finding order by id: ${id}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(`CALL ${ORDER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [id]);
+    if (!result?.[0]?.[0]) return null;
+    return this.mapRowToOrder(result[0][0]);
   }
 
   async findByUserIdempotency(userId: string, idempotencyKey: string): Promise<Order | null> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.FIND_BY_USER_IDEMPOTENCY}(?, ?)`,
-        [userId, idempotencyKey],
-      );
-      if (!result?.[0]?.[0]) return null;
-      return this.mapRowToOrder(result[0][0]);
-    } catch (error) {
-      this.logger.error(
-        `Error finding order by idempotency: user=${userId}, key=${idempotencyKey}`,
-        error,
-      );
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${ORDER_STORE_PROCEDURE.FIND_BY_USER_IDEMPOTENCY}(?, ?)`,
+      [userId, idempotencyKey],
+    );
+    if (!result?.[0]?.[0]) return null;
+    return this.mapRowToOrder(result[0][0]);
   }
 
   /**
@@ -84,29 +69,24 @@ export class OrderRepository extends BaseRepository<Order> {
     side: 'BUY' | 'SELL',
     limit: number = 50,
   ): Promise<OrderBookLevel[]> {
-    try {
-      const result = await this.dataSource.query(`CALL ${ORDER_STORE_PROCEDURE.BOOK}(?, ?, ?)`, [
-        pairId,
-        side,
-        limit,
-      ]);
-      const rows = result?.[0] ?? [];
-      return rows
-        .filter((r: any) => {
-          const p = r?.price;
-          if (p == null) return false;
-          const n = Number(p);
-          return Number.isFinite(n) && n > 0;
-        })
-        .map((r: any) => ({
-          price: String(r.price ?? '0'),
-          remaining: String(r.remaining ?? '0'),
-          order_count: Number(r.order_count ?? 0),
-        }));
-    } catch (error) {
-      this.logger.error(`Error getting order book: pair=${pairId}, side=${side}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(`CALL ${ORDER_STORE_PROCEDURE.BOOK}(?, ?, ?)`, [
+      pairId,
+      side,
+      limit,
+    ]);
+    const rows = result?.[0] ?? [];
+    return rows
+      .filter((r: any) => {
+        const p = r?.price;
+        if (p == null) return false;
+        const n = Number(p);
+        return Number.isFinite(n) && n > 0;
+      })
+      .map((r: any) => ({
+        price: String(r.price ?? '0'),
+        remaining: String(r.remaining ?? '0'),
+        order_count: Number(r.order_count ?? 0),
+      }));
   }
 
   async createOrderViaProcedure(params: {
@@ -123,59 +103,49 @@ export class OrderRepository extends BaseRepository<Order> {
     slippageTolerance: string | null;
     marketBuyReservedQuote: string | null;
   }): Promise<CreateOrderProcedureResult> {
-    try {
-      await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)`,
-        [
-          params.orderId,
-          params.userId,
-          params.pairId,
-          params.side,
-          params.type,
-          params.price ?? null,
-          params.amount,
-          params.timeInForce,
-          params.clientOrderId ?? null,
-          params.idempotencyKey,
-          params.slippageTolerance,
-          params.marketBuyReservedQuote,
-        ],
-      );
-      const [out] = await this.dataSource.query(
-        'SELECT @p_error_code AS error_code, @p_error_message AS error_message',
-      );
-      return {
-        order_id: out?.error_code ? null : params.orderId,
-        error_code: out?.error_code ?? null,
-        error_message: out?.error_message ?? null,
-      };
-    } catch (error) {
-      this.logger.error('Error creating order via procedure', error);
-      throw error;
-    }
+    await this.dataSource.query(
+      `CALL ${ORDER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_error_code, @p_error_message)`,
+      [
+        params.orderId,
+        params.userId,
+        params.pairId,
+        params.side,
+        params.type,
+        params.price ?? null,
+        params.amount,
+        params.timeInForce,
+        params.clientOrderId ?? null,
+        params.idempotencyKey,
+        params.slippageTolerance,
+        params.marketBuyReservedQuote,
+      ],
+    );
+    const [out] = await this.dataSource.query(
+      'SELECT @p_error_code AS error_code, @p_error_message AS error_message',
+    );
+    return {
+      order_id: out?.error_code ? null : params.orderId,
+      error_code: out?.error_code ?? null,
+      error_message: out?.error_message ?? null,
+    };
   }
 
   async cancelOrderViaProcedure(
     orderId: string,
     userId: string,
   ): Promise<CancelOrderProcedureResult> {
-    try {
-      await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.CANCEL}(?, ?, @p_cancelled, @p_error_code, @p_error_message)`,
-        [orderId, userId],
-      );
-      const [out] = await this.dataSource.query(
-        'SELECT @p_cancelled AS cancelled, @p_error_code AS error_code, @p_error_message AS error_message',
-      );
-      return {
-        cancelled: Number(out?.cancelled ?? 0),
-        error_code: out?.error_code ?? null,
-        error_message: out?.error_message ?? null,
-      };
-    } catch (error) {
-      this.logger.error(`Error cancelling order: ${orderId}`, error);
-      throw error;
-    }
+    await this.dataSource.query(
+      `CALL ${ORDER_STORE_PROCEDURE.CANCEL}(?, ?, @p_cancelled, @p_error_code, @p_error_message)`,
+      [orderId, userId],
+    );
+    const [out] = await this.dataSource.query(
+      'SELECT @p_cancelled AS cancelled, @p_error_code AS error_code, @p_error_message AS error_message',
+    );
+    return {
+      cancelled: Number(out?.cancelled ?? 0),
+      error_code: out?.error_code ?? null,
+      error_message: out?.error_message ?? null,
+    };
   }
 
   async findByUser(
@@ -184,31 +154,21 @@ export class OrderRepository extends BaseRepository<Order> {
     skip: number,
     limit: number,
   ): Promise<Order[]> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.FIND_BY_USER}(?, ?, ?, ?)`,
-        [userId, status ?? '', skip, limit],
-      );
-      const rows = result?.[0] ?? [];
-      return rows.map((r: any) => this.mapRowToOrder(r));
-    } catch (error) {
-      this.logger.error(`Error finding orders by user: ${userId}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${ORDER_STORE_PROCEDURE.FIND_BY_USER}(?, ?, ?, ?)`,
+      [userId, status ?? '', skip, limit],
+    );
+    const rows = result?.[0] ?? [];
+    return rows.map((r: any) => this.mapRowToOrder(r));
   }
 
   async countByUser(userId: string, status: string | null): Promise<number> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.COUNT_BY_USER}(?, ?)`,
-        [userId, status ?? ''],
-      );
-      const total = result?.[0]?.[0]?.total;
-      return Number(total ?? 0);
-    } catch (error) {
-      this.logger.error(`Error counting orders by user: ${userId}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${ORDER_STORE_PROCEDURE.COUNT_BY_USER}(?, ?)`,
+      [userId, status ?? ''],
+    );
+    const total = result?.[0]?.[0]?.total;
+    return Number(total ?? 0);
   }
 
   /** Admin: paginated list of all orders with optional filters */

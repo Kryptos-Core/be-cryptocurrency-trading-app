@@ -23,20 +23,13 @@ export class MatchingProcessor {
     this.logger.debug(
       `Processing match job ${job.id} — order=${takerOrder.order_id} pair=${pairId}`,
     );
-    try {
-      await this.matchingService.runMatch({
-        takerOrder,
-        pairId,
-        feeCurrencyId,
-        makerFeeRate,
-        takerFeeRate,
-        slippageTolerance,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Match job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw error; // Rethrow → Bull retries per enqueueMatch options
-    }
+    await this.matchingService.runMatch({
+      takerOrder,
+      pairId,
+      feeCurrencyId,
+      makerFeeRate,
+      takerFeeRate,
+      slippageTolerance,
+    });
   }
 }

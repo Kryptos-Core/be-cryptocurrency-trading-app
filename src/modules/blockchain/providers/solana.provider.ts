@@ -124,20 +124,15 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
-    try {
-      const pubkey = new PublicKey(address);
-      const lamports = await this.connection.getBalance(pubkey);
-      return {
-        address,
-        network: this.bindings.network,
-        balance: (lamports / LAMPORTS_PER_SOL).toString(),
-        symbol: 'SOL',
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`Error getting Solana balance: ${address}`, error);
-      throw error;
-    }
+    const pubkey = new PublicKey(address);
+    const lamports = await this.connection.getBalance(pubkey);
+    return {
+      address,
+      network: this.bindings.network,
+      balance: (lamports / LAMPORTS_PER_SOL).toString(),
+      symbol: 'SOL',
+      timestamp: new Date(),
+    };
   }
 
   async verifySignature(address: string, message: string, signature: string): Promise<boolean> {

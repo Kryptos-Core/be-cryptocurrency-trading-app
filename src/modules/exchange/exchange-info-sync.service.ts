@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ServiceUnavailableException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
+import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { MarketRepository } from '@/modules/markets/repositories';
-import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 
 /** Cache exchangeInfo 1 hour to avoid Binance request weight / IP ban (418). */
 const EXCHANGE_INFO_CACHE_KEY = 'exchange:binance:exchangeInfo';

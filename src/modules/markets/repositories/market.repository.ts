@@ -27,39 +27,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Supports finding by pair_id or other options
    */
   async findOne(options: any): Promise<MarketPair | null> {
-    try {
-      // If options has a where clause with pair_id, use it
-      if (options?.where?.pair_id !== undefined) {
-        const id = options.where.pair_id;
-        const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-          id,
-        ]);
-        if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
-          return null;
-        }
-        return this.mapProcedureResultToEntity(result[0][0]);
-      }
-
-      // Fallback: try to find by using the parent implementation
-      // This is a safety measure, but normally we should have pair_id in the where clause
-      if (options?.where?.symbol !== undefined) {
-        return this.findBySymbol(options.where.symbol);
-      }
-
-      // If neither pair_id nor symbol is provided, return null
-      return null;
-    } catch (error) {
-      this.logger.error(`Error finding one market pair`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Override findById to use stored procedure
-   * Database Procedure Pattern: sp_market_find_by_id
-   */
-  async findById(id: number | string): Promise<MarketPair | null> {
-    try {
+    // If options has a where clause with pair_id, use it
+    if (options?.where?.pair_id !== undefined) {
+      const id = options.where.pair_id;
       const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
         id,
       ]);
@@ -67,10 +37,30 @@ export class MarketRepository extends BaseRepository<MarketPair> {
         return null;
       }
       return this.mapProcedureResultToEntity(result[0][0]);
-    } catch (error) {
-      this.logger.error(`Error finding market pair by ID: ${id}`, error);
-      throw error;
     }
+
+    // Fallback: try to find by using the parent implementation
+    // This is a safety measure, but normally we should have pair_id in the where clause
+    if (options?.where?.symbol !== undefined) {
+      return this.findBySymbol(options.where.symbol);
+    }
+
+    // If neither pair_id nor symbol is provided, return null
+    return null;
+  }
+
+  /**
+   * Override findById to use stored procedure
+   * Database Procedure Pattern: sp_market_find_by_id
+   */
+  async findById(id: number | string): Promise<MarketPair | null> {
+    const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+      id,
+    ]);
+    if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
+      return null;
+    }
+    return this.mapProcedureResultToEntity(result[0][0]);
   }
 
   /**
@@ -78,19 +68,13 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_find_by_symbol
    */
   async findBySymbol(symbol: string): Promise<MarketPair | null> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.FIND_BY_SYMBOL}(?)`,
-        [symbol.toUpperCase()],
-      );
-      if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
-        return null;
-      }
-      return this.mapProcedureResultToEntity(result[0][0]);
-    } catch (error) {
-      this.logger.error(`Error finding market pair by symbol: ${symbol}`, error);
-      throw error;
+    const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_SYMBOL}(?)`, [
+      symbol.toUpperCase(),
+    ]);
+    if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
+      return null;
     }
+    return this.mapProcedureResultToEntity(result[0][0]);
   }
 
   /**
@@ -101,22 +85,14 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     baseCurrencyId: number,
     quoteCurrencyId: number,
   ): Promise<MarketPair | null> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.FIND_BY_CURRENCIES}(?, ?)`,
-        [baseCurrencyId, quoteCurrencyId],
-      );
-      if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
-        return null;
-      }
-      return this.mapProcedureResultToEntity(result[0][0]);
-    } catch (error) {
-      this.logger.error(
-        `Error finding market pair by currencies: ${baseCurrencyId}/${quoteCurrencyId}`,
-        error,
-      );
-      throw error;
+    const result = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.FIND_BY_CURRENCIES}(?, ?)`,
+      [baseCurrencyId, quoteCurrencyId],
+    );
+    if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
+      return null;
     }
+    return this.mapProcedureResultToEntity(result[0][0]);
   }
 
   /**
@@ -128,32 +104,28 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     limit: number = 10,
     includeInactive: boolean = false,
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
-    try {
-      const skip = calcSkip(page, limit);
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`,
-        [skip, limit, includeInactive],
-      );
+    const skip = calcSkip(page, limit);
+    const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`, [
+      skip,
+      limit,
+      includeInactive,
+    ]);
 
-      // Get total count using stored procedure
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.COUNT}(?, @total)`, [
-        includeInactive,
-      ]);
-      const totalResult = await this.dataSource.query('SELECT @total as total');
-      const total = totalResult[0]?.total || 0;
+    // Get total count using stored procedure
+    await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.COUNT}(?, @total)`, [
+      includeInactive,
+    ]);
+    const totalResult = await this.dataSource.query('SELECT @total as total');
+    const total = totalResult[0]?.total || 0;
 
-      const data = result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
+    const data = result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
 
-      return {
-        data,
-        total,
-        page,
-        limit,
-      };
-    } catch (error) {
-      this.logger.error('Error finding all market pairs', error);
-      throw error;
-    }
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
@@ -170,31 +142,26 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       quoteSymbol?: string | null;
     } = {},
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
-    try {
-      const skip = calcSkip(page, limit);
-      const includeInactive = options.includeInactive ?? false;
-      const search = options.search?.trim() || null;
-      const baseSymbol = options.baseSymbol?.trim() || null;
-      const quoteSymbol = options.quoteSymbol?.trim() || null;
+    const skip = calcSkip(page, limit);
+    const includeInactive = options.includeInactive ?? false;
+    const search = options.search?.trim() || null;
+    const baseSymbol = options.baseSymbol?.trim() || null;
+    const quoteSymbol = options.quoteSymbol?.trim() || null;
 
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL_FILTERED}(?, ?, ?, ?, ?, ?)`,
-        [skip, limit, includeInactive, search, baseSymbol, quoteSymbol],
-      );
+    const result = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL_FILTERED}(?, ?, ?, ?, ?, ?)`,
+      [skip, limit, includeInactive, search, baseSymbol, quoteSymbol],
+    );
 
-      await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.COUNT_FILTERED}(?, ?, ?, ?, @total)`,
-        [includeInactive, search, baseSymbol, quoteSymbol],
-      );
-      const totalResult = await this.dataSource.query('SELECT @total as total');
-      const total = totalResult[0]?.total || 0;
+    await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.COUNT_FILTERED}(?, ?, ?, ?, @total)`,
+      [includeInactive, search, baseSymbol, quoteSymbol],
+    );
+    const totalResult = await this.dataSource.query('SELECT @total as total');
+    const total = totalResult[0]?.total || 0;
 
-      const data = result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
-      return { data, total, page, limit };
-    } catch (error) {
-      this.logger.error('Error finding market pairs with filter', error);
-      throw error;
-    }
+    const data = result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
+    return { data, total, page, limit };
   }
 
   /**
@@ -255,56 +222,49 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       fuzzySearch?: boolean;
     },
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
-    try {
-      const skip = calcSkip(page, limit);
-      const includeInactive = options.includeInactive ?? false;
-      const search = options.search?.trim() ? options.search.trim().toUpperCase() : null;
-      const baseSymbol = options.baseSymbol?.trim()
-        ? options.baseSymbol.trim().toUpperCase()
-        : null;
-      const quoteSymbol = options.quoteSymbol?.trim()
-        ? options.quoteSymbol.trim().toUpperCase()
-        : null;
-      const quoteSymbols = (options.quoteSymbols ?? [])
-        .map((item) => item.trim().toUpperCase())
-        .filter(Boolean);
-      const quoteSymbolsCsv = quoteSymbols.length > 0 ? quoteSymbols.join(',') : null;
+    const skip = calcSkip(page, limit);
+    const includeInactive = options.includeInactive ?? false;
+    const search = options.search?.trim() ? options.search.trim().toUpperCase() : null;
+    const baseSymbol = options.baseSymbol?.trim() ? options.baseSymbol.trim().toUpperCase() : null;
+    const quoteSymbol = options.quoteSymbol?.trim()
+      ? options.quoteSymbol.trim().toUpperCase()
+      : null;
+    const quoteSymbols = (options.quoteSymbols ?? [])
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean);
+    const quoteSymbolsCsv = quoteSymbols.length > 0 ? quoteSymbols.join(',') : null;
 
-      const sortByParam =
-        options.sortBy === 'createdAt' ? 'createdat' : (options.sortBy ?? 'symbol').toLowerCase();
-      const sortOrder = options.sortOrder === 'desc' ? 'desc' : 'asc';
-      const fuzzySearch = options.fuzzySearch === true;
+    const sortByParam =
+      options.sortBy === 'createdAt' ? 'createdat' : (options.sortBy ?? 'symbol').toLowerCase();
+    const sortOrder = options.sortOrder === 'desc' ? 'desc' : 'asc';
+    const fuzzySearch = options.fuzzySearch === true;
 
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL_ADVANCED}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          skip,
-          limit,
-          includeInactive,
-          search,
-          baseSymbol,
-          quoteSymbol,
-          quoteSymbolsCsv,
-          sortByParam,
-          sortOrder,
-          fuzzySearch,
-        ],
-      );
+    const result = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL_ADVANCED}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        skip,
+        limit,
+        includeInactive,
+        search,
+        baseSymbol,
+        quoteSymbol,
+        quoteSymbolsCsv,
+        sortByParam,
+        sortOrder,
+        fuzzySearch,
+      ],
+    );
 
-      await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.COUNT_ADVANCED}(?, ?, ?, ?, ?, ?, @total)`,
-        [includeInactive, search, baseSymbol, quoteSymbol, quoteSymbolsCsv, fuzzySearch],
-      );
-      const totalResult = await this.dataSource.query('SELECT @total as total');
-      const total = Number(totalResult[0]?.total ?? 0);
-      const rows = result?.[0] || [];
-      const data = rows.map((row: any) => this.mapProcedureResultToEntity(row));
+    await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.COUNT_ADVANCED}(?, ?, ?, ?, ?, ?, @total)`,
+      [includeInactive, search, baseSymbol, quoteSymbol, quoteSymbolsCsv, fuzzySearch],
+    );
+    const totalResult = await this.dataSource.query('SELECT @total as total');
+    const total = Number(totalResult[0]?.total ?? 0);
+    const rows = result?.[0] || [];
+    const data = rows.map((row: any) => this.mapProcedureResultToEntity(row));
 
-      return { data, total, page, limit };
-    } catch (error) {
-      this.logger.error('Error finding market pairs with advanced query', error);
-      throw error;
-    }
+    return { data, total, page, limit };
   }
 
   /**
@@ -312,16 +272,11 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_find_active
    */
   async findActive(): Promise<MarketPair[]> {
-    try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_ACTIVE}()`);
-      if (!result || result.length === 0 || !result[0]) {
-        return [];
-      }
-      return result[0].map((row: any) => this.mapProcedureResultToEntity(row));
-    } catch (error) {
-      this.logger.error('Error finding active market pairs', error);
-      throw error;
+    const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_ACTIVE}()`);
+    if (!result || result.length === 0 || !result[0]) {
+      return [];
     }
+    return result[0].map((row: any) => this.mapProcedureResultToEntity(row));
   }
 
   /**
@@ -333,17 +288,12 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     quoteCurrencyId: string,
     excludePairId?: string,
   ): Promise<boolean> {
-    try {
-      const _result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.PAIR_EXISTS}(?, ?, ?, @exists)`,
-        [baseCurrencyId, quoteCurrencyId, excludePairId || null],
-      );
-      const existsResult = await this.dataSource.query('SELECT @exists as exists');
-      return existsResult[0]?.exists === 1 || existsResult[0]?.exists === true;
-    } catch (error) {
-      this.logger.error('Error checking pair existence', error);
-      throw error;
-    }
+    const _result = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.PAIR_EXISTS}(?, ?, ?, @exists)`,
+      [baseCurrencyId, quoteCurrencyId, excludePairId || null],
+    );
+    const existsResult = await this.dataSource.query('SELECT @exists as exists');
+    return existsResult[0]?.exists === 1 || existsResult[0]?.exists === true;
   }
 
   /**
@@ -351,17 +301,12 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_symbol_exists
    */
   async symbolExists(symbol: string, excludePairId?: string): Promise<boolean> {
-    try {
-      const _result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`,
-        [symbol.toUpperCase(), excludePairId || null],
-      );
-      const existsResult = await this.dataSource.query('SELECT @exists as exists');
-      return existsResult[0]?.exists === 1 || existsResult[0]?.exists === true;
-    } catch (error) {
-      this.logger.error(`Error checking symbol existence: ${symbol}`, error);
-      throw error;
-    }
+    const _result = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`,
+      [symbol.toUpperCase(), excludePairId || null],
+    );
+    const existsResult = await this.dataSource.query('SELECT @exists as exists');
+    return existsResult[0]?.exists === 1 || existsResult[0]?.exists === true;
   }
 
   /**
@@ -419,39 +364,34 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Complex Query: Aggregates orders by price level
    */
   async getOrderBook(pairId: string, limit: number = 20): Promise<{ bids: any[]; asks: any[] }> {
-    try {
-      const bidsResult = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.ORDER_BOOK_BIDS}(?, ?)`,
-        [pairId, limit],
-      );
-      const asksResult = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.ORDER_BOOK_ASKS}(?, ?)`,
-        [pairId, limit],
-      );
+    const bidsResult = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.ORDER_BOOK_BIDS}(?, ?)`,
+      [pairId, limit],
+    );
+    const asksResult = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.ORDER_BOOK_ASKS}(?, ?)`,
+      [pairId, limit],
+    );
 
-      const bids = bidsResult?.[0] || [];
-      const asks = asksResult?.[0] || [];
+    const bids = bidsResult?.[0] || [];
+    const asks = asksResult?.[0] || [];
 
-      const toLevel = (row: any) => ({
-        price: row.price?.toString() ?? '0',
-        amount: row.amount?.toString() ?? '0',
-        orders: parseInt(row.orders?.toString() ?? '0', 10) || 0,
-      });
-      const validPrice = (row: any) => {
-        const p = row?.price;
-        if (p == null) return false;
-        const n = Number(p);
-        return Number.isFinite(n) && n > 0;
-      };
+    const toLevel = (row: any) => ({
+      price: row.price?.toString() ?? '0',
+      amount: row.amount?.toString() ?? '0',
+      orders: parseInt(row.orders?.toString() ?? '0', 10) || 0,
+    });
+    const validPrice = (row: any) => {
+      const p = row?.price;
+      if (p == null) return false;
+      const n = Number(p);
+      return Number.isFinite(n) && n > 0;
+    };
 
-      return {
-        bids: bids.filter(validPrice).map(toLevel),
-        asks: asks.filter(validPrice).map(toLevel),
-      };
-    } catch (error) {
-      this.logger.error(`Error getting order book for pair: ${pairId}`, error);
-      throw error;
-    }
+    return {
+      bids: bids.filter(validPrice).map(toLevel),
+      asks: asks.filter(validPrice).map(toLevel),
+    };
   }
 
   /**
@@ -459,58 +399,48 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Returns zeroed string fields when no data; service layer may apply OHLCV fallback.
    */
   async getTicker(pairId: string): Promise<IMarketTickerData> {
-    try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.TICKER}(?)`, [
-        pairId,
-      ]);
-      const row = result?.[0]?.[0] || {};
+    const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.TICKER}(?)`, [
+      pairId,
+    ]);
+    const row = result?.[0]?.[0] || {};
 
-      const lastPrice = row.last_price?.toString() || '0';
-      const open24h = row.open_24h?.toString() || lastPrice;
-      const high24h = row.high_24h?.toString() || lastPrice;
-      const low24h = row.low_24h?.toString() || lastPrice;
-      const volume24h = row.volume_24h?.toString() || '0';
-      const quoteVolume24h = row.quote_volume_24h?.toString() || '0';
-      const bestBid = row.best_bid?.toString() || '0';
-      const bestAsk = row.best_ask?.toString() || '0';
+    const lastPrice = row.last_price?.toString() || '0';
+    const open24h = row.open_24h?.toString() || lastPrice;
+    const high24h = row.high_24h?.toString() || lastPrice;
+    const low24h = row.low_24h?.toString() || lastPrice;
+    const volume24h = row.volume_24h?.toString() || '0';
+    const quoteVolume24h = row.quote_volume_24h?.toString() || '0';
+    const bestBid = row.best_bid?.toString() || '0';
+    const bestAsk = row.best_ask?.toString() || '0';
 
-      const changeAmount = parseFloat(lastPrice) - parseFloat(open24h);
-      const changePercent =
-        parseFloat(open24h) > 0 ? ((changeAmount / parseFloat(open24h)) * 100).toFixed(2) : '0';
+    const changeAmount = parseFloat(lastPrice) - parseFloat(open24h);
+    const changePercent =
+      parseFloat(open24h) > 0 ? ((changeAmount / parseFloat(open24h)) * 100).toFixed(2) : '0';
 
-      return {
-        lastPrice,
-        high24h,
-        low24h,
-        open24h,
-        volume24h,
-        quoteVolume24h,
-        change24h: changePercent,
-        changeAmount24h: changeAmount.toFixed(18),
-        bestBid,
-        bestAsk,
-      };
-    } catch (error) {
-      this.logger.error(`Error getting ticker for pair: ${pairId}`, error);
-      throw error;
-    }
+    return {
+      lastPrice,
+      high24h,
+      low24h,
+      open24h,
+      volume24h,
+      quoteVolume24h,
+      change24h: changePercent,
+      changeAmount24h: changeAmount.toFixed(18),
+      bestBid,
+      bestAsk,
+    };
   }
 
   /**
    * Get recent trades for a market pair
    */
   async getRecentTrades(pairId: string, limit: number = 50): Promise<Trade[]> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.RECENT_TRADES}(?, ?)`,
-        [pairId, limit],
-      );
-      const rows = result?.[0] || [];
-      return rows.map((row: any) => this.mapTradeRow(row));
-    } catch (error) {
-      this.logger.error(`Error getting recent trades for pair: ${pairId}`, error);
-      throw error;
-    }
+    const result = await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.RECENT_TRADES}(?, ?)`,
+      [pairId, limit],
+    );
+    const rows = result?.[0] || [];
+    return rows.map((row: any) => this.mapTradeRow(row));
   }
 
   /**
@@ -518,35 +448,30 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_create (UUID v7: pair_id passed IN)
    */
   async create(entity: Partial<MarketPair>): Promise<MarketPair> {
-    try {
-      const pairId = entity.pair_id ?? newUuid();
-      const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+    const pairId = entity.pair_id ?? newUuid();
+    const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          pairId,
-          entity.base_currency_id,
-          entity.quote_currency_id,
-          symbol,
-          entity.price_scale ?? 2,
-          entity.amount_scale ?? 6,
-          entity.min_order_amount ?? '0.0001',
-          entity.maker_fee_rate ?? 0.001,
-          entity.taker_fee_rate ?? 0.001,
-          entity.is_active ?? true,
-        ],
-      );
+    await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        pairId,
+        entity.base_currency_id,
+        entity.quote_currency_id,
+        symbol,
+        entity.price_scale ?? 2,
+        entity.amount_scale ?? 6,
+        entity.min_order_amount ?? '0.0001',
+        entity.maker_fee_rate ?? 0.001,
+        entity.taker_fee_rate ?? 0.001,
+        entity.is_active ?? true,
+      ],
+    );
 
-      const createdPair = await this.findById(pairId);
-      if (!createdPair) {
-        throw new Error('Failed to fetch created market pair');
-      }
-      return createdPair;
-    } catch (error) {
-      this.logger.error('Error creating market pair', error);
-      throw error;
+    const createdPair = await this.findById(pairId);
+    if (!createdPair) {
+      throw new Error('Failed to fetch created market pair');
     }
+    return createdPair;
   }
 
   /**
@@ -554,37 +479,32 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_update
    */
   async update(id: number | string, entity: Partial<MarketPair>): Promise<MarketPair> {
-    try {
-      // Normalize symbol to uppercase if provided
-      const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+    // Normalize symbol to uppercase if provided
+    const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      // Call stored procedure
-      await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          entity.base_currency_id ?? null,
-          entity.quote_currency_id ?? null,
-          symbol,
-          entity.price_scale ?? null,
-          entity.amount_scale ?? null,
-          entity.min_order_amount ?? null,
-          entity.maker_fee_rate ?? null,
-          entity.taker_fee_rate ?? null,
-          entity.is_active ?? null,
-        ],
-      );
+    // Call stored procedure
+    await this.dataSource.query(
+      `CALL ${MARKET_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        entity.base_currency_id ?? null,
+        entity.quote_currency_id ?? null,
+        symbol,
+        entity.price_scale ?? null,
+        entity.amount_scale ?? null,
+        entity.min_order_amount ?? null,
+        entity.maker_fee_rate ?? null,
+        entity.taker_fee_rate ?? null,
+        entity.is_active ?? null,
+      ],
+    );
 
-      // Fetch the updated pair using stored procedure
-      const updatedPair = await this.findById(id);
-      if (!updatedPair) {
-        throw new Error(`Market pair with id ${id} not found after update`);
-      }
-      return updatedPair;
-    } catch (error) {
-      this.logger.error(`Error updating market pair: ${id}`, error);
-      throw error;
+    // Fetch the updated pair using stored procedure
+    const updatedPair = await this.findById(id);
+    if (!updatedPair) {
+      throw new Error(`Market pair with id ${id} not found after update`);
     }
+    return updatedPair;
   }
 
   /**
@@ -592,11 +512,6 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_delete
    */
   async delete(id: number | string): Promise<void> {
-    try {
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.DELETE}(?)`, [id]);
-    } catch (error) {
-      this.logger.error(`Error deleting market pair: ${id}`, error);
-      throw error;
-    }
+    await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.DELETE}(?)`, [id]);
   }
 }

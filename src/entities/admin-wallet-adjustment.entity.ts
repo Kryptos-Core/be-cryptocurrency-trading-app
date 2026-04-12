@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
+import { DECIMAL_36_18_COLUMN } from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 import { User } from './user.entity';
 
@@ -30,7 +31,7 @@ export class AdminWalletAdjustment {
   @ForeignKey(() => Currency)
   currency_id!: string;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18 })
+  @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
 
   @Column({ type: 'enum', enum: ['DEPOSIT', 'WITHDRAW'] })

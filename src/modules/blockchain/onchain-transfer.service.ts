@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BlockchainNetwork } from '@/common/enums';
-import type {
-  RequestWithdrawalDto,
-  SubmitDepositDto,
-} from './dto';
+import type { RequestWithdrawalDto, SubmitDepositDto } from './dto';
 import { OnchainDepositService } from './onchain-deposit.service';
 import { OnchainTransferQueryService } from './onchain-transfer-query.service';
 import { OnchainWithdrawalService } from './onchain-withdrawal.service';

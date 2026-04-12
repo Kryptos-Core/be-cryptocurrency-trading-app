@@ -45,11 +45,9 @@ export class BinanceRestClient {
   }
 
   async getServerTime(baseUrl: string): Promise<number> {
-    const data = await this.getPublicJson<{ serverTime?: number }>(
-      '/api/v3/time',
-      undefined,
-      { baseUrl },
-    );
+    const data = await this.getPublicJson<{ serverTime?: number }>('/api/v3/time', undefined, {
+      baseUrl,
+    });
     return Number(data.serverTime ?? 0);
   }
 
@@ -72,19 +70,14 @@ export class BinanceRestClient {
     const signature = createHmac('sha256', args.apiSecret).update(query).digest('hex');
     const endpointWithSig = `${args.endpoint}?${query}&signature=${signature}`;
 
-    const response = await this.requestRaw(
-      args.method,
-      endpointWithSig,
-      undefined,
-      {
-        baseUrl: args.baseUrl,
-        timeoutMs: args.timeoutMs,
-        headers: {
-          'X-MBX-APIKEY': args.apiKey,
-          'Content-Type': 'application/json',
-        },
+    const response = await this.requestRaw(args.method, endpointWithSig, undefined, {
+      baseUrl: args.baseUrl,
+      timeoutMs: args.timeoutMs,
+      headers: {
+        'X-MBX-APIKEY': args.apiKey,
+        'Content-Type': 'application/json',
       },
-    );
+    });
 
     if (!response.ok) {
       throw new Error(`Binance API error: ${response.status} ${response.body}`);

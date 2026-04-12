@@ -5,6 +5,7 @@ import { EVM_CHAIN_DEFINITIONS } from '@/common/constants/evm-chain-definitions'
 import { BlockchainNetwork } from '@/common/enums';
 import { LinkedWallet } from '@/entities/linked-wallet.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import { OnchainTransferService } from '@/modules/blockchain/onchain-transfer.service';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
@@ -28,14 +29,13 @@ import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { DepositFxService } from './deposit-fx.service';
 import { OnchainDepositService } from './onchain-deposit.service';
 import { OnchainTransferQueryService } from './onchain-transfer-query.service';
-import { OnchainTransferService } from '@/modules/blockchain/onchain-transfer.service';
 import { OnchainWithdrawalService } from './onchain-withdrawal.service';
 import { EthereumProvider } from './providers/ethereum.provider';
 import { SolanaProvider } from './providers/solana.provider';
 import { TronProvider } from './providers/tron.provider';
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
-import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
+import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
 import { WalletLinkingService } from './wallet-linking.service';
 
 /**

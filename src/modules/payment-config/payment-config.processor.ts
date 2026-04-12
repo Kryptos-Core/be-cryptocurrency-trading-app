@@ -28,14 +28,6 @@ export class PaymentConfigProcessor {
     const { configId, type, network, userId } = job.data;
     this.logger.log(`Processing activation job for configId=${configId} (${type}/${network})`);
 
-    try {
-      await this.paymentConfigService.completeActivation(configId, type, network, userId);
-    } catch (error) {
-      this.logger.error(
-        `Failed to activate configId=${configId}: ${(error as Error).message}`,
-        (error as Error).stack,
-      );
-      throw error; // Rethrow so Bull retries
-    }
+    await this.paymentConfigService.completeActivation(configId, type, network, userId);
   }
 }

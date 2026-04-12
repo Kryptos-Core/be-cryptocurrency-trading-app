@@ -104,19 +104,14 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
-    try {
-      const weiBalance = await this.provider.getBalance(address);
-      return {
-        address,
-        network: this.evmChain,
-        balance: ethers.formatEther(weiBalance),
-        symbol: this.nativeSymbol,
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`Error getting ${this.nativeSymbol} balance: ${address}`, error);
-      throw error;
-    }
+    const weiBalance = await this.provider.getBalance(address);
+    return {
+      address,
+      network: this.evmChain,
+      balance: ethers.formatEther(weiBalance),
+      symbol: this.nativeSymbol,
+      timestamp: new Date(),
+    };
   }
 
   async verifySignature(address: string, message: string, signature: string): Promise<boolean> {

@@ -22,8 +22,8 @@ export class FcmService implements OnModuleInit {
       this.configService.get<string>('GOOGLE_APPLICATION_CREDENTIALS');
 
     if (!rawPath?.trim()) {
-      this.logger.warn(
-        'Firebase service account path not set (FIREBASE_SERVICE_ACCOUNT_PATH or GOOGLE_APPLICATION_CREDENTIALS) — FCM push notifications disabled',
+      this.logFcmDisabled(
+        'Firebase service account path not set (FIREBASE_SERVICE_ACCOUNT_PATH or GOOGLE_APPLICATION_CREDENTIALS)',
       );
       return;
     }
@@ -32,9 +32,7 @@ export class FcmService implements OnModuleInit {
     const accountPath = isAbsolute(trimmed) ? resolve(trimmed) : resolve(process.cwd(), trimmed);
 
     if (!existsSync(accountPath)) {
-      this.logger.warn(
-        `Firebase credentials file not found: ${accountPath} — FCM push notifications disabled`,
-      );
+      this.logFcmDisabled(`Firebase credentials file not found: ${accountPath}`);
       return;
     }
 
@@ -78,6 +76,18 @@ export class FcmService implements OnModuleInit {
       } catch (error) {
         this.logger.error('FCM multicast error', error);
       }
+    }
+  }
+
+  /** Optional FCM: info in dev/staging, warn in production (possible misconfiguration). */
+  private logFcmDisabled(reason: string): void {
+    const suffix = ' — FCM push notifications disabled';
+    const msg = reason + suffix;
+    const nodeEnv = this.configService.get<string>('NODE_ENV') ?? 'development';
+    if (nodeEnv === 'production') {
+      this.logger.warn(msg);
+    } else {
+      this.logger.log(msg);
     }
   }
 

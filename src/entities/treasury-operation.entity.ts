@@ -12,6 +12,7 @@ import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
   type BlockchainChainDbValue,
 } from '@/common/constants/blockchain-chain-db';
+import { DECIMAL_36_18_DEFAULT_ZERO_STRING_COLUMN } from '@/common/constants/column-types';
 import { TransactionWallet } from './transaction-wallet.entity';
 import { User } from './user.entity';
 
@@ -42,7 +43,7 @@ export class TreasuryOperation {
   @ForeignKey(() => TransactionWallet)
   to_wallet_id!: string | null;
 
-  @Column({ type: 'decimal', precision: 36, scale: 18, default: '0' })
+  @Column({ ...DECIMAL_36_18_DEFAULT_ZERO_STRING_COLUMN })
   amount!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
