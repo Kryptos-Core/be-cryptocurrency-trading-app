@@ -23,7 +23,7 @@ async function run() {
 
   const database = process.env.DB_NAME;
   if (!database) {
-    console.error('DB_NAME is not set (.env)');
+    console.error('DB_NAME is not set (.env.<NODE_ENV>, e.g. .env.development)');
     process.exit(1);
   }
 

@@ -12,7 +12,7 @@ npm run db:seed
 npm run db:reset
 ```
 
-Cần file `.env` hợp lệ (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`). Nên chạy `npm run migration:run` trước lần đầu seed.
+Cần file **`.env.development`** hợp lệ (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`) — `npm run db:seed` đặt `NODE_ENV=development`. Nên chạy `npm run migration:run` trước lần đầu seed.
 
 ## Sau khi seed
 

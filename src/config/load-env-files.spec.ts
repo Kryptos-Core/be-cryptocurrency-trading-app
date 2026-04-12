@@ -13,13 +13,13 @@ describe('nestEnvFilePaths', () => {
     }
   });
 
-  it('returns only base .env when NODE_ENV is unset', () => {
+  it('uses .env.development when NODE_ENV is unset', () => {
     delete process.env.NODE_ENV;
-    expect(nestEnvFilePaths(cwd)).toEqual([path.join(cwd, '.env')]);
+    expect(nestEnvFilePaths(cwd)).toEqual([path.join(cwd, '.env.development')]);
   });
 
-  it('appends .env.<NODE_ENV> when NODE_ENV is set', () => {
+  it('uses .env.<NODE_ENV> when NODE_ENV is set', () => {
     process.env.NODE_ENV = 'staging';
-    expect(nestEnvFilePaths(cwd)).toEqual([path.join(cwd, '.env'), path.join(cwd, '.env.staging')]);
+    expect(nestEnvFilePaths(cwd)).toEqual([path.join(cwd, '.env.staging')]);
   });
 });

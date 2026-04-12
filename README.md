@@ -21,15 +21,19 @@ Chi tiết luồng nghiệp vụ, Redis, migration đặc biệt, v.v. nằm tro
 
 ### 1. Biến môi trường
 
-- Copy `.env.example` → `.env` và điền giá trị phù hợp (DB, Redis, JWT, …). Có thể tham chiếu thêm `.env.staging.example` / `.env.production.example` khi tạo override theo môi trường.  
-- Tùy chọn: file **`.env.${NODE_ENV}`** ghi đè theo môi trường — ví dụ `.env.development`, `.env.staging`, `.env.production` (cùng thư mục với `.env`). Thứ tự load: `.env` trước, sau đó file theo `NODE_ENV`.  
+- Mỗi môi trường một file: **`.env.development`**, **`.env.staging`**, **`.env.production`** (cùng thư mục gốc backend). Tạo từ bản mẫu tương ứng: `.env.development.example`, `.env.staging.example`, `.env.production.example`.  
+- App Nest và CLI (migration, seed) chỉ đọc **`.env.${NODE_ENV}`**. Scripts npm đặt `NODE_ENV` qua `cross-env`; nếu chạy thủ công mà thiếu `NODE_ENV`, mặc định file env là **`.env.development`**.  
 - Không commit file chứa secret thật.
 
 ### 2. MySQL + Redis
 
+Dùng **cùng file env** với app cho dev (`.env.development` — `DB_*` / `REDIS_*` khớp Compose):
+
 ```bash
-docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
+npm run docker:infra:up
 ```
+
+Tuỳ chọn: `npm run docker:infra:down` (tắt), `npm run docker:infra:logs` (log). Nếu gọi Docker trực tiếp, Compose **không** tự đọc `.env.development`; cần `--env-file .env.development` (hoặc shell đã export đủ biến).
 
 ### 3. Cài đặt, migration, seed, chạy dev
 
@@ -50,6 +54,7 @@ npm run start:dev
 | `npm run start:prod` | Production (cần `npm run build` trước) |
 | `npm run migration:run` / `migration:revert` / `migration:show` | TypeORM migrations |
 | `npm run db:seed` / `db:clean` | Seed / dọn dữ liệu seed |
+| `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
 | `npm run test` | Jest |
 
 Production: `npm run build` rồi `npm run start:prod`.

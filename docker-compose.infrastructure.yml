@@ -1,3 +1,6 @@
+# Biến ${DB_*}, ${REDIS_*} được nội suy từ file env khi chạy Compose (mặc định dev: .env.development).
+# Khuyến nghị: npm run docker:infra:up  (tương đương --env-file .env.development).
+# Development/staging/production: docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d
 version: '3.8'
 
 services:

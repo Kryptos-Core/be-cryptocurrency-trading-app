@@ -30,6 +30,10 @@
     "db:seed": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
     "db:clean": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-db-clean.ts",
     "db:reset": "npm run db:seed",
+    "docker:infra:up": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d",
+    "docker:infra:up:redis": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d redis",
+    "docker:infra:down": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development down",
+    "docker:infra:logs": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f",
     "treasury:e2e": "ts-node -r tsconfig-paths/register scripts/daily-testnet-deposit-withdraw-e2e.ts",
     "treasury:health": "ts-node -r tsconfig-paths/register scripts/daily-treasury-health-check.ts",
     "treasury:daily": "npm run treasury:e2e && npm run treasury:health",
@@ -37,7 +41,8 @@
     "treasury:schedule:unregister": "powershell -ExecutionPolicy Bypass -File scripts/unregister-treasury-daily-task.ps1",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "postman:build": "node postman/build-collection.mjs"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.4",

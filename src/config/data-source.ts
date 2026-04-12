@@ -12,7 +12,7 @@ function assertDbEnvForCli(): void {
   if (missing.length > 0) {
     throw new Error(
       `TypeORM CLI: thiếu biến môi trường: ${missing.join(', ')}. ` +
-        'Với `npm run migration:*`, cần `.env` + `.env.development` (hoặc đặt NODE_ENV khác và file `.env.<NODE_ENV>` tương ứng).',
+        'Với `npm run migration:*`, cần file `.env.<NODE_ENV>` (mặc định CLI: `NODE_ENV=development` → `.env.development`).',
     );
   }
 }

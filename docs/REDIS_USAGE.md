@@ -11,20 +11,20 @@ REDIS_PASSWORD=   # trong docker-compose.infrastructure.yml Redis chạy với r
 REDIS_DB=0
 ```
 
-Giá trị mẫu đầy đủ nằm trong [`env.example`](../env.example) ở root backend.
+Giá trị mẫu đầy đủ nằm trong [`.env.development.example`](../.env.development.example) (và các file `.env.*.example` khác) ở root backend.
 
 ## Chạy Redis (và MySQL) bằng Docker
 
-Từ thư mục `be-cryptocurrency-trading-app`, dùng cùng file `.env` với app:
+Từ thư mục `be-cryptocurrency-trading-app`, dev mặc định dùng `.env.development`:
 
 ```bash
-docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
+npm run docker:infra:up
 ```
 
 Chỉ Redis:
 
 ```bash
-docker compose -f docker-compose.infrastructure.yml --env-file .env up -d redis
+npm run docker:infra:up:redis
 ```
 
 ## Thực hành

@@ -2,7 +2,7 @@
 
 ## 1. Các biến môi trường cần thiết cho testnet
 
-Thiết lập trong file `.env`:
+Thiết lập trong file `.env.development` (hoặc `.env.<NODE_ENV>` tương ứng):
 
 ```env
 TRADING_ENVIRONMENT=testnet
@@ -21,8 +21,8 @@ Nếu sử dụng futures testnet trong nhánh riêng của bạn, hãy cập nh
 MySQL và Redis (khuyến nghị):
 
 ```bash
-cp env.example .env
-docker compose -f docker-compose.infrastructure.yml --env-file .env up -d
+cp .env.development.example .env.development
+npm run docker:infra:up
 ```
 
 Sau đó:
