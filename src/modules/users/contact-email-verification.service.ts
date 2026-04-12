@@ -1,10 +1,10 @@
 import { randomInt } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
-import type { CacheService, MailService } from '@/common/services';
+import { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import type { User } from '@/entities/user.entity';
-import type { UsersRepository } from './repositories';
+import { UsersRepository } from './repositories';
 
 /**
  * OTP gửi thẳng tới email mới để gắn email liên hệ cho tài khoản đăng nhập ví (email @*.wallet).

@@ -27,7 +27,7 @@ import { RequirePermissions } from '@/common/decorators/require-permissions.deco
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import type { CurrenciesService } from './currencies.service';
+import { CurrenciesService } from './currencies.service';
 import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
 
 /**

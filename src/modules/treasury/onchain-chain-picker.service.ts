@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { buildChainPickerOptions, type ChainPickerOptionsDto } from './onchain-chain-picker.util';
 
 @Injectable()

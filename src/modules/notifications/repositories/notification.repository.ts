@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { NOTIFICATION_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { Notification } from '@/entities/notification.entity';

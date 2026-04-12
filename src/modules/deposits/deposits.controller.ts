@@ -15,7 +15,7 @@ import type { Request } from 'express';
 import { RequirePermissions, RequireRoles } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import type { DepositsService } from './deposits.service';
+import { DepositsService } from './deposits.service';
 import type { CreateFiatDepositDto } from './dto/create-deposit.dto';
 
 @ApiTags('Deposits')

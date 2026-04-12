@@ -11,7 +11,7 @@ import {
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import type { AdminAdjustWalletDto } from './dto/admin-adjust-wallet.dto';
-import type { WalletsService } from './wallets.service';
+import { WalletsService } from './wallets.service';
 
 /**
  * Wallets Controller

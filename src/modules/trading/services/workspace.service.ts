@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 import type { WorkspaceState, WorkspaceSubscription } from '../interfaces/websocket.interface';
 
 const WORKSPACE_TTL_SEC = 24 * 3600; // 24 hours

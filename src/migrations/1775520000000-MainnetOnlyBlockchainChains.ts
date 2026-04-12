@@ -47,36 +47,41 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
       );
     }
 
-    /** Đổi PK `key`: nếu đích đã tồn tại thì xóa bản ghi nguồn (giữ mainnet), tránh ER_DUP_ENTRY. */
-    const systemConfigKeyRenames: [fromKey: string, toKey: string][] = [
-      ['TRON_NILE_FULL_HOST', 'TRON_MAINNET_FULL_HOST'],
-      ['SOLANA_DEVNET_URL', 'SOLANA_MAINNET_URL'],
-      ['ETH_SEPOLIA_RPC_URL', 'ETH_MAINNET_RPC_URL'],
-      ['ETH_SEPOLIA_CHAIN_ID', 'ETH_MAINNET_CHAIN_ID'],
-      ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET'],
-      ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET'],
-      ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET'],
-    ];
+    if (await queryRunner.hasTable('system_configs')) {
+      /** Đổi PK `key`: nếu đích đã tồn tại thì xóa bản ghi nguồn (giữ mainnet), tránh ER_DUP_ENTRY. */
+      const systemConfigKeyRenames: [fromKey: string, toKey: string][] = [
+        ['TRON_NILE_FULL_HOST', 'TRON_MAINNET_FULL_HOST'],
+        ['SOLANA_DEVNET_URL', 'SOLANA_MAINNET_URL'],
+        ['ETH_SEPOLIA_RPC_URL', 'ETH_MAINNET_RPC_URL'],
+        ['ETH_SEPOLIA_CHAIN_ID', 'ETH_MAINNET_CHAIN_ID'],
+        ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET'],
+        [
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',
+          'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET',
+        ],
+        ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET'],
+      ];
 
-    for (const [fromKey, toKey] of systemConfigKeyRenames) {
-      await queryRunner.query(
-        `DELETE s1 FROM system_configs s1
+      for (const [fromKey, toKey] of systemConfigKeyRenames) {
+        await queryRunner.query(
+          `DELETE s1 FROM system_configs s1
          INNER JOIN system_configs s2 ON s2.\`key\` = ?
          WHERE s1.\`key\` = ?`,
-        [toKey, fromKey],
-      );
-      await queryRunner.query(`UPDATE system_configs SET \`key\` = ? WHERE \`key\` = ?`, [
-        toKey,
-        fromKey,
-      ]);
-    }
+          [toKey, fromKey],
+        );
+        await queryRunner.query(`UPDATE system_configs SET \`key\` = ? WHERE \`key\` = ?`, [
+          toKey,
+          fromKey,
+        ]);
+      }
 
-    await queryRunner.query(`
-      DELETE FROM system_configs WHERE \`key\` IN ('TRON_SHASTA_FULL_HOST', 'TRON_DEFAULT_NETWORK')
-    `);
-    await queryRunner.query(`
-      DELETE FROM system_configs WHERE \`key\` = 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA'
-    `);
+      await queryRunner.query(`
+        DELETE FROM system_configs WHERE \`key\` IN ('TRON_SHASTA_FULL_HOST', 'TRON_DEFAULT_NETWORK')
+      `);
+      await queryRunner.query(`
+        DELETE FROM system_configs WHERE \`key\` = 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA'
+      `);
+    }
   }
 
   public async down(_queryRunner: QueryRunner): Promise<void> {

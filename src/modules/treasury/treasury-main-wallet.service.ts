@@ -16,18 +16,18 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@/common/exceptions';
-import type { WalletEncryptionService } from '@/common/services';
-import type { RedisService } from '@/common/services/redis.service';
+import { WalletEncryptionService } from '@/common/services';
+import { RedisService } from '@/common/services/redis.service';
 import type {
   TreasuryMainWallet,
   TreasuryMainWalletChain,
   TreasuryMainWalletStatus,
 } from '@/entities/treasury-main-wallet.entity';
 import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import type { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import type { ImportMainWalletDto } from './dto';
-import type { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
-import type { TransactionWalletService } from './transaction-wallet.service';
+import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
+import { TransactionWalletService } from './transaction-wallet.service';
 
 export type SupportedTreasuryChain = TreasuryMainWalletChain;
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { ORDER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { Order } from '@/entities/order.entity';

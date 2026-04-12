@@ -37,7 +37,7 @@ import { RequirePermissions } from '@/common/decorators/require-permissions.deco
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import type { ContactEmailVerificationService } from './contact-email-verification.service';
+import { ContactEmailVerificationService } from './contact-email-verification.service';
 import {
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
@@ -47,7 +47,7 @@ import {
   type UserFilterDto,
   VerifyContactEmailDto,
 } from './dto';
-import type { UsersService } from './users.service';
+import { UsersService } from './users.service';
 
 /**
  * Users Controller

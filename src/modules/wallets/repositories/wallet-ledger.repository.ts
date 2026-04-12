@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DataSource, EntityManager } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { WALLET_LEDGER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';

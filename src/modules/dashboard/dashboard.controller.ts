@@ -2,7 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@/common/decorators';
 import { OptionalJwtAuthGuard } from '@/common/guards';
-import type { DashboardService } from './dashboard.service';
+import { DashboardService } from './dashboard.service';
 
 /**
  * Dashboard Controller

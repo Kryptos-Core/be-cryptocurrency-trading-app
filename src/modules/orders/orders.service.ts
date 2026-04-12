@@ -1,19 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
-import type { MarketRepository } from '@/modules/markets/repositories';
+import { MarketRepository } from '@/modules/markets/repositories';
 import type { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
-import type { MatchingService } from '@/modules/matching/matching.service';
-import type { MatchingQueueService } from '@/modules/matching/matching-queue.service';
-import type { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import { MatchingService } from '@/modules/matching/matching.service';
+import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
+import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
 import type { CancelOrderCommand } from './commands/cancel-order.command';
 import type { CreateOrderCommand } from './commands/create-order.command';
 import type { CancelBatchOrderDto, CreateBatchOrderDto } from './dto';
-import type { OrderRepository } from './repositories';
+import { OrderRepository } from './repositories';
 import { canCancelOrder } from './states';
-import type { OrderValidationStrategy } from './strategies';
+import { OrderValidationStrategy } from './strategies';
 import { computeMarketBuyMaxQuoteReserve } from './utils/market-buy-reserve.util';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';

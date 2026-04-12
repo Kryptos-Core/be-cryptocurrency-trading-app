@@ -1,6 +1,6 @@
 import { Logger, type OnApplicationBootstrap, UseFilters } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import type { JwtService } from '@nestjs/jwt';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -13,7 +13,7 @@ import {
 } from '@nestjs/websockets';
 import { createAdapter } from '@socket.io/redis-adapter';
 import type { Namespace, Server, Socket } from 'socket.io';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 import {
   type AuthMessage,
   MARKET_EVENTS,
@@ -25,10 +25,10 @@ import {
   type WebSocketMessage,
   type WorkspaceSubscription,
 } from '../interfaces/websocket.interface';
-import type { BinancePriceFeedService } from '../services/binance-price-feed.service';
-import type { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
-import type { TradingSubscriptionService } from '../services/trading-subscription.service';
-import type { WorkspaceService } from '../services/workspace.service';
+import { BinancePriceFeedService } from '../services/binance-price-feed.service';
+import { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
+import { TradingSubscriptionService } from '../services/trading-subscription.service';
+import { WorkspaceService } from '../services/workspace.service';
 import { WebSocketExceptionFilter } from './filters/websocket-exception.filter';
 
 /**

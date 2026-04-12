@@ -2,8 +2,8 @@ import { InjectQueue } from '@nestjs/bull';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bull';
 import { uuidv7 } from 'uuidv7';
-import type { WalletEncryptionService } from '@/common/services';
-import type { RedisService } from '@/common/services/redis.service';
+import { WalletEncryptionService } from '@/common/services';
+import { RedisService } from '@/common/services/redis.service';
 import type {
   PaymentMethodConfig,
   PaymentMethodType,
@@ -18,7 +18,7 @@ import {
   type PaymentConfigEvent,
   type PaymentGatewayConfig,
 } from './interfaces/payment-gateway-config.interface';
-import type { PaymentConfigRepository } from './repositories/payment-config.repository';
+import { PaymentConfigRepository } from './repositories/payment-config.repository';
 
 export const PAYMENT_CONFIG_QUEUE = 'payment-config-activation';
 export const ACTIVATE_JOB = 'activate-config';

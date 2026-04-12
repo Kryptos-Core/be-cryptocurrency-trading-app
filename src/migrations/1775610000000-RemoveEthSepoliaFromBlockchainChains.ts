@@ -51,13 +51,15 @@ export class RemoveEthSepoliaFromBlockchainChains1775610000000 implements Migrat
       );
     }
 
-    await queryRunner.query(`
+    if (await queryRunner.hasTable('system_configs')) {
+      await queryRunner.query(`
       DELETE FROM \`system_configs\` WHERE \`key\` IN (
         'ETH_SEPOLIA_RPC_URL',
         'ETH_SEPOLIA_CHAIN_ID',
         'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA'
       )
     `);
+    }
 
     for (const t of chainTables) {
       await queryRunner.query(

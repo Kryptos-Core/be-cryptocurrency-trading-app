@@ -2,12 +2,12 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
-import type { RedisService } from '@/common/services/redis.service';
+import { RedisService } from '@/common/services/redis.service';
 import { newUuid } from '@/common/utils/uuid.util';
-import type { ExchangeService } from '@/modules/exchange/exchange.service';
+import { ExchangeService } from '@/modules/exchange/exchange.service';
 import { WALLET_BALANCE_EVENTS_CHANNEL, type WalletBalanceEvent } from './constants';
 import type {
   AdminAdjustWalletDto,
@@ -17,9 +17,9 @@ import type { WalletBalanceDto } from './dto/wallet-balance.dto';
 import type { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
 import type { WalletListItemDto } from './dto/wallet-list-item.dto';
 import type { WalletTransactionDto } from './dto/wallet-transaction.dto';
-import type { AdminWalletAdjustmentRepository } from './repositories/admin-wallet-adjustment.repository';
-import type { WalletRepository } from './repositories/wallet.repository';
-import type { WalletLedgerRepository } from './repositories/wallet-ledger.repository';
+import { AdminWalletAdjustmentRepository } from './repositories/admin-wallet-adjustment.repository';
+import { WalletRepository } from './repositories/wallet.repository';
+import { WalletLedgerRepository } from './repositories/wallet-ledger.repository';
 
 /**
  * Wallets Service - Business Logic Layer

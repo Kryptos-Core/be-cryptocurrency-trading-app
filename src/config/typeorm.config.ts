@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 // Explicit entity imports — required when webpack bundles everything into dist/main.js

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { FcmService } from '@/common/services/fcm.service';
-import type { RedisService } from '@/common/services/redis.service';
+import { FcmService } from '@/common/services/fcm.service';
+import { RedisService } from '@/common/services/redis.service';
 import type { CreateNotificationDto } from '../dto/create-notification.dto';
 import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from '../notifications.service';
 

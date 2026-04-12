@@ -13,25 +13,25 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@/common/exceptions';
-import type { WalletEncryptionService } from '@/common/services';
+import { WalletEncryptionService } from '@/common/services';
 import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
-import type { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
 import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
-import type {
+import {
   TreasuryTransactionWalletRepository,
-  TronDepositUiChain,
+  type TronDepositUiChain,
 } from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
-import type { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
-import type { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
   CreateManagedWalletDto,
   ManagedWalletResponseDto,
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
 } from './dto';
-import type { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
+import { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
 
 const MANAGED_TRON_CHAINS = [
   BlockchainNetwork.TRON_MAINNET,

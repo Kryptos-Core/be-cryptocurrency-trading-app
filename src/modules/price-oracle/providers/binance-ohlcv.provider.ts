@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 import type { IOHLCVProvider, OHLCVCandleDto } from '../interfaces/ohlcv-provider.interface';
 
 /** Binance Spot klines interval symbols. */
@@ -186,7 +186,7 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
     const client = this.redisService.getClient();
     const members = await client.zrangebyscore(redisKey, startMs, endMs);
     return members
-      .map((m) => {
+      .map((m: string) => {
         try {
           const parsed = JSON.parse(m) as Record<string, unknown>;
           return {
@@ -203,7 +203,7 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
           return null;
         }
       })
-      .filter((c): c is OHLCVCandleDto => c !== null);
+      .filter((c: OHLCVCandleDto | null): c is OHLCVCandleDto => c !== null);
   }
 
   /**

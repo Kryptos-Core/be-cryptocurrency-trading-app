@@ -2,22 +2,22 @@ import { createHash, createHmac } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import type SignClient from '@walletconnect/sign-client';
-import type { SessionTypes } from '@walletconnect/types';
+import { ConfigService } from '@nestjs/config';
+import type { WalletConnectSignClient } from '@walletconnect/sign-client';
 import { getAddressFromAccount, getChainFromAccount } from '@walletconnect/utils';
 import bs58 from 'bs58';
 import { uuidv7 } from 'uuidv7';
 import { BlockchainNetwork } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import {
   isWcEvmChain,
   WC_RELAY_PAIRING_CHAINS,
   wcCaip2ForChain,
 } from '@/modules/blockchain/wallet-connect/wc-caip.util';
-import type { BlockchainProviderFactory } from '../blockchain-provider.factory';
-import type { WalletLinkingService } from '../wallet-linking.service';
+import type { WcApprovedSession, WcConnectPairingResult } from '@/types/walletconnect-session';
+import { BlockchainProviderFactory } from '../blockchain-provider.factory';
+import { WalletLinkingService } from '../wallet-linking.service';
 import { type WcSessionData, WcSessionStatus } from './dto';
 import { withWalletConnectSignClientLock } from './wallet-connect-sign-client-gate';
 
@@ -146,7 +146,7 @@ export class WalletConnectService implements OnModuleInit {
                         },
                       });
                   const { uri, approval } = await this.withTimeout(
-                    connectPromise,
+                    connectPromise as Promise<WcConnectPairingResult>,
                     WalletConnectService.WC_CONNECT_TIMEOUT_MS,
                     'WC_INIT_CONNECT_TIMEOUT',
                   );
@@ -388,8 +388,8 @@ export class WalletConnectService implements OnModuleInit {
     sessionId: string,
     chain: BlockchainNetwork,
     message: string,
-    approval: () => Promise<SessionTypes.Struct>,
-    client: SignClient,
+    approval: () => Promise<WcApprovedSession>,
+    client: WalletConnectSignClient,
   ): Promise<void> {
     const loaded = await this.loadSession(userId, sessionId);
     if (!loaded) return;
@@ -397,7 +397,7 @@ export class WalletConnectService implements OnModuleInit {
     const deadline = loaded.createdAt + WalletConnectService.SESSION_TTL * 1000;
     const msLeftPairing = Math.max(5_000, deadline - Date.now());
 
-    let wcSession: SessionTypes.Struct;
+    let wcSession: WcApprovedSession;
     try {
       wcSession = await this.withTimeout(approval(), msLeftPairing, 'WC_PAIRING_TIMEOUT');
     } catch (e) {

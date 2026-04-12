@@ -2,7 +2,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { TREASURY_FUND_JOB, TREASURY_QUEUE, TREASURY_SWEEP_JOB } from './constants';
-import type { TreasuryOperationsService } from './treasury-operations.service';
+import { TreasuryOperationsService } from './treasury-operations.service';
 
 interface TreasuryJobData {
   operationId: string;

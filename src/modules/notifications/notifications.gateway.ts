@@ -1,5 +1,5 @@
 import { Logger, type OnApplicationBootstrap, UseFilters } from '@nestjs/common';
-import type { JwtService } from '@nestjs/jwt';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -11,7 +11,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import type { RedisService } from '@/common/services/redis.service';
+import { RedisService } from '@/common/services/redis.service';
 import { PAYMENT_CONFIG_EVENTS_CHANNEL } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
 import { TREASURY_EVENTS_CHANNEL } from '@/modules/treasury/constants';

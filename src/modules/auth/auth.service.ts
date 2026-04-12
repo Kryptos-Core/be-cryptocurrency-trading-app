@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import type { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
 import type { Permission } from '@/common/enums';
@@ -14,8 +14,8 @@ import {
 import type { User } from '@/entities/user.entity';
 import { formatName } from '@/utils/helpers';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
-import type { AuthRepository } from './repositories';
-import type { TwoFaService } from './two-fa.service';
+import { AuthRepository } from './repositories';
+import { TwoFaService } from './two-fa.service';
 
 /**
  * Auth Service - Business Logic Layer

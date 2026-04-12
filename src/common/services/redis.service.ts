@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import Redis, { type RedisOptions } from 'ioredis';
 
 /**
@@ -97,8 +97,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Redis ${name} ready`);
     });
 
-    client.on('error', (error) => {
-      this.logger.error(`Redis ${name} error: ${error.message}`, error.stack);
+    client.on('error', (error: unknown) => {
+      const e = error instanceof Error ? error : new Error(String(error));
+      this.logger.error(`Redis ${name} error: ${e.message}`, e.stack);
     });
 
     client.on('close', () => {
@@ -306,7 +307,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async subscribe(channel: string, callback: (message: string) => void): Promise<void> {
     await this.subscriber.subscribe(channel);
-    this.subscriber.on('message', (ch, msg) => {
+    this.subscriber.on('message', (ch: string, msg: string) => {
       if (ch === channel) {
         callback(msg);
       }

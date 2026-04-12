@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import type { BlockchainNetwork } from '@/common/enums';
-import type { CacheService } from '@/common/services';
-import type { CurrencyRepository } from '@/modules/currencies/repositories';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { CacheService } from '@/common/services';
+import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 export interface DepositConversionResult {
   /** ID của currency platform cash (USDT) sẽ được credit vào ví user (UUID) */

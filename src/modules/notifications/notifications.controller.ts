@@ -12,7 +12,7 @@ import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import type { NotificationQueryDto } from './dto/notification-query.dto';
-import type { NotificationsService } from './notifications.service';
+import { NotificationsService } from './notifications.service';
 
 /**
  * Notifications Controller

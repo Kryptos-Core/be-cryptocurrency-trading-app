@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { IOHLCVProvider, OHLCVCandleDto } from './interfaces/ohlcv-provider.interface';
-import type { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
+import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
 
 /**
  * Registry of OHLCV providers. Binance-only for on-demand candles.

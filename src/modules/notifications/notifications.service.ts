@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import type { CreateNotificationDto } from './dto/create-notification.dto';
 import type { NotificationQueryDto } from './dto/notification-query.dto';
-import type { NotificationRepository } from './repositories/notification.repository';
+import { NotificationRepository } from './repositories/notification.repository';
 import {
   type INotificationStrategy,
   NOTIFICATION_STRATEGIES,

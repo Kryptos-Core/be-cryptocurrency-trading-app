@@ -20,7 +20,7 @@ import {
 import type { BlockchainNetwork } from '@/common/enums';
 import { JwtAuthGuard } from '@/common/guards';
 import type { WcInitDto } from './dto';
-import type { WalletConnectService } from './wallet-connect.service';
+import { WalletConnectService } from './wallet-connect.service';
 
 /**
  * WalletConnect Controller

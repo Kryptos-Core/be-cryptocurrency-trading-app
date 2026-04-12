@@ -1,8 +1,8 @@
 import { randomInt } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, NotFoundException } from '@/common/exceptions';
-import type { CacheService, MailService } from '@/common/services';
-import type { AuthRepository } from './repositories';
+import { CacheService, MailService } from '@/common/services';
+import { AuthRepository } from './repositories';
 
 @Injectable()
 export class TwoFaService {

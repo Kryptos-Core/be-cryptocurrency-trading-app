@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { ListTreasuryTransactionsDto } from '../dto';
 

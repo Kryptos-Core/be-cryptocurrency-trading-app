@@ -1,4 +1,4 @@
-import type SignClient from '@walletconnect/sign-client';
+import type { WalletConnectSignClient } from '@walletconnect/sign-client';
 import { getWalletConnectDappClient } from './walletconnect-dapp-client.factory';
 
 /**
@@ -10,7 +10,7 @@ let signClientOpChain: Promise<unknown> = Promise.resolve();
 
 export function withWalletConnectSignClientLock<T>(
   params: { projectId: string; relayUrl: string },
-  fn: (client: SignClient) => Promise<T>,
+  fn: (client: WalletConnectSignClient) => Promise<T>,
 ): Promise<T> {
   const next = signClientOpChain.then(async (): Promise<T> => {
     const client = await getWalletConnectDappClient(params);

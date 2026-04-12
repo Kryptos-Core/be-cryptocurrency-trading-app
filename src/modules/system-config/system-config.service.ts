@@ -1,13 +1,13 @@
 import { BadRequestException, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import type { EventEmitter2 } from '@nestjs/event-emitter';
+import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import {
   EVM_CHAIN_DEFINITIONS,
   getEvmDefinitionByTreasuryChain,
 } from '@/common/constants/evm-chain-definitions';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 import {
   type ConfigCategory,
   type ConfigDataType,
@@ -35,6 +35,19 @@ export class SystemConfigService implements OnModuleInit {
 
   async onModuleInit() {
     this.logger.log('Initializing system configs (runtime keys + Redis sync)...');
+    const runner = this.configRepo.manager.connection.createQueryRunner();
+    await runner.connect();
+    try {
+      if (!(await runner.hasTable('system_configs'))) {
+        this.logger.error(
+          'Table `system_configs` is missing. Run `npm run migration:run` (DB_* must be set in `.env.development`).',
+        );
+        this.subscribeToPubSub();
+        return;
+      }
+    } finally {
+      await runner.release();
+    }
     await this.ensureRuntimeRows();
     await this.syncDbToRedis();
     this.subscribeToPubSub();
@@ -81,13 +94,13 @@ export class SystemConfigService implements OnModuleInit {
   private subscribeToPubSub() {
     const subscriber = this.redisService.getSubscriber();
     if (subscriber) {
-      subscriber.subscribe(this.UPDATE_EVENT, (err) => {
+      subscriber.subscribe(this.UPDATE_EVENT, (err: Error | null) => {
         if (err) {
           this.logger.error(`Failed to subscribe to ${this.UPDATE_EVENT}`, err.message);
         }
       });
 
-      subscriber.on('message', async (channel, message) => {
+      subscriber.on('message', async (channel: string, message: string) => {
         if (channel === this.UPDATE_EVENT) {
           try {
             const { key, value } = JSON.parse(message) as { key: string; value: string };

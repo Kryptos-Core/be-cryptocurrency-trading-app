@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import type { MarketMakerConfig } from '@/entities/market-maker-config.entity';
-import type { MarketsService } from '@/modules/markets/markets.service';
-import type { OrdersService } from '@/modules/orders/orders.service';
+import { MarketsService } from '@/modules/markets/markets.service';
+import { OrdersService } from '@/modules/orders/orders.service';
 
 interface RedisTickerPayload {
   last_price?: string;

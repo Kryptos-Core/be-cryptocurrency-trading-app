@@ -29,7 +29,7 @@ import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
-import type { MarketsService } from './markets.service';
+import { MarketsService } from './markets.service';
 import { resolveOhlcvLocale } from './ohlcv-locale.util';
 
 /**

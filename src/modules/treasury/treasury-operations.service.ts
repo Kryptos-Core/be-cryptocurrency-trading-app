@@ -1,6 +1,6 @@
 import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import {
   Connection,
   Keypair,
@@ -17,11 +17,11 @@ import { TronWeb } from 'tronweb';
 import { uuidv7 } from 'uuidv7';
 import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
 import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   TREASURY_EVENTS_CHANNEL,
   TREASURY_FUND_JOB,
@@ -29,12 +29,12 @@ import {
   TREASURY_SWEEP_JOB,
 } from './constants';
 import type { FundWalletDto, ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from './dto';
-import type { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
-import type { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
-import type { TransactionWalletService } from './transaction-wallet.service';
+import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
+import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
+import { TransactionWalletService } from './transaction-wallet.service';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
-import type {
-  SupportedTreasuryChain,
+import {
+  type SupportedTreasuryChain,
   TreasuryMainWalletService,
 } from './treasury-main-wallet.service';
 

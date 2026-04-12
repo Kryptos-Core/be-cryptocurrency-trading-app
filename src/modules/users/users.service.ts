@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
-import type { CloudinaryService } from '@/common/services';
+import { CloudinaryService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { User } from '@/entities/user.entity';
-import type { TwoFaService } from '@/modules/auth/two-fa.service';
-import type { OrderRepository } from '@/modules/orders/repositories';
-import type { WalletsService } from '@/modules/wallets/wallets.service';
+import { TwoFaService } from '@/modules/auth/two-fa.service';
+import { OrderRepository } from '@/modules/orders/repositories';
+import { WalletsService } from '@/modules/wallets/wallets.service';
 import type {
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
@@ -16,7 +16,7 @@ import type {
   UpdateUserDto,
   UserFilterDto,
 } from './dto';
-import type { UsersRepository } from './repositories';
+import { UsersRepository } from './repositories';
 
 /**
  * Users Service - Business Logic Layer

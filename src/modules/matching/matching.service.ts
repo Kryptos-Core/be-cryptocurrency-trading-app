@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import type { RedisService } from '@/common/services';
-import type { CircuitBreakerService } from './circuit-breaker.service';
+import { ConfigService } from '@nestjs/config';
+import { RedisService } from '@/common/services';
+import { CircuitBreakerService } from './circuit-breaker.service';
 import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
 import type {
   MatchingContext,
@@ -11,13 +11,13 @@ import type {
   TradeExecutionResult,
   TradeExecutor,
 } from './interfaces';
-import type { OrderBookService } from './orderbook';
-import type { MatchingRepository } from './repositories';
-import type { MarketOrderStrategy } from './strategies/market-order.strategy';
-import type { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
+import { OrderBookService } from './orderbook';
+import { MatchingRepository } from './repositories';
+import { MarketOrderStrategy } from './strategies/market-order.strategy';
+import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from './utils';
 import { marketOrderCanFullyFillRemaining } from './utils/market-fok-fill.util';
-import type { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
+import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 
 const LOCK_PREFIX = 'matching:lock:';
 const LOCK_TTL_MS = 10000;

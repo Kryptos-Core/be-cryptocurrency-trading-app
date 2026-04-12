@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import {
   Connection,
   Keypair,
@@ -12,7 +12,7 @@ import bs58 from 'bs58';
 import Decimal from 'decimal.js';
 import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
-import type { DataSource, FindOptionsWhere } from 'typeorm';
+import { DataSource, type FindOptionsWhere } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
@@ -25,15 +25,15 @@ import {
   ConflictException,
   NotFoundException,
 } from '@/common/exceptions';
-import type { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
+import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import type { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
-import type { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
+import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import {
   TRON_DEPOSIT_UI_CHAINS,
-  type TreasuryTransactionWalletRepository,
+  TreasuryTransactionWalletRepository,
   type TronDepositUiChain,
 } from './repositories/treasury-transaction-wallet.repository';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';

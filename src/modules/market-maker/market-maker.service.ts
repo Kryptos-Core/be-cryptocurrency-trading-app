@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { NotFoundException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
-import type { MarketsService } from '@/modules/markets/markets.service';
-import type { OrdersService } from '@/modules/orders/orders.service';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { MarketsService } from '@/modules/markets/markets.service';
+import { OrdersService } from '@/modules/orders/orders.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import type { UpsertMarketMakerConfigDto } from './dto';
-import type { MarketMakerConfigRepository } from './repositories';
-import type { MmOrderStrategyService } from './services/mm-order-strategy.service';
+import { MarketMakerConfigRepository } from './repositories';
+import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 const MM_REFRESH_IDEMPOTENCY_TTL_SEC = 300;
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
+import { DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';

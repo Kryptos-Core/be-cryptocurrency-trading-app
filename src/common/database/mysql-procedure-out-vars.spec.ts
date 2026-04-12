@@ -1,4 +1,4 @@
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { selectMysqlUserVars } from './mysql-procedure-out-vars';
 
 describe('selectMysqlUserVars', () => {

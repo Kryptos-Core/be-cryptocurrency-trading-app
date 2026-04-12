@@ -20,7 +20,7 @@ import {
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard } from '@/common/guards';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import type { AuthService } from './auth.service';
+import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
   LoginDto,
@@ -31,9 +31,9 @@ import {
   WcAuthInitDto,
   WcAuthVerifyDto,
 } from './dto';
-import type { TwoFaService } from './two-fa.service';
-import type { WalletAuthService } from './wallet-auth.service';
-import type { WalletConnectAuthService } from './wallet-connect-auth.service';
+import { TwoFaService } from './two-fa.service';
+import { WalletAuthService } from './wallet-auth.service';
+import { WalletConnectAuthService } from './wallet-connect-auth.service';
 
 /**
  * Auth Controller - API Endpoints

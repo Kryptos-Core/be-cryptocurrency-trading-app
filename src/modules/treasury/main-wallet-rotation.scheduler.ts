@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
-import type { RedisService } from '@/common/services/redis.service';
+import { RedisService } from '@/common/services/redis.service';
 import type { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import {
   TREASURY_MAIN_WALLET_EVENTS_CHANNEL,
-  type TreasuryMainWalletService,
+  TreasuryMainWalletService,
 } from './treasury-main-wallet.service';
 
 /**

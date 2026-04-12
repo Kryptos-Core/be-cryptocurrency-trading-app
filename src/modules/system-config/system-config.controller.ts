@@ -9,7 +9,7 @@ import { PermissionGuard } from '@/common/guards/permission.guard';
 import { RoleGuard } from '@/common/guards/role.guard';
 import type { UpdateRuntimeSettingsBulkDto } from './dto/update-runtime-settings-bulk.dto';
 import type { UpdateSystemConfigDto } from './dto/update-system-config.dto';
-import type { SystemConfigService } from './system-config.service';
+import { SystemConfigService } from './system-config.service';
 
 @ApiTags('System Configs')
 @ApiBearerAuth()

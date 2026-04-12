@@ -1,10 +1,10 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConflictException, NotFoundException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import type { Currency } from '@/entities/currency.entity';
 import { MarketsService } from '@/modules/markets/markets.service';
 import type { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
-import type { CurrencyRepository } from './repositories';
+import { CurrencyRepository } from './repositories';
 
 /**
  * Currencies Service - Business Logic Layer

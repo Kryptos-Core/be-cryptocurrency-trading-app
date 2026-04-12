@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ServiceUnavailableException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
-import type { CurrencyRepository } from '@/modules/currencies/repositories';
-import type { MarketRepository } from '@/modules/markets/repositories';
+import { CacheService } from '@/common/services';
+import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { MarketRepository } from '@/modules/markets/repositories';
 
 const BINANCE_EXCHANGE_INFO_URL = 'https://api.binance.com/api/v3/exchangeInfo';
 /** Cache exchangeInfo 1 hour to avoid Binance request weight / IP ban (418). */
@@ -130,8 +130,16 @@ export class ExchangeInfoSyncService {
 
     for (const asset of assetSet) {
       try {
-        const existing = await this.currencyRepository.findBySymbol(asset);
+        let existing = await this.currencyRepository.findBySymbol(asset);
         if (existing) {
+          // sp_market_create requires base/quote rows with is_tradable=1 and is_active=1.
+          // Re-enable when Binance still lists the asset on TRADING pairs (stale DB rows).
+          if (!existing.is_tradable || !existing.is_active) {
+            existing = await this.currencyRepository.update(existing.currency_id, {
+              is_tradable: true,
+              is_active: true,
+            });
+          }
           symbolToCurrencyId.set(asset, existing.currency_id);
           result.currenciesSkipped += 1;
           continue;

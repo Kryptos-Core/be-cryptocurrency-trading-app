@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 
 const HALT_KEY_PREFIX = 'circuit:halt:';
 const PRICE_WINDOW_KEY_PREFIX = 'circuit:price:';

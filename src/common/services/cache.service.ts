@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { RedisService } from './redis.service';
+import { RedisService } from './redis.service';
 
 /**
  * Cache Service

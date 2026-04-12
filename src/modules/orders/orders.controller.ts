@@ -19,7 +19,7 @@ import type {
   CreateBatchOrderDto,
   CreateOrderDto,
 } from './dto';
-import type { OrdersService } from './orders.service';
+import { OrdersService } from './orders.service';
 
 /**
  * Orders Controller

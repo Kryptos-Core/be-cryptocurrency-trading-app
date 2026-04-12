@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
 import type { BlockchainNetwork, Permission } from '@/common/enums';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import type { User } from '@/entities/user.entity';
-import type { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
-import type { AuthRepository } from './repositories';
+import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
+import { AuthRepository } from './repositories';
 
 /** Response for wallet auth (login or register) */
 export interface WalletAuthResult {

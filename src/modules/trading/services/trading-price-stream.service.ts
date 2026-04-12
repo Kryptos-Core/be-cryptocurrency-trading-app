@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import type { EventEmitter2 } from '@nestjs/event-emitter';
-import type { RedisService } from '@/common/services';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RedisService } from '@/common/services';
 import {
   type CandleInterval,
   type CandleUpdateEvent,

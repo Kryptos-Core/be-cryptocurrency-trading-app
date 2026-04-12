@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   Connection,
@@ -15,9 +15,9 @@ import * as nacl from 'tweetnacl';
 import { BlockchainNetwork } from '@/common/enums';
 import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import type { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
-import type { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,

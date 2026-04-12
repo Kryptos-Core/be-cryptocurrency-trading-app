@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
-import type { TradeAuditLogRepository } from './trade-audit-log.repository';
+import { TradeAuditLogRepository } from './trade-audit-log.repository';
 
 /**
  * Visitor Pattern: Audit log visitor for trade execution results.

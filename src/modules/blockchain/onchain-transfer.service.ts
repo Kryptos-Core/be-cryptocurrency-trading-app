@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import {
@@ -11,16 +11,16 @@ import {
   WalletTransactionAction,
 } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
-import type { CurrencyRepository } from '@/modules/currencies/repositories';
-import type { NotificationsService } from '@/modules/notifications/notifications.service';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
-import type { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
-import type { WalletsService } from '@/modules/wallets/wallets.service';
-import type { BlockchainProviderFactory } from './blockchain-provider.factory';
-import type { DepositFxService } from './deposit-fx.service';
+import { CacheService } from '@/common/services';
+import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { NotificationsService } from '@/modules/notifications/notifications.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import { WalletsService } from '@/modules/wallets/wallets.service';
+import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { DepositFxService } from './deposit-fx.service';
 import type { RequestWithdrawalDto, SubmitDepositDto } from './dto';
-import type { WalletLinkingService } from './wallet-linking.service';
+import { WalletLinkingService } from './wallet-linking.service';
 
 /**
  * Onchain Transfer Service

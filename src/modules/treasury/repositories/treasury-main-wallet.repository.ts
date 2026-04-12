@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type DataSource, type DeepPartial, In, Not } from 'typeorm';
+import { DataSource, type DeepPartial, In, Not } from 'typeorm';
 import {
   TreasuryMainWallet,
   type TreasuryMainWalletChain,

@@ -4,7 +4,7 @@ import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorato
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import type { PlaceMakerOrdersDto, RefreshMakerOrdersDto, UpsertMarketMakerConfigDto } from './dto';
-import type { MarketMakerService } from './market-maker.service';
+import { MarketMakerService } from './market-maker.service';
 
 @ApiTags('market-maker')
 @ApiBearerAuth('JWT-auth')

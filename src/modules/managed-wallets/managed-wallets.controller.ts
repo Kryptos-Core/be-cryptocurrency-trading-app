@@ -20,7 +20,7 @@ import type {
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
 } from './dto';
-import type { ManagedWalletsService } from './managed-wallets.service';
+import { ManagedWalletsService } from './managed-wallets.service';
 
 @ApiTags('managed-wallets')
 @ApiBearerAuth('JWT-auth')

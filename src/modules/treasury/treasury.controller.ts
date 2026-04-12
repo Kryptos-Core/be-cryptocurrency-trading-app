@@ -14,7 +14,7 @@ import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorato
 import { Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import type { TwoFaService } from '@/modules/auth/two-fa.service';
+import { TwoFaService } from '@/modules/auth/two-fa.service';
 import type {
   CreateTransactionWalletDto,
   FundWalletDto,
@@ -27,13 +27,13 @@ import type {
   SweepWalletDto,
   UpdateMainWalletDto,
 } from './dto';
-import type { OnchainChainPickerService } from './onchain-chain-picker.service';
-import type { TransactionWalletService } from './transaction-wallet.service';
-import type {
-  SupportedTreasuryChain,
+import { OnchainChainPickerService } from './onchain-chain-picker.service';
+import { TransactionWalletService } from './transaction-wallet.service';
+import {
+  type SupportedTreasuryChain,
   TreasuryMainWalletService,
 } from './treasury-main-wallet.service';
-import type { TreasuryOperationsService } from './treasury-operations.service';
+import { TreasuryOperationsService } from './treasury-operations.service';
 
 @ApiTags('treasury')
 @ApiBearerAuth('JWT-auth')

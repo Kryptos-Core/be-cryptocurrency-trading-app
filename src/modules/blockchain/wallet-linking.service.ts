@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { type BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
-import type { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { CacheService } from '@/common/services';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import type { RequestLinkDto, VerifyLinkDto } from './dto';
 
 /**

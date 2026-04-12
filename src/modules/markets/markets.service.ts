@@ -7,17 +7,17 @@ import {
   Optional,
 } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
-import type { CacheService } from '@/common/services';
+import { CacheService } from '@/common/services';
 import type { MarketPair } from '@/entities/market-pair.entity';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
 import {
   type DepthSnapshot,
   OrderBookService,
 } from '@/modules/matching/orderbook/order-book.service';
-import type { OHLCVProviderRegistry } from '@/modules/price-oracle';
+import { OHLCVProviderRegistry } from '@/modules/price-oracle';
 import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
 import type { IMarketTickerData } from './interfaces/market-ticker.interface';
-import type { MarketRepository } from './repositories';
+import { MarketRepository } from './repositories';
 
 /** Default string for missing/zero price (repository contract). */
 const TICKER_ZERO = '0';

@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import {
   ApiBadRequestResponse,
   ApiSuccessResponse,
@@ -24,8 +24,8 @@ import {
 import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import type { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
-import type { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
+import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import type {
   ManualWithdrawalActionDto,
   RequestLinkDto,
@@ -33,8 +33,8 @@ import type {
   SubmitDepositDto,
   VerifyLinkDto,
 } from './dto';
-import type { OnchainTransferService } from './onchain-transfer.service';
-import type { WalletLinkingService } from './wallet-linking.service';
+import { OnchainTransferService } from './onchain-transfer.service';
+import { WalletLinkingService } from './wallet-linking.service';
 
 /**
  * Blockchain Controller

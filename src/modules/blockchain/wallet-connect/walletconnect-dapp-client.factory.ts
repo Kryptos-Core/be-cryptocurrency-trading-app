@@ -1,10 +1,11 @@
+import type { WalletConnectSignClient } from '@walletconnect/sign-client';
 import SignClient from '@walletconnect/sign-client';
 
 /**
  * Singleton SignClient (dapp / initiator) cho relay WalletConnect v2.
  * Dùng cho đăng nhập public (`WalletConnectAuthService`) và liên kết ví JWT (`WalletConnectService` + project id).
  */
-let signClientPromise: Promise<SignClient> | null = null;
+let signClientPromise: Promise<WalletConnectSignClient> | null = null;
 
 /** Tránh HTTP /init treo vô hạn khi relay WSS không auth được (JWT/đồng hồ) hoặc mạng chặn. */
 const SIGN_CLIENT_INIT_TIMEOUT_MS = 18_000;
@@ -16,7 +17,7 @@ export function resetWalletConnectDappClientForTests(): void {
 export function getWalletConnectDappClient(params: {
   projectId: string;
   relayUrl: string;
-}): Promise<SignClient> {
+}): Promise<WalletConnectSignClient> {
   if (!params.projectId) {
     return Promise.reject(new Error('WALLETCONNECT_PROJECT_ID is required for SignClient'));
   }
@@ -34,7 +35,7 @@ export function getWalletConnectDappClient(params: {
     });
     signClientPromise = Promise.race([
       init,
-      new Promise<SignClient>((_, reject) => {
+      new Promise<WalletConnectSignClient>((_, reject) => {
         setTimeout(() => {
           reject(
             new Error(

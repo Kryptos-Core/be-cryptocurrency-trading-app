@@ -1,5 +1,5 @@
 import { JsonRpcProvider } from 'ethers';
-import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 /** JsonRpcProvider for any EVM treasury chain code (uses system_configs / env per `evm-chain-definitions`). */
 export async function jsonRpcProviderForTreasuryEvmChain(

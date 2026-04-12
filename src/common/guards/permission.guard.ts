@@ -1,5 +1,5 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
-import type { Reflector } from '@nestjs/core';
+import { Reflector } from '@nestjs/core';
 import { hasPermission } from '@/common/authz/rbac-policy';
 import { REQUIRED_PERMISSIONS_KEY } from '@/common/decorators/require-permissions.decorator';
 import type { Permission, UserRole } from '@/common/enums';

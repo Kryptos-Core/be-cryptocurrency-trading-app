@@ -4,7 +4,7 @@ import { RequirePermissions } from '@/common/decorators/require-permissions.deco
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import type { ExchangeInfoSyncService } from './exchange-info-sync.service';
+import { ExchangeInfoSyncService } from './exchange-info-sync.service';
 
 @ApiTags('Exchange')
 @Controller('exchange')

@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
 
 export interface CloudinaryUploadResult {

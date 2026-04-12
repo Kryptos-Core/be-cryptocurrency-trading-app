@@ -5,18 +5,18 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { PayOS } from '@payos/node';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import type { FiatDeposit } from '@/entities/fiat-deposit.entity';
-import type { CurrencyRepository } from '@/modules/currencies/repositories';
+import { CurrencyRepository } from '@/modules/currencies/repositories';
 import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import type { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import type { WalletsService } from '@/modules/wallets/wallets.service';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { WalletsService } from '@/modules/wallets/wallets.service';
 import { resolvePayosFiatDepositLimits } from './payos-fiat-limits.util';
-import type { FiatDepositRepository } from './repositories/fiat-deposit.repository';
+import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 
 interface PayOSInstanceEntry {
   instance: any;

@@ -1,8 +1,8 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
-import type { RedisService } from '@/common/services';
-import type { MarketRepository } from '@/modules/markets/repositories';
+import { RedisService } from '@/common/services';
+import { MarketRepository } from '@/modules/markets/repositories';
 import { BinanceWebSocketPriceFeedClient } from '../clients/binance-websocket-price-feed.client';
 import type { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
 import {
@@ -11,8 +11,8 @@ import {
   type OhlcSubscriptionEvent,
   type TickerMessage,
 } from '../interfaces/websocket.interface';
-import type { TradingPriceStreamService } from './trading-price-stream.service';
-import type { TradingSubscriptionService } from './trading-subscription.service';
+import { TradingPriceStreamService } from './trading-price-stream.service';
+import { TradingSubscriptionService } from './trading-subscription.service';
 
 const RATE_LIMIT_LOG_MS = 60_000;
 const DEBOUNCE_RECONNECT_MS = 4000;

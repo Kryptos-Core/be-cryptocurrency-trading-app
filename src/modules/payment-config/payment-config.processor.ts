@@ -2,11 +2,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import type { PaymentMethodType } from '@/entities/payment-method-config.entity';
-import {
-  ACTIVATE_JOB,
-  PAYMENT_CONFIG_QUEUE,
-  type PaymentConfigService,
-} from './payment-config.service';
+import { ACTIVATE_JOB, PAYMENT_CONFIG_QUEUE, PaymentConfigService } from './payment-config.service';
 
 interface ActivateJobData {
   configId: string;

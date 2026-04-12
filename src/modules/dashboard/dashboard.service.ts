@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { RedisService } from '@/common/services';
+import { RedisService } from '@/common/services';
 import type { MarketPair } from '@/entities/market-pair.entity';
-import type { MarketsService } from '@/modules/markets/markets.service';
-import type { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import { MarketsService } from '@/modules/markets/markets.service';
+import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
 import type {
   DashboardMarketDto,
   DashboardResponseDto,

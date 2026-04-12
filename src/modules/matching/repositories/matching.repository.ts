@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { MATCHING_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { selectMysqlUserVars } from '@/common/database/mysql-procedure-out-vars';
 import type { OrderBookOrder } from '../interfaces';

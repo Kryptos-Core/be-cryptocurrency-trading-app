@@ -22,7 +22,7 @@ import type {
   CreatePaymentConfigDto,
   UpdatePaymentConfigDto,
 } from './dto';
-import type { PaymentConfigService } from './payment-config.service';
+import { PaymentConfigService } from './payment-config.service';
 
 @Controller('payment-configs')
 @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)

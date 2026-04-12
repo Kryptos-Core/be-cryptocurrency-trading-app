@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type DataSource, type DeepPartial, type FindOptionsWhere, In } from 'typeorm';
+import { DataSource, type DeepPartial, type FindOptionsWhere, In } from 'typeorm';
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 import { NotFoundException } from '@/common/exceptions';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
