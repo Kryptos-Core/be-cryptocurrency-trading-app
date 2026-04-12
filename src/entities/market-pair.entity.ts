@@ -78,7 +78,4 @@ export class MarketPair {
 
   @OneToMany('Trade', 'pair')
   trades!: any[];
-
-  @OneToMany('PriceAlert', 'pair')
-  price_alerts!: any[];
 }

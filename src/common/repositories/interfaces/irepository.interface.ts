@@ -61,7 +61,7 @@ export interface IRepository<T> {
   updateMany(criteria: FindOptionsWhere<T>, entity: DeepPartial<T>): Promise<number>;
 
   /**
-   * Delete entity by ID (soft delete if entity has deletedAt)
+   * Delete entity by ID
    */
   delete(id: number | string): Promise<void>;
 
@@ -69,11 +69,6 @@ export interface IRepository<T> {
    * Delete entities by criteria
    */
   deleteMany(criteria: FindOptionsWhere<T>): Promise<number>;
-
-  /**
-   * Hard delete entity by ID
-   */
-  hardDelete(id: number | string): Promise<void>;
 
   /**
    * Save entity (create or update)

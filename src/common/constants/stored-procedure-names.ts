@@ -124,20 +124,3 @@ export const ALL_STORE_PROCEDURE_GROUPS = [
   PAYMENT_CONFIG_STORE_PROCEDURE,
   FIAT_DEPOSIT_STORE_PROCEDURE,
 ] as const;
-
-/** Legacy aggregate — prefer importing `*_STORE_PROCEDURE` in new code. */
-export const STORED_PROCEDURE_NAMES = {
-  order: ORDER_STORE_PROCEDURE,
-  matching: MATCHING_STORE_PROCEDURE,
-  user: USER_STORE_PROCEDURE,
-  wallet: WALLET_STORE_PROCEDURE,
-  walletLedger: WALLET_LEDGER_STORE_PROCEDURE,
-  adminWalletAdjustment: ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE,
-  currency: CURRENCY_STORE_PROCEDURE,
-  market: MARKET_STORE_PROCEDURE,
-  notification: NOTIFICATION_STORE_PROCEDURE,
-  paymentConfig: PAYMENT_CONFIG_STORE_PROCEDURE,
-  fiatDeposit: FIAT_DEPOSIT_STORE_PROCEDURE,
-} as const;
-
-export type StoredProcedureNames = typeof STORED_PROCEDURE_NAMES;

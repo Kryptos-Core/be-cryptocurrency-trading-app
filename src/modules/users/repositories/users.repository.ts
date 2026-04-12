@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
+import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-result.util';
 import { UserRole } from '@/common/enums';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
 import type { UserFilterDto } from '../dto/user-filter.dto';
@@ -32,7 +34,7 @@ export class UsersRepository {
 
       // Stored procedure returns array of results
       // First element is the actual result set
-      return result[0]?.[0] || null;
+      return spFirstRow<User>(result);
     } catch (error) {
       this.logger.error(`Error finding user by ID: ${userId}`, error);
       throw error;
@@ -48,7 +50,7 @@ export class UsersRepository {
         email.toLowerCase(),
       ]);
 
-      return result[0]?.[0] || null;
+      return spFirstRow<User>(result);
     } catch (error) {
       this.logger.error(`Error finding user by email: ${email}`, error);
       throw error;
@@ -71,7 +73,7 @@ export class UsersRepository {
     try {
       const page = filters.page ?? 1;
       const limit = filters.limit ?? 20;
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
 
       const qb = this.dataSource
         .getRepository(User)
@@ -140,7 +142,7 @@ export class UsersRepository {
     total: number;
   }> {
     try {
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
       const rows = await this.dataSource.query(
         `SELECT request_id, change_type, status, requested_at, reviewed_at, reviewed_by, review_note
          FROM user_security_change_requests
@@ -162,24 +164,42 @@ export class UsersRepository {
   }
 
   /**
-   * Create new user (UUID v7)
+   * Create new user with optional profile fields
    */
-  async create(email: string, passwordHash: string): Promise<User> {
+  async createUser(
+    email: string,
+    passwordHash: string,
+    firstName?: string | null,
+    lastName?: string | null,
+    role: UserRole = UserRole.TRADER,
+  ): Promise<User> {
     try {
       const userId = newUuid();
       await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
         userId,
         email.toLowerCase(),
         passwordHash,
-        null,
-        null,
-        UserRole.TRADER,
+        firstName ?? null,
+        lastName ?? null,
+        role,
       ]);
-      return this.findById(userId) as Promise<User>;
+
+      const createdUser = await this.findById(userId);
+      if (!createdUser) {
+        throw new Error(`Created user ${userId} was not found`);
+      }
+      return createdUser;
     } catch (error) {
       this.logger.error(`Error creating user: ${email}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Create new trader user (legacy path)
+   */
+  async create(email: string, passwordHash: string): Promise<User> {
+    return this.createUser(email, passwordHash, null, null, UserRole.TRADER);
   }
 
   /**
@@ -232,7 +252,13 @@ export class UsersRepository {
     try {
       const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`);
 
-      const stats = result[0]?.[0] || {
+      const stats =
+        spFirstRow<{
+          total: number;
+          active: number;
+          banned: number;
+          pending: number;
+        }>(result) || {
         total: 0,
         active: 0,
         banned: 0,
@@ -256,7 +282,7 @@ export class UsersRepository {
         [email.toLowerCase(), excludeUserId || null],
       );
 
-      const count = result[0]?.[0]?.count || 0;
+      const count = Number(spFirstValue<number>(result, 'count') ?? 0);
       return count > 0;
     } catch (error) {
       this.logger.error(`Error checking email: ${email}`, error);
@@ -285,7 +311,7 @@ export class UsersRepository {
         `CALL ${USER_STORE_PROCEDURE.UPDATE_PROFILE_BASIC}(?, ?, ?)`,
         [userId, firstName ?? null, lastName ?? null],
       );
-      const affected = result[0]?.[0]?.affected ?? 0;
+      const affected = spFirstValue<number>(result, 'affected') ?? 0;
       return Number(affected);
     } catch (error) {
       this.logger.error(`Error updating profile basic: ${userId}`, error);
@@ -306,7 +332,7 @@ export class UsersRepository {
         `CALL ${USER_STORE_PROCEDURE.UPDATE_AVATAR}(?, ?, ?)`,
         [userId, avatarUrl ?? null, avatarPublicId ?? null],
       );
-      const affected = result[0]?.[0]?.affected ?? 0;
+      const affected = spFirstValue<number>(result, 'affected') ?? 0;
       return Number(affected);
     } catch (error) {
       this.logger.error(`Error updating avatar: ${userId}`, error);
@@ -375,7 +401,7 @@ export class UsersRepository {
         `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_REVIEW}(?, ?, ?, ?)`,
         [requestId, reviewedBy, approve ? 1 : 0, reviewNote ?? null],
       );
-      return result[0]?.[0] ?? null;
+      return spFirstRow<{ request_id: string; user_id: string; status: string }>(result);
     } catch (error) {
       this.logger.error(`Error reviewing security change request: ${requestId}`, error);
       throw error;

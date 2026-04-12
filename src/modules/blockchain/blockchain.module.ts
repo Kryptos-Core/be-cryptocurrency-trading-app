@@ -26,11 +26,15 @@ import {
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { DepositFxService } from './deposit-fx.service';
-import { OnchainTransferService } from './onchain-transfer.service';
+import { OnchainDepositService } from './onchain-deposit.service';
+import { OnchainTransferQueryService } from './onchain-transfer-query.service';
+import { OnchainTransferService } from '@/modules/blockchain/onchain-transfer.service';
+import { OnchainWithdrawalService } from './onchain-withdrawal.service';
 import { EthereumProvider } from './providers/ethereum.provider';
 import { SolanaProvider } from './providers/solana.provider';
 import { TronProvider } from './providers/tron.provider';
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
+import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletLinkingService } from './wallet-linking.service';
 
@@ -143,7 +147,11 @@ import { WalletLinkingService } from './wallet-linking.service';
 
     DepositFxService,
     WalletLinkingService,
+    OnchainDepositService,
+    OnchainWithdrawalService,
+    OnchainTransferQueryService,
     OnchainTransferService,
+    WalletConnectSessionManager,
     WalletConnectService,
   ],
   exports: [

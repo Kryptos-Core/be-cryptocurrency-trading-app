@@ -36,27 +36,26 @@ export class MailService {
     return this.transporter;
   }
 
-  /** OTP gửi tới email mới khi user ví gắn email liên hệ (khác mã 2FA đăng nhập). */
-  async sendContactEmailVerificationOtp(toEmail: string, otpCode: string): Promise<void> {
+  private async sendEmailWithDevFallback(
+    toEmail: string,
+    subject: string,
+    text: string,
+    logLabel: string,
+  ): Promise<void> {
     const from =
       this.configService.get<string>('SMTP_FROM') ||
       'Crypto Trading App <no-reply@crypto-trading.local>';
 
-    const subject = 'Ma xac minh email lien he / Contact email verification';
-    const text =
-      `Ma xac minh email lien he cua ban la: ${otpCode}. Ma co hieu luc trong 5 phut.\n\n` +
-      `Your contact email verification code is: ${otpCode}. Valid for 5 minutes.`;
-
     try {
       const transporter = this.getTransporter();
       await transporter.sendMail({ from, to: toEmail, subject, text });
-      this.logger.log(`Contact-email OTP sent to ${toEmail}`);
+      this.logger.log(`${logLabel} sent to ${toEmail}`);
     } catch (err) {
       const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
       if (isDev) {
         this.logger.warn(
           `SMTP unavailable (${err instanceof Error ? err.message : String(err)}). ` +
-            `[DEV ONLY] Contact-email OTP for ${toEmail}: ${otpCode}`,
+            `[DEV ONLY] ${logLabel} for ${toEmail}: ${text}`,
         );
       } else {
         throw err;
@@ -64,30 +63,20 @@ export class MailService {
     }
   }
 
-  async sendOtp(toEmail: string, otpCode: string): Promise<void> {
-    const from =
-      this.configService.get<string>('SMTP_FROM') ||
-      'Crypto Trading App <no-reply@crypto-trading.local>';
+  /** OTP gửi tới email mới khi user ví gắn email liên hệ (khác mã 2FA đăng nhập). */
+  async sendContactEmailVerificationOtp(toEmail: string, otpCode: string): Promise<void> {
+    const subject = 'Ma xac minh email lien he / Contact email verification';
+    const text =
+      `Ma xac minh email lien he cua ban la: ${otpCode}. Ma co hieu luc trong 5 phut.\n\n` +
+      `Your contact email verification code is: ${otpCode}. Valid for 5 minutes.`;
 
+    await this.sendEmailWithDevFallback(toEmail, subject, text, 'Contact-email OTP');
+  }
+
+  async sendOtp(toEmail: string, otpCode: string): Promise<void> {
     const subject = 'Ma OTP xac thuc 2 buoc';
     const text = `Ma OTP cua ban la: ${otpCode}. Ma co hieu luc trong 5 phut.`;
 
-    try {
-      const transporter = this.getTransporter();
-      await transporter.sendMail({ from, to: toEmail, subject, text });
-      this.logger.log(`OTP sent to ${toEmail}`);
-    } catch (err) {
-      const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
-      if (isDev) {
-        // SMTP unavailable in dev → print OTP to console so manual testing works.
-        this.logger.warn(
-          `SMTP unavailable (${err instanceof Error ? err.message : String(err)}). ` +
-            `[DEV ONLY] OTP for ${toEmail}: ${otpCode}`,
-        );
-      } else {
-        // Production must have a working SMTP — propagate the error.
-        throw err;
-      }
-    }
+    await this.sendEmailWithDevFallback(toEmail, subject, text, 'OTP');
   }
 }

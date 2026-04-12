@@ -10,6 +10,7 @@ import { PayOS } from '@payos/node';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
+import { calcSkip } from '@/common/utils/pagination.util';
 import type { FiatDeposit } from '@/entities/fiat-deposit.entity';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
@@ -313,7 +314,7 @@ export class DepositsService {
     page: number;
     limit: number;
   }) {
-    const skip = (params.page - 1) * params.limit;
+    const skip = calcSkip(params.page, params.limit);
     const { items, total } = await this.fiatDepositRepo.findAllForAdmin({
       userId: params.userId,
       status: params.status,

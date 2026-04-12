@@ -1,362 +1,182 @@
-import { ConfigService } from '@nestjs/config';
-import { Test, type TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
-import { BlockchainNetwork, OnchainTxStatus, WalletTransactionAction } from '@/common/enums';
-import { CacheService } from '@/common/services';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
-import { NotificationsService } from '@/modules/notifications/notifications.service';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
-import { WalletsService } from '@/modules/wallets/wallets.service';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DepositFxService } from './deposit-fx.service';
+import { Test } from '@nestjs/testing';
+import { BlockchainNetwork, OnchainTxStatus } from '@/common/enums';
+import { OnchainDepositService } from './onchain-deposit.service';
+import { OnchainTransferQueryService } from './onchain-transfer-query.service';
 import { OnchainTransferService } from './onchain-transfer.service';
-import { WalletLinkingService } from './wallet-linking.service';
+import { OnchainWithdrawalService } from './onchain-withdrawal.service';
 
 describe('OnchainTransferService', () => {
   let service: OnchainTransferService;
-  let dataSource: jest.Mocked<DataSource>;
-  let cacheService: jest.Mocked<CacheService>;
-  let providerFactory: jest.Mocked<BlockchainProviderFactory>;
-  let walletLinkingService: jest.Mocked<WalletLinkingService>;
-  let walletsService: jest.Mocked<WalletsService>;
-  let currencyRepository: jest.Mocked<CurrencyRepository>;
-  let configService: jest.Mocked<ConfigService>;
-  let systemConfigService: jest.Mocked<Pick<SystemConfigService, 'get'>>;
-
-  const provider = {
-    getTransactionStatus: jest.fn(),
-    sendTransaction: jest.fn(),
-    getHotWalletAddress: jest.fn(),
+  const depositService = {
+    previewDepositTx: jest.fn(),
+    submitDeposit: jest.fn(),
+    settleDepositByTxId: jest.fn(),
+  };
+  const withdrawalService = {
+    requestWithdrawal: jest.fn(),
+    approveManualWithdrawal: jest.fn(),
+    rejectManualWithdrawal: jest.fn(),
+    processPendingManualWithdrawals: jest.fn(),
+  };
+  const queryService = {
+    getTransactions: jest.fn(),
+    getTransactionById: jest.fn(),
+    getAdminWithdrawals: jest.fn(),
+    getAdminWithdrawalById: jest.fn(),
+    getAdminWithdrawalStats: jest.fn(),
   };
 
   beforeEach(async () => {
-    const dataSourceMock = {
-      query: jest.fn(),
-    };
-    const cacheMock = {
-      get: jest.fn(),
-      exists: jest.fn(),
-      set: jest.fn(),
-      delete: jest.fn(),
-    };
-    const providerFactoryMock = {
-      getProvider: jest.fn(),
-    };
-    const walletLinkingMock = {
-      findByLinkId: jest.fn(),
-      findVerifiedWallet: jest.fn(),
-    };
-    const walletsMock = {
-      applyTransaction: jest.fn(),
-    };
-    const currencyRepoMock = {
-      findBySymbol: jest.fn(),
-    };
-    const configMock = {
-      get: jest.fn(),
-    };
+    jest.clearAllMocks();
 
-    const systemConfigMock = {
-      get: jest.fn(),
-    };
-
-    const txWalletMock = {
-      getWithdrawalSourceWallet: jest.fn().mockResolvedValue(null),
-      sendWithdrawalNativeTransfer: jest.fn(),
-      getDefaultUserDepositWallet: jest.fn().mockResolvedValue(null),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleRef = await Test.createTestingModule({
       providers: [
         OnchainTransferService,
-        { provide: DataSource, useValue: dataSourceMock },
-        { provide: CacheService, useValue: cacheMock },
-        { provide: BlockchainProviderFactory, useValue: providerFactoryMock },
-        { provide: WalletLinkingService, useValue: walletLinkingMock },
-        {
-          provide: DepositFxService,
-          useValue: {
-            convertToPlatformCash: jest.fn().mockResolvedValue({
-              creditCurrencyId: '019cecc4-2dc1-7dd9-ac3e-630f88893875',
-              creditAmount: '2.5',
-              conversionRate: '1',
-              originalAmount: '2.5',
-            }),
-          },
-        },
-        { provide: WalletsService, useValue: walletsMock },
-        { provide: CurrencyRepository, useValue: currencyRepoMock },
-        { provide: ConfigService, useValue: configMock },
-        { provide: SystemConfigService, useValue: systemConfigMock },
-        { provide: NotificationsService, useValue: { sendToUser: jest.fn() } },
-        { provide: TransactionWalletService, useValue: txWalletMock },
+        { provide: OnchainDepositService, useValue: depositService },
+        { provide: OnchainWithdrawalService, useValue: withdrawalService },
+        { provide: OnchainTransferQueryService, useValue: queryService },
       ],
     }).compile();
 
-    service = module.get(OnchainTransferService);
-    dataSource = module.get(DataSource);
-    cacheService = module.get(CacheService);
-    providerFactory = module.get(BlockchainProviderFactory);
-    walletLinkingService = module.get(WalletLinkingService);
-    walletsService = module.get(WalletsService);
-    currencyRepository = module.get(CurrencyRepository);
-    configService = module.get(ConfigService);
-    systemConfigService = module.get(SystemConfigService);
-
-    providerFactory.getProvider.mockReturnValue(provider as any);
-    provider.getHotWalletAddress.mockReturnValue('0xHotWallet');
-
-    cacheService.get.mockResolvedValue(null);
-    cacheService.exists.mockResolvedValue(false);
-    cacheService.set.mockResolvedValue(undefined as never);
-    cacheService.delete.mockResolvedValue(undefined as never);
-
-    walletLinkingService.findByLinkId.mockResolvedValue({
-      link_id: 'link-1',
-      chain: BlockchainNetwork.ETH_MAINNET,
-      address: '0xRecipient',
-      status: 'VERIFIED',
-    } as any);
-
-    walletsService.applyTransaction.mockResolvedValue({} as any);
-
-    currencyRepository.findBySymbol.mockResolvedValue({
-      currency_id: '1',
-      symbol: 'ETH',
-    } as any);
-
-    configService.get.mockImplementation((key: string) => {
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '10';
-      if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
-      return undefined;
-    });
-
-    dataSource.query.mockResolvedValue([] as never);
-
-    jest.clearAllMocks();
-
-    systemConfigService.get.mockImplementation(async (key: string) => {
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '10';
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET') return null;
-      if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
-      return null;
-    });
+    service = moduleRef.get(OnchainTransferService);
   });
 
-  it('auto withdrawal success should freeze -> unfreeze -> debit', async () => {
-    provider.sendTransaction.mockResolvedValue('0xhash-ok');
+  it('delegates previewDepositTx to deposit service', async () => {
+    depositService.previewDepositTx.mockResolvedValue({ txHash: '0x1' });
 
-    const result = await service.requestWithdrawal('user-1', {
+    const result = await service.previewDepositTx('user-1', BlockchainNetwork.ETH_MAINNET, '0x1');
+
+    expect(depositService.previewDepositTx).toHaveBeenCalledWith(
+      'user-1',
+      BlockchainNetwork.ETH_MAINNET,
+      '0x1',
+    );
+    expect(result).toEqual({ txHash: '0x1' });
+  });
+
+  it('delegates submitDeposit to deposit service', async () => {
+    depositService.submitDeposit.mockResolvedValue({ txId: 'tx-1' });
+
+    const result = await service.submitDeposit('user-1', {
       chain: BlockchainNetwork.ETH_MAINNET,
-      linkedWalletId: 'link-1',
+      txHash: '0xhash',
       amount: '1',
-      idempotencyKey: 'idem-1',
     });
 
-    expect(result.status).toBe(OnchainTxStatus.CONFIRMING);
-    expect(walletsService.applyTransaction).toHaveBeenCalledTimes(3);
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      1,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.FREEZE }),
-    );
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      2,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.UNFREEZE }),
-    );
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      3,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.DEBIT }),
-    );
-  });
-
-  it('auto withdrawal failed send should freeze -> unfreeze only', async () => {
-    provider.sendTransaction.mockRejectedValue(new Error('send failed'));
-
-    const result = await service.requestWithdrawal('user-1', {
+    expect(depositService.submitDeposit).toHaveBeenCalledWith('user-1', {
       chain: BlockchainNetwork.ETH_MAINNET,
-      linkedWalletId: 'link-1',
+      txHash: '0xhash',
       amount: '1',
-      idempotencyKey: 'idem-2',
     });
-
-    expect(result.status).toBe(OnchainTxStatus.FAILED);
-    expect(walletsService.applyTransaction).toHaveBeenCalledTimes(2);
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      1,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.FREEZE }),
-    );
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      2,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.UNFREEZE }),
-    );
+    expect(result).toEqual({ txId: 'tx-1' });
   });
 
-  it('manual withdrawal should keep pending review and not send on-chain', async () => {
-    configService.get.mockImplementation((key: string) => {
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '0.5';
-      if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
-      return undefined;
-    });
-    systemConfigService.get.mockImplementation(async (key: string) => {
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX') return '0.5';
-      if (key === 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET') return null;
-      if (key === 'BLOCKCHAIN_WITHDRAW_ETH_SYMBOL') return 'ETH';
-      return null;
-    });
+  it('delegates settleDepositByTxId to deposit service', async () => {
+    depositService.settleDepositByTxId.mockResolvedValue({ txId: 'tx-1', settled: true });
 
-    const result = await service.requestWithdrawal('user-1', {
-      chain: BlockchainNetwork.ETH_MAINNET,
-      linkedWalletId: 'link-1',
-      amount: '1',
-      idempotencyKey: 'idem-3',
-    });
+    const result = await service.settleDepositByTxId('user-1', 'tx-1');
 
-    expect(result.reviewRequired).toBe(true);
-    expect(result.status).toBe(OnchainTxStatus.PENDING);
-    expect(provider.sendTransaction).not.toHaveBeenCalled();
-    expect(walletsService.applyTransaction).toHaveBeenCalledTimes(1);
-    expect(walletsService.applyTransaction).toHaveBeenCalledWith(
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.FREEZE }),
-    );
+    expect(depositService.settleDepositByTxId).toHaveBeenCalledWith('user-1', 'tx-1');
+    expect(result).toEqual({ txId: 'tx-1', settled: true });
   });
 
-  it('idempotency cache should return cached result and skip side effects', async () => {
-    cacheService.get.mockResolvedValue({
-      txId: 'cached-tx',
+  it('delegates requestWithdrawal to withdrawal service', async () => {
+    withdrawalService.requestWithdrawal.mockResolvedValue({
+      txId: 'tx-w-1',
       status: OnchainTxStatus.CONFIRMING,
-      amount: '1',
-      chain: BlockchainNetwork.ETH_MAINNET,
-      toAddress: '0xRecipient',
-    } as never);
+    });
 
     const result = await service.requestWithdrawal('user-1', {
       chain: BlockchainNetwork.ETH_MAINNET,
       linkedWalletId: 'link-1',
       amount: '1',
-      idempotencyKey: 'idem-4',
     });
 
-    expect(result.txId).toBe('cached-tx');
-    expect(cacheService.exists).not.toHaveBeenCalled();
-    expect(walletsService.applyTransaction).not.toHaveBeenCalled();
-    expect(provider.sendTransaction).not.toHaveBeenCalled();
+    expect(withdrawalService.requestWithdrawal).toHaveBeenCalledWith('user-1', {
+      chain: BlockchainNetwork.ETH_MAINNET,
+      linkedWalletId: 'link-1',
+      amount: '1',
+    });
+    expect(result).toEqual({
+      txId: 'tx-w-1',
+      status: OnchainTxStatus.CONFIRMING,
+    });
   });
 
-  it('approveManualWithdrawal should unfreeze and debit when on-chain send succeeds', async () => {
-    dataSource.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM onchain_transactions') && sql.includes('WHERE tx_id = ?')) {
-        return [
-          {
-            tx_id: 'tx-manual-1',
-            user_id: 'user-1',
-            chain: BlockchainNetwork.ETH_MAINNET,
-            type: 'WITHDRAWAL',
-            tx_hash: null,
-            from_address: '0xHotWallet',
-            to_address: '0xRecipient',
-            amount: '1.25',
-            status: OnchainTxStatus.PENDING,
-          },
-        ];
-      }
-      return [];
-    });
+  it('delegates approveManualWithdrawal to withdrawal service', async () => {
+    withdrawalService.approveManualWithdrawal.mockResolvedValue({ txId: 'tx-w-1' });
 
-    provider.sendTransaction.mockResolvedValue('0xmanualhash');
+    const result = await service.approveManualWithdrawal('admin-1', 'tx-w-1');
 
-    const result = await service.approveManualWithdrawal('actor-1', 'tx-manual-1');
-
-    expect(result.status).toBe(OnchainTxStatus.CONFIRMING);
-    expect(walletsService.applyTransaction).toHaveBeenCalledTimes(2);
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      1,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.UNFREEZE }),
-    );
-    expect(walletsService.applyTransaction).toHaveBeenNthCalledWith(
-      2,
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.DEBIT }),
-    );
+    expect(withdrawalService.approveManualWithdrawal).toHaveBeenCalledWith('admin-1', 'tx-w-1');
+    expect(result).toEqual({ txId: 'tx-w-1' });
   });
 
-  it('rejectManualWithdrawal should unfreeze only and mark failed', async () => {
-    dataSource.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM onchain_transactions') && sql.includes('WHERE tx_id = ?')) {
-        return [
-          {
-            tx_id: 'tx-manual-2',
-            user_id: 'user-1',
-            chain: BlockchainNetwork.ETH_MAINNET,
-            type: 'WITHDRAWAL',
-            tx_hash: null,
-            amount: '0.75',
-            status: OnchainTxStatus.PENDING,
-          },
-        ];
-      }
-      return [];
-    });
+  it('delegates rejectManualWithdrawal to withdrawal service', async () => {
+    withdrawalService.rejectManualWithdrawal.mockResolvedValue({ txId: 'tx-w-1', status: 'FAILED' });
 
-    const result = await service.rejectManualWithdrawal('actor-1', 'tx-manual-2', 'risk rejected');
+    const result = await service.rejectManualWithdrawal('admin-1', 'tx-w-1', 'risk');
 
-    expect(result.status).toBe(OnchainTxStatus.FAILED);
-    expect(walletsService.applyTransaction).toHaveBeenCalledTimes(1);
-    expect(walletsService.applyTransaction).toHaveBeenCalledWith(
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.UNFREEZE }),
+    expect(withdrawalService.rejectManualWithdrawal).toHaveBeenCalledWith(
+      'admin-1',
+      'tx-w-1',
+      'risk',
     );
+    expect(result).toEqual({ txId: 'tx-w-1', status: 'FAILED' });
   });
 
-  it('settleDepositByTxId should credit wallet once when tx becomes confirmed', async () => {
-    dataSource.query.mockImplementation(async (sql: string) => {
-      if (
-        sql.includes('FROM onchain_transactions') &&
-        sql.includes('WHERE tx_id = ? AND user_id = ?')
-      ) {
-        return [
-          {
-            tx_id: 'tx-dep-1',
-            user_id: 'user-1',
-            chain: BlockchainNetwork.ETH_MAINNET,
-            type: 'DEPOSIT',
-            tx_hash: '0xdep',
-            amount: '2.5',
-            status: OnchainTxStatus.CONFIRMING,
-            confirmations: 2,
-          },
-        ];
-      }
-      if (sql.includes('FROM wallet_ledger')) {
-        return [];
-      }
-      return [];
-    });
+  it('delegates processPendingManualWithdrawals to withdrawal service', async () => {
+    withdrawalService.processPendingManualWithdrawals.mockResolvedValue({ processed: 2 });
 
-    provider.getTransactionStatus.mockResolvedValue({
-      txHash: '0xdep',
-      network: BlockchainNetwork.ETH_MAINNET,
-      status: 'CONFIRMED',
-      confirmations: 12,
-      from: '0xSender',
-      to: '0xHotWallet',
-      value: '2.5',
-    });
+    const result = await service.processPendingManualWithdrawals('admin-1', 25);
 
-    const result = await service.settleDepositByTxId('user-1', 'tx-dep-1');
+    expect(withdrawalService.processPendingManualWithdrawals).toHaveBeenCalledWith('admin-1', 25);
+    expect(result).toEqual({ processed: 2 });
+  });
 
-    expect(result.status).toBe(OnchainTxStatus.COMPLETED);
-    expect(result.settled).toBe(true);
-    expect(walletsService.applyTransaction).toHaveBeenCalledWith(
-      'user-1',
-      expect.objectContaining({ action: WalletTransactionAction.CREDIT }),
-    );
+  it('delegates getTransactions to query service', async () => {
+    queryService.getTransactions.mockResolvedValue([{ txId: 'tx-1' }]);
+
+    const result = await service.getTransactions('user-1', 30);
+
+    expect(queryService.getTransactions).toHaveBeenCalledWith('user-1', 30);
+    expect(result).toEqual([{ txId: 'tx-1' }]);
+  });
+
+  it('delegates getTransactionById to query service', async () => {
+    queryService.getTransactionById.mockResolvedValue({ txId: 'tx-1' });
+
+    const result = await service.getTransactionById('user-1', 'tx-1');
+
+    expect(queryService.getTransactionById).toHaveBeenCalledWith('user-1', 'tx-1');
+    expect(result).toEqual({ txId: 'tx-1' });
+  });
+
+  it('delegates getAdminWithdrawals to query service', async () => {
+    queryService.getAdminWithdrawals.mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 });
+    const filters = { status: OnchainTxStatus.PENDING, page: 1, limit: 20 };
+
+    const result = await service.getAdminWithdrawals(filters);
+
+    expect(queryService.getAdminWithdrawals).toHaveBeenCalledWith(filters);
+    expect(result).toEqual({ data: [], total: 0, page: 1, limit: 20 });
+  });
+
+  it('delegates getAdminWithdrawalById to query service', async () => {
+    queryService.getAdminWithdrawalById.mockResolvedValue({ txId: 'tx-1' });
+
+    const result = await service.getAdminWithdrawalById('tx-1');
+
+    expect(queryService.getAdminWithdrawalById).toHaveBeenCalledWith('tx-1');
+    expect(result).toEqual({ txId: 'tx-1' });
+  });
+
+  it('delegates getAdminWithdrawalStats to query service', async () => {
+    queryService.getAdminWithdrawalStats.mockResolvedValue({ pendingCount: 0, pendingTotalByChain: {} });
+
+    const result = await service.getAdminWithdrawalStats();
+
+    expect(queryService.getAdminWithdrawalStats).toHaveBeenCalledWith();
+    expect(result).toEqual({ pendingCount: 0, pendingTotalByChain: {} });
   });
 });

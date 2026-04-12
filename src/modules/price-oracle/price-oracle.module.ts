@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { OHLCVProviderRegistry } from './ohlcv-provider.registry';
 import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
 
 /**
@@ -10,7 +9,7 @@ import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
  */
 @Module({
   imports: [ConfigModule],
-  providers: [BinanceOHLCVProvider, OHLCVProviderRegistry],
-  exports: [OHLCVProviderRegistry],
+  providers: [BinanceOHLCVProvider],
+  exports: [BinanceOHLCVProvider],
 })
 export class PriceOracleModule {}

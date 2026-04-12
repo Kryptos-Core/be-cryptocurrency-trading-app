@@ -9,6 +9,7 @@ import type {
   ObjectLiteral,
   Repository,
 } from 'typeorm';
+import { calcSkip } from '@/common/utils/pagination.util';
 import type { IRepository } from './interfaces/irepository.interface';
 
 /**
@@ -109,7 +110,7 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     options?: FindManyOptions<T>,
   ): Promise<{ data: T[]; total: number; page: number; limit: number }> {
     try {
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
       const take = limit;
 
       const [data, total] = await this.repository.findAndCount({
@@ -217,8 +218,8 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
   }
 
   /**
-   * Delete entity by ID (soft delete if entity has deletedAt)
-   * Template Method: Can be overridden for soft delete
+   * Delete entity by ID
+   * Template Method: Can be overridden for soft delete behavior
    * Automatically uses the correct primary key field name
    */
   async delete(id: number | string): Promise<void> {
@@ -244,24 +245,6 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
       return result.affected || 0;
     } catch (error) {
       this.logger.error(`Error deleting multiple ${this.entity.toString()}`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Hard delete entity by ID
-   * Automatically uses the correct primary key field name
-   */
-  async hardDelete(id: number | string): Promise<void> {
-    try {
-      const primaryKeyName = this.getPrimaryKeyName();
-      const whereClause = { [primaryKeyName]: id } as any;
-      const result = await this.repository.delete(whereClause);
-      if (result.affected === 0) {
-        throw new Error(`Entity with ID ${id} not found`);
-      }
-    } catch (error) {
-      this.logger.error(`Error hard deleting ${this.entity.toString()} with ID: ${id}`, error);
       throw error;
     }
   }

@@ -9,6 +9,7 @@ import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import type { User } from '@/entities/user.entity';
 import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
+import { UsersRepository } from '@/modules/users/repositories';
 import { AuthRepository } from './repositories';
 
 /** Response for wallet auth (login or register) */
@@ -31,6 +32,7 @@ export class WalletAuthService {
 
   constructor(
     private readonly authRepository: AuthRepository,
+    private readonly usersRepository: UsersRepository,
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly jwtService: JwtService,
@@ -143,7 +145,7 @@ export class WalletAuthService {
       if (user.status === 'BANNED') {
         throw new BusinessException('Tài khoản đã bị khoá', 'ACCOUNT_BANNED');
       }
-      const full = await this.authRepository.findById(user.user_id);
+      const full = await this.usersRepository.findById(user.user_id);
       if (full) {
         user = full;
       }

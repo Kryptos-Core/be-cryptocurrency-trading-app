@@ -15,6 +15,7 @@ import {
   extractTronFirstContractOwnerBase58,
   extractTronNativeTransferMeta,
 } from '../utils/tron-native-transfer.util';
+import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
 
 export interface TronProviderBindings {
   network: BlockchainNetwork;
@@ -112,7 +113,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     try {
       const tx = await this.tronWeb.trx.getTransaction(txHash);
       if (!tx?.txID) {
-        return this.buildNotFound(txHash);
+        return buildNotFoundTxStatus(txHash, this.bindings.network);
       }
       const receipt = await this.tronWeb.trx.getTransactionInfo(txHash);
       const confirmed = receipt?.blockNumber != null;
@@ -142,7 +143,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
       };
     } catch (error) {
       this.logger.error(`Error getting TRON tx: ${txHash}`, error);
-      return this.buildNotFound(txHash);
+      return buildNotFoundTxStatus(txHash, this.bindings.network);
     }
   }
 
@@ -165,17 +166,5 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     const privateKey = await this.resolveHotWalletKey();
     const tw = await this.buildTronWebWithKey(privateKey);
     return tw.defaultAddress.base58;
-  }
-
-  private buildNotFound(txHash: string): BlockchainTxStatusDto {
-    return {
-      txHash,
-      network: this.bindings.network,
-      status: 'NOT_FOUND',
-      confirmations: 0,
-      from: '',
-      to: '',
-      value: '0',
-    };
   }
 }

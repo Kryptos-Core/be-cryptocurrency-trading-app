@@ -14,7 +14,7 @@ import {
   type DepthSnapshot,
   OrderBookService,
 } from '@/modules/matching/orderbook/order-book.service';
-import { OHLCVProviderRegistry } from '@/modules/price-oracle';
+import { BinanceOHLCVProvider } from '@/modules/price-oracle';
 import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
 import type { IMarketTickerData } from './interfaces/market-ticker.interface';
 import { MarketRepository } from './repositories';
@@ -48,7 +48,7 @@ export class MarketsService implements OnModuleInit {
     private readonly cacheService: CacheService,
     @Inject(forwardRef(() => CurrenciesService))
     private readonly currenciesService: CurrenciesService,
-    private readonly ohlcvProviderRegistry: OHLCVProviderRegistry,
+    private readonly ohlcvProvider: BinanceOHLCVProvider,
     @Optional()
     @Inject(forwardRef(() => OrderBookService))
     private readonly orderBookService?: OrderBookService,
@@ -467,7 +467,7 @@ export class MarketsService implements OnModuleInit {
     }
     const toDate = new Date();
     const fromDate = new Date(toDate.getTime() - 25 * 60 * 60 * 1000);
-    const candles = await this.ohlcvProviderRegistry.getOHLCVByRange(
+    const candles = await this.ohlcvProvider.getOHLCVByRange(
       pairId,
       symbol,
       60,
@@ -778,7 +778,7 @@ export class MarketsService implements OnModuleInit {
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '') || pair.symbol;
 
-    const candles = await this.ohlcvProviderRegistry.getOHLCVByRange(
+    const candles = await this.ohlcvProvider.getOHLCVByRange(
       pairId,
       symbol,
       intervalSec,

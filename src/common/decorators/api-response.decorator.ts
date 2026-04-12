@@ -16,7 +16,7 @@ type ExtendedApiResponseOptions = Omit<ApiResponseOptions, 'status' | 'descripti
  * Custom API Response Decorator
  * Wrapper for common response patterns
  */
-export const ApiStandardResponse = (
+const apiStandardResponse = (
   statusCode: number,
   description: string,
   options?: ExtendedApiResponseOptions,
@@ -37,7 +37,7 @@ export const ApiSuccessResponse = (
   description: string = 'Success',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(200, description, options);
+  return apiStandardResponse(200, description, options);
 };
 
 /**
@@ -47,7 +47,7 @@ export const ApiCreatedResponse = (
   description: string = 'Resource created successfully',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(201, description, options);
+  return apiStandardResponse(201, description, options);
 };
 
 /**
@@ -57,7 +57,7 @@ export const ApiBadRequestResponse = (
   description: string = 'Bad request',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(400, description, options);
+  return apiStandardResponse(400, description, options);
 };
 
 /**
@@ -67,7 +67,7 @@ export const ApiUnauthorizedResponse = (
   description: string = 'Unauthorized',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(401, description, options);
+  return apiStandardResponse(401, description, options);
 };
 
 /**
@@ -77,7 +77,7 @@ export const ApiForbiddenResponse = (
   description: string = 'Forbidden',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(403, description, options);
+  return apiStandardResponse(403, description, options);
 };
 
 /**
@@ -87,7 +87,7 @@ export const ApiNotFoundResponse = (
   description: string = 'Resource not found',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(404, description, options);
+  return apiStandardResponse(404, description, options);
 };
 
 /**
@@ -97,7 +97,7 @@ export const ApiConflictResponse = (
   description: string = 'Resource conflict',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(409, description, options);
+  return apiStandardResponse(409, description, options);
 };
 
 /**
@@ -107,5 +107,5 @@ export const ApiInternalServerErrorResponse = (
   description: string = 'Internal server error',
   options?: ExtendedApiResponseOptions,
 ) => {
-  return ApiStandardResponse(500, description, options);
+  return apiStandardResponse(500, description, options);
 };

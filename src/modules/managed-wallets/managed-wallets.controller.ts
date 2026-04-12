@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
+import { CurrentUser, RequireFinanceAccess, RequirePermissions } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import type {
@@ -31,7 +31,7 @@ export class ManagedWalletsController {
 
   @Post()
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({
     summary: 'Deprecated — use POST /treasury/wallets',
@@ -43,7 +43,7 @@ export class ManagedWalletsController {
 
   @Get()
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({
     summary: 'List Tron transaction wallets eligible for user deposit defaults (DEPOSIT/BOTH)',
@@ -54,7 +54,7 @@ export class ManagedWalletsController {
 
   @Get('deposit-defaults')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get current default deposit wallets and recommended chain' })
   async getDepositDefaults() {
@@ -63,7 +63,7 @@ export class ManagedWalletsController {
 
   @Patch('settings/recommended-chain')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Set the recommended deposit chain shown to users' })
   async setRecommendedChain(@Body() dto: UpdateRecommendedChainDto) {
@@ -72,7 +72,7 @@ export class ManagedWalletsController {
 
   @Get(':walletId')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get managed wallet details and live on-chain balance' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
@@ -86,7 +86,7 @@ export class ManagedWalletsController {
 
   @Get(':walletId/transactions')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get recent on-chain transactions for a managed wallet' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
@@ -102,7 +102,7 @@ export class ManagedWalletsController {
 
   @Post(':walletId/send')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_WITHDRAW)
   @ApiOperation({ summary: 'Send TRX from a managed wallet' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })
@@ -117,7 +117,7 @@ export class ManagedWalletsController {
 
   @Patch(':walletId/set-deposit-default')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({
     summary: 'Set a transaction wallet as the default user deposit address for its chain',
@@ -133,7 +133,7 @@ export class ManagedWalletsController {
 
   @Patch(':walletId/clear-deposit-default')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({
     summary: 'Clear this wallet as the default user deposit address for its chain',
@@ -151,7 +151,7 @@ export class ManagedWalletsController {
 
   @Delete(':walletId')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Deactivate a managed wallet' })
   @ApiParam({ name: 'walletId', description: 'Managed wallet UUID' })

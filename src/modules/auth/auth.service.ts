@@ -12,6 +12,7 @@ import {
   UnauthorizedException,
 } from '@/common/exceptions';
 import type { User } from '@/entities/user.entity';
+import { UsersRepository } from '@/modules/users/repositories';
 import { formatName } from '@/utils/helpers';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
 import { AuthRepository } from './repositories';
@@ -19,7 +20,7 @@ import { TwoFaService } from './two-fa.service';
 
 /**
  * Auth Service - Business Logic Layer
- * Gọi AuthRepository để access database thông qua stored procedures
+ * Gọi UsersRepository cho user CRUD/auth lookups và AuthRepository cho auth-specific updates
  * Áp dụng:
  * - Single Responsibility Principle (SRP): Chỉ xử lý authentication logic
  * - Dependency Inversion Principle (DIP): Phụ thuộc vào Repository abstraction
@@ -30,6 +31,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
+    private readonly usersRepository: UsersRepository,
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
     readonly _configService: ConfigService,
@@ -44,7 +46,7 @@ export class AuthService {
     const { email, password, firstName, lastName } = registerDto;
 
     // Check if user already exists via repository
-    const emailExists = await this.authRepository.emailExists(email);
+    const emailExists = await this.usersRepository.emailExists(email);
     if (emailExists) {
       throw new ConflictException('Email already exists', 'EMAIL_EXISTS');
     }
@@ -57,7 +59,7 @@ export class AuthService {
     const formattedLastName = formatName(lastName);
 
     // Create user via repository (stored procedure)
-    const user = await this.authRepository.createUser(
+    const user = await this.usersRepository.createUser(
       email,
       passwordHash,
       formattedFirstName,
@@ -82,7 +84,7 @@ export class AuthService {
     const { email, password } = loginDto;
 
     // Find user via repository (stored procedure)
-    const user = await this.authRepository.findByEmail(email);
+    const user = await this.usersRepository.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -119,7 +121,7 @@ export class AuthService {
   }
 
   async getUserById(userId: string): Promise<User> {
-    const user = await this.authRepository.findById(userId);
+    const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
@@ -131,7 +133,7 @@ export class AuthService {
    * Requires 2FA OTP verification.
    */
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<{ success: boolean }> {
-    const user = await this.authRepository.findById(userId);
+    const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

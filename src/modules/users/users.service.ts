@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
@@ -67,7 +68,7 @@ export class UsersService {
     limit: number = 20,
   ): Promise<{ items: OnchainTransaction[]; total: number; page: number; limit: number }> {
     await this.findOne(userId);
-    const skip = (page - 1) * limit;
+    const skip = calcSkip(page, limit);
     const [items, total] = await this.dataSource
       .getRepository(OnchainTransaction)
       .createQueryBuilder('tx')
@@ -92,7 +93,7 @@ export class UsersService {
    */
   async getUserOrders(userId: string, page: number = 1, limit: number = 20, status?: string) {
     await this.findOne(userId);
-    return this.orderRepository.findByUserForAdmin(userId, (page - 1) * limit, limit, status);
+    return this.orderRepository.findByUserForAdmin(userId, calcSkip(page, limit), limit, status);
   }
 
   /**

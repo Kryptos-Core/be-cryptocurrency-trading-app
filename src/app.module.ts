@@ -7,9 +7,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import appConfig from './config/app.config';
 import { validateEnvironment } from './config/env.validation';
 import { nestEnvFilePaths } from './config/load-env-files';
+import { getBullRedisConfig } from './config/redis.config';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BinanceRestModule } from './modules/binance-rest/binance-rest.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -53,15 +55,11 @@ import { WalletsModule } from './modules/wallets/wallets.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService): BullRootModuleOptions => ({
-        redis: {
-          host: config.get<string>('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6379),
-          password: config.get<string>('REDIS_PASSWORD'),
-          db: config.get<number>('REDIS_DB', 0),
-        },
+        redis: getBullRedisConfig(config),
       }),
     }),
     RedisModule,
+    BinanceRestModule,
     AuthModule,
     UsersModule,
     CurrenciesModule,

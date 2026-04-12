@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MailService } from '@/common/services';
 import { User } from '@/entities/user.entity';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
+import { UsersModule } from '@/modules/users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './repositories';
@@ -33,6 +34,7 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     }),
     TypeOrmModule.forFeature([User]),
     forwardRef(() => BlockchainModule),
+    forwardRef(() => UsersModule),
   ],
   providers: [
     AuthService,

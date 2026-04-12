@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { RedisService } from '@/common/services';
+import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 import { MarketRepository } from '@/modules/markets/repositories';
 import { BinanceWebSocketPriceFeedClient } from '../clients/binance-websocket-price-feed.client';
 import type { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
@@ -29,7 +30,6 @@ const EXCHANGE_INFO_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BinancePriceFeedService.name);
   private lastLogAt: Record<string, number> = {};
-  private readonly baseUrl: string;
   private readonly pairSymbolMap: Map<string, string> = new Map(); // pair_id -> symbol
   private requestedTickerSymbols: string[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -43,12 +43,12 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     readonly _configService: ConfigService,
+    private readonly binanceRestClient: BinanceRestClient,
     private readonly redisService: RedisService,
     private readonly tradingPriceStreamService: TradingPriceStreamService,
     private readonly tradingSubscriptionService: TradingSubscriptionService,
     private readonly marketRepository: MarketRepository,
   ) {
-    this.baseUrl = 'https://api.binance.com/api/v3';
     this.priceFeedClient = new BinanceWebSocketPriceFeedClient();
   }
 
@@ -105,9 +105,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       return this.binanceSymbolsCache;
     }
     try {
-      const res = await fetch(`${this.baseUrl}/exchangeInfo`);
-      if (!res.ok) return this.binanceSymbolsCache;
-      const data = (await res.json()) as { symbols?: Array<{ symbol?: string }> };
+      const data = await this.binanceRestClient.getPublicJson<{
+        symbols?: Array<{ symbol?: string }>;
+      }>('/api/v3/exchangeInfo');
       const symbols = data.symbols ?? [];
       this.binanceSymbolsCache = new Set(
         symbols.map((s) => String(s.symbol ?? '').toUpperCase()).filter(Boolean),
@@ -245,10 +245,10 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
    */
   async getCurrentPrice(symbol: string): Promise<number | null> {
     try {
-      const url = `${this.baseUrl}/ticker/price?symbol=${symbol}`;
-      const response = await fetch(url);
-      if (!response.ok) return null;
-      const data = (await response.json()) as { price?: string };
+      const data = await this.binanceRestClient.getPublicJson<{ price?: string }>(
+        '/api/v3/ticker/price',
+        { symbol },
+      );
       return data.price != null ? parseFloat(data.price) : null;
     } catch {
       return null;

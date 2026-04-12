@@ -3,8 +3,8 @@ import { ServiceUnavailableException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { MarketRepository } from '@/modules/markets/repositories';
+import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 
-const BINANCE_EXCHANGE_INFO_URL = 'https://api.binance.com/api/v3/exchangeInfo';
 /** Cache exchangeInfo 1 hour to avoid Binance request weight / IP ban (418). */
 const EXCHANGE_INFO_CACHE_KEY = 'exchange:binance:exchangeInfo';
 const EXCHANGE_INFO_CACHE_TTL = 3600;
@@ -51,6 +51,7 @@ export class ExchangeInfoSyncService {
     private readonly currencyRepository: CurrencyRepository,
     private readonly marketRepository: MarketRepository,
     private readonly cacheService: CacheService,
+    private readonly binanceRestClient: BinanceRestClient,
   ) {}
 
   /**
@@ -67,8 +68,8 @@ export class ExchangeInfoSyncService {
       }
     }
 
-    const res = await fetch(BINANCE_EXCHANGE_INFO_URL);
-    const bodyText = await res.text();
+    const res = await this.binanceRestClient.getPublicText('/api/v3/exchangeInfo');
+    const bodyText = res.body;
 
     if (res.status === 418) {
       // "IP banned until 1771291118565" – parse and return retry-after

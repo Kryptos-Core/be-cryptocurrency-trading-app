@@ -1,7 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
 import { ManagedWallet } from './managed-wallet.entity';
 import { TreasuryOperation } from './treasury-operation.entity';
-import { UserSession } from './user-session.entity';
 
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
@@ -61,12 +60,6 @@ export class User {
   @CreateDateColumn()
   created_at!: Date;
 
-  @OneToMany(
-    () => UserSession,
-    (session) => session.user,
-  )
-  sessions!: UserSession[];
-
   @OneToMany('Wallet', 'user')
   wallets!: any[];
 
@@ -81,9 +74,6 @@ export class User {
 
   @OneToMany('WalletLedger', 'user')
   wallet_ledgers!: any[];
-
-  @OneToMany('PriceAlert', 'user')
-  price_alerts!: any[];
 
   @OneToMany('LinkedWallet', 'user')
   linked_wallets!: any[];

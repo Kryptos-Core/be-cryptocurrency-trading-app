@@ -37,7 +37,6 @@ export const setupSwagger = (app: INestApplication): void => {
     .addTag('markets', 'Market data endpoints')
     .addTag('orders', 'Order management endpoints')
     .addTag('trades', 'Trade history endpoints')
-    .addTag('price-alerts', 'Price alert endpoints')
     .addTag('deposits', 'Deposit endpoints')
     .addTag('withdrawals', 'Withdrawal endpoints')
     .addServer('http://localhost:3000', 'Development server')
@@ -359,28 +358,4 @@ export const setupSwagger = (app: INestApplication): void => {
       }
     `,
   });
-};
-
-/**
- * Get Swagger JSON endpoint
- */
-export const getSwaggerDocument = (app: INestApplication) => {
-  const config = new DocumentBuilder()
-    .setTitle('Cryptocurrency Trading API')
-    .setDescription('API documentation for Cryptocurrency Trading Platform')
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter JWT token',
-        in: 'header',
-      },
-      'JWT-auth',
-    )
-    .build();
-
-  return SwaggerModule.createDocument(app, config);
 };

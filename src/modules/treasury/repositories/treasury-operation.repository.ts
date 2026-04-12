@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
@@ -79,7 +80,7 @@ export class TreasuryOperationRepository {
   }> {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
-    const offset = (page - 1) * limit;
+    const offset = calcSkip(page, limit);
 
     const qb = this.dataSource
       .getRepository(TreasuryOperation)

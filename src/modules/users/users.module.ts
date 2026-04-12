@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CloudinaryService } from '@/common/services';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
@@ -13,7 +13,11 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, OnchainTransaction, Order]), AuthModule, WalletsModule],
+  imports: [
+    TypeOrmModule.forFeature([User, OnchainTransaction, Order]),
+    forwardRef(() => AuthModule),
+    WalletsModule,
+  ],
   providers: [
     UsersService,
     UsersRepository,

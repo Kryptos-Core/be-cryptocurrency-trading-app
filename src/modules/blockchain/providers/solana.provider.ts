@@ -23,6 +23,7 @@ import type {
   BlockchainTxStatusDto,
   IBlockchainProvider,
 } from '../interfaces';
+import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
 
 export interface SolanaProviderBindings {
   network: BlockchainNetwork;
@@ -157,7 +158,7 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
         maxSupportedTransactionVersion: 0,
       });
 
-      if (!tx) return this.buildNotFound(txHash);
+      if (!tx) return buildNotFoundTxStatus(txHash, this.bindings.network);
 
       const meta = tx.meta;
       const failed = meta?.err !== null;
@@ -185,7 +186,7 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
       };
     } catch (error) {
       this.logger.error(`Error getting Solana tx: ${txHash}`, error);
-      return this.buildNotFound(txHash);
+      return buildNotFoundTxStatus(txHash, this.bindings.network);
     }
   }
 
@@ -219,17 +220,5 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
   async getHotWalletAddress(): Promise<string> {
     const hotWallet = await this.resolveHotWallet();
     return hotWallet.publicKey.toBase58();
-  }
-
-  private buildNotFound(txHash: string): BlockchainTxStatusDto {
-    return {
-      txHash,
-      network: this.bindings.network,
-      status: 'NOT_FOUND',
-      confirmations: 0,
-      from: '',
-      to: '',
-      value: '0',
-    };
   }
 }

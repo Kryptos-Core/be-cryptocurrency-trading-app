@@ -12,6 +12,7 @@ import type {
   BlockchainTxStatusDto,
   IBlockchainProvider,
 } from '../interfaces';
+import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
 
 /**
  * EVM provider — one Nest instance per chain (JsonRpcProvider + fixed chainId).
@@ -133,7 +134,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
       const receipt = await this.provider.getTransactionReceipt(txHash);
       const tx = await this.provider.getTransaction(txHash);
 
-      if (!tx) return this.buildNotFound(txHash);
+      if (!tx) return buildNotFoundTxStatus(txHash, this.evmChain);
 
       if (!receipt) {
         return {
@@ -165,7 +166,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
       };
     } catch (error) {
       this.logger.error(`Error getting EVM tx: ${txHash}`, error);
-      return this.buildNotFound(txHash);
+      return buildNotFoundTxStatus(txHash, this.evmChain);
     }
   }
 
@@ -191,17 +192,5 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     const privateKey = await this.resolveHotWalletKey();
     const wallet = new ethers.Wallet(privateKey);
     return wallet.address;
-  }
-
-  private buildNotFound(txHash: string): BlockchainTxStatusDto {
-    return {
-      txHash,
-      network: this.evmChain,
-      status: 'NOT_FOUND',
-      confirmations: 0,
-      from: '',
-      to: '',
-      value: '0',
-    };
   }
 }

@@ -7,7 +7,6 @@ import type { ChainNetworkCatalogItemDto } from '@/common/constants/chain-regist
 import {
   buildNetworkCatalog,
   listActionableOnchainChainCodes,
-  listTreasuryOpsChainCodes,
 } from '@/common/constants/chain-registry';
 
 export type ChainPickerContextKey =
@@ -86,7 +85,7 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
   const tronDefaultNetwork = mainnetOnly ? 'TRON_MAINNET' : sandboxTron;
 
   const actionable = listActionableOnchainChainCodes(mainnetOnly, input.tronDefaultNetwork);
-  const treasuryList = listTreasuryOpsChainCodes(mainnetOnly, input.tronDefaultNetwork);
+  const treasuryList = listActionableOnchainChainCodes(mainnetOnly, input.tronDefaultNetwork);
   const catalog = buildNetworkCatalog(mainnetOnly, input.tronDefaultNetwork);
 
   return {

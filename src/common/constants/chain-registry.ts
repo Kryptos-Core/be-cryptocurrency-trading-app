@@ -208,10 +208,3 @@ export function nativeSymbolForChain(network: BlockchainNetwork): string {
   }
 }
 
-/** Treasury / admin hot-wallet creation — actionable chains only (no TON until Phase 2). */
-export function listTreasuryOpsChainCodes(
-  mainnetOnly: boolean,
-  tronDefaultNetwork?: string,
-): string[] {
-  return listActionableOnchainChainCodes(mainnetOnly, tronDefaultNetwork);
-}

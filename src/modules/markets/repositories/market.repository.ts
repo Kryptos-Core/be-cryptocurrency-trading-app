@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { MARKET_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { Trade } from '@/entities/trade.entity';
@@ -128,7 +129,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     includeInactive: boolean = false,
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
     try {
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
       const result = await this.dataSource.query(
         `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`,
         [skip, limit, includeInactive],
@@ -170,7 +171,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     } = {},
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
     try {
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
       const includeInactive = options.includeInactive ?? false;
       const search = options.search?.trim() || null;
       const baseSymbol = options.baseSymbol?.trim() || null;
@@ -255,7 +256,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     },
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
     try {
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
       const includeInactive = options.includeInactive ?? false;
       const search = options.search?.trim() ? options.search.trim().toUpperCase() : null;
       const baseSymbol = options.baseSymbol?.trim()

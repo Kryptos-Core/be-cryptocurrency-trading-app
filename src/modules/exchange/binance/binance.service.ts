@@ -1,7 +1,7 @@
-import * as crypto from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
+import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 import type {
   ExchangeBalanceDto,
   ExchangeOrderParams,
@@ -23,7 +23,10 @@ export class BinanceExchangeService implements IExchangeProvider {
   private timeOffset: number = 0; // Offset between local time and Binance server time
   private lastTimeSync: number = 0;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly binanceRestClient: BinanceRestClient,
+  ) {
     const tradingEnv = this.configService.get<string>('app.trading.environment');
     this.isTestnet = tradingEnv === 'testnet';
 
@@ -52,9 +55,7 @@ export class BinanceExchangeService implements IExchangeProvider {
    */
   private async syncServerTime(): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/v3/time`);
-      const data: any = await response.json();
-      const serverTime = data.serverTime;
+      const serverTime = await this.binanceRestClient.getServerTime(this.baseUrl);
       const localTime = Date.now();
       this.timeOffset = serverTime - localTime;
       this.lastTimeSync = localTime;
@@ -72,13 +73,6 @@ export class BinanceExchangeService implements IExchangeProvider {
   }
 
   /**
-   * Generate signature for Binance API request
-   */
-  private generateSignature(queryString: string): string {
-    return crypto.createHmac('sha256', this.apiSecret).update(queryString).digest('hex');
-  }
-
-  /**
    * Make authenticated request to Binance API
    */
   private async makeRequest(
@@ -90,41 +84,20 @@ export class BinanceExchangeService implements IExchangeProvider {
     if (!this.lastTimeSync || now - this.lastTimeSync > 5 * 60 * 1000) {
       await this.syncServerTime();
     }
-    const timestamp = this.getTimestamp();
-    const queryParams = {
-      ...params,
-      timestamp,
-      recvWindow: 60000, // 60 seconds window for testnet
-    };
-
-    const queryString = Object.entries(queryParams)
-      .map(([key, value]) => `${key}=${String(value)}`)
-      .join('&');
-
-    const signature = this.generateSignature(queryString);
-    const url = `${this.baseUrl}${endpoint}?${queryString}&signature=${signature}`;
 
     this.logger.debug(`[Binance] ${method} ${endpoint}`);
-    this.logger.debug(`Base URL: ${this.baseUrl}`);
-    this.logger.debug(`Query String: ${queryString}`);
 
     try {
-      const response = await fetch(url, {
+      return await this.binanceRestClient.signedRequest({
+        baseUrl: this.baseUrl,
+        endpoint,
         method,
-        headers: {
-          'X-MBX-APIKEY': this.apiKey,
-          'Content-Type': 'application/json',
-        },
+        apiKey: this.apiKey,
+        apiSecret: this.apiSecret,
+        params,
+        timestamp: this.getTimestamp(),
+        recvWindow: 60000,
       });
-
-      if (!response.ok) {
-        const error = await response.text();
-        this.logger.error(`Response Status: ${response.status}`);
-        this.logger.error(`Response Body: ${error}`);
-        throw new Error(`Binance API error: ${response.status} ${error}`);
-      }
-
-      return await response.json();
     } catch (error) {
       this.logger.error(`Binance API request failed:`, error);
       throw error;
@@ -262,8 +235,7 @@ export class BinanceExchangeService implements IExchangeProvider {
 
   async ping(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/fapi/v1/ping`);
-      return response.ok;
+      return await this.binanceRestClient.ping('/fapi/v1/ping', this.baseUrl);
     } catch (error) {
       this.logger.error('Ping failed:', error);
       return false;

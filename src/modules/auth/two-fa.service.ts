@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
+import { UsersRepository } from '@/modules/users/repositories';
 import { AuthRepository } from './repositories';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class TwoFaService {
   constructor(
     private readonly cacheService: CacheService,
     private readonly mailService: MailService,
+    private readonly usersRepository: UsersRepository,
     private readonly authRepository: AuthRepository,
   ) {}
 
@@ -93,7 +95,7 @@ export class TwoFaService {
   }
 
   async enable(userId: string, code: string): Promise<void> {
-    const user = await this.authRepository.findById(userId);
+    const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
     }
@@ -108,7 +110,7 @@ export class TwoFaService {
   }
 
   async disable(userId: string, code: string): Promise<void> {
-    const user = await this.authRepository.findById(userId);
+    const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
     }

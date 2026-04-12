@@ -45,29 +45,3 @@ export function formatName(name: string | undefined): string | undefined {
   const sanitized = sanitizeName(name);
   return sanitized ? capitalizeWords(sanitized) : undefined;
 }
-
-/**
- * Lấy tên đầy đủ từ first name và last name
- * Return tên đầy đủ đã format hoặc undefined nếu cả hai đều rỗng
- */
-export function getFullName(firstName?: string, lastName?: string): string | undefined {
-  const formattedFirst = formatName(firstName);
-  const formattedLast = formatName(lastName);
-
-  if (!formattedFirst && !formattedLast) {
-    return undefined;
-  }
-
-  return [formattedFirst, formattedLast].filter(Boolean).join(' ');
-}
-
-/**
- * Validate xem tên có chỉ chứa các ký tự hợp lệ hay không
- * Hợp lệ: chữ cái (bao gồm tiếng Việt) và khoảng trắng
- */
-export function isValidName(name: string): boolean {
-  if (!name) return false;
-
-  const nameRegex = /^[a-zA-ZÀ-ỹ\s]+$/;
-  return nameRegex.test(name.trim());
-}

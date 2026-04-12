@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis, { type RedisOptions } from 'ioredis';
+import Redis from 'ioredis';
+import { getRedisConfig } from '@/config/redis.config';
 
 /**
  * Redis Service
@@ -17,7 +18,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
-    const config = this.getRedisConfig();
+    const config = getRedisConfig(this.configService);
 
     // Main client for general operations
     // ioredis will auto-connect when instantiated
@@ -109,24 +110,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     client.on('reconnecting', () => {
       this.logger.log(`Redis ${name} reconnecting...`);
     });
-  }
-
-  private getRedisConfig(): RedisOptions {
-    return {
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD'),
-      db: this.configService.get<number>('REDIS_DB', 0),
-      retryStrategy: (times: number) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: true,
-      enableOfflineQueue: false,
-      connectTimeout: 10000,
-      lazyConnect: false, // Auto-connect on instantiation
-    };
   }
 
   /**

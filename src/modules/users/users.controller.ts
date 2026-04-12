@@ -32,6 +32,8 @@ import {
   ApiSuccessResponse,
   ApiUnauthorizedResponse,
   CurrentUser,
+  RequireAdminOrSupport,
+  RequireFinanceAccess,
 } from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
@@ -90,7 +92,7 @@ export class UsersController {
   @ApiQuery({ name: 'sortBy', required: false, enum: ['created_at', 'email', 'first_name'] })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequireAdminOrSupport()
   @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('Users retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -108,7 +110,7 @@ export class UsersController {
     description: 'Retrieve statistics about users in the system',
   })
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequireAdminOrSupport()
   @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('Statistics retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -336,7 +338,7 @@ export class UsersController {
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiSuccessResponse('User wallets retrieved successfully')
   @ApiNotFoundResponse('User not found')
@@ -358,7 +360,7 @@ export class UsersController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequireAdminOrSupport()
   @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('Onchain transactions retrieved successfully')
   @ApiNotFoundResponse('User not found')
@@ -408,7 +410,7 @@ export class UsersController {
   })
   @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000001' })
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequireAdminOrSupport()
   @RequirePermissions(Permission.USERS_READ)
   @ApiSuccessResponse('User retrieved successfully')
   @ApiNotFoundResponse('User not found')
@@ -490,7 +492,7 @@ export class UsersController {
    */
   @Get(':id/orders')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.SUPPORT_AGENT, UserRole.RISK_OFFICER)
+  @RequireAdminOrSupport()
   @RequirePermissions(Permission.USERS_READ)
   @ApiOperation({
     summary: 'Get user orders',

@@ -1,3 +1,3 @@
 export * from './interfaces/ohlcv-provider.interface';
-export * from './ohlcv-provider.registry';
+export * from './providers/binance-ohlcv.provider';
 export * from './price-oracle.module';

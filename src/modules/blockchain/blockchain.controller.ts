@@ -18,10 +18,10 @@ import {
   ApiUnauthorizedResponse,
   CurrentUser,
   Public,
+  RequireFinanceAccess,
   RequirePermissions,
-  RequireRoles,
 } from '@/common/decorators';
-import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
+import { BlockchainNetwork, Permission } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
@@ -283,7 +283,7 @@ export class BlockchainController {
    */
   @Post('withdraw/manual/:txId/approve')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Approve manual withdrawal',
@@ -308,7 +308,7 @@ export class BlockchainController {
    */
   @Post('withdraw/manual/:txId/reject')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Reject manual withdrawal',
@@ -332,7 +332,7 @@ export class BlockchainController {
    */
   @Post('withdraw/manual/process-pending')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Process pending manual withdrawals',
@@ -394,7 +394,7 @@ export class BlockchainController {
    */
   @Get('admin/withdrawals/stats')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Admin: Withdrawal stats',
@@ -410,7 +410,7 @@ export class BlockchainController {
    */
   @Get('admin/withdrawals/:txId')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Admin: Withdrawal detail',
@@ -427,7 +427,7 @@ export class BlockchainController {
    */
   @Get('admin/withdrawals')
   @UseGuards(RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Admin: List all withdrawal transactions',

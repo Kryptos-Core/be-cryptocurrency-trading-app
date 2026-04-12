@@ -3,6 +3,7 @@ import Decimal from 'decimal.js';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import type { BlockchainNetwork } from '@/common/enums';
 import { CacheService } from '@/common/services';
+import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
@@ -37,6 +38,7 @@ export class DepositFxService {
     private readonly cacheService: CacheService,
     private readonly currencyRepository: CurrencyRepository,
     private readonly systemConfigService: SystemConfigService,
+    private readonly binanceRestClient: BinanceRestClient,
   ) {}
 
   /**
@@ -115,24 +117,16 @@ export class DepositFxService {
   }
 
   private async fetchFromBinance(pair: string): Promise<string> {
-    const url = `https://api.binance.com/api/v3/ticker/price?symbol=${pair}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    try {
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) {
-        throw new Error(`Binance returned HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as { price?: string };
-      const price = data?.price;
-      if (!price || Number.isNaN(Number(price)) || Number(price) <= 0) {
-        throw new Error(`Invalid price from Binance: ${price}`);
-      }
-      return price;
-    } finally {
-      clearTimeout(timeout);
+    const data = await this.binanceRestClient.getPublicJson<{ price?: string }>(
+      '/api/v3/ticker/price',
+      { symbol: pair },
+      { timeoutMs: 5000 },
+    );
+    const price = data?.price;
+    if (!price || Number.isNaN(Number(price)) || Number(price) <= 0) {
+      throw new Error(`Invalid price from Binance: ${price}`);
     }
+    return price;
   }
 
   private async getConfigFallbackRate(fromSymbol: string): Promise<string | null> {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
 import { MarketRepository } from '@/modules/markets/repositories';
@@ -303,7 +304,7 @@ export class OrdersService {
     limit: number = 20,
     status?: string,
   ): Promise<{ data: Order[]; total: number; page: number; limit: number }> {
-    const skip = (page - 1) * limit;
+    const skip = calcSkip(page, limit);
     const [data, total] = await Promise.all([
       this.orderRepository.findByUser(userId, status ?? null, skip, limit),
       this.orderRepository.countByUser(userId, status ?? null),
@@ -319,7 +320,7 @@ export class OrdersService {
     page: number;
     limit: number;
   }) {
-    const skip = (params.page - 1) * params.limit;
+    const skip = calcSkip(params.page, params.limit);
     const { items, total } = await this.orderRepository.findAllForAdmin({
       userId: params.userId,
       pairId: params.pairId,
@@ -337,7 +338,7 @@ export class OrdersService {
 
   /** Admin: orders for a specific user */
   async findOrdersByUser(userId: string, page: number = 1, limit: number = 20, status?: string) {
-    const skip = (page - 1) * limit;
+    const skip = calcSkip(page, limit);
     const { items, total } = await this.orderRepository.findByUserForAdmin(
       userId,
       skip,

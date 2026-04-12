@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CURRENCY_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Currency } from '@/entities/currency.entity';
 
@@ -181,7 +182,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     options?: any,
   ): Promise<{ data: Currency[]; total: number; page: number; limit: number }> {
     try {
-      const skip = (page - 1) * limit;
+      const skip = calcSkip(page, limit);
       const includeInactive = options?.includeInactive ?? false;
 
       const result = await this.dataSource.query(
@@ -225,7 +226,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     limit: number;
   }): Promise<{ currencies: Currency[]; total: number; page: number; limit: number }> {
     try {
-      const skip = (params.page - 1) * params.limit;
+      const skip = calcSkip(params.page, params.limit);
       const qb = this.dataSource
         .getRepository(Currency)
         .createQueryBuilder('c')

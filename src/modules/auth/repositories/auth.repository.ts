@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
-import { UserRole } from '@/common/enums';
-import { newUuid } from '@/common/utils/uuid.util';
+import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-result.util';
 import type { User } from '@/entities/user.entity';
 
 /**
@@ -16,89 +15,6 @@ export class AuthRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
-   * Find user by email (used for login and check existence)
-   */
-  async findByEmail(email: string): Promise<User | null> {
-    try {
-      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`, [
-        email.toLowerCase(),
-      ]);
-
-      return result[0]?.[0] || null;
-    } catch (error) {
-      this.logger.error(`Error finding user by email: ${email}`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Find user by ID
-   */
-  async findById(userId: string): Promise<User | null> {
-    try {
-      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-        userId,
-      ]);
-      return result[0]?.[0] || null;
-    } catch (error) {
-      this.logger.error(`Error finding user by ID: ${userId}`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create new user (for registration)
-   * Procedure returns the newly created user_id
-   */
-  async createUser(
-    email: string,
-    passwordHash: string,
-    firstName?: string,
-    lastName?: string,
-    role: UserRole = UserRole.TRADER,
-  ): Promise<User> {
-    try {
-      const userId = newUuid();
-      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
-        userId,
-        email.toLowerCase(),
-        passwordHash,
-        firstName || null,
-        lastName || null,
-        role,
-      ]);
-
-      // Fetch and return created user
-      const userResult = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-        userId,
-      ]);
-
-      return userResult[0]?.[0];
-    } catch (error) {
-      this.logger.error(`Error creating user: ${email}`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if email exists
-   */
-  async emailExists(email: string): Promise<boolean> {
-    try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.EMAIL_EXISTS}(?, ?)`,
-        [email.toLowerCase(), null],
-      );
-
-      const count = result[0]?.[0]?.count || 0;
-      return count > 0;
-    } catch (error) {
-      this.logger.error(`Error checking email: ${email}`, error);
-      throw error;
-    }
-  }
-
-  /**
    * Find user by linked wallet (chain + address), status = VERIFIED
    */
   async findByLinkedWallet(chain: string, address: string): Promise<User | null> {
@@ -107,7 +23,7 @@ export class AuthRepository {
         `CALL ${USER_STORE_PROCEDURE.FIND_BY_LINKED_WALLET}(?, ?)`,
         [chain, address],
       );
-      return result[0]?.[0] || null;
+      return spFirstRow<User>(result);
     } catch (error) {
       this.logger.error(`Error finding user by linked wallet: ${chain}/${address}`, error);
       throw error;
@@ -132,7 +48,11 @@ export class AuthRepository {
       const userResult = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
         userId,
       ]);
-      return userResult[0]?.[0];
+      const createdUser = spFirstRow<User>(userResult);
+      if (!createdUser) {
+        throw new Error(`Created wallet-only user ${userId} was not found`);
+      }
+      return createdUser;
     } catch (error) {
       this.logger.error(`Error creating wallet-only user: ${email}`, error);
       throw error;
@@ -163,7 +83,7 @@ export class AuthRepository {
         userId,
         enabled ? 1 : 0,
       ]);
-      return Number(result[0]?.[0]?.affected ?? 0);
+      return Number(spFirstValue<number>(result, 'affected') ?? 0);
     } catch (error) {
       this.logger.error(`Error updating 2FA status for user ${userId}`, error);
       throw error;

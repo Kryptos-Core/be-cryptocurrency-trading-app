@@ -370,7 +370,7 @@ export class CurrenciesService {
     // This would require checking MarketPair entity
     // For now, we'll just hard delete
 
-    await this.currencyRepository.hardDelete(currencyId);
+    await this.currencyRepository.delete(currencyId);
 
     // Invalidate cache
     await this.invalidateCache();

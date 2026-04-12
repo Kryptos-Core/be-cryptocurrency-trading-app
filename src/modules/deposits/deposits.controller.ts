@@ -12,8 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { RequirePermissions, RequireRoles } from '@/common/decorators';
-import { Permission, UserRole } from '@/common/enums';
+import { RequireFinanceAccess, RequirePermissions } from '@/common/decorators';
+import { Permission } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { DepositsService } from './deposits.service';
 import type { CreateFiatDepositDto } from './dto/create-deposit.dto';
@@ -68,7 +68,7 @@ export class DepositsController {
 
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
-  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
+  @RequireFinanceAccess()
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({

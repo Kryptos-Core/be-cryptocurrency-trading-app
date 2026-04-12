@@ -115,16 +115,6 @@ export enum WithdrawalStatus {
 }
 
 // ============================================
-// Price Alert Module Enums
-// ============================================
-
-/** Price alert comparison operator */
-export enum PriceAlertCondition {
-  ABOVE = 'ABOVE',
-  BELOW = 'BELOW',
-}
-
-// ============================================
 // Wallet Module Enums
 // ============================================
 

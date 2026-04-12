@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { calcSkip } from '@/common/utils/pagination.util';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { ListTreasuryTransactionsDto } from '../dto';
 
@@ -15,7 +16,7 @@ export class TreasuryOnchainReadRepository {
   }> {
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 20;
-    const offset = (page - 1) * limit;
+    const offset = calcSkip(page, limit);
 
     const qb = this.dataSource
       .getRepository(OnchainTransaction)

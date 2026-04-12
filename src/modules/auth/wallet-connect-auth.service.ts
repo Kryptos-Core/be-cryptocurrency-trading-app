@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto';
-import { appendFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { WalletConnectSignClient } from '@walletconnect/sign-client';
@@ -19,32 +17,13 @@ import {
 import type { WcApprovedSession, WcConnectPairingResult } from '@/types/walletconnect-session';
 import type { WalletAuthResult } from './wallet-auth.service';
 import { WalletAuthService } from './wallet-auth.service';
-
-// #region agent log
-function agentWcAuthDebugLog(payload: {
-  location: string;
-  message: string;
-  hypothesisId: string;
-  data?: Record<string, unknown>;
-}): void {
-  const line = `${JSON.stringify({
-    sessionId: 'cb6ec4',
-    timestamp: Date.now(),
-    ...payload,
-  })}\n`;
-  for (const logPath of [
-    resolve(process.cwd(), '..', 'debug-cb6ec4.log'),
-    resolve(process.cwd(), 'debug-cb6ec4.log'),
-  ]) {
-    try {
-      appendFileSync(logPath, line);
-      return;
-    } catch {
-      /* try next */
-    }
-  }
-}
-// #endregion
+import {
+  formatWalletConnectInitError,
+  parseSolanaCaip10Account,
+  resolveWalletConnectProjectId,
+  solanaWcResultToBackendSignature,
+  withWalletConnectTimeout,
+} from '@/modules/blockchain/wallet-connect/wallet-connect-common.util';
 
 /**
  * Public WalletConnect login session (no JWT để init).
@@ -87,7 +66,7 @@ export class WalletConnectAuthService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    this.projectId = this.resolveWalletConnectProjectId();
+    this.projectId = resolveWalletConnectProjectId(this.configService);
     this.relayUrl = this.configService.get<string>(
       'WALLETCONNECT_RELAY_URL',
       'wss://relay.walletconnect.com',
@@ -97,13 +76,6 @@ export class WalletConnectAuthService implements OnModuleInit {
         '[WC-Auth] Chưa có WALLETCONNECT_PROJECT_ID hoặc REOWN_PROJECT_ID — mainnet dùng URI giả + dán tay (QR không nối relay).',
       );
     }
-  }
-
-  /** Cùng giá trị Reown Cloud; FE thường đặt một trong hai — BE đọc cả hai để tránh sót cấu hình. */
-  private resolveWalletConnectProjectId(): string {
-    const a = (this.configService.get<string>('WALLETCONNECT_PROJECT_ID', '') ?? '').trim();
-    const b = (this.configService.get<string>('REOWN_PROJECT_ID', '') ?? '').trim();
-    return a || b;
   }
 
   async initSession(chain: BlockchainNetwork): Promise<{
@@ -151,7 +123,7 @@ export class WalletConnectAuthService implements OnModuleInit {
                           },
                         },
                       });
-                  const { uri, approval } = await this.withTimeout(
+                  const { uri, approval } = await withWalletConnectTimeout(
                     connectPromise as Promise<WcConnectPairingResult>,
                     WalletConnectAuthService.WC_CONNECT_TIMEOUT_MS,
                     'WC_INIT_CONNECT_TIMEOUT',
@@ -189,7 +161,7 @@ export class WalletConnectAuthService implements OnModuleInit {
         wcUri = pairedUri;
       } catch (e) {
         this.logger.error('[WC-Auth] SignClient connect failed', e);
-        const msg = WalletConnectAuthService.formatWcInitError(e);
+        const msg = formatWalletConnectInitError(e);
         throw new BadRequestException(msg, 'WC_AUTH_INIT_FAILED');
       }
     } else {
@@ -210,20 +182,6 @@ export class WalletConnectAuthService implements OnModuleInit {
     this.logger.debug(
       `[WC-Auth] init: sessionId=${sessionId}, chain=${chain}, relayPairing=${relayPairing}`,
     );
-
-    // #region agent log
-    agentWcAuthDebugLog({
-      location: 'wallet-connect-auth.service.ts:initSession',
-      message: 'WC auth init',
-      hypothesisId: 'H1',
-      data: {
-        chain: String(chain),
-        relayPairing,
-        hasProjectId: Boolean(this.projectId),
-        sessionId,
-      },
-    });
-    // #endregion
 
     return {
       sessionId,
@@ -247,28 +205,12 @@ export class WalletConnectAuthService implements OnModuleInit {
     const session = await this.loadSession(sessionId);
 
     if (!session) {
-      // #region agent log
-      agentWcAuthDebugLog({
-        location: 'wallet-connect-auth.service.ts:getSessionStatus',
-        message: 'auth session missing in redis',
-        hypothesisId: 'H2',
-        data: { sessionId },
-      });
-      // #endregion
       return { sessionId, status: WcSessionStatus.EXPIRED };
     }
 
     const expiresAt = session.createdAt + WalletConnectAuthService.SESSION_TTL * 1000;
 
     if (Date.now() > expiresAt) {
-      // #region agent log
-      agentWcAuthDebugLog({
-        location: 'wallet-connect-auth.service.ts:getSessionStatus',
-        message: 'auth session past ttl',
-        hypothesisId: 'H2',
-        data: { sessionId, expiresAt, now: Date.now() },
-      });
-      // #endregion
       await this.deleteSession(sessionId);
       return { sessionId, status: WcSessionStatus.EXPIRED };
     }
@@ -344,21 +286,12 @@ export class WalletConnectAuthService implements OnModuleInit {
     const loaded = await this.loadSession(sessionId);
     if (!loaded) return;
 
-    // #region agent log
-    agentWcAuthDebugLog({
-      location: 'wallet-connect-auth.service.ts:runApprovalAndSign',
-      message: 'auth background pairing entry',
-      hypothesisId: 'H3',
-      data: { sessionId, chain: String(chain) },
-    });
-    // #endregion
-
     const deadline = loaded.createdAt + WalletConnectAuthService.SESSION_TTL * 1000;
     const msLeftPairing = Math.max(5_000, deadline - Date.now());
 
     let wcSession: WcApprovedSession;
     try {
-      wcSession = await this.withTimeout(approval(), msLeftPairing, 'WC_PAIRING_TIMEOUT');
+      wcSession = await withWalletConnectTimeout(approval(), msLeftPairing, 'WC_PAIRING_TIMEOUT');
     } catch (e) {
       this.logger.warn(`[WC-Auth] pairing failed sessionId=${sessionId}`, e);
       await this.patchSession(sessionId, { status: WcSessionStatus.FAILED });
@@ -379,7 +312,7 @@ export class WalletConnectAuthService implements OnModuleInit {
       }
       let parsed: { chainId: string; pubkey: string };
       try {
-        parsed = WalletConnectAuthService.parseSolanaCaip10Account(fullSol);
+        parsed = parseSolanaCaip10Account(fullSol);
       } catch (e) {
         this.logger.warn(`[WC-Auth] bad solana CAIP-10 sessionId=${sessionId}: ${fullSol}`, e);
         await this.patchSession(sessionId, { status: WcSessionStatus.FAILED });
@@ -399,7 +332,7 @@ export class WalletConnectAuthService implements OnModuleInit {
       const msLeftSign = Math.max(5_000, deadline - Date.now());
 
       try {
-        const raw = await this.withTimeout(
+        const raw = await withWalletConnectTimeout(
           client.request({
             topic: wcSession.topic,
             chainId: chainId || expectedCaip2,
@@ -414,7 +347,7 @@ export class WalletConnectAuthService implements OnModuleInit {
           Math.min(msLeftSign, 120_000),
           'WC_SIGN_TIMEOUT',
         );
-        signature = WalletConnectAuthService.solanaWcResultToBackendSignature(raw);
+        signature = solanaWcResultToBackendSignature(raw);
       } catch (e) {
         this.logger.warn(`[WC-Auth] solana_signMessage failed sessionId=${sessionId}`, e);
         await this.patchSession(sessionId, { status: WcSessionStatus.FAILED, address });
@@ -453,7 +386,7 @@ export class WalletConnectAuthService implements OnModuleInit {
       const msLeftSign = Math.max(5_000, deadline - Date.now());
 
       try {
-        const raw = await this.withTimeout(
+        const raw = await withWalletConnectTimeout(
           client.request({
             topic: wcSession.topic,
             chainId,
@@ -491,81 +424,6 @@ export class WalletConnectAuthService implements OnModuleInit {
     } catch (dcErr) {
       this.logger.warn(`[WC-Auth] disconnect: ${dcErr}`);
     }
-  }
-
-  /** CAIP-10 `solana:<ref>:<pubkey>` */
-  private static parseSolanaCaip10Account(full: string): { chainId: string; pubkey: string } {
-    const prefix = 'solana:';
-    if (!full.startsWith(prefix)) {
-      throw new Error(`Invalid Solana CAIP-10 account: ${full}`);
-    }
-    const rest = full.slice(prefix.length);
-    const colonIdx = rest.indexOf(':');
-    if (colonIdx === -1) {
-      throw new Error(`Invalid Solana CAIP-10 account: ${full}`);
-    }
-    const ref = rest.slice(0, colonIdx);
-    const pubkey = rest.slice(colonIdx + 1);
-    return { chainId: `solana:${ref}`, pubkey };
-  }
-
-  /** WC trả signature base58; verify Solana cần base64 (64 byte ed25519). */
-  private static solanaWcResultToBackendSignature(raw: unknown): string {
-    const sigStr =
-      typeof raw === 'string'
-        ? raw
-        : raw &&
-            typeof raw === 'object' &&
-            raw !== null &&
-            'signature' in raw &&
-            typeof (raw as { signature: unknown }).signature === 'string'
-          ? (raw as { signature: string }).signature
-          : '';
-    if (!sigStr) {
-      throw new Error('Wallet returned empty Solana signature');
-    }
-    try {
-      const bytes = bs58.decode(sigStr);
-      return Buffer.from(bytes).toString('base64');
-    } catch {
-      const asB64 = Buffer.from(sigStr, 'base64');
-      if (asB64.length === 64) {
-        return sigStr;
-      }
-      throw new Error('Could not decode Solana signature from wallet');
-    }
-  }
-
-  private static formatWcInitError(e: unknown): string {
-    const raw = e instanceof Error ? e.message : String(e);
-    let msg = `Không khởi tạo WalletConnect: ${raw}`;
-    const lower = raw.toLowerCase();
-    if (
-      lower.includes('jwt') ||
-      lower.includes('not yet valid') ||
-      lower.includes('iat') ||
-      raw.includes('3000')
-    ) {
-      msg +=
-        ' — Relay từ chối JWT (thường do đồng hồ máy chạy Nest lệch so với thời gian thực: bật đồng bộ thời gian tự động / NTP trên Windows hoặc máy ảo).';
-    }
-    return msg;
-  }
-
-  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(label)), ms);
-      promise.then(
-        (v) => {
-          clearTimeout(t);
-          resolve(v);
-        },
-        (e) => {
-          clearTimeout(t);
-          reject(e);
-        },
-      );
-    });
   }
 
   private static isSolanaWcChain(chain: BlockchainNetwork): boolean {

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
+import { calcSkip } from '@/common/utils/pagination.util';
 import type { CreateNotificationDto } from './dto/create-notification.dto';
 import type { NotificationQueryDto } from './dto/notification-query.dto';
 import { NotificationRepository } from './repositories/notification.repository';
@@ -77,7 +78,7 @@ export class NotificationsService {
 
   async findByUser(userId: string, query: NotificationQueryDto) {
     const limit = query.limit ?? 20;
-    const offset = ((query.page ?? 1) - 1) * limit;
+    const offset = calcSkip(query.page ?? 1, limit);
     return this.notificationRepo.findByUser(userId, limit, offset);
   }
 

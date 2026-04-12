@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services';
+import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
 import type { IOHLCVProvider, OHLCVCandleDto } from '../interfaces/ohlcv-provider.interface';
 
 /** Binance Spot klines interval symbols. */
@@ -17,8 +18,6 @@ const INTERVAL_TO_BINANCE: Record<number, string> = {
   86400: '1d',
   604800: '1w',
 };
-
-const BINANCE_KLINES_URL = 'https://api.binance.com/api/v3/klines';
 
 /** TTL for completed (immutable) candles in Redis: 7 days. */
 const COMPLETED_CANDLE_TTL_SEC = 7 * 24 * 3600;
@@ -42,7 +41,10 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
   private readonly logger = new Logger(BinanceOHLCVProvider.name);
   readonly name = 'binance';
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly binanceRestClient: BinanceRestClient,
+  ) {}
 
   async getOHLCVByRange(
     pairId: string,
@@ -140,18 +142,14 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
     endMs: number,
     limit: number,
   ): Promise<OHLCVCandleDto[]> {
-    const params = new URLSearchParams({
-      symbol: normalized,
-      interval: binanceInterval,
-      startTime: String(startMs),
-      endTime: String(endMs),
-      limit: String(Math.min(limit, 1000)),
-    });
-
     try {
-      const res = await fetch(`${BINANCE_KLINES_URL}?${params}`);
-      if (!res.ok) return [];
-      const raw = await res.json();
+      const raw = await this.binanceRestClient.getPublicJson<unknown[]>('/api/v3/klines', {
+        symbol: normalized,
+        interval: binanceInterval,
+        startTime: startMs,
+        endTime: endMs,
+        limit: Math.min(limit, 1000),
+      });
       const rows = Array.isArray(raw) ? raw : [];
       return rows.map((row: unknown) => this.mapRow(row, pairId, intervalSec));
     } catch {

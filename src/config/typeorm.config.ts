@@ -18,7 +18,6 @@ import { Notification } from '../entities/notification.entity';
 import { OnchainTransaction } from '../entities/onchain-transaction.entity';
 import { Order } from '../entities/order.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
-import { PriceAlert } from '../entities/price-alert.entity';
 import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
 import { TransactionWallet } from '../entities/transaction-wallet.entity';
@@ -26,7 +25,6 @@ import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '../entities/treasury-operation.entity';
 import { User } from '../entities/user.entity';
 import { UserNotification } from '../entities/user-notification.entity';
-import { UserSession } from '../entities/user-session.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
@@ -44,10 +42,8 @@ const ALL_ENTITIES = [
   MarketPair,
   OnchainTransaction,
   Order,
-  PriceAlert,
   Trade,
   User,
-  UserSession,
   Wallet,
   WalletLedger,
   Withdrawal,
