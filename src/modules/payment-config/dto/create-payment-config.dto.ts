@@ -11,7 +11,7 @@ import {
 import type { PaymentMethodType } from '@/entities/payment-method-config.entity';
 
 export class CreatePaymentConfigDto {
-  @IsEnum(['PAYOS', 'ETH', 'TRON', 'SOL'])
+  @IsEnum(['PAYOS', 'ETH', 'TRON', 'SOL', 'BSC'])
   type!: PaymentMethodType;
 
   @IsString()

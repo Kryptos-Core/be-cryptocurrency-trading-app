@@ -1,5 +1,6 @@
 import { InjectQueue } from '@nestjs/bull';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bull';
 import { uuidv7 } from 'uuidv7';
 import { WalletEncryptionService } from '@/common/services';
@@ -18,6 +19,11 @@ import {
   type PaymentConfigEvent,
   type PaymentGatewayConfig,
 } from './interfaces/payment-gateway-config.interface';
+import {
+  buildPaymentConfigFormOptions,
+  isPaymentConfigTypeNetworkPairAllowed,
+  resolvePaymentConfigFormOptionsEnv,
+} from './payment-config-form-options.util';
 import { PaymentConfigRepository } from './repositories/payment-config.repository';
 
 export const PAYMENT_CONFIG_QUEUE = 'payment-config-activation';
@@ -49,6 +55,7 @@ export class PaymentConfigService {
     private readonly repo: PaymentConfigRepository,
     private readonly encryptionService: WalletEncryptionService,
     private readonly redisService: RedisService,
+    private readonly configService: ConfigService,
     @InjectQueue(PAYMENT_CONFIG_QUEUE) private readonly activationQueue: Queue,
   ) {}
 
@@ -111,15 +118,8 @@ export class PaymentConfigService {
     types: string[];
     networksByType: Record<string, string[]>;
   } {
-    return {
-      types: ['PAYOS', 'ETH', 'TRON', 'SOL'],
-      networksByType: {
-        PAYOS: ['MAINNET'],
-        ETH: ['SEPOLIA', 'MAINNET'],
-        TRON: ['NILE', 'SHASTA', 'MAINNET'],
-        SOL: ['DEVNET', 'MAINNET'],
-      },
-    };
+    const env = resolvePaymentConfigFormOptionsEnv(this.configService);
+    return buildPaymentConfigFormOptions(env.mainnetOnly, env.tronDefaultNetwork);
   }
 
   /**
@@ -170,6 +170,20 @@ export class PaymentConfigService {
   // ── Public Write ─────────────────────────────────────────────────────────
 
   async createConfig(dto: CreatePaymentConfigDto, userId: string): Promise<PaymentMethodConfig> {
+    const env = resolvePaymentConfigFormOptionsEnv(this.configService);
+    if (
+      !isPaymentConfigTypeNetworkPairAllowed(
+        dto.type,
+        dto.network,
+        env.mainnetOnly,
+        env.tronDefaultNetwork,
+      )
+    ) {
+      throw new BadRequestException(
+        `Invalid payment config type/network for current environment: ${dto.type}/${dto.network}`,
+      );
+    }
+
     const configId = uuidv7();
     const encryptedConfig = this.encryptionService.encrypt(JSON.stringify(dto.config));
 

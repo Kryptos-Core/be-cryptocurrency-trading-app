@@ -27,8 +27,8 @@ import type {
 export interface SolanaProviderBindings {
   network: BlockchainNetwork;
   rpcRuntimeKey: string;
-  /** Payment config network segment (legacy mainnet hot wallet path). */
-  paymentSolNetwork: 'MAINNET' | 'DEVNET';
+  /** Payment config row key: matches payment_method_configs.network (chain code). */
+  paymentSolNetwork: 'SOLANA_MAINNET' | 'SOLANA_DEVNET';
   /** When set, devnet signing uses treasury main wallet for this chain. */
   treasuryChain: TreasuryMainWalletChain | null;
 }

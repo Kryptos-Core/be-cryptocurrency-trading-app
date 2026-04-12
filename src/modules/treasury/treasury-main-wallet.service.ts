@@ -658,10 +658,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
     chain: SupportedTreasuryChain,
   ): Promise<BlockchainGatewayConfig | null> {
     const mapping: Partial<Record<SupportedTreasuryChain, [string, string]>> = {
-      ETH_MAINNET: ['ETH', 'MAINNET'],
-      BSC_MAINNET: ['BSC', 'MAINNET'],
-      TRON_MAINNET: ['TRON', 'MAINNET'],
-      SOLANA_MAINNET: ['SOL', 'MAINNET'],
+      ETH_MAINNET: ['ETH', 'ETH_MAINNET'],
+      BSC_MAINNET: ['BSC', 'BSC_MAINNET'],
+      TRON_MAINNET: ['TRON', 'TRON_MAINNET'],
+      SOLANA_MAINNET: ['SOL', 'SOLANA_MAINNET'],
     };
     const entry = mapping[chain];
     if (!entry) return null;

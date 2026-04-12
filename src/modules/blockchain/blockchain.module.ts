@@ -103,7 +103,7 @@ import { WalletLinkingService } from './wallet-linking.service';
         new SolanaProvider(config, payment, sys, treasury, {
           network: BlockchainNetwork.SOLANA_MAINNET,
           rpcRuntimeKey: 'SOLANA_MAINNET_URL',
-          paymentSolNetwork: 'MAINNET',
+          paymentSolNetwork: 'SOLANA_MAINNET',
           treasuryChain: null,
         }),
       inject: [ConfigService, PaymentConfigService, SystemConfigService, TreasuryMainWalletService],
@@ -119,7 +119,7 @@ import { WalletLinkingService } from './wallet-linking.service';
         new SolanaProvider(config, payment, sys, treasury, {
           network: BlockchainNetwork.SOLANA_DEVNET,
           rpcRuntimeKey: 'SOLANA_DEVNET_URL',
-          paymentSolNetwork: 'DEVNET',
+          paymentSolNetwork: 'SOLANA_DEVNET',
           treasuryChain: 'SOLANA_DEVNET',
         }),
       inject: [ConfigService, PaymentConfigService, SystemConfigService, TreasuryMainWalletService],
