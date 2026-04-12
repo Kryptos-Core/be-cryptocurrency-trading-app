@@ -406,6 +406,8 @@ export class ManagedWalletsService {
         return 'Tron Network (TRC-20 Mainnet)';
       case BlockchainNetwork.ETH_MAINNET:
         return 'Ethereum (mainnet)';
+      case BlockchainNetwork.ETH_SEPOLIA:
+        return 'Ethereum — Sepolia (testnet)';
       case BlockchainNetwork.BSC_CHAPEL:
         return 'BNB Smart Chain (Chapel testnet)';
       case BlockchainNetwork.BSC_MAINNET:
@@ -414,6 +416,42 @@ export class ManagedWalletsService {
         return 'Solana (devnet)';
       case BlockchainNetwork.SOLANA_MAINNET:
         return 'Solana (mainnet)';
+      case BlockchainNetwork.BASE_MAINNET:
+        return 'Base — Mainnet';
+      case BlockchainNetwork.BASE_SEPOLIA:
+        return 'Base — Sepolia (testnet)';
+      case BlockchainNetwork.ARBITRUM_MAINNET:
+        return 'Arbitrum — Mainnet';
+      case BlockchainNetwork.ARBITRUM_SEPOLIA:
+        return 'Arbitrum — Sepolia (testnet)';
+      case BlockchainNetwork.OPTIMISM_MAINNET:
+        return 'Optimism — Mainnet';
+      case BlockchainNetwork.OPTIMISM_SEPOLIA:
+        return 'Optimism — Sepolia (testnet)';
+      case BlockchainNetwork.POLYGON_MAINNET:
+        return 'Polygon — Mainnet';
+      case BlockchainNetwork.POLYGON_AMOY:
+        return 'Polygon — Amoy (testnet)';
+      case BlockchainNetwork.AVALANCHE_MAINNET:
+        return 'Avalanche — Mainnet';
+      case BlockchainNetwork.AVALANCHE_FUJI:
+        return 'Avalanche — Fuji (testnet)';
+      case BlockchainNetwork.GNOSIS_MAINNET:
+        return 'Gnosis — Mainnet';
+      case BlockchainNetwork.GNOSIS_CHIADO:
+        return 'Gnosis — Chiado (testnet)';
+      case BlockchainNetwork.LINEA_MAINNET:
+        return 'Linea — Mainnet';
+      case BlockchainNetwork.LINEA_SEPOLIA:
+        return 'Linea — Sepolia (testnet)';
+      case BlockchainNetwork.FANTOM_MAINNET:
+        return 'Fantom — Mainnet';
+      case BlockchainNetwork.FANTOM_TESTNET:
+        return 'Fantom — Testnet';
+      case BlockchainNetwork.TON_MAINNET:
+        return 'TON — Mainnet';
+      case BlockchainNetwork.TON_TESTNET:
+        return 'TON — Testnet';
       default:
         return chain;
     }
