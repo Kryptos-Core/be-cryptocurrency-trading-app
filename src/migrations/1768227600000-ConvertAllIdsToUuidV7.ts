@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Convert all tables to UUID v7 (CHAR(36)) for primary and foreign keys.
@@ -9,20 +9,55 @@ export class ConvertAllIdsToUuidV71768227600000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ---- 1. Drop all stored procedures ----
     const procedures = [
-      'sp_order_count_by_user', 'sp_order_find_by_user', 'sp_order_cancel', 'sp_order_create',
-      'sp_order_book', 'sp_order_find_by_user_idempotency', 'sp_order_find_by_id',
-      'sp_market_recent_trades', 'sp_market_ticker', 'sp_market_order_book_asks', 'sp_market_order_book_bids',
-      'sp_market_find_by_currencies', 'sp_market_find_active', 'sp_market_pair_exists', 'sp_market_symbol_exists',
-      'sp_market_delete', 'sp_market_update', 'sp_market_create', 'sp_market_count', 'sp_market_find_all',
-      'sp_market_find_by_symbol', 'sp_market_find_by_id',
-      'sp_trade_execute', 'sp_orders_open_for_pair',
-      'sp_wallet_ledger_create', 'sp_wallet_apply_balance_delta', 'sp_wallet_get_or_create_for_update', 'sp_wallet_find_by_user_currency',
-      'sp_currency_find_tradable', 'sp_currency_find_active', 'sp_currency_symbol_exists', 'sp_currency_delete',
-      'sp_currency_update', 'sp_currency_create', 'sp_currency_count', 'sp_currency_find_all',
-      'sp_currency_find_by_symbol', 'sp_currency_find_by_id',
-      'sp_user_email_exists', 'sp_user_get_statistics', 'sp_user_delete', 'sp_user_update',
-      'sp_user_create', 'sp_user_count', 'sp_user_find_all', 'sp_user_find_by_email', 'sp_user_find_by_id',
-      'sp_ohlcv_upsert', 'sp_ohlcv_get_by_pair_interval',
+      'sp_order_count_by_user',
+      'sp_order_find_by_user',
+      'sp_order_cancel',
+      'sp_order_create',
+      'sp_order_book',
+      'sp_order_find_by_user_idempotency',
+      'sp_order_find_by_id',
+      'sp_market_recent_trades',
+      'sp_market_ticker',
+      'sp_market_order_book_asks',
+      'sp_market_order_book_bids',
+      'sp_market_find_by_currencies',
+      'sp_market_find_active',
+      'sp_market_pair_exists',
+      'sp_market_symbol_exists',
+      'sp_market_delete',
+      'sp_market_update',
+      'sp_market_create',
+      'sp_market_count',
+      'sp_market_find_all',
+      'sp_market_find_by_symbol',
+      'sp_market_find_by_id',
+      'sp_trade_execute',
+      'sp_orders_open_for_pair',
+      'sp_wallet_ledger_create',
+      'sp_wallet_apply_balance_delta',
+      'sp_wallet_get_or_create_for_update',
+      'sp_wallet_find_by_user_currency',
+      'sp_currency_find_tradable',
+      'sp_currency_find_active',
+      'sp_currency_symbol_exists',
+      'sp_currency_delete',
+      'sp_currency_update',
+      'sp_currency_create',
+      'sp_currency_count',
+      'sp_currency_find_all',
+      'sp_currency_find_by_symbol',
+      'sp_currency_find_by_id',
+      'sp_user_email_exists',
+      'sp_user_get_statistics',
+      'sp_user_delete',
+      'sp_user_update',
+      'sp_user_create',
+      'sp_user_count',
+      'sp_user_find_all',
+      'sp_user_find_by_email',
+      'sp_user_find_by_id',
+      'sp_ohlcv_upsert',
+      'sp_ohlcv_get_by_pair_interval',
     ];
     for (const name of procedures) {
       await queryRunner.query(`DROP PROCEDURE IF EXISTS \`${name}\``);
@@ -31,8 +66,19 @@ export class ConvertAllIdsToUuidV71768227600000 implements MigrationInterface {
     // ---- 2. Drop tables (reverse FK order) ----
     await queryRunner.query('SET FOREIGN_KEY_CHECKS = 0');
     const tables = [
-      'wallet_ledger', 'trades', 'orders', 'price_alerts', 'deposits', 'withdrawals',
-      'user_sessions', 'wallets', 'market_pairs', 'currency_networks', 'currencies', 'users', 'app_settings',
+      'wallet_ledger',
+      'trades',
+      'orders',
+      'price_alerts',
+      'deposits',
+      'withdrawals',
+      'user_sessions',
+      'wallets',
+      'market_pairs',
+      'currency_networks',
+      'currencies',
+      'users',
+      'app_settings',
     ];
     for (const t of tables) {
       await queryRunner.query(`DROP TABLE IF EXISTS \`${t}\``);
@@ -287,8 +333,19 @@ export class ConvertAllIdsToUuidV71768227600000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('SET FOREIGN_KEY_CHECKS = 0');
     const tables = [
-      'app_settings', 'withdrawals', 'deposits', 'price_alerts', 'wallet_ledger', 'trades', 'orders',
-      'wallets', 'user_sessions', 'currency_networks', 'market_pairs', 'currencies', 'users',
+      'app_settings',
+      'withdrawals',
+      'deposits',
+      'price_alerts',
+      'wallet_ledger',
+      'trades',
+      'orders',
+      'wallets',
+      'user_sessions',
+      'currency_networks',
+      'market_pairs',
+      'currencies',
+      'users',
     ];
     for (const t of tables) {
       await queryRunner.query(`DROP TABLE IF EXISTS \`${t}\``);

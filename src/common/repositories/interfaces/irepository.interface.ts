@@ -1,4 +1,4 @@
-import { DeepPartial, FindManyOptions, FindOneOptions, FindOptionsWhere } from 'typeorm';
+import type { DeepPartial, FindManyOptions, FindOneOptions, FindOptionsWhere } from 'typeorm';
 
 /**
  * IRepository Interface

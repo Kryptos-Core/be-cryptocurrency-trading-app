@@ -1,6 +1,6 @@
+import type { TradeExecutionResult } from '../interfaces';
+import { EventStore, type TradeExecutedEvent } from './event-store';
 import { EventStoreVisitor } from './event-store-visitor';
-import { EventStore, TradeExecutedEvent } from './event-store';
-import { TradeExecutionResult } from '../interfaces';
 
 describe('EventStoreVisitor', () => {
   let store: EventStore;

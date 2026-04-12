@@ -1,4 +1,4 @@
-import { toBaseUnits, fromBaseUnits, comparePriceBigInt } from './base-units';
+import { comparePriceBigInt, fromBaseUnits, toBaseUnits } from './base-units';
 
 const SCALE_18 = 18;
 
@@ -35,9 +35,7 @@ describe('toBaseUnits', () => {
 
   it('truncates excess decimals beyond scale', () => {
     // 19 decimal digits → truncate to 18
-    expect(toBaseUnits('1.1234567890123456789', SCALE_18)).toBe(
-      1_123456789012345678n,
-    );
+    expect(toBaseUnits('1.1234567890123456789', SCALE_18)).toBe(1_123456789012345678n);
   });
 
   it('trims leading/trailing whitespace', () => {
@@ -55,9 +53,7 @@ describe('toBaseUnits', () => {
 
 describe('fromBaseUnits', () => {
   it('converts 1e18 base units to "1.000000000000000000"', () => {
-    expect(fromBaseUnits(1_000_000_000_000_000_000n, SCALE_18)).toBe(
-      '1.000000000000000000',
-    );
+    expect(fromBaseUnits(1_000_000_000_000_000_000n, SCALE_18)).toBe('1.000000000000000000');
   });
 
   it('converts 1 base unit to smallest decimal', () => {
@@ -79,9 +75,7 @@ describe('fromBaseUnits', () => {
   });
 
   it('converts negative base units', () => {
-    expect(fromBaseUnits(-1_500_000_000_000_000_000n, SCALE_18)).toBe(
-      '-1.500000000000000000',
-    );
+    expect(fromBaseUnits(-1_500_000_000_000_000_000n, SCALE_18)).toBe('-1.500000000000000000');
   });
 });
 
@@ -111,11 +105,7 @@ describe('comparePriceBigInt', () => {
 
   it('returns negative when a < b', () => {
     expect(
-      comparePriceBigInt(
-        '0.000000000000000001',
-        '0.000000000000000002',
-        SCALE_18,
-      ),
+      comparePriceBigInt('0.000000000000000001', '0.000000000000000002', SCALE_18),
     ).toBeLessThan(0);
   });
 
@@ -128,12 +118,8 @@ describe('comparePriceBigInt', () => {
   it('distinguishes values where parseFloat fails (> 2^53)', () => {
     // parseFloat('9007199254740992.5') === parseFloat('9007199254740992.6')
     // BigInt must distinguish them
-    expect(
-      comparePriceBigInt(
-        '9007199254740992.5',
-        '9007199254740992.6',
-        SCALE_18,
-      ),
-    ).toBeLessThan(0);
+    expect(comparePriceBigInt('9007199254740992.5', '9007199254740992.6', SCALE_18)).toBeLessThan(
+      0,
+    );
   });
 });

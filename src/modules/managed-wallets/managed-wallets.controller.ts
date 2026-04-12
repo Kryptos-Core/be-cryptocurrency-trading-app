@@ -11,22 +11,16 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
-import { ManagedWalletsService } from './managed-wallets.service';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
-import {
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type {
   CreateManagedWalletDto,
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
 } from './dto';
+import type { ManagedWalletsService } from './managed-wallets.service';
 
 @ApiTags('managed-wallets')
 @ApiBearerAuth('JWT-auth')
@@ -43,10 +37,7 @@ export class ManagedWalletsController {
     summary: 'Deprecated — use POST /treasury/wallets',
     description: 'Returns 403. Wallet creation is only allowed via treasury transaction wallets.',
   })
-  async createWallet(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: CreateManagedWalletDto,
-  ) {
+  async createWallet(@CurrentUser('userId') userId: string, @Body() dto: CreateManagedWalletDto) {
     return this.managedWalletsService.createWallet(userId, dto);
   }
 
@@ -55,13 +46,9 @@ export class ManagedWalletsController {
   @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({
-    summary:
-      'List Tron transaction wallets eligible for user deposit defaults (DEPOSIT/BOTH)',
+    summary: 'List Tron transaction wallets eligible for user deposit defaults (DEPOSIT/BOTH)',
   })
-  async listWallets(
-    @CurrentUser('userId') userId: string,
-    @CurrentUser('role') role: UserRole,
-  ) {
+  async listWallets(@CurrentUser('userId') userId: string, @CurrentUser('role') role: UserRole) {
     return this.managedWalletsService.listWallets(userId, role);
   }
 

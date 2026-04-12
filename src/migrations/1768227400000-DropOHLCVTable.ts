@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: Drop OHLCV table and related stored procedures.
@@ -19,7 +19,9 @@ export class DropOHLCVTable1768227400000 implements MigrationInterface {
       [schema, tableName, constraintName],
     );
     if (rows.length > 0) {
-      await queryRunner.query(`ALTER TABLE \`${tableName}\` DROP FOREIGN KEY \`${constraintName}\``);
+      await queryRunner.query(
+        `ALTER TABLE \`${tableName}\` DROP FOREIGN KEY \`${constraintName}\``,
+      );
     }
   }
 

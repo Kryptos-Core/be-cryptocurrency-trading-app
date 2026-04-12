@@ -1,6 +1,6 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional, IsObject, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { NotificationType } from '@/entities/notification.entity';
+import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import type { NotificationType } from '@/entities/notification.entity';
 
 export class CreateNotificationDto {
   @ApiProperty({ example: 'System Maintenance', maxLength: 255 })

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import 'reflect-metadata';
 
 type ResultItem = {
@@ -32,7 +31,9 @@ async function apiRequest(
   }
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${path} -> ${typeof payload === 'string' ? payload : JSON.stringify(payload)}`);
+    throw new Error(
+      `HTTP ${res.status} ${path} -> ${typeof payload === 'string' ? payload : JSON.stringify(payload)}`,
+    );
   }
 
   return payload;
@@ -96,7 +97,11 @@ async function main() {
     );
     results.push({ step: 'withdraw_auto_request', status: 'passed', detail: autoRes });
   } catch (error: any) {
-    results.push({ step: 'withdraw_auto_request', status: 'failed', detail: error?.message || String(error) });
+    results.push({
+      step: 'withdraw_auto_request',
+      status: 'failed',
+      detail: error?.message || String(error),
+    });
   }
 
   try {
@@ -115,7 +120,11 @@ async function main() {
     manualTxId = manualRes?.txId || null;
     results.push({ step: 'withdraw_manual_request', status: 'passed', detail: manualRes });
   } catch (error: any) {
-    results.push({ step: 'withdraw_manual_request', status: 'failed', detail: error?.message || String(error) });
+    results.push({
+      step: 'withdraw_manual_request',
+      status: 'failed',
+      detail: error?.message || String(error),
+    });
   }
 
   if (manualTxId) {
@@ -129,7 +138,11 @@ async function main() {
       );
       results.push({ step: 'withdraw_manual_approve', status: 'passed', detail: approveRes });
     } catch (error: any) {
-      results.push({ step: 'withdraw_manual_approve', status: 'failed', detail: error?.message || String(error) });
+      results.push({
+        step: 'withdraw_manual_approve',
+        status: 'failed',
+        detail: error?.message || String(error),
+      });
     }
   } else {
     results.push({
@@ -160,7 +173,11 @@ async function main() {
       depositTxId = submitRes?.txId || null;
       results.push({ step: 'deposit_submit', status: 'passed', detail: submitRes });
     } catch (error: any) {
-      results.push({ step: 'deposit_submit', status: 'failed', detail: error?.message || String(error) });
+      results.push({
+        step: 'deposit_submit',
+        status: 'failed',
+        detail: error?.message || String(error),
+      });
     }
 
     if (depositTxId) {
@@ -173,7 +190,11 @@ async function main() {
         );
         results.push({ step: 'deposit_settle', status: 'passed', detail: settleRes });
       } catch (error: any) {
-        results.push({ step: 'deposit_settle', status: 'failed', detail: error?.message || String(error) });
+        results.push({
+          step: 'deposit_settle',
+          status: 'failed',
+          detail: error?.message || String(error),
+        });
       }
     }
   } else {
@@ -185,10 +206,19 @@ async function main() {
   }
 
   try {
-    const txRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/transactions?limit=20', 'GET');
+    const txRes = await apiRequest(
+      baseUrl,
+      traderToken,
+      '/api/v1/blockchain/transactions?limit=20',
+      'GET',
+    );
     results.push({ step: 'transactions_check', status: 'passed', detail: txRes });
   } catch (error: any) {
-    results.push({ step: 'transactions_check', status: 'failed', detail: error?.message || String(error) });
+    results.push({
+      step: 'transactions_check',
+      status: 'failed',
+      detail: error?.message || String(error),
+    });
   }
 
   const report = {

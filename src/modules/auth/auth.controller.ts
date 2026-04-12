@@ -1,35 +1,39 @@
-import { Controller, Post, Body, Get, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBody,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
-import { AuthService } from './auth.service';
-import { WalletAuthService } from './wallet-auth.service';
-import { WalletConnectAuthService } from './wallet-connect-auth.service';
-import { TwoFaService } from './two-fa.service';
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
-  RegisterDto,
+  ApiBadRequestResponse,
+  ApiCreatedResponse,
+  ApiSuccessResponse,
+  ApiUnauthorizedResponse,
+  CurrentUser,
+  Public,
+} from '@/common/decorators';
+import { BadRequestException } from '@/common/exceptions';
+import { JwtAuthGuard } from '@/common/guards';
+import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
+import type { AuthService } from './auth.service';
+import {
+  ChangePasswordDto,
   LoginDto,
+  RegisterDto,
+  TwoFaOtpDto,
   WalletNonceDto,
   WalletVerifyAuthDto,
-  TwoFaOtpDto,
-  ChangePasswordDto,
   WcAuthInitDto,
   WcAuthVerifyDto,
 } from './dto';
-import { Public, CurrentUser } from '@/common/decorators';
-import { JwtAuthGuard } from '@/common/guards';
-import { BadRequestException } from '@/common/exceptions';
-import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import {
-  ApiSuccessResponse,
-  ApiBadRequestResponse,
-  ApiUnauthorizedResponse,
-  ApiCreatedResponse,
-} from '@/common/decorators';
+import type { TwoFaService } from './two-fa.service';
+import type { WalletAuthService } from './wallet-auth.service';
+import type { WalletConnectAuthService } from './wallet-connect-auth.service';
 
 /**
  * Auth Controller - API Endpoints
@@ -139,7 +143,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify wallet signature',
-    description: 'Verify signed message and return JWT (login if user exists, register and link wallet if new)',
+    description:
+      'Verify signed message and return JWT (login if user exists, register and link wallet if new)',
   })
   @ApiBody({ type: WalletVerifyAuthDto })
   @ApiSuccessResponse('Wallet auth successful', {
@@ -153,11 +158,7 @@ export class AuthController {
   })
   @ApiBadRequestResponse('Invalid signature or expired nonce')
   async walletVerify(@Body() dto: WalletVerifyAuthDto) {
-    return this.walletAuthService.verifyAndAuthenticate(
-      dto.chain,
-      dto.address,
-      dto.signature,
-    );
+    return this.walletAuthService.verifyAndAuthenticate(dto.chain, dto.address, dto.signature);
   }
 
   /**
@@ -187,7 +188,8 @@ export class AuthController {
   @Get('wallet/wc/status/:sessionId')
   @ApiOperation({
     summary: 'Poll WalletConnect login session status',
-    description: 'Trả về pending/expired và metadata; chữ ký chỉ có khi relay/SDK cập nhật (tùy triển khai).',
+    description:
+      'Trả về pending/expired và metadata; chữ ký chỉ có khi relay/SDK cập nhật (tùy triển khai).',
   })
   @ApiSuccessResponse('Session status')
   @ApiBadRequestResponse('Invalid session id')
@@ -264,16 +266,10 @@ export class AuthController {
   @ApiSuccessResponse('OTP is valid')
   @ApiBadRequestResponse('Invalid or expired OTP')
   @ApiUnauthorizedResponse('Unauthorized')
-  async validateTwoFaOtp(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: TwoFaOtpDto,
-  ) {
+  async validateTwoFaOtp(@CurrentUser('userId') userId: string, @Body() dto: TwoFaOtpDto) {
     const ok = await this.twoFaService.validateOtpOnly(userId, dto.otpCode);
     if (!ok) {
-      throw new BadRequestException(
-        'OTP không hợp lệ hoặc đã hết hạn',
-        'INVALID_OTP',
-      );
+      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
     }
     return { valid: true };
   }
@@ -289,10 +285,7 @@ export class AuthController {
   @ApiBody({ type: TwoFaOtpDto })
   @ApiSuccessResponse('2FA enabled successfully')
   @ApiBadRequestResponse('Invalid OTP')
-  async enableTwoFa(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: TwoFaOtpDto,
-  ) {
+  async enableTwoFa(@CurrentUser('userId') userId: string, @Body() dto: TwoFaOtpDto) {
     await this.twoFaService.enable(userId, dto.otpCode);
     return { enabled: true };
   }
@@ -308,10 +301,7 @@ export class AuthController {
   @ApiBody({ type: TwoFaOtpDto })
   @ApiSuccessResponse('2FA disabled successfully')
   @ApiBadRequestResponse('Invalid OTP')
-  async disableTwoFa(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: TwoFaOtpDto,
-  ) {
+  async disableTwoFa(@CurrentUser('userId') userId: string, @Body() dto: TwoFaOtpDto) {
     await this.twoFaService.disable(userId, dto.otpCode);
     return { enabled: false };
   }
@@ -332,10 +322,7 @@ export class AuthController {
   @ApiBody({ type: ChangePasswordDto })
   @ApiSuccessResponse('Password changed successfully')
   @ApiBadRequestResponse('Invalid OTP or 2FA not enabled')
-  async changePassword(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: ChangePasswordDto,
-  ) {
+  async changePassword(@CurrentUser('userId') userId: string, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(userId, dto);
   }
 

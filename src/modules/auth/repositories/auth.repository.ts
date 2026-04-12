@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
-import { newUuid } from '@/common/utils/uuid.util';
-import { User } from '@/entities/user.entity';
 import { UserRole } from '@/common/enums';
+import { newUuid } from '@/common/utils/uuid.util';
+import type { User } from '@/entities/user.entity';
 
 /**
  * Auth Repository - Data Access Layer for Authentication
@@ -20,10 +20,9 @@ export class AuthRepository {
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`,
-        [email.toLowerCase()],
-      );
+      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`, [
+        email.toLowerCase(),
+      ]);
 
       return result[0]?.[0] || null;
     } catch (error) {
@@ -37,10 +36,9 @@ export class AuthRepository {
    */
   async findById(userId: string): Promise<User | null> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
-        [userId],
-      );
+      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        userId,
+      ]);
       return result[0]?.[0] || null;
     } catch (error) {
       this.logger.error(`Error finding user by ID: ${userId}`, error);
@@ -61,16 +59,19 @@ export class AuthRepository {
   ): Promise<User> {
     try {
       const userId = newUuid();
-      await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`,
-        [userId, email.toLowerCase(), passwordHash, firstName || null, lastName || null, role],
-      );
+      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
+        userId,
+        email.toLowerCase(),
+        passwordHash,
+        firstName || null,
+        lastName || null,
+        role,
+      ]);
 
       // Fetch and return created user
-      const userResult = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
-        [userId],
-      );
+      const userResult = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        userId,
+      ]);
 
       return userResult[0]?.[0];
     } catch (error) {
@@ -128,10 +129,9 @@ export class AuthRepository {
         `CALL ${USER_STORE_PROCEDURE.CREATE_WALLET_ONLY}(?, ?, ?, ?, ?)`,
         [userId, email, passwordHash, chain, address],
       );
-      const userResult = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
-        [userId],
-      );
+      const userResult = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        userId,
+      ]);
       return userResult[0]?.[0];
     } catch (error) {
       this.logger.error(`Error creating wallet-only user: ${email}`, error);
@@ -144,10 +144,10 @@ export class AuthRepository {
    */
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
     try {
-      await this.dataSource.query(
-        'UPDATE users SET password_hash = ? WHERE user_id = ?',
-        [passwordHash, userId],
-      );
+      await this.dataSource.query('UPDATE users SET password_hash = ? WHERE user_id = ?', [
+        passwordHash,
+        userId,
+      ]);
     } catch (error) {
       this.logger.error(`Error updating password for user ${userId}`, error);
       throw error;
@@ -159,10 +159,10 @@ export class AuthRepository {
    */
   async setTwoFaEnabled(userId: string, enabled: boolean): Promise<number> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.SET_TWO_FA}(?, ?)`,
-        [userId, enabled ? 1 : 0],
-      );
+      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.SET_TWO_FA}(?, ?)`, [
+        userId,
+        enabled ? 1 : 0,
+      ]);
       return Number(result[0]?.[0]?.affected ?? 0);
     } catch (error) {
       this.logger.error(`Error updating 2FA status for user ${userId}`, error);

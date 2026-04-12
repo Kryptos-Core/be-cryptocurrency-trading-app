@@ -1,8 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
-import { RedisService } from '@/common/services/redis.service';
-import { TreasuryMainWalletService, TREASURY_MAIN_WALLET_EVENTS_CHANNEL } from './treasury-main-wallet.service';
+import type { ConfigService } from '@nestjs/config';
+import { Cron } from '@nestjs/schedule';
+import type { RedisService } from '@/common/services/redis.service';
+import type { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
+import {
+  TREASURY_MAIN_WALLET_EVENTS_CHANNEL,
+  type TreasuryMainWalletService,
+} from './treasury-main-wallet.service';
 
 /**
  * MainWalletRotationScheduler
@@ -51,9 +55,10 @@ export class MainWalletRotationScheduler {
       `[RotationScheduler] Running rotation check (globalIntervalDays=${globalIntervalDays})`,
     );
 
-    let dueMallets;
+    let dueMallets: TreasuryMainWallet[];
     try {
-      dueMallets = await this.treasuryMainWalletService.getWalletsDueForRotation(globalIntervalDays);
+      dueMallets =
+        await this.treasuryMainWalletService.getWalletsDueForRotation(globalIntervalDays);
     } catch (err) {
       this.logger.error(`[RotationScheduler] Failed to query wallets due for rotation`, err);
       return;
@@ -67,8 +72,8 @@ export class MainWalletRotationScheduler {
     for (const wallet of dueMallets) {
       try {
         this.logger.warn(
-          `[RotationScheduler] Main wallet ${wallet.main_wallet_id} (chain=${wallet.chain}, address=${wallet.address}) is due for rotation. `
-          + `Marking rotated and notifying operators.`,
+          `[RotationScheduler] Main wallet ${wallet.main_wallet_id} (chain=${wallet.chain}, address=${wallet.address}) is due for rotation. ` +
+            `Marking rotated and notifying operators.`,
         );
 
         // Mark last_rotated_at so the scheduler doesn't re-alert until the next interval
@@ -91,8 +96,8 @@ export class MainWalletRotationScheduler {
         );
 
         this.logger.log(
-          `[RotationScheduler] Rotation event published for ${wallet.main_wallet_id}. `
-          + `Operator must import a new key via POST /treasury/main-wallets.`,
+          `[RotationScheduler] Rotation event published for ${wallet.main_wallet_id}. ` +
+            `Operator must import a new key via POST /treasury/main-wallets.`,
         );
       } catch (err) {
         this.logger.error(

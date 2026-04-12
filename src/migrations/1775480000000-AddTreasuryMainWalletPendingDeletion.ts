@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Allow main-wallet deletion workflow: Finance requests → Risk approves/rejects before row is removed.

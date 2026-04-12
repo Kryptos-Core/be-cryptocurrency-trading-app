@@ -1,14 +1,10 @@
-import { randomInt } from 'crypto';
+import { randomInt } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { CacheService, MailService } from '@/common/services';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@/common/exceptions';
-import { UsersRepository } from './repositories';
+import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
+import type { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import { User } from '@/entities/user.entity';
+import type { User } from '@/entities/user.entity';
+import type { UsersRepository } from './repositories';
 
 /**
  * OTP gửi thẳng tới email mới để gắn email liên hệ cho tài khoản đăng nhập ví (email @*.wallet).
@@ -88,11 +84,7 @@ export class ContactEmailVerificationService {
     return { expiresIn: this.otpTtlSeconds };
   }
 
-  async verifyAndUpdateEmail(
-    userId: string,
-    newEmailRaw: string,
-    otpCode: string,
-  ): Promise<User> {
+  async verifyAndUpdateEmail(userId: string, newEmailRaw: string, otpCode: string): Promise<User> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);

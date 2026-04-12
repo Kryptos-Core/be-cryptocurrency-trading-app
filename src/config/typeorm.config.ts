@@ -1,6 +1,6 @@
-import { ConfigService } from '@nestjs/config';
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import * as path from 'path';
+import * as path from 'node:path';
+import type { ConfigService } from '@nestjs/config';
+import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 // Explicit entity imports — required when webpack bundles everything into dist/main.js
 // because filesystem globs resolve to empty arrays in bundled environments.
@@ -14,22 +14,22 @@ import { LinkedWallet } from '../entities/linked-wallet.entity';
 import { ManagedWallet } from '../entities/managed-wallet.entity';
 import { MarketMakerConfig } from '../entities/market-maker-config.entity';
 import { MarketPair } from '../entities/market-pair.entity';
+import { Notification } from '../entities/notification.entity';
 import { OnchainTransaction } from '../entities/onchain-transaction.entity';
 import { Order } from '../entities/order.entity';
+import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
 import { PriceAlert } from '../entities/price-alert.entity';
+import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
+import { TransactionWallet } from '../entities/transaction-wallet.entity';
+import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
+import { TreasuryOperation } from '../entities/treasury-operation.entity';
 import { User } from '../entities/user.entity';
+import { UserNotification } from '../entities/user-notification.entity';
 import { UserSession } from '../entities/user-session.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
-import { Notification } from '../entities/notification.entity';
-import { UserNotification } from '../entities/user-notification.entity';
-import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
-import { TransactionWallet } from '../entities/transaction-wallet.entity';
-import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
-import { TreasuryOperation } from '../entities/treasury-operation.entity';
-import { SystemConfig } from '../entities/system-config.entity';
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
@@ -60,16 +60,11 @@ const ALL_ENTITIES = [
   SystemConfig,
 ];
 
-export const getTypeOrmConfig = (
-  configService: ConfigService,
-): TypeOrmModuleOptions => {
+export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOptions => {
   const nodeEnv = configService.get<string>('NODE_ENV') ?? 'development';
   const isProduction = nodeEnv === 'production';
-  const debugSqlFlag = (configService.get<string>('TYPEORM_DEBUG_SQL') ?? '')
-    .trim()
-    .toLowerCase();
-  const debugSql =
-    !isProduction && ['true', '1', 'yes', 'on'].includes(debugSqlFlag);
+  const debugSqlFlag = (configService.get<string>('TYPEORM_DEBUG_SQL') ?? '').trim().toLowerCase();
+  const debugSql = !isProduction && ['true', '1', 'yes', 'on'].includes(debugSqlFlag);
 
   return {
     type: 'mysql',

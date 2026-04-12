@@ -1,16 +1,19 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  Index,
+  Entity,
   ForeignKey,
-  ManyToOne,
+  Index,
   JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
 import { TransactionWallet } from './transaction-wallet.entity';
-import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
+import { User } from './user.entity';
 
 @Entity('treasury_operations')
 @Index('idx_treasury_op_chain_type_status', ['chain', 'type', 'status'])

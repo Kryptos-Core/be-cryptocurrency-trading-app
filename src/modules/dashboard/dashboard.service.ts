@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MarketsService } from '@/modules/markets/markets.service';
-import { MarketPair } from '@/entities/market-pair.entity';
-import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
-import { RedisService } from '@/common/services';
-import {
-  DashboardResponseDto,
+import type { RedisService } from '@/common/services';
+import type { MarketPair } from '@/entities/market-pair.entity';
+import type { MarketsService } from '@/modules/markets/markets.service';
+import type { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import type {
   DashboardMarketDto,
+  DashboardResponseDto,
   DashboardWalletDto,
 } from './dto/dashboard-response.dto';
 
@@ -47,10 +47,10 @@ export class DashboardService {
     const [activePairs, wallets] = await Promise.all([
       this.marketsService.findActive(),
       userId
-        // includeZero: true → return all wallets so walletCount reflects every
-        // currency wallet the user owns, even those with 0 balance.
-        // The FE filters what is *displayed* (only > 0), but the count is accurate.
-        ? this.walletRepository.findByUser(userId, true)
+        ? // includeZero: true → return all wallets so walletCount reflects every
+          // currency wallet the user owns, even those with 0 balance.
+          // The FE filters what is *displayed* (only > 0), but the count is accurate.
+          this.walletRepository.findByUser(userId, true)
         : Promise.resolve([] as any[]),
     ]);
 
@@ -129,10 +129,8 @@ export class DashboardService {
 
     return pool
       .sort((a, b) => {
-        const pa =
-          STABLE_QUOTE_SUFFIXES.findIndex((s) => a.symbol.endsWith(s));
-        const pb =
-          STABLE_QUOTE_SUFFIXES.findIndex((s) => b.symbol.endsWith(s));
+        const pa = STABLE_QUOTE_SUFFIXES.findIndex((s) => a.symbol.endsWith(s));
+        const pb = STABLE_QUOTE_SUFFIXES.findIndex((s) => b.symbol.endsWith(s));
         return (pa === -1 ? 99 : pa) - (pb === -1 ? 99 : pb);
       })
       .slice(0, CANDIDATE_LIMIT);

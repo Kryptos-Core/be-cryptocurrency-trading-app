@@ -1,5 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test, type TestingModule } from '@nestjs/testing';
 import Decimal from 'decimal.js';
 import { MockExchangeService } from './mock-exchange.service';
 

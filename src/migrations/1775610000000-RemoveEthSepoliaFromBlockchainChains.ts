@@ -1,11 +1,10 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Retire Ethereum Sepolia: rewrite rows to BSC Chapel, drop Sepolia from MySQL ENUMs,
  * and remove Sepolia-related runtime config keys.
  */
-const chainEnumWithoutSepolia =
-  `'TRON_NILE','TRON_SHASTA','TRON_MAINNET','SOLANA_DEVNET','SOLANA_MAINNET','ETH_MAINNET','BSC_CHAPEL','BSC_MAINNET'`;
+const chainEnumWithoutSepolia = `'TRON_NILE','TRON_SHASTA','TRON_MAINNET','SOLANA_DEVNET','SOLANA_MAINNET','ETH_MAINNET','BSC_CHAPEL','BSC_MAINNET'`;
 
 const chainTables = [
   'linked_wallets',
@@ -67,7 +66,7 @@ export class RemoveEthSepoliaFromBlockchainChains1775610000000 implements Migrat
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     throw new Error('RemoveEthSepoliaFromBlockchainChains1775610000000 down() is not supported');
   }
 }

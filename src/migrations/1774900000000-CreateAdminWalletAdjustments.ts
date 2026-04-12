@@ -1,9 +1,10 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 async function runProcedureSql(queryRunner: QueryRunner, sql: string): Promise<void> {
-  const conn = queryRunner.connection.driver.options.type === 'mariadb'
-    ? (queryRunner as any).connection.master
-    : (queryRunner as any).connection;
+  const conn =
+    queryRunner.connection.driver.options.type === 'mariadb'
+      ? (queryRunner as any).connection.master
+      : (queryRunner as any).connection;
   const raw = conn?.queryRunner?.connection ?? conn?.connection ?? conn;
   if (raw?.query) {
     await raw.query(sql);
@@ -45,7 +46,9 @@ export class CreateAdminWalletAdjustments1774900000000 implements MigrationInter
 
     // ── sp_admin_wallet_adjustment_create ────────────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_admin_wallet_adjustment_create');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_admin_wallet_adjustment_create(
         IN p_adjustment_id  CHAR(36),
         IN p_actor_user_id  CHAR(36),
@@ -81,11 +84,14 @@ export class CreateAdminWalletAdjustments1774900000000 implements MigrationInter
         WHERE a.adjustment_id = p_adjustment_id
         LIMIT 1;
       END
-    `);
+    `,
+    );
 
     // ── sp_admin_wallet_adjustment_find_by_target ────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_admin_wallet_adjustment_find_by_target');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_admin_wallet_adjustment_find_by_target(
         IN p_target_user_id CHAR(36),
         IN p_limit          INT,
@@ -113,7 +119,8 @@ export class CreateAdminWalletAdjustments1774900000000 implements MigrationInter
         ORDER BY a.created_at DESC
         LIMIT p_limit OFFSET p_offset;
       END
-    `);
+    `,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

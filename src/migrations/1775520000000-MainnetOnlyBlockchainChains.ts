@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 const expandedChainEnum = `'TRON_NILE','TRON_SHASTA','TRON_MAINNET','SOLANA_DEVNET','SOLANA_MAINNET','ETH_SEPOLIA','ETH_MAINNET','BSC_MAINNET'`;
 const finalChainEnum = `'TRON_MAINNET','SOLANA_MAINNET','ETH_MAINNET','BSC_MAINNET'`;
@@ -53,18 +53,9 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
       ['SOLANA_DEVNET_URL', 'SOLANA_MAINNET_URL'],
       ['ETH_SEPOLIA_RPC_URL', 'ETH_MAINNET_RPC_URL'],
       ['ETH_SEPOLIA_CHAIN_ID', 'ETH_MAINNET_CHAIN_ID'],
-      [
-        'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA',
-        'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET',
-      ],
-      [
-        'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET',
-        'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET',
-      ],
-      [
-        'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE',
-        'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET',
-      ],
+      ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_SEPOLIA', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_ETH_MAINNET'],
+      ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_DEVNET', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_SOLANA_MAINNET'],
+      ['BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_NILE', 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_MAINNET'],
     ];
 
     for (const [fromKey, toKey] of systemConfigKeyRenames) {
@@ -74,10 +65,10 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
          WHERE s1.\`key\` = ?`,
         [toKey, fromKey],
       );
-      await queryRunner.query(
-        `UPDATE system_configs SET \`key\` = ? WHERE \`key\` = ?`,
-        [toKey, fromKey],
-      );
+      await queryRunner.query(`UPDATE system_configs SET \`key\` = ? WHERE \`key\` = ?`, [
+        toKey,
+        fromKey,
+      ]);
     }
 
     await queryRunner.query(`
@@ -88,7 +79,7 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
     `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     throw new Error('MainnetOnlyBlockchainChains1775520000000 down() is not supported');
   }
 }

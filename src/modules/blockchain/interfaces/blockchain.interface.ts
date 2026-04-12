@@ -1,4 +1,4 @@
-import { BlockchainNetwork } from '@/common/enums';
+import type { BlockchainNetwork } from '@/common/enums';
 
 /**
  * Số dư on-chain trả về từ blockchain provider
@@ -41,11 +41,7 @@ export interface IBlockchainProvider {
   getBalance(address: string): Promise<BlockchainBalanceDto>;
 
   /** Xác minh chữ ký (challenge-response flow) */
-  verifySignature(
-    address: string,
-    message: string,
-    signature: string,
-  ): Promise<boolean>;
+  verifySignature(address: string, message: string, signature: string): Promise<boolean>;
 
   /** Lấy trạng thái giao dịch on-chain */
   getTransactionStatus(txHash: string): Promise<BlockchainTxStatusDto>;

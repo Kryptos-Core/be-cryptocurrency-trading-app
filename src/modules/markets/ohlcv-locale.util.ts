@@ -2,10 +2,7 @@
  * Resolve BCP 47-ish locale for OHLCV responses / client hints.
  * Query `locale` wins over `Accept-Language` first segment.
  */
-export function resolveOhlcvLocale(
-  localeQuery?: string,
-  acceptLanguageHeader?: string,
-): string {
+export function resolveOhlcvLocale(localeQuery?: string, acceptLanguageHeader?: string): string {
   const q = localeQuery?.trim();
   if (q) {
     const normalized = q.replace(/_/g, '-');

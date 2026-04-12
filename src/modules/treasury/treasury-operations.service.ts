@@ -1,43 +1,42 @@
 import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Queue } from 'bull';
+import type { ConfigService } from '@nestjs/config';
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  sendAndConfirmTransaction,
+  Transaction,
+} from '@solana/web3.js';
+import bs58 from 'bs58';
+import type { Queue } from 'bull';
+import Decimal from 'decimal.js';
 import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
-import bs58 from 'bs58';
-import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
-import {
-  BadRequestException,
-  BusinessException,
-  NotFoundException,
-} from '@/common/exceptions';
-import { RedisService } from '@/common/services';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import { TreasuryOperation } from '@/entities/treasury-operation.entity';
-import { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import {
-  FundWalletDto,
-  ListTreasuryOperationsDto,
-  ListTreasuryTransactionsDto,
-} from './dto';
+import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
+import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
+import type { RedisService } from '@/common/services';
+import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   TREASURY_EVENTS_CHANNEL,
   TREASURY_FUND_JOB,
   TREASURY_QUEUE,
   TREASURY_SWEEP_JOB,
 } from './constants';
-import { TransactionWalletService } from './transaction-wallet.service';
-import {
+import type { FundWalletDto, ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from './dto';
+import type { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
+import type { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
+import type { TransactionWalletService } from './transaction-wallet.service';
+import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
+import type {
   SupportedTreasuryChain,
   TreasuryMainWalletService,
 } from './treasury-main-wallet.service';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
-import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
-import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
-import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
@@ -54,7 +53,7 @@ export class TreasuryOperationsService {
     private readonly redisService: RedisService,
     private readonly transactionWalletService: TransactionWalletService,
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
-    private readonly configService: ConfigService,
+    readonly _configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
     private readonly treasuryOperationRepository: TreasuryOperationRepository,
     private readonly treasuryOnchainReadRepository: TreasuryOnchainReadRepository,
@@ -130,7 +129,10 @@ export class TreasuryOperationsService {
   async processSweepJob(data: TreasuryJobData): Promise<void> {
     const operation = await this.getOperationForProcessing(data.operationId, 'SWEEP');
     if (!operation.from_wallet_id) {
-      throw new BusinessException('Sweep operation missing source wallet', 'TREASURY_SWEEP_MISSING_SOURCE');
+      throw new BusinessException(
+        'Sweep operation missing source wallet',
+        'TREASURY_SWEEP_MISSING_SOURCE',
+      );
     }
 
     const lockKey = `treasury:lock:${operation.from_wallet_id}`;
@@ -144,9 +146,18 @@ export class TreasuryOperationsService {
 
       const result = await this.sendSweepFromWallet(wallet, mainAddress);
       if (TreasuryOperationsService.isTronChain(wallet.chain)) {
-        await this.transactionWalletService.waitForTronBalanceReflectSweep(wallet.chain, wallet.address);
+        await this.transactionWalletService.waitForTronBalanceReflectSweep(
+          wallet.chain,
+          wallet.address,
+        );
       }
-      await this.finalizeSuccess(operation, wallet.address, mainAddress, result.txHash, result.amount);
+      await this.finalizeSuccess(
+        operation,
+        wallet.address,
+        mainAddress,
+        result.txHash,
+        result.amount,
+      );
       await this.publishEvent('operation.completed', {
         operationId: operation.operation_id,
         type: operation.type,
@@ -160,7 +171,10 @@ export class TreasuryOperationsService {
   async processFundJob(data: TreasuryJobData): Promise<void> {
     const operation = await this.getOperationForProcessing(data.operationId, 'FUND');
     if (!operation.to_wallet_id) {
-      throw new BusinessException('Fund operation missing destination wallet', 'TREASURY_FUND_MISSING_DESTINATION');
+      throw new BusinessException(
+        'Fund operation missing destination wallet',
+        'TREASURY_FUND_MISSING_DESTINATION',
+      );
     }
 
     const lockKey = `treasury:lock:${operation.to_wallet_id}`;
@@ -222,7 +236,8 @@ export class TreasuryOperationsService {
   }
 
   async getOperation(operationId: string): Promise<TreasuryOperation> {
-    const operation = await this.treasuryOperationRepository.findByOperationIdWithWallets(operationId);
+    const operation =
+      await this.treasuryOperationRepository.findByOperationIdWithWallets(operationId);
 
     if (!operation) {
       throw new NotFoundException('Treasury operation', operationId);
@@ -315,7 +330,10 @@ export class TreasuryOperationsService {
 
     const evmSweepDef = getEvmDefinitionByTreasuryChain(wallet.chain);
     if (evmSweepDef) {
-      const provider = await jsonRpcProviderForTreasuryEvmChain(wallet.chain, this.systemConfigService);
+      const provider = await jsonRpcProviderForTreasuryEvmChain(
+        wallet.chain,
+        this.systemConfigService,
+      );
       const signer = new ethers.Wallet(privateKey, provider);
       const balanceWei = await provider.getBalance(wallet.address);
       const feeData = await provider.getFeeData();
@@ -349,13 +367,16 @@ export class TreasuryOperationsService {
       const connection = await this.buildSolanaConnection(wallet.chain);
       const decodedKey = bs58.decode(privateKey);
       const keypair = Keypair.fromSecretKey(decodedKey);
-      
+
       const balanceLamports = await connection.getBalance(keypair.publicKey);
       const reserveLamports = 5000; // standard solana fee
       const transferLamports = Math.max(0, balanceLamports - reserveLamports);
-      
+
       if (transferLamports <= 0) {
-        throw new BusinessException('Insufficient SOL balance to sweep', 'TREASURY_SWEEP_INSUFFICIENT_BALANCE');
+        throw new BusinessException(
+          'Insufficient SOL balance to sweep',
+          'TREASURY_SWEEP_INSUFFICIENT_BALANCE',
+        );
       }
 
       const tx = new Transaction().add(
@@ -363,11 +384,11 @@ export class TreasuryOperationsService {
           fromPubkey: keypair.publicKey,
           toPubkey: new PublicKey(mainAddress),
           lamports: transferLamports,
-        })
+        }),
       );
 
       const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
-      
+
       return {
         txHash,
         amount: new Decimal(transferLamports).div(1_000_000_000).toString(),
@@ -379,12 +400,18 @@ export class TreasuryOperationsService {
     const reserveSun = 100_000; // Keep 0.1 TRX for fees/bandwidth.
     const transferSun = Math.max(0, balanceSun - reserveSun);
     if (transferSun <= 0) {
-      throw new BusinessException('Insufficient TRX balance to sweep', 'TREASURY_SWEEP_INSUFFICIENT_BALANCE');
+      throw new BusinessException(
+        'Insufficient TRX balance to sweep',
+        'TREASURY_SWEEP_INSUFFICIENT_BALANCE',
+      );
     }
 
     const tx = await tronWeb.trx.sendTransaction(mainAddress, transferSun);
     if (!tx?.result || !tx?.txid) {
-      throw new BusinessException('Failed to submit TRON sweep transaction', 'TREASURY_SWEEP_SEND_FAILED');
+      throw new BusinessException(
+        'Failed to submit TRON sweep transaction',
+        'TREASURY_SWEEP_SEND_FAILED',
+      );
     }
 
     return {
@@ -415,15 +442,15 @@ export class TreasuryOperationsService {
       const decodedKey = bs58.decode(privateKey);
       const keypair = Keypair.fromSecretKey(decodedKey);
       const lamports = Math.floor(new Decimal(amount).mul(1_000_000_000).toNumber());
-      
+
       const tx = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: keypair.publicKey,
           toPubkey: new PublicKey(toAddress),
           lamports,
-        })
+        }),
       );
-      
+
       const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
       return txHash;
     }
@@ -432,7 +459,10 @@ export class TreasuryOperationsService {
     const sun = Math.floor(new Decimal(amount).mul(1_000_000).toNumber());
     const tx = await tronWeb.trx.sendTransaction(toAddress, sun);
     if (!tx?.result || !tx?.txid) {
-      throw new BusinessException('Failed to submit TRON fund transaction', 'TREASURY_FUND_SEND_FAILED');
+      throw new BusinessException(
+        'Failed to submit TRON fund transaction',
+        'TREASURY_FUND_SEND_FAILED',
+      );
     }
     return tx.txid;
   }
@@ -443,7 +473,10 @@ export class TreasuryOperationsService {
     const lock = await client.set(lockKey, token, 'EX', 120, 'NX');
 
     if (lock !== 'OK') {
-      throw new BusinessException('Another treasury operation is running on this wallet', 'TREASURY_WALLET_LOCKED');
+      throw new BusinessException(
+        'Another treasury operation is running on this wallet',
+        'TREASURY_WALLET_LOCKED',
+      );
     }
 
     try {
@@ -475,7 +508,9 @@ export class TreasuryOperationsService {
     return chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA';
   }
 
-  private async buildSolanaConnection(chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET'): Promise<Connection> {
+  private async buildSolanaConnection(
+    chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET',
+  ): Promise<Connection> {
     if (chain === 'SOLANA_DEVNET') {
       const v = await this.systemConfigService.get<string>('SOLANA_DEVNET_URL');
       const url =

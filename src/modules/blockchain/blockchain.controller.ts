@@ -1,43 +1,40 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
   Body,
+  Controller,
+  DefaultValuePipe,
+  Delete,
+  Get,
   Param,
+  ParseIntPipe,
+  Post,
   Query,
   UseGuards,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import type { DataSource } from 'typeorm';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiParam,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { DataSource } from 'typeorm';
-import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
-import { CurrentUser, Public, RequirePermissions, RequireRoles } from '@/common/decorators';
-import {
-  ApiSuccessResponse,
   ApiBadRequestResponse,
+  ApiSuccessResponse,
   ApiUnauthorizedResponse,
+  CurrentUser,
+  Public,
+  RequirePermissions,
+  RequireRoles,
 } from '@/common/decorators';
-import { BadRequestException } from '@/common/exceptions';
 import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
-import { WalletLinkingService } from './wallet-linking.service';
-import { OnchainTransferService } from './onchain-transfer.service';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
-import {
-  RequestLinkDto,
-  VerifyLinkDto,
-  SubmitDepositDto,
-  RequestWithdrawalDto,
+import { BadRequestException } from '@/common/exceptions';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
+import type { BlockchainProviderFactory } from './blockchain-provider.factory';
+import type {
   ManualWithdrawalActionDto,
+  RequestLinkDto,
+  RequestWithdrawalDto,
+  SubmitDepositDto,
+  VerifyLinkDto,
 } from './dto';
+import type { OnchainTransferService } from './onchain-transfer.service';
+import type { WalletLinkingService } from './wallet-linking.service';
 
 /**
  * Blockchain Controller
@@ -53,7 +50,7 @@ export class BlockchainController {
     private readonly onchainTransferService: OnchainTransferService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly managedWalletsService: ManagedWalletsService,
-    private readonly dataSource: DataSource,
+    readonly _dataSource: DataSource,
   ) {}
 
   // ============ WALLET LINKING ============
@@ -71,10 +68,7 @@ export class BlockchainController {
   @ApiSuccessResponse('Nonce challenge tạo thành công')
   @ApiBadRequestResponse('Địa chỉ ví không hợp lệ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async requestLink(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: RequestLinkDto,
-  ) {
+  async requestLink(@CurrentUser('userId') userId: string, @Body() dto: RequestLinkDto) {
     return this.walletLinkingService.requestLink(userId, dto);
   }
 
@@ -85,16 +79,12 @@ export class BlockchainController {
   @Post('wallets/verify-link')
   @ApiOperation({
     summary: 'Xác minh liên kết ví',
-    description:
-      'Gửi chữ ký đã ký từ ví. BE sẽ verify trên blockchain và tạo liên kết.',
+    description: 'Gửi chữ ký đã ký từ ví. BE sẽ verify trên blockchain và tạo liên kết.',
   })
   @ApiSuccessResponse('Liên kết ví thành công')
   @ApiBadRequestResponse('Chữ ký không hợp lệ hoặc nonce hết hạn')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async verifyLink(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: VerifyLinkDto,
-  ) {
+  async verifyLink(@CurrentUser('userId') userId: string, @Body() dto: VerifyLinkDto) {
     return this.walletLinkingService.verifyLink(userId, dto);
   }
 
@@ -146,10 +136,7 @@ export class BlockchainController {
   @ApiSuccessResponse('Huỷ liên kết thành công')
   @ApiBadRequestResponse('Ví liên kết không tìm thấy')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async unlinkWallet(
-    @CurrentUser('userId') userId: string,
-    @Param('linkId') linkId: string,
-  ) {
+  async unlinkWallet(@CurrentUser('userId') userId: string, @Param('linkId') linkId: string) {
     return this.walletLinkingService.unlinkWallet(userId, linkId);
   }
 
@@ -180,9 +167,8 @@ export class BlockchainController {
     }
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
-    const depositWallet = await this.managedWalletsService.getConfiguredDepositWallet(
-      normalizedChain,
-    );
+    const depositWallet =
+      await this.managedWalletsService.getConfiguredDepositWallet(normalizedChain);
 
     if (normalizedChain === BlockchainNetwork.TRON_MAINNET) {
       if (!depositWallet) {
@@ -215,8 +201,7 @@ export class BlockchainController {
   @Get('deposit/preview')
   @ApiOperation({
     summary: 'Preview nạp tiền theo txHash',
-    description:
-      'Kiểm tra nhanh giao dịch on-chain để FE tự điền amount trước khi submit deposit.',
+    description: 'Kiểm tra nhanh giao dịch on-chain để FE tự điền amount trước khi submit deposit.',
   })
   @ApiQuery({ name: 'chain', required: true, type: String, example: 'ETH_MAINNET' })
   @ApiQuery({ name: 'txHash', required: true, type: String })
@@ -236,11 +221,7 @@ export class BlockchainController {
     }
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
-    return this.onchainTransferService.previewDepositTx(
-      userId,
-      normalizedChain,
-      txHash,
-    );
+    return this.onchainTransferService.previewDepositTx(userId, normalizedChain, txHash);
   }
 
   /**
@@ -256,10 +237,7 @@ export class BlockchainController {
   @ApiSuccessResponse('Nạp tiền thành công')
   @ApiBadRequestResponse('TxHash không hợp lệ hoặc giao dịch lỗi')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async submitDeposit(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: SubmitDepositDto,
-  ) {
+  async submitDeposit(@CurrentUser('userId') userId: string, @Body() dto: SubmitDepositDto) {
     return this.onchainTransferService.submitDeposit(userId, dto);
   }
 
@@ -270,17 +248,13 @@ export class BlockchainController {
   @Post('deposit/:txId/settle')
   @ApiOperation({
     summary: 'Settle nạp tiền on-chain',
-    description:
-      'Re-check trạng thái on-chain và credit wallet ledger khi giao dịch đã CONFIRMED.',
+    description: 'Re-check trạng thái on-chain và credit wallet ledger khi giao dịch đã CONFIRMED.',
   })
   @ApiParam({ name: 'txId', description: 'ID giao dịch nạp on-chain' })
   @ApiSuccessResponse('Settle nạp tiền thành công')
   @ApiBadRequestResponse('Giao dịch nạp không hợp lệ hoặc chưa confirm')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async settleDeposit(
-    @CurrentUser('userId') userId: string,
-    @Param('txId') txId: string,
-  ) {
+  async settleDeposit(@CurrentUser('userId') userId: string, @Param('txId') txId: string) {
     return this.onchainTransferService.settleDepositByTxId(userId, txId);
   }
 
@@ -291,8 +265,7 @@ export class BlockchainController {
   @Post('withdraw/request')
   @ApiOperation({
     summary: 'Yêu cầu rút tiền',
-    description:
-      'Gửi coin từ platform về ví liên kết đã verified. Xử lý async.',
+    description: 'Gửi coin từ platform về ví liên kết đã verified. Xử lý async.',
   })
   @ApiSuccessResponse('Yêu cầu rút tiền đã tiếp nhận')
   @ApiBadRequestResponse('Ví chưa xác minh hoặc balance không đủ')
@@ -339,8 +312,7 @@ export class BlockchainController {
   @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
   @ApiOperation({
     summary: 'Reject manual withdrawal',
-    description:
-      'Từ chối yêu cầu manual review và hoàn frozen balance về available.',
+    description: 'Từ chối yêu cầu manual review và hoàn frozen balance về available.',
   })
   @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền pending manual' })
   @ApiSuccessResponse('Reject manual withdrawal thành công')
@@ -351,11 +323,7 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() dto: ManualWithdrawalActionDto,
   ) {
-    return this.onchainTransferService.rejectManualWithdrawal(
-      actorUserId,
-      txId,
-      dto.reason,
-    );
+    return this.onchainTransferService.rejectManualWithdrawal(actorUserId, txId, dto.reason);
   }
 
   /**
@@ -379,10 +347,7 @@ export class BlockchainController {
     @Query('limit') limit?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.onchainTransferService.processPendingManualWithdrawals(
-      actorUserId,
-      parsedLimit,
-    );
+    return this.onchainTransferService.processPendingManualWithdrawals(actorUserId, parsedLimit);
   }
 
   // ============ LỊCH SỬ GIAO DỊCH ============
@@ -399,10 +364,7 @@ export class BlockchainController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
   @ApiSuccessResponse('Lịch sử giao dịch')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async getTransactions(
-    @CurrentUser('userId') userId: string,
-    @Query('limit') limit?: string,
-  ) {
+  async getTransactions(@CurrentUser('userId') userId: string, @Query('limit') limit?: string) {
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
     return this.onchainTransferService.getTransactions(userId, parsedLimit);
   }
@@ -420,10 +382,7 @@ export class BlockchainController {
   @ApiSuccessResponse('Chi tiết giao dịch')
   @ApiBadRequestResponse('Giao dịch không tìm thấy')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async getTransaction(
-    @CurrentUser('userId') userId: string,
-    @Param('txId') txId: string,
-  ) {
+  async getTransaction(@CurrentUser('userId') userId: string, @Param('txId') txId: string) {
     return this.onchainTransferService.getTransactionById(userId, txId);
   }
 
@@ -475,9 +434,18 @@ export class BlockchainController {
     description: 'Paginated list of all onchain withdrawal transactions across all users.',
   })
   @ApiQuery({ name: 'userId', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'],
+  })
   @ApiQuery({ name: 'chain', required: false, type: String })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search email, name, address, txId' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search email, name, address, txId',
+  })
   @ApiQuery({ name: 'dateFrom', required: false, type: String, description: 'YYYY-MM-DD' })
   @ApiQuery({ name: 'dateTo', required: false, type: String, description: 'YYYY-MM-DD' })
   @ApiQuery({ name: 'page', required: false, type: Number })

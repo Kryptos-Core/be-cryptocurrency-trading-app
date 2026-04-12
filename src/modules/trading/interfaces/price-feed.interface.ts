@@ -1,4 +1,4 @@
-import { TickerMessage } from './websocket.interface';
+import type { TickerMessage } from './websocket.interface';
 
 /**
  * Resolver to get pair_id for a symbol (e.g. from MarketRepository).

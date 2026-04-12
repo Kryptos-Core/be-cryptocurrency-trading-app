@@ -1,11 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { CacheService } from '@/common/services';
 import { MarketsService } from '@/modules/markets/markets.service';
 import { OrdersService } from '@/modules/orders/orders.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { MarketMakerService } from './market-maker.service';
 import { MarketMakerConfigRepository } from './repositories';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
-import { MarketMakerService } from './market-maker.service';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 describe('MarketMakerService + MmOrderStrategyService Integration', () => {
   let marketMakerService: MarketMakerService;

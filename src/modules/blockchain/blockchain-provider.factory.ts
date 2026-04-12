@@ -1,18 +1,18 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BlockchainNetwork } from '@/common/enums';
-import { IBlockchainProvider } from './interfaces';
-import { TronProvider } from './providers/tron.provider';
-import { SolanaProvider } from './providers/solana.provider';
-import { EthereumProvider } from './providers/ethereum.provider';
 import { BadRequestException } from '@/common/exceptions';
 import {
+  BC_SOLANA_DEVNET,
+  BC_SOLANA_MAINNET,
   BC_TRON_MAINNET,
   BC_TRON_NILE,
   BC_TRON_SHASTA,
-  BC_SOLANA_MAINNET,
-  BC_SOLANA_DEVNET,
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
+import type { IBlockchainProvider } from './interfaces';
+import type { EthereumProvider } from './providers/ethereum.provider';
+import type { SolanaProvider } from './providers/solana.provider';
+import type { TronProvider } from './providers/tron.provider';
 
 @Injectable()
 export class BlockchainProviderFactory {

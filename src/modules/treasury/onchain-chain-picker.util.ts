@@ -3,12 +3,12 @@
  * `lib/presentation/constants/treasury_chains.dart` (server + `networkCatalog` is source of truth).
  */
 
+import type { ChainNetworkCatalogItemDto } from '@/common/constants/chain-registry';
 import {
   buildNetworkCatalog,
   listActionableOnchainChainCodes,
   listTreasuryOpsChainCodes,
 } from '@/common/constants/chain-registry';
-import type { ChainNetworkCatalogItemDto } from '@/common/constants/chain-registry';
 
 export type ChainPickerContextKey =
   | 'treasury_ops'
@@ -45,7 +45,9 @@ export function resolveTreasuryChainsUseMainnetOnly(input: ChainPickerEnvInput):
   return (input.env ?? '').trim().toLowerCase() === 'production';
 }
 
-export function resolveSandboxTronDefaultNetwork(tronDefaultNetwork?: string): 'TRON_NILE' | 'TRON_SHASTA' {
+export function resolveSandboxTronDefaultNetwork(
+  tronDefaultNetwork?: string,
+): 'TRON_NILE' | 'TRON_SHASTA' {
   const u = tronDefaultNetwork?.trim().toUpperCase();
   if (u === 'TRON_SHASTA') return 'TRON_SHASTA';
   if (u === 'TRON_NILE') return 'TRON_NILE';

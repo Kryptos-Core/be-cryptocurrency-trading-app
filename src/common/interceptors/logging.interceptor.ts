@@ -1,17 +1,17 @@
 import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
+  type CallHandler,
+  type ExecutionContext,
   HttpException,
+  Injectable,
+  Logger,
+  type NestInterceptor,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
+import type { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { AppException } from '../exceptions';
 
 /**
- * Logging Interceptor - Log incoming requests and responses 
+ * Logging Interceptor - Log incoming requests and responses
  * Applicable: Cross-Cutting Concern
  */
 @Injectable()
@@ -35,7 +35,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const { method, originalUrl, body, ip } = request;
+    const { method, originalUrl, ip } = request;
     const startTime = Date.now();
 
     return next.handle().pipe(

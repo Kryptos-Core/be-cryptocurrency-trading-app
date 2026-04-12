@@ -1,6 +1,6 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
+import { type ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Observable } from 'rxjs';
+import type { Observable } from 'rxjs';
 import { UnauthorizedException } from '@/common/exceptions';
 
 function hasBearerHeader(req: { headers?: { authorization?: unknown } }): boolean {
@@ -14,9 +14,7 @@ function hasBearerHeader(req: { headers?: { authorization?: unknown } }): boolea
  */
 @Injectable()
 export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const req = context.switchToHttp().getRequest();
     if (!hasBearerHeader(req)) {
       return true;

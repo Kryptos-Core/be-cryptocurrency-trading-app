@@ -1,14 +1,18 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { UsersService } from './users.service';
-import { UsersRepository } from './repositories';
+import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
+import type { User } from '@/entities/user.entity';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
-import { WalletsService } from '@/modules/wallets/wallets.service';
 import { OrderRepository } from '@/modules/orders/repositories';
-import { User } from '@/entities/user.entity';
-import { UpdateMyProfileBasicDto, RequestSecurityChangeDto, ReviewSecurityChangeDto } from './dto';
-import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
+import { WalletsService } from '@/modules/wallets/wallets.service';
+import type {
+  RequestSecurityChangeDto,
+  ReviewSecurityChangeDto,
+  UpdateMyProfileBasicDto,
+} from './dto';
+import { UsersRepository } from './repositories';
+import { UsersService } from './users.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -42,7 +46,9 @@ describe('UsersService', () => {
     };
     const mockCloudinary = {
       isConfigured: jest.fn().mockReturnValue(true),
-      upload: jest.fn().mockResolvedValue({ url: 'https://cdn.example/av.jpg', publicId: 'avatars/av1' }),
+      upload: jest
+        .fn()
+        .mockResolvedValue({ url: 'https://cdn.example/av.jpg', publicId: 'avatars/av1' }),
       destroy: jest.fn().mockResolvedValue(undefined),
     };
     const mockTwoFa = {
@@ -133,7 +139,9 @@ describe('UsersService', () => {
         payload: { password: 'newpass123' },
         otpCode: '123456',
       };
-      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject PASSWORD_CHANGE if password too short', async () => {
@@ -142,17 +150,24 @@ describe('UsersService', () => {
         payload: { password: 'short' },
         otpCode: '123456',
       };
-      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject if 2FA not enabled', async () => {
-      (usersRepository.findById as jest.Mock).mockResolvedValueOnce({ ...mockUser, two_fa_enabled: 0 });
+      (usersRepository.findById as jest.Mock).mockResolvedValueOnce({
+        ...mockUser,
+        two_fa_enabled: 0,
+      });
       const dto: RequestSecurityChangeDto = {
         changeType: 'EMAIL_CHANGE',
         payload: { email: 'new@test.com' },
         otpCode: '123456',
       };
-      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -189,7 +204,12 @@ describe('UsersService', () => {
       const result = await service.reviewSecurityChangeRequest('r1', 'reviewer-1', dto);
       expect(result.requestId).toBe('r1');
       expect(result.status).toBe('APPROVED');
-      expect(usersRepository.reviewSecurityChangeRequest).toHaveBeenCalledWith('r1', 'reviewer-1', true, null);
+      expect(usersRepository.reviewSecurityChangeRequest).toHaveBeenCalledWith(
+        'r1',
+        'reviewer-1',
+        true,
+        null,
+      );
     });
 
     it('should throw NotFoundException when request not found', async () => {
@@ -213,7 +233,9 @@ describe('UsersService', () => {
 
     it('should throw when Cloudinary is not configured', async () => {
       (cloudinaryService.isConfigured as jest.Mock).mockReturnValue(false);
-      await expect(service.uploadAvatar('user-1', Buffer.from('x'))).rejects.toThrow(BadRequestException);
+      await expect(service.uploadAvatar('user-1', Buffer.from('x'))).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

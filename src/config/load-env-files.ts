@@ -1,5 +1,5 @@
+import * as path from 'node:path';
 import * as dotenv from 'dotenv';
-import * as path from 'path';
 
 /**
  * Load `.env` then `.env.${NODE_ENV}` (latter overrides) for TypeORM CLI / seed scripts.

@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Ensures DB currency rows exist for native EVM symbols used by auto-withdraw / treasury mapping (POL, AVAX, XDAI, FTM).

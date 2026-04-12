@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { RedisService } from '@/common/services';
+import type { RedisService } from '@/common/services';
 
 const HALT_KEY_PREFIX = 'circuit:halt:';
 const PRICE_WINDOW_KEY_PREFIX = 'circuit:price:';
@@ -70,7 +70,11 @@ export class CircuitBreakerService {
     if (changePct.gte(threshold)) {
       await client.set(
         `${HALT_KEY_PREFIX}${pairId}`,
-        JSON.stringify({ triggeredAt: new Date().toISOString(), referencePrice: referenceRaw, currentPrice: price }),
+        JSON.stringify({
+          triggeredAt: new Date().toISOString(),
+          referencePrice: referenceRaw,
+          currentPrice: price,
+        }),
         'EX',
         config.haltDurationSec,
       );

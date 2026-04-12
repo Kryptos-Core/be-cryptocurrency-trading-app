@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Fix sp_order_book: ORDER BY must not use columns outside GROUP BY.
@@ -7,9 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - SELL (asks): best ask first = price ASC.
  * - BUY (bids): best bid first = price DESC.
  */
-export class FixOrderBookProcedureGroupBy1768227300000
-  implements MigrationInterface
-{
+export class FixOrderBookProcedureGroupBy1768227300000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_book');
     await queryRunner.query(`

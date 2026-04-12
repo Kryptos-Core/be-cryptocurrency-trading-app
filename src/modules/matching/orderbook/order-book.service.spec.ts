@@ -1,6 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { OrderBookOrder } from '../interfaces';
 import { OrderBookService } from './order-book.service';
-import { OrderBookOrder } from '../interfaces';
 
 function order(
   overrides: Partial<OrderBookOrder> & { order_id: string; side: 'BUY' | 'SELL' },
@@ -177,15 +177,9 @@ describe('OrderBookService', () => {
     });
 
     it('uses BigInt aggregation: no floating-point error', () => {
-      service.addOrder(
-        order({ order_id: 'b1', side: 'BUY', price: '100', remaining: '0.1' }),
-      );
-      service.addOrder(
-        order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '0.2' }),
-      );
-      service.addOrder(
-        order({ order_id: 'b3', side: 'BUY', price: '100', remaining: '0.1' }),
-      );
+      service.addOrder(order({ order_id: 'b1', side: 'BUY', price: '100', remaining: '0.1' }));
+      service.addOrder(order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '0.2' }));
+      service.addOrder(order({ order_id: 'b3', side: 'BUY', price: '100', remaining: '0.1' }));
 
       const snap = service.getSnapshot('pair-1', 5);
       // 0.1 + 0.2 + 0.1 = 0.4 exactly (parseFloat would give 0.30000000000000004 + 0.1)
@@ -196,9 +190,7 @@ describe('OrderBookService', () => {
       service.addOrder(
         order({ order_id: 'b1', side: 'BUY', price: null, remaining: '1', type: 'MARKET' }),
       );
-      service.addOrder(
-        order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '1' }),
-      );
+      service.addOrder(order({ order_id: 'b2', side: 'BUY', price: '100', remaining: '1' }));
 
       const snap = service.getSnapshot('pair-1', 5);
       expect(snap.bids).toHaveLength(1);

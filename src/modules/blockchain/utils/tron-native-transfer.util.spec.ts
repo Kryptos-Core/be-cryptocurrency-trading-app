@@ -1,7 +1,7 @@
 import {
   extractTronFirstContractOwnerBase58,
   extractTronNativeTransferMeta,
-  TronWebAddressSun,
+  type TronWebAddressSun,
 } from './tron-native-transfer.util';
 
 describe('tron-native-transfer.util', () => {

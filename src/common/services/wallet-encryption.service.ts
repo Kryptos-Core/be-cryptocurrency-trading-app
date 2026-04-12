@@ -1,6 +1,6 @@
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import type { ConfigService } from '@nestjs/config';
 import { InternalServerException } from '@/common/exceptions';
 
 /**
@@ -14,17 +14,15 @@ export class WalletEncryptionService {
     const rawKey = this.configService.get<string>('WALLET_ENCRYPTION_KEY')?.trim();
 
     if (!rawKey) {
-      throw new InternalServerException(
-        'Missing WALLET_ENCRYPTION_KEY configuration',
-        { envVar: 'WALLET_ENCRYPTION_KEY' },
-      );
+      throw new InternalServerException('Missing WALLET_ENCRYPTION_KEY configuration', {
+        envVar: 'WALLET_ENCRYPTION_KEY',
+      });
     }
 
     if (!/^[0-9a-fA-F]{64}$/.test(rawKey)) {
-      throw new InternalServerException(
-        'WALLET_ENCRYPTION_KEY must be a 32-byte hex string',
-        { envVar: 'WALLET_ENCRYPTION_KEY' },
-      );
+      throw new InternalServerException('WALLET_ENCRYPTION_KEY must be a 32-byte hex string', {
+        envVar: 'WALLET_ENCRYPTION_KEY',
+      });
     }
 
     this.encryptionKey = Buffer.from(rawKey, 'hex');
@@ -33,17 +31,12 @@ export class WalletEncryptionService {
   encrypt(plaintext: string): string {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
-    const ciphertext = Buffer.concat([
-      cipher.update(plaintext, 'utf8'),
-      cipher.final(),
-    ]);
+    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     const authTag = cipher.getAuthTag();
 
-    return [
-      iv.toString('base64'),
-      authTag.toString('base64'),
-      ciphertext.toString('base64'),
-    ].join(':');
+    return [iv.toString('base64'), authTag.toString('base64'), ciphertext.toString('base64')].join(
+      ':',
+    );
   }
 
   decrypt(encrypted: string): string {

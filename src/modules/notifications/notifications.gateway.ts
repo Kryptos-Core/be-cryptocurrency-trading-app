@@ -1,22 +1,25 @@
+import { Logger, type OnApplicationBootstrap, UseFilters } from '@nestjs/common';
+import type { JwtService } from '@nestjs/jwt';
 import {
-  WebSocketGateway,
-  SubscribeMessage,
-  OnGatewayInit,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  WebSocketServer,
   ConnectedSocket,
   MessageBody,
+  type OnGatewayConnection,
+  type OnGatewayDisconnect,
+  type OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
-import { UseFilters, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
-import { RedisService } from '@/common/services/redis.service';
-import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from './notifications.service';
+import type { Server, Socket } from 'socket.io';
+import type { RedisService } from '@/common/services/redis.service';
 import { PAYMENT_CONFIG_EVENTS_CHANNEL } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import { TREASURY_EVENTS_CHANNEL } from '@/modules/treasury/constants';
-import { WALLET_BALANCE_EVENTS_CHANNEL, WalletBalanceEvent } from '@/modules/wallets/constants';
 import { WebSocketExceptionFilter } from '@/modules/trading/websocket/filters/websocket-exception.filter';
+import { TREASURY_EVENTS_CHANNEL } from '@/modules/treasury/constants';
+import {
+  WALLET_BALANCE_EVENTS_CHANNEL,
+  type WalletBalanceEvent,
+} from '@/modules/wallets/constants';
+import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from './notifications.service';
 
 const SYSTEM_CONFIG_EVENTS_CHANNEL = 'system_config.updated';
 
@@ -145,9 +148,7 @@ export class NotificationsGateway
             },
             timestamp: Date.now(),
           });
-          this.logger.debug(
-            `Wallet balance update for user ${targetUserId}: ${payload.symbol}`,
-          );
+          this.logger.debug(`Wallet balance update for user ${targetUserId}: ${payload.symbol}`);
         }
       } catch (error) {
         this.logger.error('Failed to parse/broadcast wallet balance event', error);

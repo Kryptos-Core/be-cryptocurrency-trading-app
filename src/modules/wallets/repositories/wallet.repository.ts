@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { WALLET_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { newUuid } from '@/common/utils/uuid.util';
@@ -63,10 +63,7 @@ export class WalletRepository extends BaseRepository<Wallet> {
       if (!row) return null;
       return this.mapRowToWallet(row);
     } catch (error) {
-      this.logger.error(
-        `Error finding wallet by user ${userId} and currency ${currencyId}`,
-        error,
-      );
+      this.logger.error(`Error finding wallet by user ${userId} and currency ${currencyId}`, error);
       throw error;
     }
   }
@@ -154,7 +151,9 @@ export class WalletRepository extends BaseRepository<Wallet> {
   /**
    * Fetch wallet user/currency pairs for reconciliation batch jobs.
    */
-  async findWalletPairs(limit: number = 100): Promise<Array<{ userId: string; currencyId: string }>> {
+  async findWalletPairs(
+    limit: number = 100,
+  ): Promise<Array<{ userId: string; currencyId: string }>> {
     const safeLimit = Math.min(Math.max(limit, 1), 1000);
     const rows = await this.dataSource.query(
       `SELECT user_id, currency_id

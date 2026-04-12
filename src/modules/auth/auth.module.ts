@@ -1,18 +1,18 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
-import { WalletAuthService } from './wallet-auth.service';
-import { WalletConnectAuthService } from './wallet-connect-auth.service';
-import { TwoFaService } from './two-fa.service';
-import { AuthRepository } from './repositories';
-import { JwtStrategy } from './strategies';
+import { MailService } from '@/common/services';
 import { User } from '@/entities/user.entity';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
-import { MailService } from '@/common/services';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { AuthRepository } from './repositories';
+import { JwtStrategy } from './strategies';
+import { TwoFaService } from './two-fa.service';
+import { WalletAuthService } from './wallet-auth.service';
+import { WalletConnectAuthService } from './wallet-connect-auth.service';
 
 /**
  * Auth Module

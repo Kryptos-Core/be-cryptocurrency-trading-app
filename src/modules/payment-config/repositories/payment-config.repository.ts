@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { PAYMENT_CONFIG_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
-import { PaymentMethodConfig, PaymentMethodStatus, PaymentMethodType } from '@/entities/payment-method-config.entity';
+import {
+  PaymentMethodConfig,
+  type PaymentMethodStatus,
+  type PaymentMethodType,
+} from '@/entities/payment-method-config.entity';
 
 @Injectable()
 export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig> {
@@ -38,7 +42,16 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
   ): Promise<PaymentMethodConfig> {
     const rows = await this.dataSource.query(
       `CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.UPSERT}(?, ?, ?, ?, ?, ?, ?, ?)`,
-      [configId, type, network, displayName, encryptedConfig, gracePeriodMinutes, sortOrder, userId],
+      [
+        configId,
+        type,
+        network,
+        displayName,
+        encryptedConfig,
+        gracePeriodMinutes,
+        sortOrder,
+        userId,
+      ],
     );
     const result = Array.isArray(rows[0]) ? rows[0][0] : rows[0];
     return result as PaymentMethodConfig;
@@ -51,10 +64,11 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
     manager?: EntityManager,
   ): Promise<PaymentMethodConfig> {
     const exec = manager ?? this.dataSource.manager;
-    const rows = await exec.query(
-      `CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.SET_STATUS}(?, ?, ?)`,
-      [configId, status, userId],
-    );
+    const rows = await exec.query(`CALL ${PAYMENT_CONFIG_STORE_PROCEDURE.SET_STATUS}(?, ?, ?)`, [
+      configId,
+      status,
+      userId,
+    ]);
     const result = Array.isArray(rows[0]) ? rows[0][0] : rows[0];
     return result as PaymentMethodConfig;
   }

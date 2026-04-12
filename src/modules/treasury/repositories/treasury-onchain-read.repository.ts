@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import { ListTreasuryTransactionsDto } from '../dto';
+import type { ListTreasuryTransactionsDto } from '../dto';
 
 @Injectable()
 export class TreasuryOnchainReadRepository {
@@ -29,9 +29,12 @@ export class TreasuryOnchainReadRepository {
     if (filter.type) qb.andWhere('tx.type = :type', { type: filter.type });
     if (filter.status) qb.andWhere('tx.status = :status', { status: filter.status });
     if (filter.q) {
-      qb.andWhere('(tx.tx_hash LIKE :q OR tx.tx_id LIKE :q OR tx.from_address LIKE :q OR tx.to_address LIKE :q)', {
-        q: `%${filter.q}%`,
-      });
+      qb.andWhere(
+        '(tx.tx_hash LIKE :q OR tx.tx_id LIKE :q OR tx.from_address LIKE :q OR tx.to_address LIKE :q)',
+        {
+          q: `%${filter.q}%`,
+        },
+      );
     }
 
     const [items, total] = await qb.getManyAndCount();

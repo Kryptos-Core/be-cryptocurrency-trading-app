@@ -1,18 +1,18 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
-import { RedisService } from '@/common/services';
-import { TradingPriceStreamService } from './trading-price-stream.service';
-import { TradingSubscriptionService } from './trading-subscription.service';
-import { MarketRepository } from '@/modules/markets/repositories';
-import {
-  TickerMessage,
-  OHLCMessage,
-  OhlcSubscriptionEvent,
-  MARKET_EVENTS,
-} from '../interfaces/websocket.interface';
+import type { RedisService } from '@/common/services';
+import type { MarketRepository } from '@/modules/markets/repositories';
 import { BinanceWebSocketPriceFeedClient } from '../clients/binance-websocket-price-feed.client';
-import { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
+import type { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
+import {
+  MARKET_EVENTS,
+  type OHLCMessage,
+  type OhlcSubscriptionEvent,
+  type TickerMessage,
+} from '../interfaces/websocket.interface';
+import type { TradingPriceStreamService } from './trading-price-stream.service';
+import type { TradingSubscriptionService } from './trading-subscription.service';
 
 const RATE_LIMIT_LOG_MS = 60_000;
 const DEBOUNCE_RECONNECT_MS = 4000;
@@ -42,7 +42,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   private readonly activeKlineSymbols = new Map<string, string>(); // pair_id -> symbol
 
   constructor(
-    private readonly configService: ConfigService,
+    readonly _configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly tradingPriceStreamService: TradingPriceStreamService,
     private readonly tradingSubscriptionService: TradingSubscriptionService,
@@ -80,7 +80,10 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       }
     } catch (err) {
       if (this.shouldLog('load_pair_mapping')) {
-        this.logger.error('Load pair symbol mapping failed', err instanceof Error ? err.stack : String(err));
+        this.logger.error(
+          'Load pair symbol mapping failed',
+          err instanceof Error ? err.stack : String(err),
+        );
       }
     }
   }
@@ -112,7 +115,10 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       this.binanceSymbolsCacheExpiry = now + EXCHANGE_INFO_CACHE_TTL_MS;
     } catch (err) {
       if (this.shouldLog('exchange_info')) {
-        this.logger.warn('ExchangeInfo fetch failed', err instanceof Error ? err.message : String(err));
+        this.logger.warn(
+          'ExchangeInfo fetch failed',
+          err instanceof Error ? err.message : String(err),
+        );
       }
     }
     return this.binanceSymbolsCache;
@@ -141,8 +147,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
       symbols = symbols.slice(0, MAX_TICKER_SYMBOLS);
     }
     const prev = new Set(this.requestedTickerSymbols);
-    const same =
-      symbols.length === prev.size && symbols.every((s) => prev.has(s));
+    const same = symbols.length === prev.size && symbols.every((s) => prev.has(s));
     if (same) return;
     this.requestedTickerSymbols = symbols;
 
@@ -160,7 +165,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
    */
   @OnEvent(MARKET_EVENTS.OHLC_SUBSCRIPTION_ADDED)
   onOhlcSubscriptionAdded(event: OhlcSubscriptionEvent): void {
-    const normalized = String(event.symbol).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normalized = String(event.symbol)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
     if (!normalized) return;
     const had = this.activeKlineSymbols.has(event.pair_id);
     this.activeKlineSymbols.set(event.pair_id, normalized);
@@ -210,7 +217,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
 
     this.priceFeedClient.onCandle(async (candle: OHLCMessage) => {
       try {
-        await this.tradingPriceStreamService.publishCandleUpdate(candle, { source: 'binance_kline' });
+        await this.tradingPriceStreamService.publishCandleUpdate(candle, {
+          source: 'binance_kline',
+        });
       } catch (err) {
         if (this.shouldLog('publish_candle')) {
           this.logger.warn('Publish candle failed', err instanceof Error ? err.stack : String(err));
@@ -250,7 +259,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
    * Add a pair to resolution map; refreshes subscription-based symbol set (debounced).
    */
   async addPair(pairId: string, symbol: string): Promise<void> {
-    const normalized = String(symbol).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normalized = String(symbol)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
     if (!normalized || this.pairSymbolMap.has(pairId)) return;
     this.pairSymbolMap.set(pairId, normalized);
     await this.requestSymbolsForSubscriptions();
@@ -266,9 +277,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   }
 
   getTrackedSymbols(): string[] {
-    return this.requestedTickerSymbols.length > 0
-      ? [...this.requestedTickerSymbols]
-      : [];
+    return this.requestedTickerSymbols.length > 0 ? [...this.requestedTickerSymbols] : [];
   }
 
   /**

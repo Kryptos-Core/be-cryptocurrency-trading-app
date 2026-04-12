@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RedisService } from './redis.service';
+import type { RedisService } from './redis.service';
 
 /**
  * Cache Service
@@ -30,13 +30,8 @@ export class CacheService {
   /**
    * Set value to cache with optional TTL
    */
-  async set<T>(
-    key: string,
-    value: T,
-    ttl: number = this.DEFAULT_TTL,
-  ): Promise<void> {
-    const serialized =
-      typeof value === 'string' ? value : JSON.stringify(value);
+  async set<T>(key: string, value: T, ttl: number = this.DEFAULT_TTL): Promise<void> {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
     await this.redisService.set(key, serialized, ttl);
   }
 
@@ -44,8 +39,7 @@ export class CacheService {
    * Idempotent claim: chỉ set nếu key chưa có (Redis SET NX EX).
    */
   async setIfNotExists<T>(key: string, value: T, ttlSec: number): Promise<boolean> {
-    const serialized =
-      typeof value === 'string' ? value : JSON.stringify(value);
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
     return this.redisService.setIfNotExists(key, serialized, ttlSec);
   }
 
@@ -76,11 +70,7 @@ export class CacheService {
   /**
    * Get or set pattern (Cache-Aside)
    */
-  async getOrSet<T>(
-    key: string,
-    factory: () => Promise<T>,
-    ttl?: number,
-  ): Promise<T> {
+  async getOrSet<T>(key: string, factory: () => Promise<T>, ttl?: number): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== null) {
       return cached;

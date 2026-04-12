@@ -1,7 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { TradeExecutionResult } from '../interfaces';
 import { AuditTradeVisitor } from './audit-trade.visitor';
 import { TradeAuditLogRepository } from './trade-audit-log.repository';
-import { TradeExecutionResult } from '../interfaces';
 
 function makeTradeResult(overrides: Partial<TradeExecutionResult> = {}): TradeExecutionResult {
   return {
@@ -29,10 +29,7 @@ describe('AuditTradeVisitor', () => {
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuditTradeVisitor,
-        { provide: TradeAuditLogRepository, useValue: auditRepo },
-      ],
+      providers: [AuditTradeVisitor, { provide: TradeAuditLogRepository, useValue: auditRepo }],
     }).compile();
 
     visitor = module.get(AuditTradeVisitor);

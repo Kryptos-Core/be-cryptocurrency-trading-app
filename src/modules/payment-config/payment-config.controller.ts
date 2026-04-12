@@ -1,28 +1,28 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
-  UseGuards,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Post,
+  Put,
+  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
-import { RoleGuard } from '@/common/guards/role.guard';
-import { PermissionGuard } from '@/common/guards/permission.guard';
-import { RequireRoles } from '@/common/decorators/require-roles.decorator';
-import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { UserRole, Permission } from '@/common/enums';
-import { PaymentConfigService } from './payment-config.service';
-import {
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { RequireRoles } from '@/common/decorators/require-roles.decorator';
+import { Permission, UserRole } from '@/common/enums';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { PermissionGuard } from '@/common/guards/permission.guard';
+import { RoleGuard } from '@/common/guards/role.guard';
+import type {
+  ActivatePaymentConfigDto,
   CreatePaymentConfigDto,
   UpdatePaymentConfigDto,
-  ActivatePaymentConfigDto,
 } from './dto';
+import type { PaymentConfigService } from './payment-config.service';
 
 @Controller('payment-configs')
 @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
@@ -51,10 +51,7 @@ export class PaymentConfigController {
 
   /** Create a new payment method config (starts as INACTIVE) */
   @Post()
-  async create(
-    @Body() dto: CreatePaymentConfigDto,
-    @CurrentUser('userId') userId: string,
-  ) {
+  async create(@Body() dto: CreatePaymentConfigDto, @CurrentUser('userId') userId: string) {
     return this.service.createConfig(dto, userId);
   }
 
@@ -87,10 +84,7 @@ export class PaymentConfigController {
   /** Immediately deactivate a config */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async deactivate(
-    @Param('id') configId: string,
-    @CurrentUser('userId') userId: string,
-  ) {
+  async deactivate(@Param('id') configId: string, @CurrentUser('userId') userId: string) {
     await this.service.deactivateConfig(configId, userId);
     return { success: true };
   }

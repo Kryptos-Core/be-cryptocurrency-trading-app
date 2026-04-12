@@ -1,4 +1,4 @@
-import { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import {
   PAYOS_DEFAULT_MIN_FIAT_DEPOSIT,
   resolvePayosFiatDepositLimits,
@@ -27,10 +27,7 @@ describe('resolvePayosFiatDepositLimits', () => {
   });
 
   it('reads min from config', () => {
-    const r = resolvePayosFiatDepositLimits(
-      baseConfig({ minDepositAmountFiat: '5000' }),
-      {},
-    );
+    const r = resolvePayosFiatDepositLimits(baseConfig({ minDepositAmountFiat: '5000' }), {});
     expect(r.minAmount).toBe(5000);
   });
 
@@ -40,10 +37,9 @@ describe('resolvePayosFiatDepositLimits', () => {
   });
 
   it('config min wins over env', () => {
-    const r = resolvePayosFiatDepositLimits(
-      baseConfig({ minDepositAmountFiat: '7000' }),
-      { min: '3000' },
-    );
+    const r = resolvePayosFiatDepositLimits(baseConfig({ minDepositAmountFiat: '7000' }), {
+      min: '3000',
+    });
     expect(r.minAmount).toBe(7000);
   });
 

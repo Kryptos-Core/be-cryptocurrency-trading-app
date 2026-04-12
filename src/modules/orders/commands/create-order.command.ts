@@ -1,4 +1,4 @@
-import { CreateOrderDto } from '../dto';
+import type { CreateOrderDto } from '../dto';
 
 /**
  * Create Order Command (Command Pattern)

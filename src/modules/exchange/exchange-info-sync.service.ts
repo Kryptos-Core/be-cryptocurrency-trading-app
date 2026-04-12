@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CacheService } from '@/common/services';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
-import { MarketRepository } from '@/modules/markets/repositories';
 import { ServiceUnavailableException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
+import type { CurrencyRepository } from '@/modules/currencies/repositories';
+import type { MarketRepository } from '@/modules/markets/repositories';
 
 const BINANCE_EXCHANGE_INFO_URL = 'https://api.binance.com/api/v3/exchangeInfo';
 /** Cache exchangeInfo 1 hour to avoid Binance request weight / IP ban (418). */
@@ -118,9 +118,7 @@ export class ExchangeInfoSyncService {
     };
 
     const data = await this.fetchBinanceExchangeInfo(forceRefresh);
-    const symbols = (data.symbols || []).filter(
-      (s: BinanceSymbolInfo) => s.status === 'TRADING',
-    );
+    const symbols = (data.symbols || []).filter((s: BinanceSymbolInfo) => s.status === 'TRADING');
 
     const assetSet = new Set<string>();
     for (const s of symbols) {
@@ -179,8 +177,7 @@ export class ExchangeInfoSyncService {
         const amount_scale = lotFilter?.stepSize
           ? decimalScaleFromStep(lotFilter.stepSize)
           : Math.min(8, s.baseAssetPrecision ?? 8);
-        const min_order_amount =
-          lotFilter?.minQty || notionalFilter?.minNotional || '0.0001';
+        const min_order_amount = lotFilter?.minQty || notionalFilter?.minNotional || '0.0001';
 
         await this.marketRepository.create({
           base_currency_id: baseId,

@@ -1,20 +1,23 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsString,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
-  IsEnum,
+  IsString,
   Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Create Order DTO
  * DTO Pattern: Data transfer for order creation (buy/sell)
  */
 export class CreateOrderDto {
-  @ApiProperty({ description: 'Market pair ID (UUID)', example: '018e9a7b-1234-7abc-8000-000000000001' })
+  @ApiProperty({
+    description: 'Market pair ID (UUID)',
+    example: '018e9a7b-1234-7abc-8000-000000000001',
+  })
   @IsString()
   @IsNotEmpty()
   pairId!: string;

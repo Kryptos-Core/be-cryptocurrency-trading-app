@@ -1,6 +1,9 @@
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
 
 export class ListTreasuryTransactionsDto {
   @IsOptional()

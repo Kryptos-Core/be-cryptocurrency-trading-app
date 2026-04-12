@@ -1,15 +1,15 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
+import { Currency } from './currency.entity';
 import { MarketPair } from './market-pair.entity';
 import { Order } from './order.entity';
-import { Currency } from './currency.entity';
 
 @Entity('trades')
 @Index('idx_trades_pair_time', ['pair_id', 'created_at'])
@@ -50,19 +50,31 @@ export class Trade {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(() => MarketPair, (pair) => pair.trades, {
-    onDelete: 'RESTRICT',
-  })
+  @ManyToOne(
+    () => MarketPair,
+    (pair) => pair.trades,
+    {
+      onDelete: 'RESTRICT',
+    },
+  )
   pair!: MarketPair;
 
-  @ManyToOne(() => Order, (order) => order.taker_trades, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => Order,
+    (order) => order.taker_trades,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   taker_order!: Order;
 
-  @ManyToOne(() => Order, (order) => order.maker_trades, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => Order,
+    (order) => order.maker_trades,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   maker_order!: Order;
 
   @ManyToOne('Currency')

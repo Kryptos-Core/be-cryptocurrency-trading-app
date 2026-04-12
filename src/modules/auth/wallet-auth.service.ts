@@ -1,16 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import type { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User } from '@/entities/user.entity';
-import { AuthRepository } from './repositories';
-import { CacheService } from '@/common/services';
-import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
-import { BadRequestException, BusinessException } from '@/common/exceptions';
-import { BlockchainNetwork } from '@/common/enums';
-import { Permission, UserRole } from '@/common/enums';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
+import type { BlockchainNetwork, Permission } from '@/common/enums';
+import { BadRequestException, BusinessException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
+import type { User } from '@/entities/user.entity';
+import type { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
+import type { AuthRepository } from './repositories';
 
 /** Response for wallet auth (login or register) */
 export interface WalletAuthResult {
@@ -40,11 +39,16 @@ export class WalletAuthService {
   /**
    * Bước 1: Tạo nonce challenge cho wallet auth (chưa đăng nhập)
    */
-  async requestNonce(chain: BlockchainNetwork, address: string): Promise<{ message: string; expiresIn: number }> {
+  async requestNonce(
+    chain: BlockchainNetwork,
+    address: string,
+  ): Promise<{ message: string; expiresIn: number }> {
     const provider = this.providerFactory.getProvider(chain);
 
     const isValid = provider.isValidAddress(address);
-    this.logger.debug(`[WalletAuth] requestNonce: chain=${chain}, address="${address}" (len=${address?.length}), isValid=${isValid}`);
+    this.logger.debug(
+      `[WalletAuth] requestNonce: chain=${chain}, address="${address}" (len=${address?.length}), isValid=${isValid}`,
+    );
     if (!isValid) {
       throw new BadRequestException(
         `Địa chỉ ví không hợp lệ trên mạng ${chain}`,
@@ -56,11 +60,7 @@ export class WalletAuthService {
     const message = `Crypto Trading Platform - Xác thực đăng nhập\n\nNonce: ${nonce}\nChain: ${chain}\nAddress: ${address}\n\nKý message này để xác minh quyền sở hữu ví.`;
 
     const cacheKey = this.nonceKey(chain, address);
-    await this.cacheService.set(
-      cacheKey,
-      { nonce, message },
-      WalletAuthService.NONCE_TTL,
-    );
+    await this.cacheService.set(cacheKey, { nonce, message }, WalletAuthService.NONCE_TTL);
 
     this.logger.debug(`[WalletAuth] Nonce requested: chain=${chain}, address=${address}`);
 

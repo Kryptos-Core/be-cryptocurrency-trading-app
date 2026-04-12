@@ -1,21 +1,16 @@
-import {
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Matches,
-  Min,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 
 /**
  * Wallet Transaction DTO
  * Request model for wallet operations
  */
 export class WalletTransactionDto {
-  @ApiProperty({ description: 'Currency ID (UUID)', example: '019cedcf-f90f-7917-9a45-000a1fd77709' })
+  @ApiProperty({
+    description: 'Currency ID (UUID)',
+    example: '019cedcf-f90f-7917-9a45-000a1fd77709',
+  })
   @IsString()
   @IsNotEmpty({ message: 'currencyId is required' })
   currencyId!: string;

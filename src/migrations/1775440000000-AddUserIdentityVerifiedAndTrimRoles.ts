@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * - identity_verified: đã nộp/xác minh CCCD/Passport (không còn dùng role VERIFIED_USER).

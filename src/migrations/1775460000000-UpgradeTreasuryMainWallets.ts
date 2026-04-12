@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Upgrade treasury_main_wallets:
@@ -49,8 +49,7 @@ export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterfa
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Extend chain enum to include Solana (mỗi bảng một query — MySQL driver không chạy multi-statement)
-    const chainEnumValues =
-      `'ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'`;
+    const chainEnumValues = `'ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'`;
     for (const table of [
       'treasury_main_wallets',
       'transaction_wallets',

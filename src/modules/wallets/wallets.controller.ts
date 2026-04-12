@@ -1,29 +1,17 @@
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiParam,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { WalletsService } from './wallets.service';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
-import {
-  ApiSuccessResponse,
   ApiBadRequestResponse,
+  ApiSuccessResponse,
   ApiUnauthorizedResponse,
+  CurrentUser,
+  RequirePermissions,
+  RequireRoles,
 } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
-import { AdminAdjustWalletDto } from './dto/admin-adjust-wallet.dto';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type { AdminAdjustWalletDto } from './dto/admin-adjust-wallet.dto';
+import type { WalletsService } from './wallets.service';
 
 /**
  * Wallets Controller
@@ -45,7 +33,8 @@ export class WalletsController {
   @Get()
   @ApiOperation({
     summary: 'List wallets',
-    description: 'Get all wallets for the current user. Use include_zero=false to hide zero balances.',
+    description:
+      'Get all wallets for the current user. Use include_zero=false to hide zero balances.',
   })
   @ApiQuery({ name: 'include_zero', required: false, type: Boolean, example: false })
   @ApiSuccessResponse('Wallet list retrieved successfully')
@@ -67,13 +56,15 @@ export class WalletsController {
     summary: 'Get wallet balance',
     description: 'Retrieve wallet balance for a specific currency',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiQuery({
+    name: 'currencyId',
+    required: true,
+    type: String,
+    example: '018e9a7b-1234-7abc-8000-000000000002',
+  })
   @ApiSuccessResponse('Wallet balance retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
-  async getBalance(
-    @CurrentUser('userId') userId: string,
-    @Query('currencyId') currencyId: string,
-  ) {
+  async getBalance(@CurrentUser('userId') userId: string, @Query('currencyId') currencyId: string) {
     return this.walletsService.getBalance(userId, currencyId);
   }
 
@@ -86,13 +77,15 @@ export class WalletsController {
     summary: 'Get transaction history',
     description: 'Retrieve recent ledger entries (deposits, withdrawals) for a currency',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiQuery({
+    name: 'currencyId',
+    required: true,
+    type: String,
+    example: '018e9a7b-1234-7abc-8000-000000000002',
+  })
   @ApiSuccessResponse('Transaction history retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
-  async getLedger(
-    @CurrentUser('userId') userId: string,
-    @Query('currencyId') currencyId: string,
-  ) {
+  async getLedger(@CurrentUser('userId') userId: string, @Query('currencyId') currencyId: string) {
     return this.walletsService.getTransactionHistory(userId, currencyId);
   }
 
@@ -105,7 +98,12 @@ export class WalletsController {
     summary: 'Sync balance with Binance',
     description: 'Fetch and sync wallet balance from Binance testnet',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiQuery({
+    name: 'currencyId',
+    required: true,
+    type: String,
+    example: '018e9a7b-1234-7abc-8000-000000000002',
+  })
   @ApiSuccessResponse('Balance synced successfully')
   @ApiBadRequestResponse('Sync failed')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -125,7 +123,12 @@ export class WalletsController {
     summary: 'Get exchange balance',
     description: 'Get current balance directly from Binance exchange',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiQuery({
+    name: 'currencyId',
+    required: true,
+    type: String,
+    example: '018e9a7b-1234-7abc-8000-000000000002',
+  })
   @ApiSuccessResponse('Exchange balance retrieved successfully')
   @ApiBadRequestResponse('Failed to get balance from exchange')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -145,7 +148,12 @@ export class WalletsController {
     summary: 'Check reconciliation status',
     description: 'Check balance discrepancy between internal wallet and Binance',
   })
-  @ApiQuery({ name: 'currencyId', required: true, type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiQuery({
+    name: 'currencyId',
+    required: true,
+    type: String,
+    example: '018e9a7b-1234-7abc-8000-000000000002',
+  })
   @ApiSuccessResponse('Reconciliation status retrieved')
   @ApiBadRequestResponse('Reconciliation check failed')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -177,10 +185,7 @@ export class WalletsController {
     @Query('limit') limit?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 100;
-    return this.walletsService.exportDailyReconciliationReport(
-      actorUserId,
-      parsedLimit,
-    );
+    return this.walletsService.exportDailyReconciliationReport(actorUserId, parsedLimit);
   }
 
   /**
@@ -232,5 +237,4 @@ export class WalletsController {
     const parsedOffset = offset ? parseInt(offset, 10) : 0;
     return this.walletsService.getAdminAdjustmentHistory(userId, parsedLimit, parsedOffset);
   }
-
 }

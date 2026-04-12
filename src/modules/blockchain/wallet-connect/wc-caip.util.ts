@@ -1,10 +1,10 @@
-import { BadRequestException } from '@/common/exceptions';
-import { BlockchainNetwork } from '@/common/enums';
 import {
   EVM_CHAIN_DEFINITIONS,
   evmCaip2,
   isEvmBlockchainNetwork,
 } from '@/common/constants/evm-chain-definitions';
+import { BlockchainNetwork } from '@/common/enums';
+import { BadRequestException } from '@/common/exceptions';
 
 /** CAIP-2 for WalletConnect init / session validation (EVM + Solana + Tron). */
 export function wcCaip2ForChain(chain: BlockchainNetwork): string {

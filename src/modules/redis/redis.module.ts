@@ -1,6 +1,6 @@
-import { Module, Global } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { RedisService, CacheService } from '@/common/services';
+import { CacheService, RedisService } from '@/common/services';
 
 /**
  * Redis Module

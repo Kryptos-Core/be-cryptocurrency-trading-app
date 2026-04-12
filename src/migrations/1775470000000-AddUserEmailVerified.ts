@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * email_verified: đã chứng minh quyền sở hữu inbox (OTP) — bật 2FA hoặc xác minh email liên hệ (ví).

@@ -1,8 +1,6 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateTreasuryWalletsAndOperations1775300000000
-  implements MigrationInterface
-{
+export class CreateTreasuryWalletsAndOperations1775300000000 implements MigrationInterface {
   name = 'CreateTreasuryWalletsAndOperations1775300000000';
 
   private async addForeignKeyIfNotExists(queryRunner: QueryRunner, sql: string): Promise<void> {
@@ -39,10 +37,19 @@ export class CreateTreasuryWalletsAndOperations1775300000000
     try {
       await queryRunner.query(sql);
     } catch (e: unknown) {
-      const err = e as { code?: string; errno?: number; driverError?: { code?: string; errno?: number } };
+      const err = e as {
+        code?: string;
+        errno?: number;
+        driverError?: { code?: string; errno?: number };
+      };
       const errno = err.driverError?.errno ?? err.errno;
       const code = err.driverError?.code ?? err.code;
-      if (errno === 3780 || errno === 1826 || code === 'ER_FK_INCOMPATIBLE_COLUMNS' || code === 'ER_FK_DUP_NAME') {
+      if (
+        errno === 3780 ||
+        errno === 1826 ||
+        code === 'ER_FK_INCOMPATIBLE_COLUMNS' ||
+        code === 'ER_FK_DUP_NAME'
+      ) {
         return;
       }
       throw e;

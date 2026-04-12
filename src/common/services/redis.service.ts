@@ -1,6 +1,6 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis, { RedisOptions } from 'ioredis';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import Redis, { type RedisOptions } from 'ioredis';
 
 /**
  * Redis Service
@@ -18,11 +18,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const config = this.getRedisConfig();
-    
+
     // Main client for general operations
     // ioredis will auto-connect when instantiated
     this.client = new Redis(config);
-    
+
     // Separate clients for pub/sub
     this.subscriber = new Redis(config);
     this.publisher = new Redis(config);
@@ -35,7 +35,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     // Wait for connections to be ready (ioredis auto-connects)
     // Add timeout to prevent blocking if Redis is unavailable
     const connectionTimeout = 10000; // 10 seconds
-    
+
     try {
       await Promise.race([
         Promise.all([
@@ -71,16 +71,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           }),
         ]),
         new Promise<void>((_, reject) =>
-          setTimeout(
-            () => reject(new Error('Redis connection timeout')),
-            connectionTimeout,
-          ),
+          setTimeout(() => reject(new Error('Redis connection timeout')), connectionTimeout),
         ),
       ]);
       this.logger.log('Redis connections established');
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to establish Redis connections: ${errorMessage}`);
       // Don't throw - allow app to start without Redis (graceful degradation)
       // Redis will retry to connect automatically
@@ -88,11 +84,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await Promise.all([
-      this.client?.quit(),
-      this.subscriber?.quit(),
-      this.publisher?.quit(),
-    ]);
+    await Promise.all([this.client?.quit(), this.subscriber?.quit(), this.publisher?.quit()]);
     this.logger.log('Redis connections closed');
   }
 

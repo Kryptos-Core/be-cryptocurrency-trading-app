@@ -1,5 +1,5 @@
-import { OrderValidationStrategy } from './order-validation.strategy';
 import { BusinessException, ValidationException } from '@/common/exceptions';
+import { OrderValidationStrategy } from './order-validation.strategy';
 
 describe('OrderValidationStrategy', () => {
   const strategy = new OrderValidationStrategy();

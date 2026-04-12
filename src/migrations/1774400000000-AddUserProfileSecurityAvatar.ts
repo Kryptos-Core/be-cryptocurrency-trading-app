@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: User profile basic update, security change requests (approval flow), avatar columns.
@@ -94,7 +94,9 @@ export class AddUserProfileSecurityAvatar1774400000000 implements MigrationInter
     `);
 
     // 6. sp_user_security_change_request_find_pending
-    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_security_change_request_find_pending');
+    await queryRunner.query(
+      'DROP PROCEDURE IF EXISTS sp_user_security_change_request_find_pending',
+    );
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_security_change_request_find_pending()
       READS SQL DATA
@@ -185,7 +187,9 @@ export class AddUserProfileSecurityAvatar1774400000000 implements MigrationInter
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_security_change_request_review');
-    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_security_change_request_find_pending');
+    await queryRunner.query(
+      'DROP PROCEDURE IF EXISTS sp_user_security_change_request_find_pending',
+    );
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_security_change_request_create');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_update_avatar');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_update_profile_basic');

@@ -1,24 +1,20 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { Currency } from './currency.entity';
+import { User } from './user.entity';
 import { Wallet } from './wallet.entity';
 
 @Entity('wallet_ledger')
-@Index('uk_ledger_ref', [
-  'ref_type',
-  'ref_id',
-  'user_id',
-  'currency_id',
-  'direction',
-], { unique: true })
+@Index('uk_ledger_ref', ['ref_type', 'ref_id', 'user_id', 'currency_id', 'direction'], {
+  unique: true,
+})
 @Index('idx_ledger_user_time', ['user_id', 'created_at'])
 @Index('idx_ledger_ref', ['ref_type', 'ref_id'])
 export class WalletLedger {
@@ -49,7 +45,6 @@ export class WalletLedger {
       'EXTERNAL_DEPOSIT',
       'EXTERNAL_WITHDRAWAL',
       'EXTERNAL_SYNC',
-
     ],
   })
   ref_type!:
@@ -80,9 +75,13 @@ export class WalletLedger {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.wallet_ledgers, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => User,
+    (user) => user.wallet_ledgers,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   user!: User;
 
   @ManyToOne('Currency')

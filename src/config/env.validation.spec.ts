@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { assertOnchainSandboxRpcOrThrow, validateEnvironment } from './env.validation';
 import { Environment } from '@/common/enums';
+import { assertOnchainSandboxRpcOrThrow, validateEnvironment } from './env.validation';
 
 function minimalValidConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -31,9 +31,7 @@ describe('validateEnvironment', () => {
 
   it('accepts NODE_ENV=staging when required DB and JWT are present', () => {
     expect(() =>
-      validateEnvironment(
-        minimalValidConfig({ NODE_ENV: Environment.Staging }),
-      ),
+      validateEnvironment(minimalValidConfig({ NODE_ENV: Environment.Staging })),
     ).not.toThrow();
   });
 

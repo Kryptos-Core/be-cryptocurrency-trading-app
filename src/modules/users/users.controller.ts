@@ -1,53 +1,53 @@
 import {
-  Controller,
-  Get,
-  Patch,
-  Post,
-  Delete,
-  Param,
-  Body,
-  Query,
-  UseGuards,
-  ParseIntPipe,
-  UseInterceptors,
-  UploadedFile,
   BadRequestException,
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
-  DefaultValuePipe,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
-  ApiTags,
-  ApiOperation,
   ApiBearerAuth,
-  ApiQuery,
-  ApiParam,
   ApiBody,
   ApiConsumes,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
 } from '@nestjs/swagger';
-import { UsersService } from './users.service';
-import { ContactEmailVerificationService } from './contact-email-verification.service';
 import {
-  UpdateUserDto,
-  UpdateMyProfileBasicDto,
-  RequestSecurityChangeDto,
-  ReviewSecurityChangeDto,
-  UserFilterDto,
-  SendContactEmailOtpDto,
-  VerifyContactEmailDto,
-} from './dto';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { CurrentUser } from '@/common/decorators';
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiSuccessResponse,
+  ApiUnauthorizedResponse,
+  CurrentUser,
+} from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
-import {
-  ApiSuccessResponse,
-  ApiBadRequestResponse,
-  ApiUnauthorizedResponse,
-  ApiNotFoundResponse,
-} from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type { ContactEmailVerificationService } from './contact-email-verification.service';
+import {
+  RequestSecurityChangeDto,
+  ReviewSecurityChangeDto,
+  SendContactEmailOtpDto,
+  UpdateMyProfileBasicDto,
+  UpdateUserDto,
+  type UserFilterDto,
+  VerifyContactEmailDto,
+} from './dto';
+import type { UsersService } from './users.service';
 
 /**
  * Users Controller
@@ -74,7 +74,12 @@ export class UsersController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search email, first_name, last_name' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search email, first_name, last_name',
+  })
   @ApiQuery({ name: 'email', required: false, type: String, description: 'Exact email match' })
   @ApiQuery({
     name: 'role',
@@ -118,7 +123,7 @@ export class UsersController {
   @Get('me')
   @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Retrieve the authenticated user\'s profile information',
+    description: "Retrieve the authenticated user's profile information",
   })
   @ApiSuccessResponse('User profile retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
@@ -419,7 +424,7 @@ export class UsersController {
   @Patch('me')
   @ApiOperation({
     summary: 'Update current user',
-    description: 'Update the authenticated user\'s profile information',
+    description: "Update the authenticated user's profile information",
   })
   @ApiBody({ type: UpdateUserDto })
   @ApiSuccessResponse('User updated successfully')
@@ -494,7 +499,11 @@ export class UsersController {
   @ApiParam({ name: 'id', type: String })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'],
+  })
   @ApiSuccessResponse('User orders retrieved successfully')
   @ApiNotFoundResponse('User not found')
   @ApiUnauthorizedResponse('Unauthorized')

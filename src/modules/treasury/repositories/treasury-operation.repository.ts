@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, In, QueryDeepPartialEntity } from 'typeorm';
+import { type DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
-import { ListTreasuryOperationsDto } from '../dto';
+import { TreasuryOperation } from '@/entities/treasury-operation.entity';
+import type { ListTreasuryOperationsDto } from '../dto';
 
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
@@ -66,7 +66,9 @@ export class TreasuryOperationRepository {
     operationId: string,
     partial: QueryDeepPartialEntity<TreasuryOperation>,
   ): Promise<void> {
-    await this.dataSource.getRepository(TreasuryOperation).update({ operation_id: operationId }, partial);
+    await this.dataSource
+      .getRepository(TreasuryOperation)
+      .update({ operation_id: operationId }, partial);
   }
 
   async listWithFilters(filter: ListTreasuryOperationsDto): Promise<{

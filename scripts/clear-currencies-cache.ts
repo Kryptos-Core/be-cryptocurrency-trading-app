@@ -14,10 +14,10 @@ async function clearCurrenciesCache() {
 
   try {
     console.log('Clearing currencies cache...');
-    
+
     // Invalidate all currencies cache
     await cacheService.invalidatePattern('currencies:*');
-    
+
     console.log('Currencies cache cleared successfully!');
     console.log('You can now test the API - it will fetch fresh data from database');
   } catch (error) {

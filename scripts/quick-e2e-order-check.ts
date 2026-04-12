@@ -3,8 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { AppModule } from '@/app.module';
-import { OrdersService } from '@/modules/orders/orders.service';
 import { CreateOrderCommand } from '@/modules/orders/commands/create-order.command';
+import { OrdersService } from '@/modules/orders/orders.service';
 
 function nowTag(): string {
   return Date.now().toString().slice(-8);
@@ -191,9 +191,7 @@ async function main() {
         amount: fokRow?.amount,
         filledAmount: fokRow?.filled_amount,
         reservedQuote: fokRow?.reserved_quote,
-        pass:
-          fokRow?.status === 'CANCELLED' &&
-          Number(fokRow?.filled_amount ?? 0) === 0,
+        pass: fokRow?.status === 'CANCELLED' && Number(fokRow?.filled_amount ?? 0) === 0,
       },
       ioc: {
         orderId: iocOrder.order_id,
@@ -219,7 +217,6 @@ async function main() {
       },
     };
 
-    // eslint-disable-next-line no-console
     console.log(JSON.stringify(result, null, 2));
 
     const allPass = result.fok.pass && result.ioc.pass && result.ledger.pass;
@@ -228,10 +225,7 @@ async function main() {
     }
   } finally {
     // Cleanup test data
-    await dataSource.query(
-      'DELETE FROM wallet_ledger WHERE user_id IN (?, ?, ?)',
-      testUserIds,
-    );
+    await dataSource.query('DELETE FROM wallet_ledger WHERE user_id IN (?, ?, ?)', testUserIds);
 
     if (createdTradeIds.length > 0) {
       await dataSource.query(
@@ -247,30 +241,22 @@ async function main() {
       );
     }
 
-    await dataSource.query(
-      'DELETE FROM wallets WHERE user_id IN (?, ?, ?)',
-      testUserIds,
-    );
+    await dataSource.query('DELETE FROM wallets WHERE user_id IN (?, ?, ?)', testUserIds);
 
-    await dataSource.query('DELETE FROM market_pairs WHERE pair_id = ?', [
-      ids.pairId,
+    await dataSource.query('DELETE FROM market_pairs WHERE pair_id = ?', [ids.pairId]);
+
+    await dataSource.query('DELETE FROM currencies WHERE currency_id IN (?, ?)', [
+      ids.baseCurrencyId,
+      ids.quoteCurrencyId,
     ]);
 
-    await dataSource.query(
-      'DELETE FROM currencies WHERE currency_id IN (?, ?)',
-      [ids.baseCurrencyId, ids.quoteCurrencyId],
-    );
-
-    await dataSource.query('DELETE FROM users WHERE user_id IN (?, ?, ?)', [
-      ...testUserIds,
-    ]);
+    await dataSource.query('DELETE FROM users WHERE user_id IN (?, ?, ?)', [...testUserIds]);
 
     await app.close();
   }
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

@@ -1,5 +1,5 @@
-import { BlockchainNetwork } from '@/common/enums';
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
+import { BlockchainNetwork } from '@/common/enums';
 
 /** Static EVM metadata for JsonRpcProvider instances (RPC key + chainId + treasury row code). */
 export interface EvmChainDefinition {
@@ -183,7 +183,9 @@ export function getEvmChainDefinition(network: BlockchainNetwork): EvmChainDefin
 }
 
 /** Resolve static EVM metadata by treasury / DB chain code (e.g. POLYGON_MAINNET). */
-export function getEvmDefinitionByTreasuryChain(treasuryChain: string): EvmChainDefinition | undefined {
+export function getEvmDefinitionByTreasuryChain(
+  treasuryChain: string,
+): EvmChainDefinition | undefined {
   return EVM_CHAIN_DEFINITIONS.find((d) => d.treasuryChain === treasuryChain);
 }
 

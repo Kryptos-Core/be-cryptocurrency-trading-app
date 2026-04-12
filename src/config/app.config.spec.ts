@@ -1,7 +1,7 @@
 import 'reflect-metadata';
+import { Environment } from '@/common/enums';
 import { createAppConfig } from './app.config';
 import { validateEnvironment } from './env.validation';
-import { Environment } from '@/common/enums';
 
 function minimalValidEnv(): Record<string, unknown> {
   return {

@@ -1,13 +1,13 @@
 /// <reference types="jest" />
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Test, TestingModule } from '@nestjs/testing';
-import { CacheService } from '../../../common/services';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { BusinessException } from '../../../common/exceptions';
+import { CacheService } from '../../../common/services';
+import type { MarketMakerConfig } from '../../../entities/market-maker-config.entity';
 import { MarketsService } from '../../markets/markets.service';
 import { OrdersService } from '../../orders/orders.service';
 import { MmOrderStrategyService } from './mm-order-strategy.service';
-import { MarketMakerConfig } from '../../../entities/market-maker-config.entity';
 
 describe('MmOrderStrategyService', () => {
   let service: MmOrderStrategyService;

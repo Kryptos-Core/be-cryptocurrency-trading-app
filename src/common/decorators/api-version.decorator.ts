@@ -6,10 +6,7 @@ import { ApiTags } from '@nestjs/swagger';
  * Adds version prefix and Swagger tag
  */
 export const ApiVersion = (version: string = 'v1') => {
-  return applyDecorators(
-    Controller(`api/${version}`),
-    ApiTags(`v${version}`),
-  );
+  return applyDecorators(Controller(`api/${version}`), ApiTags(`v${version}`));
 };
 
 /**

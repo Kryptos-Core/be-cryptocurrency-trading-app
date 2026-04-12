@@ -1,16 +1,16 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   ForeignKey,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { MarketPair } from './market-pair.entity';
+import { User } from './user.entity';
 
 @Entity('market_maker_configs')
 @Index('uk_mm_cfg_user_pair', ['user_id', 'pair_id'], { unique: true })

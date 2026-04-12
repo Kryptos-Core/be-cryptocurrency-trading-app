@@ -1,11 +1,11 @@
-export { EventStore } from './event-store';
 export type {
   OrderBookEvent,
-  OrderPlacedEvent,
   OrderCancelledEvent,
-  TradeExecutedEvent,
+  OrderPlacedEvent,
   StoredEvent,
+  TradeExecutedEvent,
 } from './event-store';
-export { OrderBookProjection } from './order-book-projection';
-export type { ProjectedOrder, ProjectedOrderBook } from './order-book-projection';
+export { EventStore } from './event-store';
 export { EventStoreVisitor } from './event-store-visitor';
+export type { ProjectedOrder, ProjectedOrderBook } from './order-book-projection';
+export { OrderBookProjection } from './order-book-projection';

@@ -1,10 +1,14 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ethers } from 'ethers';
-import { TronWeb } from 'tronweb';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { ethers } from 'ethers';
+import { TronWeb } from 'tronweb';
 import { uuidv7 } from 'uuidv7';
-import { WalletEncryptionService } from '@/common/services';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
+import { UserRole } from '@/common/enums';
 import {
   BadRequestException,
   BusinessException,
@@ -12,22 +16,18 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@/common/exceptions';
-import { RedisService } from '@/common/services/redis.service';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import {
+import type { WalletEncryptionService } from '@/common/services';
+import type { RedisService } from '@/common/services/redis.service';
+import type {
   TreasuryMainWallet,
   TreasuryMainWalletChain,
   TreasuryMainWalletStatus,
 } from '@/entities/treasury-main-wallet.entity';
-import { TransactionWalletService } from './transaction-wallet.service';
-import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
-import { ImportMainWalletDto } from './dto';
-import {
-  BLOCKCHAIN_CHAIN_DB_VALUES,
-  type BlockchainChainDbValue,
-} from '@/common/constants/blockchain-chain-db';
-import { UserRole } from '@/common/enums';
+import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import type { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import type { ImportMainWalletDto } from './dto';
+import type { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
+import type { TransactionWalletService } from './transaction-wallet.service';
 
 export type SupportedTreasuryChain = TreasuryMainWalletChain;
 
@@ -143,8 +143,8 @@ export class TreasuryMainWalletService implements OnModuleInit {
 
     if (!wallet) {
       throw new BusinessException(
-        `No active default main wallet configured for chain ${chain}. `
-        + `Import via POST /treasury/main-wallets (Finance/Admin activates immediately).`,
+        `No active default main wallet configured for chain ${chain}. ` +
+          `Import via POST /treasury/main-wallets (Finance/Admin activates immediately).`,
         'TREASURY_MAIN_WALLET_NOT_CONFIGURED',
       );
     }
@@ -180,8 +180,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       );
     }
 
-    const selfActivate =
-      actorRole === UserRole.FINANCE_MANAGER || actorRole === UserRole.ADMIN;
+    const selfActivate = actorRole === UserRole.FINANCE_MANAGER || actorRole === UserRole.ADMIN;
 
     let status: TreasuryMainWalletStatus;
     let approvedBy: string | null;
@@ -250,10 +249,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Risk Officer approves a pending main wallet.
    * If no active default exists for this chain → auto-set as default.
    */
-  async approveMainWallet(
-    mainWalletId: string,
-    approverUserId: string,
-  ): Promise<MainWalletDto> {
+  async approveMainWallet(mainWalletId: string, approverUserId: string): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'PENDING_APPROVAL') {
@@ -291,10 +287,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
   /**
    * Risk Officer rejects a pending main wallet.
    */
-  async rejectMainWallet(
-    mainWalletId: string,
-    rejectorUserId: string,
-  ): Promise<MainWalletDto> {
+  async rejectMainWallet(mainWalletId: string, rejectorUserId: string): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'PENDING_APPROVAL') {
@@ -337,7 +330,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
 
     const updated = await this.mainWalletRepository.findByMainWalletId(mainWalletId);
 
-    this.logger.log(`Main wallet set as default: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
+    this.logger.log(
+      `Main wallet set as default: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`,
+    );
     await this.publishEvent('main_wallet.default_changed', {
       mainWalletId,
       chain: wallet.chain,
@@ -351,7 +346,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
   /**
    * Returns decrypted private key — caller must enforce MFA (controller).
    */
-  async revealPrivateKey(mainWalletId: string, actorUserId: string): Promise<{ privateKey: string }> {
+  async revealPrivateKey(
+    mainWalletId: string,
+    actorUserId: string,
+  ): Promise<{ privateKey: string }> {
     const wallet = await this.getById(mainWalletId);
     const privateKey = this.decryptPrivateKey(wallet);
     this.logger.log(`Main wallet private key revealed (audit): ${mainWalletId} by ${actorUserId}`);
@@ -378,7 +376,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
    * Finance/Admin requests deletion — wallet becomes PENDING_DELETION until Risk approves.
    * Same default rule as hard delete: cannot request removal of default while other ACTIVE wallets exist.
    */
-  async requestMainWalletDeletion(mainWalletId: string, actorUserId: string): Promise<MainWalletDto> {
+  async requestMainWalletDeletion(
+    mainWalletId: string,
+    actorUserId: string,
+  ): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
 
     if (wallet.status !== 'ACTIVE') {
@@ -403,7 +404,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
     wallet.status = 'PENDING_DELETION';
     const updated = await this.mainWalletRepository.saveWallet(wallet);
 
-    this.logger.log(`Main wallet PENDING_DELETION: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
+    this.logger.log(
+      `Main wallet PENDING_DELETION: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`,
+    );
     await this.publishEvent('main_wallet.deletion_pending', {
       mainWalletId,
       chain: wallet.chain,
@@ -431,7 +434,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
   /**
    * Risk Officer: reject deletion request — wallet back to ACTIVE.
    */
-  async rejectMainWalletDeletion(mainWalletId: string, rejectorUserId: string): Promise<MainWalletDto> {
+  async rejectMainWalletDeletion(
+    mainWalletId: string,
+    rejectorUserId: string,
+  ): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
     if (wallet.status !== 'PENDING_DELETION') {
       throw new BadRequestException(
@@ -443,7 +449,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
     wallet.status = 'ACTIVE';
     const updated = await this.mainWalletRepository.saveWallet(wallet);
 
-    this.logger.log(`Main wallet deletion REJECTED (restored ACTIVE): ${mainWalletId} by ${rejectorUserId}`);
+    this.logger.log(
+      `Main wallet deletion REJECTED (restored ACTIVE): ${mainWalletId} by ${rejectorUserId}`,
+    );
     await this.publishEvent('main_wallet.deletion_rejected', {
       mainWalletId,
       chain: wallet.chain,
@@ -475,7 +483,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
 
     await this.mainWalletRepository.deleteByMainWalletId(mainWalletId);
 
-    this.logger.log(`Main wallet deleted: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`);
+    this.logger.log(
+      `Main wallet deleted: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`,
+    );
     await this.publishEvent('main_wallet.deleted', {
       mainWalletId,
       chain: wallet.chain,
@@ -521,7 +531,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
     let symbol = '';
     let usdtTrc20Balance: string | null = null;
     try {
-      const result = await this.transactionWalletService.getBalanceCached(w.chain as any, w.address);
+      const result = await this.transactionWalletService.getBalanceCached(
+        w.chain as any,
+        w.address,
+      );
       balance = result.balance;
       symbol = result.symbol;
       usdtTrc20Balance = result.usdtTrc20Balance ?? null;
@@ -565,26 +578,30 @@ export class TreasuryMainWalletService implements OnModuleInit {
         balance = r.balance;
         symbol = r.symbol;
         usdtTrc20Balance = r.usdtTrc20Balance ?? null;
-      } catch { /* best-effort */ }
-      return [{
-        mainWalletId: 'payment-config-default',
-        chain,
-        address,
-        label: null,
-        balance,
-        symbol,
-        usdtTrc20Balance,
-        isDefault: true,
-        status: 'ACTIVE',
-        createdBy: null,
-        approvedBy: null,
-        approvedAt: null,
-        rejectedBy: null,
-        rejectedAt: null,
-        lastRotatedAt: null,
-        rotationIntervalDays: null,
-        createdAt: new Date().toISOString(),
-      }];
+      } catch {
+        /* best-effort */
+      }
+      return [
+        {
+          mainWalletId: 'payment-config-default',
+          chain,
+          address,
+          label: null,
+          balance,
+          symbol,
+          usdtTrc20Balance,
+          isDefault: true,
+          status: 'ACTIVE',
+          createdBy: null,
+          approvedBy: null,
+          approvedAt: null,
+          rejectedBy: null,
+          rejectedAt: null,
+          lastRotatedAt: null,
+          rotationIntervalDays: null,
+          createdAt: new Date().toISOString(),
+        },
+      ];
     } catch {
       return [];
     }
@@ -666,11 +683,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       );
     };
 
-    if (
-      chain === 'ETH_MAINNET' ||
-      chain === 'BSC_MAINNET' ||
-      chain === 'BSC_CHAPEL'
-    ) {
+    if (chain === 'ETH_MAINNET' || chain === 'BSC_MAINNET' || chain === 'BSC_CHAPEL') {
       try {
         return new ethers.Wallet(privateKey).address;
       } catch {

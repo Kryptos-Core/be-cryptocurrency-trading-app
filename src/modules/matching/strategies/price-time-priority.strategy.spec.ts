@@ -1,11 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { PriceTimePriorityStrategy } from './price-time-priority.strategy';
-import {
+import { Test, type TestingModule } from '@nestjs/testing';
+import type {
   MatchingContext,
   OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
 } from '../interfaces';
+import { PriceTimePriorityStrategy } from './price-time-priority.strategy';
 
 function order(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {
@@ -36,7 +36,13 @@ describe('PriceTimePriorityStrategy', () => {
   });
 
   it('matches BUY taker with SELL maker when price crosses', async () => {
-    const maker = order({ order_id: 'm1', side: 'SELL', price: '99', remaining: '1', user_id: 'user-2' });
+    const maker = order({
+      order_id: 'm1',
+      side: 'SELL',
+      price: '99',
+      remaining: '1',
+      user_id: 'user-2',
+    });
     const orderBook = {
       peekBestMaker: jest.fn().mockReturnValueOnce(maker).mockReturnValueOnce(null),
       popBestMaker: jest.fn().mockReturnValueOnce(maker),
@@ -73,7 +79,13 @@ describe('PriceTimePriorityStrategy', () => {
   });
 
   it('does not match when price does not cross', async () => {
-    const maker = order({ order_id: 'm1', side: 'SELL', price: '101', remaining: '1', user_id: 'user-2' });
+    const maker = order({
+      order_id: 'm1',
+      side: 'SELL',
+      price: '101',
+      remaining: '1',
+      user_id: 'user-2',
+    });
     const orderBook = {
       peekBestMaker: jest.fn().mockReturnValue(maker),
       popBestMaker: jest.fn(),
@@ -95,7 +107,13 @@ describe('PriceTimePriorityStrategy', () => {
   });
 
   it('restores maker and stops when executeTrade returns null', async () => {
-    const maker = order({ order_id: 'm1', side: 'SELL', price: '100', remaining: '1', user_id: 'user-2' });
+    const maker = order({
+      order_id: 'm1',
+      side: 'SELL',
+      price: '100',
+      remaining: '1',
+      user_id: 'user-2',
+    });
     const orderBook = {
       peekBestMaker: jest.fn().mockReturnValueOnce(maker).mockReturnValueOnce(null),
       popBestMaker: jest.fn().mockReturnValueOnce(maker),
@@ -132,7 +150,13 @@ describe('PriceTimePriorityStrategy', () => {
       addOrder: jest.fn(),
     };
     const executeTrade = jest.fn();
-    const taker = order({ order_id: 'tk-self', side: 'BUY', price: '100', remaining: '1', user_id: 'user-1' });
+    const taker = order({
+      order_id: 'tk-self',
+      side: 'BUY',
+      price: '100',
+      remaining: '1',
+      user_id: 'user-1',
+    });
     const context: MatchingContext = {
       pairId,
       takerOrder: taker,
@@ -177,7 +201,13 @@ describe('PriceTimePriorityStrategy', () => {
       addOrder: jest.fn(),
     };
     const executeTrade = jest.fn().mockResolvedValue(tradeResult);
-    const taker = order({ order_id: 'tk-other', side: 'BUY', price: '100', remaining: '1', user_id: 'user-1' });
+    const taker = order({
+      order_id: 'tk-other',
+      side: 'BUY',
+      price: '100',
+      remaining: '1',
+      user_id: 'user-1',
+    });
     const context: MatchingContext = {
       pairId,
       takerOrder: taker,
@@ -194,11 +224,33 @@ describe('PriceTimePriorityStrategy', () => {
   it('computes fill amount exactly without floating-point error (0.1 + 0.2 precision)', async () => {
     // Classic float trap: 0.3 - 0.1 - 0.1 = 0.09999999999999998 in IEEE 754, not 0.1
     // When taker fills 0.1 twice, the third fill should be exactly '0.1', not '0.09999...'
-    const m1 = order({ order_id: 'm-dec-1', side: 'SELL', price: '1', remaining: '0.1', user_id: 'user-2' });
-    const m2 = order({ order_id: 'm-dec-2', side: 'SELL', price: '1', remaining: '0.1', user_id: 'user-2' });
-    const m3 = order({ order_id: 'm-dec-3', side: 'SELL', price: '1', remaining: '0.1', user_id: 'user-2' });
+    const m1 = order({
+      order_id: 'm-dec-1',
+      side: 'SELL',
+      price: '1',
+      remaining: '0.1',
+      user_id: 'user-2',
+    });
+    const m2 = order({
+      order_id: 'm-dec-2',
+      side: 'SELL',
+      price: '1',
+      remaining: '0.1',
+      user_id: 'user-2',
+    });
+    const m3 = order({
+      order_id: 'm-dec-3',
+      side: 'SELL',
+      price: '1',
+      remaining: '0.1',
+      user_id: 'user-2',
+    });
 
-    const makeTradeResult = (id: string, makerId: string, amount: string): TradeExecutionResult => ({
+    const makeTradeResult = (
+      id: string,
+      makerId: string,
+      amount: string,
+    ): TradeExecutionResult => ({
       trade_id: id,
       pair_id: pairId,
       maker_order_id: makerId,
@@ -212,23 +264,32 @@ describe('PriceTimePriorityStrategy', () => {
     });
 
     const orderBook = {
-      peekBestMaker: jest.fn()
+      peekBestMaker: jest
+        .fn()
         .mockReturnValueOnce(m1)
         .mockReturnValueOnce(m2)
         .mockReturnValueOnce(m3)
         .mockReturnValueOnce(null),
-      popBestMaker: jest.fn()
+      popBestMaker: jest
+        .fn()
         .mockReturnValueOnce(m1)
         .mockReturnValueOnce(m2)
         .mockReturnValueOnce(m3),
       addOrder: jest.fn(),
     };
-    const executeTrade = jest.fn()
+    const executeTrade = jest
+      .fn()
       .mockResolvedValueOnce(makeTradeResult('t1', 'm-dec-1', '0.1'))
       .mockResolvedValueOnce(makeTradeResult('t2', 'm-dec-2', '0.1'))
       .mockResolvedValueOnce(makeTradeResult('t3', 'm-dec-3', '0.1'));
 
-    const taker = order({ order_id: 'tk-dec', side: 'BUY', price: '2', remaining: '0.3', user_id: 'user-1' });
+    const taker = order({
+      order_id: 'tk-dec',
+      side: 'BUY',
+      price: '2',
+      remaining: '0.3',
+      user_id: 'user-1',
+    });
     const context: MatchingContext = {
       pairId,
       takerOrder: taker,

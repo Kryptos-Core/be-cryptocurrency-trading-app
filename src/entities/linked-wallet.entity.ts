@@ -1,15 +1,15 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   ForeignKey,
   Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
+import { User } from './user.entity';
 
 @Entity('linked_wallets')
 @Index('uk_linked_wallet_user_chain_addr', ['user_id', 'chain', 'address'], {
@@ -49,7 +49,11 @@ export class LinkedWallet {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.linked_wallets, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.linked_wallets,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'user_id' })
   user!: User;
 }

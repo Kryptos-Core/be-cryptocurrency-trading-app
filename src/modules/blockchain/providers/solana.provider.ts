@@ -1,28 +1,28 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { ConfigService } from '@nestjs/config';
 import {
   Connection,
-  PublicKey,
-  LAMPORTS_PER_SOL,
   Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
   SystemProgram,
-  Transaction,
   sendAndConfirmTransaction,
+  Transaction,
 } from '@solana/web3.js';
-import * as nacl from 'tweetnacl';
 import bs58 from 'bs58';
+import * as nacl from 'tweetnacl';
 import { BlockchainNetwork } from '@/common/enums';
-import {
-  IBlockchainProvider,
+import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
+import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import type { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
+  IBlockchainProvider,
 } from '../interfaces';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
-import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 
 export interface SolanaProviderBindings {
   network: BlockchainNetwork;
@@ -112,7 +112,8 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
       }
     }
 
-    const envKey = this.configService.get<string>('app.blockchain.solana.hotWalletPrivateKey') ?? '';
+    const envKey =
+      this.configService.get<string>('app.blockchain.solana.hotWalletPrivateKey') ?? '';
     if (!envKey) {
       throw new Error(
         'Solana hot wallet not configured. Add SOL gateway in payment configs, treasury main wallet, or env hot key.',
@@ -175,9 +176,8 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
         to: accountKeys?.[1]?.toBase58?.() ?? '',
         value: meta
           ? (
-              Math.abs(
-                (meta.preBalances?.[1] ?? 0) - (meta.postBalances?.[1] ?? 0),
-              ) / LAMPORTS_PER_SOL
+              Math.abs((meta.preBalances?.[1] ?? 0) - (meta.postBalances?.[1] ?? 0)) /
+              LAMPORTS_PER_SOL
             ).toString()
           : '0',
         blockNumber: tx.slot,

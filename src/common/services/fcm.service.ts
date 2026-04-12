@@ -1,8 +1,8 @@
-import { existsSync } from 'fs';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { existsSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
-import { isAbsolute, resolve } from 'path';
 
 /**
  * FCM Service
@@ -29,9 +29,7 @@ export class FcmService implements OnModuleInit {
     }
 
     const trimmed = rawPath.trim().replace(/^["']|["']$/g, '');
-    const accountPath = isAbsolute(trimmed)
-      ? resolve(trimmed)
-      : resolve(process.cwd(), trimmed);
+    const accountPath = isAbsolute(trimmed) ? resolve(trimmed) : resolve(process.cwd(), trimmed);
 
     if (!existsSync(accountPath)) {
       this.logger.warn(

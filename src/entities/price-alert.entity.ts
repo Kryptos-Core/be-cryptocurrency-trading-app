@@ -1,14 +1,14 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { MarketPair } from './market-pair.entity';
+import { User } from './user.entity';
 
 @Entity('price_alerts')
 @Index('idx_alert_user', ['user_id', 'is_active'])
@@ -40,11 +40,19 @@ export class PriceAlert {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.price_alerts, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.price_alerts,
+    { onDelete: 'CASCADE' },
+  )
   user!: User;
 
-  @ManyToOne(() => MarketPair, (pair) => pair.price_alerts, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => MarketPair,
+    (pair) => pair.price_alerts,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   pair!: MarketPair;
 }

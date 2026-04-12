@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Recreate user and wallet stored procedures for UUID v7 schema.
@@ -235,11 +235,26 @@ export class RecreateUsersAndWalletsProceduresUuidV71768227800000 implements Mig
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const userProcs = ['sp_user_email_exists', 'sp_user_get_statistics', 'sp_user_delete', 'sp_user_update', 'sp_user_create', 'sp_user_count', 'sp_user_find_all', 'sp_user_find_by_email', 'sp_user_find_by_id'];
+    const userProcs = [
+      'sp_user_email_exists',
+      'sp_user_get_statistics',
+      'sp_user_delete',
+      'sp_user_update',
+      'sp_user_create',
+      'sp_user_count',
+      'sp_user_find_all',
+      'sp_user_find_by_email',
+      'sp_user_find_by_id',
+    ];
     for (const name of userProcs) {
       await queryRunner.query(`DROP PROCEDURE IF EXISTS \`${name}\``);
     }
-    const walletProcs = ['sp_wallet_ledger_create', 'sp_wallet_apply_balance_delta', 'sp_wallet_get_or_create_for_update', 'sp_wallet_find_by_user_currency'];
+    const walletProcs = [
+      'sp_wallet_ledger_create',
+      'sp_wallet_apply_balance_delta',
+      'sp_wallet_get_or_create_for_update',
+      'sp_wallet_find_by_user_currency',
+    ];
     for (const name of walletProcs) {
       await queryRunner.query(`DROP PROCEDURE IF EXISTS \`${name}\``);
     }

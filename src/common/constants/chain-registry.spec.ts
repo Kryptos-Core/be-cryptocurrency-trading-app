@@ -45,7 +45,9 @@ describe('chain-registry', () => {
 
 describe('evm-chain-definitions', () => {
   it('defines an entry for every EVM enum member', () => {
-    const evmEnumMembers = Object.values(BlockchainNetwork).filter((n) => isEvmBlockchainNetwork(n));
+    const evmEnumMembers = Object.values(BlockchainNetwork).filter((n) =>
+      isEvmBlockchainNetwork(n),
+    );
     expect(new Set(evmEnumMembers).size).toBe(EVM_CHAIN_DEFINITIONS.length);
   });
 

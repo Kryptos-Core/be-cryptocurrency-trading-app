@@ -1,8 +1,8 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { MatchingService } from './matching.service';
-import { MATCHING_QUEUE, MATCH_ORDER_JOB, MatchOrderJobData } from './matching-queue.service';
+import type { Job } from 'bull';
+import type { MatchingService } from './matching.service';
+import { MATCH_ORDER_JOB, MATCHING_QUEUE, type MatchOrderJobData } from './matching-queue.service';
 
 /**
  * MatchingProcessor — Bull queue consumer.
@@ -18,12 +18,20 @@ export class MatchingProcessor {
 
   @Process({ name: MATCH_ORDER_JOB, concurrency: 1 })
   async handleMatch(job: Job<MatchOrderJobData>): Promise<void> {
-    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } = job.data;
+    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } =
+      job.data;
     this.logger.debug(
       `Processing match job ${job.id} — order=${takerOrder.order_id} pair=${pairId}`,
     );
     try {
-      await this.matchingService.runMatch({ takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance });
+      await this.matchingService.runMatch({
+        takerOrder,
+        pairId,
+        feeCurrencyId,
+        makerFeeRate,
+        takerFeeRate,
+        slippageTolerance,
+      });
     } catch (error) {
       this.logger.error(
         `Match job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,

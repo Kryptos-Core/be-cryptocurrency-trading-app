@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Adds EVM L1/L2 chains, Ethereum Sepolia (sandbox L1), and TON codes to MySQL chain ENUMs.
@@ -24,7 +24,7 @@ export class ExpandMultichainEvmAndTon1775620000000 implements MigrationInterfac
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     throw new Error('ExpandMultichainEvmAndTon1775620000000 down() is not supported');
   }
 }

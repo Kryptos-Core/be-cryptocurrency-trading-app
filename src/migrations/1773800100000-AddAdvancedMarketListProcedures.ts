@@ -1,12 +1,10 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Add advanced market list/count stored procedures.
  * Repository Pattern + Database Procedure Pattern: advanced query logic in DB layer.
  */
-export class AddAdvancedMarketListProcedures1773800100000
-  implements MigrationInterface
-{
+export class AddAdvancedMarketListProcedures1773800100000 implements MigrationInterface {
   name = 'AddAdvancedMarketListProcedures1773800100000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

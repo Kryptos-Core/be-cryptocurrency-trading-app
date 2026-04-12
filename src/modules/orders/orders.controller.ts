@@ -1,26 +1,25 @@
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  ParseIntPipe,
+  Post,
   Query,
   UseGuards,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiQuery,
-  ApiParam,
-} from '@nestjs/swagger';
-import { OrdersService } from './orders.service';
-import { CreateOrderDto, CancelOrderDto, CreateBatchOrderDto, CancelBatchOrderDto } from './dto';
-import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
-import { CurrentUser, RequireRoles, RequirePermissions } from '@/common/decorators';
-import { UserRole, Permission } from '@/common/enums';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
+import { Permission, UserRole } from '@/common/enums';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type {
+  CancelBatchOrderDto,
+  CancelOrderDto,
+  CreateBatchOrderDto,
+  CreateOrderDto,
+} from './dto';
+import type { OrdersService } from './orders.service';
 
 /**
  * Orders Controller
@@ -34,11 +33,11 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create order', description: 'Create a new buy/sell order (idempotent by idempotencyKey).' })
-  async create(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: CreateOrderDto,
-  ) {
+  @ApiOperation({
+    summary: 'Create order',
+    description: 'Create a new buy/sell order (idempotent by idempotencyKey).',
+  })
+  async create(@CurrentUser('userId') userId: string, @Body() dto: CreateOrderDto) {
     return this.ordersService.create({
       userId,
       dto,
@@ -52,10 +51,7 @@ export class OrdersController {
     summary: 'Market Maker: Place multiple orders at once',
     description: 'Place a bounded batch of orders in one request.',
   })
-  async createBatch(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: CreateBatchOrderDto,
-  ) {
+  async createBatch(@CurrentUser('userId') userId: string, @Body() dto: CreateBatchOrderDto) {
     return this.ordersService.createBatch({ userId, dto });
   }
 
@@ -70,7 +66,11 @@ export class OrdersController {
   })
   @ApiQuery({ name: 'userId', required: false, type: String })
   @ApiQuery({ name: 'pairId', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'],
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAllAdmin(
@@ -115,10 +115,17 @@ export class OrdersController {
   }
 
   @Get('my')
-  @ApiOperation({ summary: 'My orders', description: 'List current user orders with optional status filter.' })
+  @ApiOperation({
+    summary: 'My orders',
+    description: 'List current user orders with optional status filter.',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED', 'REJECTED'],
+  })
   async findMyOrders(
     @CurrentUser('userId') userId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
@@ -131,10 +138,7 @@ export class OrdersController {
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order', description: 'Get one order by ID (own orders only).' })
   @ApiParam({ name: 'orderId', type: String, description: 'Order UUID' })
-  async findOne(
-    @CurrentUser('userId') userId: string,
-    @Param('orderId') orderId: string,
-  ) {
+  async findOne(@CurrentUser('userId') userId: string, @Param('orderId') orderId: string) {
     return this.ordersService.findOne(orderId, userId);
   }
 
@@ -160,10 +164,7 @@ export class OrdersController {
     summary: 'Cancel multiple orders at once',
     description: 'Cancel a bounded list of open/partial orders owned by current user.',
   })
-  async cancelBatch(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: CancelBatchOrderDto,
-  ) {
+  async cancelBatch(@CurrentUser('userId') userId: string, @Body() dto: CancelBatchOrderDto) {
     return this.ordersService.cancelBatch({ userId, dto });
   }
 }

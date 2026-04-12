@@ -1,5 +1,14 @@
-import { IsEnum, IsString, IsNotEmpty, IsOptional, IsInt, Min, Max, IsObject } from 'class-validator';
-import { PaymentMethodType } from '@/entities/payment-method-config.entity';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import type { PaymentMethodType } from '@/entities/payment-method-config.entity';
 
 export class CreatePaymentConfigDto {
   @IsEnum(['PAYOS', 'ETH', 'TRON', 'SOL'])

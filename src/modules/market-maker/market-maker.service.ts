@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { NotFoundException } from '@/common/exceptions';
-import { CacheService } from '@/common/services';
-import { MarketsService } from '@/modules/markets/markets.service';
-import { OrdersService } from '@/modules/orders/orders.service';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { CacheService } from '@/common/services';
 import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
-import { UpsertMarketMakerConfigDto } from './dto';
-import { MarketMakerConfigRepository } from './repositories';
-import { MmOrderStrategyService } from './services/mm-order-strategy.service';
+import type { MarketsService } from '@/modules/markets/markets.service';
+import type { OrdersService } from '@/modules/orders/orders.service';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { UpsertMarketMakerConfigDto } from './dto';
+import type { MarketMakerConfigRepository } from './repositories';
+import type { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 const MM_REFRESH_IDEMPOTENCY_TTL_SEC = 300;
 
@@ -30,15 +30,14 @@ export class MarketMakerService {
   /** Defaults for MM config form when no row exists (system_configs + env fallbacks). */
   async getFormDefaults() {
     const spread = await this.systemConfigService.get<number>('MM_DEFAULT_SPREAD_BPS');
-    const alert = await this.systemConfigService.get<number>('MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS');
+    const alert = await this.systemConfigService.get<number>(
+      'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',
+    );
     const orderAmt = await this.systemConfigService.get<string>('MM_DEFAULT_ORDER_AMOUNT');
     const spreadBps = spread != null && Number.isFinite(spread) ? spread : 10;
-    const alertBps =
-      alert != null && Number.isFinite(alert) ? alert : 20;
+    const alertBps = alert != null && Number.isFinite(alert) ? alert : 20;
     const order =
-      orderAmt != null && String(orderAmt).trim().length > 0
-        ? String(orderAmt).trim()
-        : '0.001';
+      orderAmt != null && String(orderAmt).trim().length > 0 ? String(orderAmt).trim() : '0.001';
     return {
       spread_bps: spreadBps,
       spread_alert_threshold_bps: alertBps,

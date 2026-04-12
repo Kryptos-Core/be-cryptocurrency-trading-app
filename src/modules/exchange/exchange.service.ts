@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { IExchangeProvider } from './interfaces/exchange.interface';
-import { BinanceExchangeService } from './binance/binance.service';
-import { MockExchangeService } from './mock/mock-exchange.service';
+import type { ConfigService } from '@nestjs/config';
+import type { BinanceExchangeService } from './binance/binance.service';
+import type { IExchangeProvider } from './interfaces/exchange.interface';
+import type { MockExchangeService } from './mock/mock-exchange.service';
 
 /**
  * Exchange Service

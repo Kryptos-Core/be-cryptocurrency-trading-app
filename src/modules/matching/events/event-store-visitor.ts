@@ -6,8 +6,8 @@
  * Converts TradeExecutionResult into a TradeExecutedEvent and appends it.
  */
 
-import { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
-import { EventStore, TradeExecutedEvent } from './event-store';
+import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
+import type { EventStore, TradeExecutedEvent } from './event-store';
 
 export class EventStoreVisitor implements ITradeResultVisitor {
   constructor(private readonly store: EventStore) {}

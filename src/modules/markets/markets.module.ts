@@ -1,12 +1,12 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MarketsService } from './markets.service';
-import { MarketsController } from './markets.controller';
-import { MarketRepository } from './repositories';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
-import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
 import { MatchingModule } from '@/modules/matching/matching.module';
+import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
+import { MarketsController } from './markets.controller';
+import { MarketsService } from './markets.service';
+import { MarketRepository } from './repositories';
 
 /**
  * Markets Module

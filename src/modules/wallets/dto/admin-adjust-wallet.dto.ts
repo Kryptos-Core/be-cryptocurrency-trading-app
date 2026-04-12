@@ -1,14 +1,13 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsNotEmpty,
   IsOptional,
-  IsPositive,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export type AdjustmentType = 'DEPOSIT' | 'WITHDRAW';
 

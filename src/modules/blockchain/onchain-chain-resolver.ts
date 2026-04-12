@@ -1,8 +1,4 @@
-import {
-  BlockchainNetwork,
-  OnChainNetworkFamily,
-  OnChainOperatorMode,
-} from '@/common/enums';
+import { BlockchainNetwork, OnChainNetworkFamily, OnChainOperatorMode } from '@/common/enums';
 
 /**
  * Map UI / ops "family" + deployment mode to the concrete chain enum stored in DB and used for WC CAIP-2.

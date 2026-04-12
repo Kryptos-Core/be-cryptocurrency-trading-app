@@ -1,8 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ManagedWalletsService } from './managed-wallets.service';
 import { Public } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
+import type { ManagedWalletsService } from './managed-wallets.service';
 
 @ApiTags('deposit')
 @Controller('deposit')

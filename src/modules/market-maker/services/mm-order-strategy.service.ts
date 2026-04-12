@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { CacheService } from '@/common/services';
 import { BusinessException } from '@/common/exceptions';
-import { MarketsService } from '@/modules/markets/markets.service';
-import { OrdersService } from '@/modules/orders/orders.service';
-import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
+import type { CacheService } from '@/common/services';
+import type { MarketMakerConfig } from '@/entities/market-maker-config.entity';
+import type { MarketsService } from '@/modules/markets/markets.service';
+import type { OrdersService } from '@/modules/orders/orders.service';
 
 interface RedisTickerPayload {
   last_price?: string;
@@ -38,7 +38,10 @@ export class MmOrderStrategyService {
     const sellPrice = this.roundByScale(midPrice * (1 + spreadFraction / 2), pair.price_scale);
 
     if (buyPrice <= 0 || sellPrice <= 0 || buyPrice >= sellPrice) {
-      throw new BusinessException('Invalid spread configuration for current market price', 'MM_INVALID_SPREAD');
+      throw new BusinessException(
+        'Invalid spread configuration for current market price',
+        'MM_INVALID_SPREAD',
+      );
     }
 
     const amount = (orderAmountOverride ?? config.order_amount).trim();

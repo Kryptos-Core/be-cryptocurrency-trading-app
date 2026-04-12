@@ -1,29 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { DataSource } from 'typeorm';
-import { UsersRepository } from './repositories';
-import { CloudinaryService } from '@/common/services';
-import { TwoFaService } from '@/modules/auth/two-fa.service';
-import {
-  UpdateUserDto,
-  UpdateMyProfileBasicDto,
-  RequestSecurityChangeDto,
-  ReviewSecurityChangeDto,
-  UserFilterDto,
-} from './dto';
-import { User } from '@/entities/user.entity';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
+import type { DataSource } from 'typeorm';
+import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
+import type { CloudinaryService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import { WalletsService } from '@/modules/wallets/wallets.service';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { User } from '@/entities/user.entity';
+import type { TwoFaService } from '@/modules/auth/two-fa.service';
+import type { OrderRepository } from '@/modules/orders/repositories';
+import type { WalletsService } from '@/modules/wallets/wallets.service';
+import type {
+  RequestSecurityChangeDto,
+  ReviewSecurityChangeDto,
+  UpdateMyProfileBasicDto,
+  UpdateUserDto,
+  UserFilterDto,
+} from './dto';
+import type { UsersRepository } from './repositories';
 
 /**
  * Users Service - Business Logic Layer
  * Chỉ chứa business logic
  * Gọi UsersRepository để access database thông qua stored procedures
- * 
+ *
  * Áp dụng:
  * - Single Responsibility Principle: Chỉ xử lý user business logic
  * - Dependency Inversion: Phụ thuộc vào Repository abstraction
@@ -45,7 +44,9 @@ export class UsersService {
   /**
    * Find all users with optional search/filter/sort (admin)
    */
-  async findAll(filters: UserFilterDto): Promise<{ users: User[]; total: number; page: number; limit: number }> {
+  async findAll(
+    filters: UserFilterDto,
+  ): Promise<{ users: User[]; total: number; page: number; limit: number }> {
     return this.usersRepository.findAllWithFilters(filters);
   }
 
@@ -81,11 +82,7 @@ export class UsersService {
   /**
    * Get security change request history for a specific user (admin/risk officer)
    */
-  async getUserSecurityChanges(
-    userId: string,
-    page: number = 1,
-    limit: number = 20,
-  ) {
+  async getUserSecurityChanges(userId: string, page: number = 1, limit: number = 20) {
     await this.findOne(userId);
     return this.usersRepository.findSecurityChangesByUserId(userId, page, limit);
   }
@@ -93,19 +90,9 @@ export class UsersService {
   /**
    * Get order history for a specific user (admin view)
    */
-  async getUserOrders(
-    userId: string,
-    page: number = 1,
-    limit: number = 20,
-    status?: string,
-  ) {
+  async getUserOrders(userId: string, page: number = 1, limit: number = 20, status?: string) {
     await this.findOne(userId);
-    return this.orderRepository.findByUserForAdmin(
-      userId,
-      (page - 1) * limit,
-      limit,
-      status,
-    );
+    return this.orderRepository.findByUserForAdmin(userId, (page - 1) * limit, limit, status);
   }
 
   /**
@@ -150,10 +137,7 @@ export class UsersService {
 
     // Check if new email already exists (if email is being updated)
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const emailExists = await this.usersRepository.emailExists(
-        updateUserDto.email,
-        userId,
-      );
+      const emailExists = await this.usersRepository.emailExists(updateUserDto.email, userId);
       if (emailExists) {
         throw new ConflictException('Email already exists', 'EMAIL_EXISTS');
       }
@@ -197,10 +181,7 @@ export class UsersService {
   /**
    * Update current user profile basic (first_name, last_name) — no approval needed
    */
-  async updateProfileBasic(
-    userId: string,
-    dto: UpdateMyProfileBasicDto,
-  ): Promise<User> {
+  async updateProfileBasic(userId: string, dto: UpdateMyProfileBasicDto): Promise<User> {
     await this.findOne(userId);
     const affected = await this.usersRepository.updateProfileBasic(
       userId,
@@ -222,10 +203,7 @@ export class UsersService {
   ): Promise<{ requestId: string; status: string }> {
     const user = await this.findOne(userId);
 
-    if (
-      isWalletPlaceholderEmail(user.email) &&
-      dto.changeType === 'EMAIL_CHANGE'
-    ) {
+    if (isWalletPlaceholderEmail(user.email) && dto.changeType === 'EMAIL_CHANGE') {
       throw new BadRequestException(
         'Tài khoản ví dùng email tạm. Vui lòng xác minh email thật trong Hồ sơ: nhập địa chỉ mới và nhập OTP được gửi tới email đó.',
         'USE_CONTACT_EMAIL_VERIFICATION',
@@ -241,17 +219,11 @@ export class UsersService {
     }
 
     if (!dto.otpCode) {
-      throw new BadRequestException(
-        'OTP code is required when 2FA is enabled',
-        'OTP_REQUIRED',
-      );
+      throw new BadRequestException('OTP code is required when 2FA is enabled', 'OTP_REQUIRED');
     }
     const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
     if (!otpValid) {
-      throw new BadRequestException(
-        'OTP không hợp lệ hoặc đã hết hạn',
-        'INVALID_OTP',
-      );
+      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
     }
 
     let payload: Record<string, unknown> = { ...dto.payload };
@@ -330,7 +302,10 @@ export class UsersService {
       dto.reviewNote ?? null,
     );
     if (!result) {
-      throw new NotFoundException('Security change request not found or already reviewed', requestId);
+      throw new NotFoundException(
+        'Security change request not found or already reviewed',
+        requestId,
+      );
     }
     return {
       requestId: result.request_id,
@@ -365,10 +340,7 @@ export class UsersService {
       );
     }
 
-    const { url, publicId } = await this.cloudinaryService.upload(
-      buffer,
-      userId.slice(0, 8),
-    );
+    const { url, publicId } = await this.cloudinaryService.upload(buffer, userId.slice(0, 8));
 
     if (user.avatar_public_id) {
       await this.cloudinaryService.destroy(user.avatar_public_id);

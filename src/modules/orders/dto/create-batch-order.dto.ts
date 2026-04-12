@@ -1,11 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  ArrayMaxSize,
-  ArrayMinSize,
-  IsArray,
-  ValidateNested,
-} from 'class-validator';
 import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, ValidateNested } from 'class-validator';
 import { CreateOrderDto } from './create-order.dto';
 
 /**

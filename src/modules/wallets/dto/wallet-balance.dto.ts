@@ -8,7 +8,10 @@ export class WalletBalanceDto {
   @ApiProperty({ description: 'User ID (UUID)', example: '018e9a7b-1234-7abc-8000-000000000001' })
   userId!: string;
 
-  @ApiProperty({ description: 'Currency ID (UUID)', example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiProperty({
+    description: 'Currency ID (UUID)',
+    example: '018e9a7b-1234-7abc-8000-000000000002',
+  })
   currencyId!: string;
 
   @ApiProperty({ description: 'Available balance', example: '100.123456' })

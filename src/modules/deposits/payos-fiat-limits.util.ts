@@ -1,4 +1,4 @@
-import { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 
 export const PAYOS_DEFAULT_MIN_FIAT_DEPOSIT = 10000;
 

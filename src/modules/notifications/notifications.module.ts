@@ -1,14 +1,18 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { FcmService } from '@/common/services/fcm.service';
 import { Notification } from '@/entities/notification.entity';
 import { UserNotification } from '@/entities/user-notification.entity';
-import { NotificationsController } from './notifications.controller';
-import { NotificationsService } from './notifications.service';
-import { NotificationsGateway } from './notifications.gateway';
-import { NotificationRepository } from './repositories/notification.repository';
-import { FcmService } from '@/common/services/fcm.service';
 import { AuthModule } from '@/modules/auth/auth.module';
-import { InAppNotificationStrategy, PushNotificationStrategy, NOTIFICATION_STRATEGIES } from './strategies/notification.strategy';
+import { NotificationsController } from './notifications.controller';
+import { NotificationsGateway } from './notifications.gateway';
+import { NotificationsService } from './notifications.service';
+import { NotificationRepository } from './repositories/notification.repository';
+import {
+  InAppNotificationStrategy,
+  NOTIFICATION_STRATEGIES,
+  PushNotificationStrategy,
+} from './strategies/notification.strategy';
 
 /**
  * Notifications Module
@@ -29,17 +33,20 @@ import { InAppNotificationStrategy, PushNotificationStrategy, NOTIFICATION_STRAT
   ],
   controllers: [NotificationsController],
   providers: [
-    NotificationsService, 
-    NotificationsGateway, 
-    NotificationRepository, 
+    NotificationsService,
+    NotificationsGateway,
+    NotificationRepository,
     FcmService,
     InAppNotificationStrategy,
     PushNotificationStrategy,
     {
       provide: NOTIFICATION_STRATEGIES,
-      useFactory: (inApp: InAppNotificationStrategy, push: PushNotificationStrategy) => [inApp, push],
-      inject: [InAppNotificationStrategy, PushNotificationStrategy]
-    }
+      useFactory: (inApp: InAppNotificationStrategy, push: PushNotificationStrategy) => [
+        inApp,
+        push,
+      ],
+      inject: [InAppNotificationStrategy, PushNotificationStrategy],
+    },
   ],
   exports: [NotificationsService],
 })

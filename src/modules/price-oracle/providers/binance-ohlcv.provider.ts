@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '@/common/services';
-import { IOHLCVProvider, OHLCVCandleDto } from '../interfaces/ohlcv-provider.interface';
+import type { RedisService } from '@/common/services';
+import type { IOHLCVProvider, OHLCVCandleDto } from '../interfaces/ohlcv-provider.interface';
 
 /** Binance Spot klines interval symbols. */
 const INTERVAL_TO_BINANCE: Record<number, string> = {
@@ -55,7 +55,9 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
     const binanceInterval = INTERVAL_TO_BINANCE[intervalSec];
     if (!binanceInterval) return [];
 
-    const normalized = String(symbol).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normalized = String(symbol)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
     if (!normalized) return [];
 
     const startMs = fromDate.getTime();
@@ -72,34 +74,55 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
     const completedRangeEnd = Math.min(endMs, currentOpenTimeMs - 1);
     if (completedRangeEnd >= startMs) {
       try {
-        const cached = await this.queryRedisRange(redisKey, pairId, intervalSec, startMs, completedRangeEnd);
+        const cached = await this.queryRedisRange(
+          redisKey,
+          pairId,
+          intervalSec,
+          startMs,
+          completedRangeEnd,
+        );
         const expectedCompleted = Math.floor((completedRangeEnd - startMs) / intervalMs) + 1;
 
         if (cached.length >= Math.floor(expectedCompleted * CACHE_HIT_RATIO)) {
           // Cache HIT for completed candles — only fetch current candle if needed
           if (endMs >= currentOpenTimeMs) {
             const current = await this.fetchFromBinance(
-              pairId, normalized, binanceInterval, intervalSec,
-              currentOpenTimeMs, endMs, 2,
+              pairId,
+              normalized,
+              binanceInterval,
+              intervalSec,
+              currentOpenTimeMs,
+              endMs,
+              2,
             );
             return [...cached, ...current].slice(-limit);
           }
           return cached.slice(-limit);
         }
       } catch (err) {
-        this.logger.warn(`Redis OHLCV cache read error: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(
+          `Redis OHLCV cache read error: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
     // --- Cache MISS: full fetch from Binance ---
     const candles = await this.fetchFromBinance(
-      pairId, normalized, binanceInterval, intervalSec, startMs, endMs, limit,
+      pairId,
+      normalized,
+      binanceInterval,
+      intervalSec,
+      startMs,
+      endMs,
+      limit,
     );
 
     // Persist completed candles to Redis asynchronously (fire-and-forget)
     if (candles.length > 0) {
       this.persistCompletedCandles(redisKey, candles, intervalMs, nowMs).catch((err) => {
-        this.logger.warn(`Redis OHLCV cache write error: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(
+          `Redis OHLCV cache write error: ${err instanceof Error ? err.message : String(err)}`,
+        );
       });
     }
 
@@ -162,23 +185,25 @@ export class BinanceOHLCVProvider implements IOHLCVProvider {
   ): Promise<OHLCVCandleDto[]> {
     const client = this.redisService.getClient();
     const members = await client.zrangebyscore(redisKey, startMs, endMs);
-    return members.map((m) => {
-      try {
-        const parsed = JSON.parse(m) as Record<string, unknown>;
-        return {
-          pair_id: pairId,
-          interval_sec: intervalSec,
-          open_time: new Date(parsed.open_time as string | number),
-          open: String(parsed.open ?? 0),
-          high: String(parsed.high ?? 0),
-          low: String(parsed.low ?? 0),
-          close: String(parsed.close ?? 0),
-          volume: String(parsed.volume ?? 0),
-        };
-      } catch {
-        return null;
-      }
-    }).filter((c): c is OHLCVCandleDto => c !== null);
+    return members
+      .map((m) => {
+        try {
+          const parsed = JSON.parse(m) as Record<string, unknown>;
+          return {
+            pair_id: pairId,
+            interval_sec: intervalSec,
+            open_time: new Date(parsed.open_time as string | number),
+            open: String(parsed.open ?? 0),
+            high: String(parsed.high ?? 0),
+            low: String(parsed.low ?? 0),
+            close: String(parsed.close ?? 0),
+            volume: String(parsed.volume ?? 0),
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((c): c is OHLCVCandleDto => c !== null);
   }
 
   /**

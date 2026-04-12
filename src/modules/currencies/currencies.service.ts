@@ -1,10 +1,10 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
-import { CurrencyRepository } from './repositories';
-import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
-import { Currency } from '@/entities/currency.entity';
-import { NotFoundException, ConflictException } from '@/common/exceptions';
-import { CacheService } from '@/common/services';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
+import type { Currency } from '@/entities/currency.entity';
 import { MarketsService } from '@/modules/markets/markets.service';
+import type { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
+import type { CurrencyRepository } from './repositories';
 
 /**
  * Currencies Service - Business Logic Layer
@@ -269,9 +269,7 @@ export class CurrenciesService {
    */
   async create(createCurrencyDto: CreateCurrencyDto): Promise<Currency> {
     // Check if symbol already exists
-    const symbolExists = await this.currencyRepository.symbolExists(
-      createCurrencyDto.symbol,
-    );
+    const symbolExists = await this.currencyRepository.symbolExists(createCurrencyDto.symbol);
 
     if (symbolExists) {
       throw new ConflictException(
@@ -330,8 +328,7 @@ export class CurrenciesService {
       updateData.min_withdraw = updateCurrencyDto.minWithdraw;
     if (updateCurrencyDto.isTradable !== undefined)
       updateData.is_tradable = updateCurrencyDto.isTradable;
-    if (updateCurrencyDto.isActive !== undefined)
-      updateData.is_active = updateCurrencyDto.isActive;
+    if (updateCurrencyDto.isActive !== undefined) updateData.is_active = updateCurrencyDto.isActive;
     if (updateCurrencyDto.symbol !== undefined) updateData.symbol = updateCurrencyDto.symbol;
 
     const updated = await this.currencyRepository.update(currencyId, updateData);

@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
-import {
-  IExchangeProvider,
+import type {
   ExchangeBalanceDto,
   ExchangeOrderParams,
   ExchangeOrderResponse,
+  IExchangeProvider,
 } from '../interfaces/exchange.interface';
 
 /**
@@ -43,7 +43,7 @@ export class MockExchangeService implements IExchangeProvider {
 
   async createOrder(params: ExchangeOrderParams): Promise<ExchangeOrderResponse> {
     this.logger.debug(`[MOCK] Creating order:`, params);
-    
+
     return {
       orderId: `mock_order_${Date.now()}`,
       symbol: params.symbol,
@@ -82,11 +82,7 @@ export class MockExchangeService implements IExchangeProvider {
     return true;
   }
 
-  async createWithdrawal(
-    asset: string,
-    amount: Decimal,
-    address: string,
-  ): Promise<string> {
+  async createWithdrawal(asset: string, amount: Decimal, address: string): Promise<string> {
     this.logger.debug(`[MOCK] Creating withdrawal: ${amount} ${asset} to ${address}`);
     return `mock_withdrawal_${Date.now()}`;
   }

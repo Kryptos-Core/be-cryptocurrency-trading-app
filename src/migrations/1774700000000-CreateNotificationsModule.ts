@@ -1,9 +1,10 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 async function runProcedureSql(queryRunner: QueryRunner, sql: string): Promise<void> {
-  const conn = queryRunner.connection.driver.options.type === 'mariadb'
-    ? (queryRunner as any).connection.master
-    : (queryRunner as any).connection;
+  const conn =
+    queryRunner.connection.driver.options.type === 'mariadb'
+      ? (queryRunner as any).connection.master
+      : (queryRunner as any).connection;
   const raw = conn?.queryRunner?.connection ?? conn?.connection ?? conn;
   if (raw?.query) {
     await raw.query(sql);
@@ -64,7 +65,9 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
 
     // ── sp_notification_create ──────────────────────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_create');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_notification_create(
         IN p_notification_id CHAR(36),
         IN p_title           VARCHAR(255),
@@ -87,11 +90,14 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
         FROM notifications
         WHERE notification_id = p_notification_id LIMIT 1;
       END
-    `);
+    `,
+    );
 
     // ── sp_notification_find_by_user ────────────────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_find_by_user');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_notification_find_by_user(
         IN p_user_id CHAR(36),
         IN p_limit   INT,
@@ -118,11 +124,14 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
         ORDER BY un.created_at DESC
         LIMIT p_limit OFFSET p_offset;
       END
-    `);
+    `,
+    );
 
     // ── sp_notification_count_unread ────────────────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_count_unread');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_notification_count_unread(
         IN p_user_id CHAR(36)
       )
@@ -132,11 +141,14 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
         FROM user_notifications
         WHERE user_id = p_user_id AND is_read = 0;
       END
-    `);
+    `,
+    );
 
     // ── sp_notification_mark_read ───────────────────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_mark_read');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_notification_mark_read(
         IN p_notification_id CHAR(36),
         IN p_user_id         CHAR(36)
@@ -149,11 +161,14 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
           AND user_id         = p_user_id
           AND is_read         = 0;
       END
-    `);
+    `,
+    );
 
     // ── sp_notification_mark_all_read ───────────────────────────────────────
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_mark_all_read');
-    await runProcedureSql(queryRunner, `
+    await runProcedureSql(
+      queryRunner,
+      `
       CREATE PROCEDURE sp_notification_mark_all_read(
         IN p_user_id CHAR(36)
       )
@@ -163,7 +178,8 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
         SET is_read = 1, read_at = NOW(3)
         WHERE user_id = p_user_id AND is_read = 0;
       END
-    `);
+    `,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

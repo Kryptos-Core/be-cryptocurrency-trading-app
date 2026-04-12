@@ -1,4 +1,4 @@
-import { ValidationException, BusinessException } from '@/common/exceptions';
+import { BusinessException, ValidationException } from '@/common/exceptions';
 
 /**
  * Context for order validation (Strategy Pattern)
@@ -40,29 +40,21 @@ export class OrderValidationStrategy implements IOrderValidationStrategy {
       : 18;
     const amountDecimals = this.countDecimals(context.amount);
     if (amountDecimals > amountScale) {
-      throw new ValidationException(
-        `Amount supports up to ${amountScale} decimal places`,
-        {
-          amount: context.amount,
-          amountScale,
-        },
-      );
+      throw new ValidationException(`Amount supports up to ${amountScale} decimal places`, {
+        amount: context.amount,
+        amountScale,
+      });
     }
 
     if (context.type === 'MARKET') return;
 
-    const priceScale = Number.isInteger(context.priceScale)
-      ? (context.priceScale as number)
-      : 18;
+    const priceScale = Number.isInteger(context.priceScale) ? (context.priceScale as number) : 18;
     const priceDecimals = this.countDecimals(context.price ?? '0');
     if (priceDecimals > priceScale) {
-      throw new ValidationException(
-        `Price supports up to ${priceScale} decimal places`,
-        {
-          price: context.price,
-          priceScale,
-        },
-      );
+      throw new ValidationException(`Price supports up to ${priceScale} decimal places`, {
+        price: context.price,
+        priceScale,
+      });
     }
   }
 

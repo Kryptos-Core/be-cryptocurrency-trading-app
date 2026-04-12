@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
+import { Injectable } from '@nestjs/common';
+import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
 
 /**
  * Visitor Pattern: Metrics aggregation visitor for trade execution results.
@@ -9,18 +9,13 @@ import { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
  */
 @Injectable()
 export class MetricsTradeVisitor implements ITradeResultVisitor {
-  private readonly logger = new Logger(MetricsTradeVisitor.name);
-
   private tradeCount = 0;
   private totalVolumeByPair = new Map<string, number>();
 
   visit(trade: TradeExecutionResult): void {
     this.tradeCount++;
     const prev = this.totalVolumeByPair.get(trade.pair_id) ?? 0;
-    this.totalVolumeByPair.set(
-      trade.pair_id,
-      prev + parseFloat(trade.amount),
-    );
+    this.totalVolumeByPair.set(trade.pair_id, prev + parseFloat(trade.amount));
   }
 
   /** Snapshot current counters (e.g. for /metrics endpoint). */

@@ -1,14 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateNotificationDto } from '../dto/create-notification.dto';
-import { RedisService } from '@/common/services/redis.service';
-import { FcmService } from '@/common/services/fcm.service';
-import { NOTIFICATIONS_TARGETED_CHANNEL, NOTIFICATIONS_CHANNEL } from '../notifications.service';
+import type { FcmService } from '@/common/services/fcm.service';
+import type { RedisService } from '@/common/services/redis.service';
+import type { CreateNotificationDto } from '../dto/create-notification.dto';
+import { NOTIFICATIONS_CHANNEL, NOTIFICATIONS_TARGETED_CHANNEL } from '../notifications.service';
 
 /**
  * Strategy Interface
  */
 export interface INotificationStrategy {
-  sendToUser(targetUserId: string, notificationId: string, dto: CreateNotificationDto, fcmToken?: string | null, tokens?: string[]): Promise<void>;
+  sendToUser(
+    targetUserId: string,
+    notificationId: string,
+    dto: CreateNotificationDto,
+    fcmToken?: string | null,
+    tokens?: string[],
+  ): Promise<void>;
   broadcast(notificationId: string, dto: CreateNotificationDto, tokens?: string[]): Promise<void>;
 }
 
@@ -21,7 +27,11 @@ export const NOTIFICATION_STRATEGIES = 'NOTIFICATION_STRATEGIES';
 export class InAppNotificationStrategy implements INotificationStrategy {
   constructor(private readonly redisService: RedisService) {}
 
-  async sendToUser(targetUserId: string, notificationId: string, dto: CreateNotificationDto): Promise<void> {
+  async sendToUser(
+    targetUserId: string,
+    notificationId: string,
+    dto: CreateNotificationDto,
+  ): Promise<void> {
     const payload = {
       targetUserId,
       notification_id: notificationId,
@@ -31,10 +41,7 @@ export class InAppNotificationStrategy implements INotificationStrategy {
       data: dto.data ?? null,
       created_at: new Date().toISOString(),
     };
-    await this.redisService.publish(
-      NOTIFICATIONS_TARGETED_CHANNEL,
-      JSON.stringify(payload),
-    );
+    await this.redisService.publish(NOTIFICATIONS_TARGETED_CHANNEL, JSON.stringify(payload));
   }
 
   async broadcast(notificationId: string, dto: CreateNotificationDto): Promise<void> {
@@ -59,7 +66,12 @@ export class PushNotificationStrategy implements INotificationStrategy {
 
   constructor(private readonly fcmService: FcmService) {}
 
-  async sendToUser(targetUserId: string, notificationId: string, dto: CreateNotificationDto, fcmToken?: string | null): Promise<void> {
+  async sendToUser(
+    _targetUserId: string,
+    notificationId: string,
+    dto: CreateNotificationDto,
+    fcmToken?: string | null,
+  ): Promise<void> {
     if (!fcmToken) return;
     try {
       await this.fcmService.sendToTokens([fcmToken], dto.title, dto.body, {
@@ -72,7 +84,11 @@ export class PushNotificationStrategy implements INotificationStrategy {
     }
   }
 
-  async broadcast(notificationId: string, dto: CreateNotificationDto, tokens?: string[]): Promise<void> {
+  async broadcast(
+    notificationId: string,
+    dto: CreateNotificationDto,
+    tokens?: string[],
+  ): Promise<void> {
     if (!tokens || tokens.length === 0) return;
     try {
       await this.fcmService.sendToTokens(tokens, dto.title, dto.body, {

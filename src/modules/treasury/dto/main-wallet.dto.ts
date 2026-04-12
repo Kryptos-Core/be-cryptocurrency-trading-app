@@ -1,15 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
-  BlockchainChainDbValue,
+  type BlockchainChainDbValue,
 } from '@/common/constants/blockchain-chain-db';
 
 export type TreasuryMainWalletChainDto = BlockchainChainDbValue;
@@ -30,7 +23,8 @@ export class ImportMainWalletDto {
   chain!: TreasuryMainWalletChainDto;
 
   @ApiProperty({
-    description: 'Raw private key (hex for ETH/TRON, Base58 for Solana). Transmitted over HTTPS only.',
+    description:
+      'Raw private key (hex for ETH/TRON, Base58 for Solana). Transmitted over HTTPS only.',
     example: '27b0a19f8390cef6a971ce3bf02197ba388a26d319a6bce7054972cba71678fa',
   })
   @IsString()

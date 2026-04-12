@@ -1,9 +1,10 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 async function runProcedureSql(queryRunner: QueryRunner, sql: string): Promise<void> {
-  const conn = (queryRunner as any).connection?.driver?.options?.type === 'mariadb'
-    ? (queryRunner as any).connection.master
-    : (queryRunner as any).connection;
+  const conn =
+    (queryRunner as any).connection?.driver?.options?.type === 'mariadb'
+      ? (queryRunner as any).connection.master
+      : (queryRunner as any).connection;
   const raw = conn?.queryRunner?.connection ?? conn?.connection ?? conn;
   if (raw?.query) {
     await raw.query(sql);

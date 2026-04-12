@@ -1,10 +1,11 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 import { BlockchainNetwork } from '@/common/enums';
 
 export class WalletNonceDto {
   @ApiProperty({
-    description: 'Blockchain network (mainnet: ETH_MAINNET, BSC_MAINNET, TRON_MAINNET, SOLANA_MAINNET)',
+    description:
+      'Blockchain network (mainnet: ETH_MAINNET, BSC_MAINNET, TRON_MAINNET, SOLANA_MAINNET)',
     enum: BlockchainNetwork,
     example: 'ETH_MAINNET',
   })

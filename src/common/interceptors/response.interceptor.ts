@@ -1,11 +1,16 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
-import { Observable } from 'rxjs';
+import {
+  type CallHandler,
+  type ExecutionContext,
+  Injectable,
+  type NestInterceptor,
+} from '@nestjs/common';
+import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-/** 
-* Response Interceptor - Transform response according to standard 
-* Applicable: Decorator Pattern & Cross-Cutting Concern 
-*/
+/**
+ * Response Interceptor - Transform response according to standard
+ * Applicable: Decorator Pattern & Cross-Cutting Concern
+ */
 export interface IApiResponse<T = any> {
   success: boolean;
   message?: string;
@@ -15,7 +20,7 @@ export interface IApiResponse<T = any> {
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       map((data) => {
         /**
@@ -30,7 +35,11 @@ export class ResponseInterceptor implements NestInterceptor {
           d.total !== undefined &&
           d.total !== null;
 
-        const payload = isPaginatedEnvelope(data) ? data : data?.data !== undefined ? data.data : data;
+        const payload = isPaginatedEnvelope(data)
+          ? data
+          : data?.data !== undefined
+            ? data.data
+            : data;
 
         const response: IApiResponse = {
           success: true,

@@ -1,11 +1,11 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
+  Entity,
+  Index,
   ManyToOne,
   OneToMany,
-  Index,
+  PrimaryColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { UserNotification } from './user-notification.entity';
@@ -39,6 +39,9 @@ export class Notification {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   creator!: User;
 
-  @OneToMany(() => UserNotification, (un) => un.notification)
+  @OneToMany(
+    () => UserNotification,
+    (un) => un.notification,
+  )
   user_notifications!: UserNotification[];
 }

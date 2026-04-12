@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
+import type {
   IMatchingStrategy,
   MatchingContext,
   OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
 } from '../interfaces';
-import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from '../utils';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../utils';
 
 /**
  * Price-Time Priority Strategy (Strategy Pattern)
@@ -64,11 +64,12 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
 
       const priceCrosses =
         takerOrder.side === 'BUY'
-          ? (takerPriceBu === null || makerPriceBu <= takerPriceBu)
-          : (takerPriceBu === null || makerPriceBu >= takerPriceBu);
+          ? takerPriceBu === null || makerPriceBu <= takerPriceBu
+          : takerPriceBu === null || makerPriceBu >= takerPriceBu;
       if (!priceCrosses) break;
 
-      const fillAmountBu = takerRemainingBu < makerRemainingBu ? takerRemainingBu : makerRemainingBu;
+      const fillAmountBu =
+        takerRemainingBu < makerRemainingBu ? takerRemainingBu : makerRemainingBu;
       const fillAmountStr = fromBaseUnits(fillAmountBu, DEFAULT_SCALE);
       const priceStr = maker.price;
 

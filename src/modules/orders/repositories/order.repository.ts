@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { ORDER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { Order } from '@/entities/order.entity';
@@ -35,10 +35,9 @@ export class OrderRepository extends BaseRepository<Order> {
 
   override async findById(id: string): Promise<Order | null> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
-        [id],
-      );
+      const result = await this.dataSource.query(`CALL ${ORDER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        id,
+      ]);
       if (!result?.[0]?.[0]) return null;
       return this.mapRowToOrder(result[0][0]);
     } catch (error) {
@@ -47,10 +46,7 @@ export class OrderRepository extends BaseRepository<Order> {
     }
   }
 
-  async findByUserIdempotency(
-    userId: string,
-    idempotencyKey: string,
-  ): Promise<Order | null> {
+  async findByUserIdempotency(userId: string, idempotencyKey: string): Promise<Order | null> {
     try {
       const result = await this.dataSource.query(
         `CALL ${ORDER_STORE_PROCEDURE.FIND_BY_USER_IDEMPOTENCY}(?, ?)`,
@@ -89,10 +85,11 @@ export class OrderRepository extends BaseRepository<Order> {
     limit: number = 50,
   ): Promise<OrderBookLevel[]> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${ORDER_STORE_PROCEDURE.BOOK}(?, ?, ?)`,
-        [pairId, side, limit],
-      );
+      const result = await this.dataSource.query(`CALL ${ORDER_STORE_PROCEDURE.BOOK}(?, ?, ?)`, [
+        pairId,
+        side,
+        limit,
+      ]);
       const rows = result?.[0] ?? [];
       return rows
         .filter((r: any) => {
@@ -107,10 +104,7 @@ export class OrderRepository extends BaseRepository<Order> {
           order_count: Number(r.order_count ?? 0),
         }));
     } catch (error) {
-      this.logger.error(
-        `Error getting order book: pair=${pairId}, side=${side}`,
-        error,
-      );
+      this.logger.error(`Error getting order book: pair=${pairId}, side=${side}`, error);
       throw error;
     }
   }
@@ -203,10 +197,7 @@ export class OrderRepository extends BaseRepository<Order> {
     }
   }
 
-  async countByUser(
-    userId: string,
-    status: string | null,
-  ): Promise<number> {
+  async countByUser(userId: string, status: string | null): Promise<number> {
     try {
       const result = await this.dataSource.query(
         `CALL ${ORDER_STORE_PROCEDURE.COUNT_BY_USER}(?, ?)`,
@@ -238,10 +229,7 @@ export class OrderRepository extends BaseRepository<Order> {
     if (params.pairId) qb.andWhere('o.pair_id = :pairId', { pairId: params.pairId });
     if (params.status) qb.andWhere('o.status = :status', { status: params.status });
 
-    const [items, total] = await qb
-      .skip(params.skip)
-      .take(params.limit)
-      .getManyAndCount();
+    const [items, total] = await qb.skip(params.skip).take(params.limit).getManyAndCount();
 
     return { items, total };
   }

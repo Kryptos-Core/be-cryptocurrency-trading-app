@@ -1,13 +1,13 @@
+import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bull';
+import { WalletEncryptionService } from '@/common/services';
 import { PaymentMethodConfig } from '@/entities/payment-method-config.entity';
-import { PaymentConfigRepository } from './repositories/payment-config.repository';
-import { PaymentConfigService, PAYMENT_CONFIG_QUEUE } from './payment-config.service';
 import { PaymentConfigController } from './payment-config.controller';
 import { PaymentConfigProcessor } from './payment-config.processor';
+import { PAYMENT_CONFIG_QUEUE, PaymentConfigService } from './payment-config.service';
 import { PaymentConfigGraceScheduler } from './payment-config-grace.scheduler';
-import { WalletEncryptionService } from '@/common/services';
+import { PaymentConfigRepository } from './repositories/payment-config.repository';
 
 /**
  * PaymentConfigModule

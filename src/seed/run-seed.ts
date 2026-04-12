@@ -5,13 +5,13 @@
  * Usage: npm run db:seed   or   npm run db:reset
  */
 
-import * as path from 'path';
-import { loadEnvFilesForCli } from '@/config/load-env-files';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { UserRole } from '@/common/enums';
 import { newUuid } from '@/common/utils/uuid.util';
+import { loadEnvFilesForCli } from '@/config/load-env-files';
 import { parseAndValidateSeedUsers } from '@/seed/seed-users-json.util';
 import { resolveSeedUsersJsonPath } from '@/seed/seed-users-path.util';
 
@@ -23,7 +23,7 @@ async function run() {
   const dataSource = new DataSource({
     type: 'mysql',
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -37,7 +37,9 @@ async function run() {
   const q = dataSource.createQueryRunner();
 
   try {
-    console.log('🗑️  Clearing user-related data (wallet_ledger, wallets, orders, trades, price_alerts, deposits, withdrawals, user_sessions, users)...');
+    console.log(
+      '🗑️  Clearing user-related data (wallet_ledger, wallets, orders, trades, price_alerts, deposits, withdrawals, user_sessions, users)...',
+    );
     await q.query('SET FOREIGN_KEY_CHECKS = 0');
     await q.query('DELETE FROM wallet_ledger');
     await q.query('DELETE FROM wallets');
@@ -77,7 +79,9 @@ async function run() {
     console.log('✅ Users seeded.');
 
     console.log('\n🎉 Seed done. Users imported.');
-    console.log('   Currencies & market pairs will sync automatically from Binance on backend startup if catalog is empty.');
+    console.log(
+      '   Currencies & market pairs will sync automatically from Binance on backend startup if catalog is empty.',
+    );
     const firstAdmin = usersData.find((x) => x.role === UserRole.ADMIN);
     if (firstAdmin) {
       console.log(`   Login e.g. ${firstAdmin.email} / (password from your seed file)`);

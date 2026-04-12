@@ -3,7 +3,7 @@
  * Kept for backward compatibility during migration
  */
 export {
-  WalletTransactionAction,
-  WalletReferenceType,
   WalletLedgerDirection,
+  WalletReferenceType,
+  WalletTransactionAction,
 } from '@/common/enums';

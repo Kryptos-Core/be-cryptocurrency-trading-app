@@ -1,26 +1,25 @@
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import Decimal from 'decimal.js';
-import { promises as fs } from 'fs';
-import * as path from 'path';
-import { WalletRepository } from './repositories/wallet.repository';
-import { WalletLedgerRepository } from './repositories/wallet-ledger.repository';
-import { AdminWalletAdjustmentRepository } from './repositories/admin-wallet-adjustment.repository';
-import {
-  BadRequestException,
-  BusinessException,
-  ConflictException,
-} from '@/common/exceptions';
-import { WalletBalanceDto } from './dto/wallet-balance.dto';
-import { WalletListItemDto } from './dto/wallet-list-item.dto';
-import { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
-import { WalletTransactionDto } from './dto/wallet-transaction.dto';
-import { AdminAdjustWalletDto, AdminAdjustWalletResponseDto } from './dto/admin-adjust-wallet.dto';
-import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
-import { ExchangeService } from '@/modules/exchange/exchange.service';
-import { RedisService } from '@/common/services/redis.service';
+import type { DataSource } from 'typeorm';
+import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
+import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import type { RedisService } from '@/common/services/redis.service';
 import { newUuid } from '@/common/utils/uuid.util';
-import { WALLET_BALANCE_EVENTS_CHANNEL, WalletBalanceEvent } from './constants';
+import type { ExchangeService } from '@/modules/exchange/exchange.service';
+import { WALLET_BALANCE_EVENTS_CHANNEL, type WalletBalanceEvent } from './constants';
+import type {
+  AdminAdjustWalletDto,
+  AdminAdjustWalletResponseDto,
+} from './dto/admin-adjust-wallet.dto';
+import type { WalletBalanceDto } from './dto/wallet-balance.dto';
+import type { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
+import type { WalletListItemDto } from './dto/wallet-list-item.dto';
+import type { WalletTransactionDto } from './dto/wallet-transaction.dto';
+import type { AdminWalletAdjustmentRepository } from './repositories/admin-wallet-adjustment.repository';
+import type { WalletRepository } from './repositories/wallet.repository';
+import type { WalletLedgerRepository } from './repositories/wallet-ledger.repository';
 
 /**
  * Wallets Service - Business Logic Layer
@@ -84,10 +83,7 @@ export class WalletsService {
   /**
    * Get all wallets for the current user (optionally exclude zero balances).
    */
-  async getWallets(
-    userId: string,
-    includeZero: boolean = true,
-  ): Promise<WalletListItemDto[]> {
+  async getWallets(userId: string, includeZero: boolean = true): Promise<WalletListItemDto[]> {
     const rows = await this.walletRepository.findByUser(userId, includeZero);
     return rows.map((w) => {
       const available = String(w.available ?? '0');
@@ -115,21 +111,13 @@ export class WalletsService {
       return this.buildBalanceDto(userId, currencyId, '0', '0');
     }
 
-    return this.buildBalanceDto(
-      userId,
-      currencyId,
-      wallet.available ?? '0',
-      wallet.frozen ?? '0',
-    );
+    return this.buildBalanceDto(userId, currencyId, wallet.available ?? '0', wallet.frozen ?? '0');
   }
 
   /**
    * Apply wallet transaction (credit, debit, freeze, unfreeze, transfer)
    */
-  async applyTransaction(
-    userId: string,
-    dto: WalletTransactionDto,
-  ): Promise<WalletBalanceDto> {
+  async applyTransaction(userId: string, dto: WalletTransactionDto): Promise<WalletBalanceDto> {
     const amount = this.parseAmount(dto.amount);
     const currencyId = String(dto.currencyId);
 
@@ -168,7 +156,11 @@ export class WalletsService {
       return result;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
-      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+      if (
+        typeof msg === 'string' &&
+        msg.includes('Duplicate entry') &&
+        msg.includes('uk_ledger_ref')
+      ) {
         throw new ConflictException(
           'Duplicate transaction reference. Please try again.',
           'DUPLICATE_LEDGER_ENTRY',
@@ -185,18 +177,9 @@ export class WalletsService {
     manager: any,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
-    const wallet = await this.walletRepository.getOrCreateForUpdate(
-      userId,
-      currencyId,
-      manager,
-    );
+    const wallet = await this.walletRepository.getOrCreateForUpdate(userId, currencyId, manager);
 
-    const updated = await this.applyDelta(
-      wallet.wallet_id,
-      amount,
-      new Decimal(0),
-      manager,
-    );
+    const updated = await this.applyDelta(wallet.wallet_id, amount, new Decimal(0), manager);
 
     await this.walletLedgerRepository.createEntry(
       {
@@ -221,11 +204,7 @@ export class WalletsService {
     manager: any,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
-    const wallet = await this.walletRepository.getOrCreateForUpdate(
-      userId,
-      currencyId,
-      manager,
-    );
+    const wallet = await this.walletRepository.getOrCreateForUpdate(userId, currencyId, manager);
 
     const updated = await this.applyDelta(
       wallet.wallet_id,
@@ -257,18 +236,9 @@ export class WalletsService {
     manager: any,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
-    const wallet = await this.walletRepository.getOrCreateForUpdate(
-      userId,
-      currencyId,
-      manager,
-    );
+    const wallet = await this.walletRepository.getOrCreateForUpdate(userId, currencyId, manager);
 
-    const updated = await this.applyDelta(
-      wallet.wallet_id,
-      amount.negated(),
-      amount,
-      manager,
-    );
+    const updated = await this.applyDelta(wallet.wallet_id, amount.negated(), amount, manager);
 
     await this.walletLedgerRepository.createDoubleEntry(
       {
@@ -292,18 +262,9 @@ export class WalletsService {
     manager: any,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
-    const wallet = await this.walletRepository.getOrCreateForUpdate(
-      userId,
-      currencyId,
-      manager,
-    );
+    const wallet = await this.walletRepository.getOrCreateForUpdate(userId, currencyId, manager);
 
-    const updated = await this.applyDelta(
-      wallet.wallet_id,
-      amount,
-      amount.negated(),
-      manager,
-    );
+    const updated = await this.applyDelta(wallet.wallet_id, amount, amount.negated(), manager);
 
     await this.walletLedgerRepository.createDoubleEntry(
       {
@@ -374,10 +335,7 @@ export class WalletsService {
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
-        balanceAfter: this.calculateTotal(
-          sourceUpdated.available,
-          sourceUpdated.frozen,
-        ),
+        balanceAfter: this.calculateTotal(sourceUpdated.available, sourceUpdated.frozen),
       },
       manager,
     );
@@ -389,20 +347,12 @@ export class WalletsService {
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
-        balanceAfter: this.calculateTotal(
-          targetUpdated.available,
-          targetUpdated.frozen,
-        ),
+        balanceAfter: this.calculateTotal(targetUpdated.available, targetUpdated.frozen),
       },
       manager,
     );
 
-    return this.buildBalanceDto(
-      userId,
-      currencyId,
-      sourceUpdated.available,
-      sourceUpdated.frozen,
-    );
+    return this.buildBalanceDto(userId, currencyId, sourceUpdated.available, sourceUpdated.frozen);
   }
 
   private async applyDelta(
@@ -512,10 +462,7 @@ export class WalletsService {
    * Sync wallet balance with Binance exchange
    * Fetches actual balance from Binance and updates internal wallet
    */
-  async syncBalanceWithExchange(
-    userId: string,
-    currencyId: string,
-  ): Promise<WalletBalanceDto> {
+  async syncBalanceWithExchange(userId: string, currencyId: string): Promise<WalletBalanceDto> {
     // Get currency symbol from database
     const wallet = await this.walletRepository.findByUserCurrency(userId, currencyId);
     if (!wallet) {
@@ -530,21 +477,15 @@ export class WalletsService {
       this.logger.debug(`[Binance] Got balance: ${JSON.stringify(exchangeBalance)}`);
 
       // Convert Decimal to string
-      const available = exchangeBalance.available
-        ? exchangeBalance.available.toString()
-        : '0';
-      const frozen = exchangeBalance.frozen
-        ? exchangeBalance.frozen.toString()
-        : '0';
+      const available = exchangeBalance.available ? exchangeBalance.available.toString() : '0';
+      const frozen = exchangeBalance.frozen ? exchangeBalance.frozen.toString() : '0';
 
       // Return synced balance
       return this.buildBalanceDto(userId, currencyId, available, frozen);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`[Binance] Balance sync failed: ${errorMessage}`);
-      throw new BusinessException(
-        'Failed to sync balance with exchange: ' + errorMessage,
-      );
+      throw new BusinessException(`Failed to sync balance with exchange: ${errorMessage}`);
     }
   }
 
@@ -557,7 +498,12 @@ export class WalletsService {
     userId: string,
     currencyId: string,
     manager?: any,
-  ): Promise<{ internalBalance: string; externalBalance: string; discrepancy: string; status: string }> {
+  ): Promise<{
+    internalBalance: string;
+    externalBalance: string;
+    discrepancy: string;
+    status: string;
+  }> {
     const wallet = await this.walletRepository.findByUserCurrency(userId, currencyId);
     if (!wallet) {
       throw new BadRequestException(
@@ -572,14 +518,10 @@ export class WalletsService {
     let externalBalance = '0';
     try {
       const exchangeBalance = await this.exchangeService.getBalance('USDT');
-      externalBalance = exchangeBalance.available
-        ? exchangeBalance.available.toString()
-        : '0';
+      externalBalance = exchangeBalance.available ? exchangeBalance.available.toString() : '0';
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new BusinessException(
-        'Failed to get balance from exchange: ' + errorMessage,
-      );
+      throw new BusinessException(`Failed to get balance from exchange: ${errorMessage}`);
     }
 
     // Calculate discrepancy
@@ -765,9 +707,7 @@ export class WalletsService {
         );
 
         const action =
-          dto.type === 'DEPOSIT'
-            ? WalletTransactionAction.CREDIT
-            : WalletTransactionAction.DEBIT;
+          dto.type === 'DEPOSIT' ? WalletTransactionAction.CREDIT : WalletTransactionAction.DEBIT;
 
         const wallet = await this.walletRepository.getOrCreateForUpdate(
           dto.userId,
@@ -806,8 +746,7 @@ export class WalletsService {
 
       // updatedBalance is assigned inside the transaction closure; TypeScript's
       // control-flow analysis narrows it to never after the closure, so we cast explicitly.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const balanceSnapshot = updatedBalance as any as ({ available: string; frozen: string } | null);
+      const balanceSnapshot = updatedBalance as any as { available: string; frozen: string } | null;
       if (balanceSnapshot !== null) {
         const symbol = await this.getCurrencySymbol(dto.currencyId);
         await this.publishBalanceChange(
@@ -822,7 +761,11 @@ export class WalletsService {
       return result;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
-      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+      if (
+        typeof msg === 'string' &&
+        msg.includes('Duplicate entry') &&
+        msg.includes('uk_ledger_ref')
+      ) {
         throw new ConflictException(
           'Duplicate transaction reference. Please try again.',
           'DUPLICATE_LEDGER_ENTRY',
@@ -842,5 +785,4 @@ export class WalletsService {
   ): Promise<AdminAdjustWalletResponseDto[]> {
     return this.adminAdjustmentRepository.findByTarget(targetUserId, limit, offset);
   }
-
 }

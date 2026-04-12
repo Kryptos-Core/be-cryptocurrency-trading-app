@@ -7,7 +7,7 @@
  * Safety: blocked when NODE_ENV=production unless ALLOW_DB_CLEAN=true
  */
 
-import * as path from 'path';
+import * as path from 'node:path';
 import { DataSource } from 'typeorm';
 import { loadEnvFilesForCli } from '@/config/load-env-files';
 
@@ -69,7 +69,9 @@ async function run() {
     await q.query('SET FOREIGN_KEY_CHECKS = 1');
 
     console.log('✅ All tables truncated (including migrations).');
-    console.log('   Run npm run migration:run if you need migration rows back, then npm run db:seed if you use seed data.');
+    console.log(
+      '   Run npm run migration:run if you need migration rows back, then npm run db:seed if you use seed data.',
+    );
   } catch (err) {
     console.error('db:clean failed:', err);
     process.exit(1);

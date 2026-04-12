@@ -1,14 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { BusinessException, ForbiddenException, NotFoundException } from '../../common/exceptions';
+import { CacheService } from '../../common/services';
+import type { Order } from '../../entities/order.entity';
+import { MarketRepository } from '../markets/repositories';
+import { MatchingService } from '../matching/matching.service';
+import { MatchingQueueService } from '../matching/matching-queue.service';
+import { WalletRepository } from '../wallets/repositories/wallet.repository';
 import { OrdersService } from './orders.service';
 import { OrderRepository } from './repositories';
 import { OrderValidationStrategy } from './strategies/order-validation.strategy';
-import { CacheService } from '../../common/services';
-import { MarketRepository } from '../markets/repositories';
-import { WalletRepository } from '../wallets/repositories/wallet.repository';
-import { MatchingService } from '../matching/matching.service';
-import { MatchingQueueService } from '../matching/matching-queue.service';
-import { Order } from '../../entities/order.entity';
-import { NotFoundException, BusinessException, ForbiddenException } from '../../common/exceptions';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -89,7 +89,10 @@ describe('OrdersService', () => {
         { provide: CacheService, useValue: mockCache },
         { provide: OrderValidationStrategy, useValue: mockValidation },
         { provide: MatchingService, useValue: matchingService },
-        { provide: MatchingQueueService, useValue: { enqueueMatch: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: MatchingQueueService,
+          useValue: { enqueueMatch: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -249,23 +252,23 @@ describe('OrdersService', () => {
   describe('cancel', () => {
     it('throws NotFoundException when order not found', async () => {
       orderRepository.findById.mockResolvedValue(null);
-      await expect(
-        service.cancel({ userId: 'u1', orderId: 'o1' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.cancel({ userId: 'u1', orderId: 'o1' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ForbiddenException when order belongs to another user', async () => {
       orderRepository.findById.mockResolvedValue({ ...mockOrder, user_id: 'u2' } as Order);
-      await expect(
-        service.cancel({ userId: 'u1', orderId: 'o1' }),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.cancel({ userId: 'u1', orderId: 'o1' })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('throws BusinessException when order cannot be cancelled (status)', async () => {
       orderRepository.findById.mockResolvedValue({ ...mockOrder, status: 'FILLED' } as Order);
-      await expect(
-        service.cancel({ userId: 'u1', orderId: 'o1' }),
-      ).rejects.toThrow(BusinessException);
+      await expect(service.cancel({ userId: 'u1', orderId: 'o1' })).rejects.toThrow(
+        BusinessException,
+      );
     });
 
     it('cancels order and returns updated order', async () => {

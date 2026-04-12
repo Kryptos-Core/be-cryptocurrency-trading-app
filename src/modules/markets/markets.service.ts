@@ -1,13 +1,23 @@
-import { Injectable, Logger, OnModuleInit, Inject, forwardRef, Optional } from '@nestjs/common';
-import { MarketRepository } from './repositories';
-import { CreateMarketPairDto, UpdateMarketPairDto, MarketTickerDto } from './dto';
-import { MarketPair } from '@/entities/market-pair.entity';
-import { IMarketTickerData } from './interfaces/market-ticker.interface';
-import { OHLCVProviderRegistry } from '@/modules/price-oracle';
-import { NotFoundException, ConflictException, BadRequestException } from '@/common/exceptions';
-import { CacheService } from '@/common/services';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleInit,
+  Optional,
+} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
+import type { MarketPair } from '@/entities/market-pair.entity';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
-import { OrderBookService, DepthSnapshot } from '@/modules/matching/orderbook/order-book.service';
+import {
+  type DepthSnapshot,
+  OrderBookService,
+} from '@/modules/matching/orderbook/order-book.service';
+import type { OHLCVProviderRegistry } from '@/modules/price-oracle';
+import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
+import type { IMarketTickerData } from './interfaces/market-ticker.interface';
+import type { MarketRepository } from './repositories';
 
 /** Default string for missing/zero price (repository contract). */
 const TICKER_ZERO = '0';
@@ -275,9 +285,7 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Generate symbol if not provided
-    const symbol =
-      createMarketPairDto.symbol ||
-      `${baseCurrency.symbol}/${quoteCurrency.symbol}`;
+    const symbol = createMarketPairDto.symbol || `${baseCurrency.symbol}/${quoteCurrency.symbol}`;
 
     // Check if symbol already exists
     const symbolExists = await this.marketRepository.symbolExists(symbol);
@@ -342,26 +350,21 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Check if new pair combination conflicts
-    const newBaseId = updateMarketPairDto.baseCurrencyId != null
-      ? String(updateMarketPairDto.baseCurrencyId)
-      : pair.base_currency_id;
-    const newQuoteId = updateMarketPairDto.quoteCurrencyId != null
-      ? String(updateMarketPairDto.quoteCurrencyId)
-      : pair.quote_currency_id;
+    const newBaseId =
+      updateMarketPairDto.baseCurrencyId != null
+        ? String(updateMarketPairDto.baseCurrencyId)
+        : pair.base_currency_id;
+    const newQuoteId =
+      updateMarketPairDto.quoteCurrencyId != null
+        ? String(updateMarketPairDto.quoteCurrencyId)
+        : pair.quote_currency_id;
 
     if (newBaseId === newQuoteId) {
       throw new BadRequestException('Base and quote currencies cannot be the same');
     }
 
-    if (
-      newBaseId !== pair.base_currency_id ||
-      newQuoteId !== pair.quote_currency_id
-    ) {
-      const pairExists = await this.marketRepository.pairExists(
-        newBaseId,
-        newQuoteId,
-        pairId,
-      );
+    if (newBaseId !== pair.base_currency_id || newQuoteId !== pair.quote_currency_id) {
+      const pairExists = await this.marketRepository.pairExists(newBaseId, newQuoteId, pairId);
       if (pairExists) {
         throw new ConflictException(
           'Market pair with these currencies already exists',
@@ -390,8 +393,7 @@ export class MarketsService implements OnModuleInit {
       updateData.base_currency_id = String(updateMarketPairDto.baseCurrencyId);
     if (updateMarketPairDto.quoteCurrencyId !== undefined)
       updateData.quote_currency_id = String(updateMarketPairDto.quoteCurrencyId);
-    if (updateMarketPairDto.symbol !== undefined)
-      updateData.symbol = updateMarketPairDto.symbol;
+    if (updateMarketPairDto.symbol !== undefined) updateData.symbol = updateMarketPairDto.symbol;
     if (updateMarketPairDto.priceScale !== undefined)
       updateData.price_scale = updateMarketPairDto.priceScale;
     if (updateMarketPairDto.amountScale !== undefined)
@@ -764,19 +766,17 @@ export class MarketsService implements OnModuleInit {
    * Get OHLCV data for a market pair (on-demand from Price Oracle; no DB).
    * @param range Optional: 1d | 1M | 3M | 1y | 5y — filter candles to this time range
    */
-  async getOHLCV(
-    pairId: string,
-    limit: number = 100,
-    range?: string,
-    locale: string = 'en',
-  ) {
+  async getOHLCV(pairId: string, limit: number = 100, range?: string, locale: string = 'en') {
     const pair = await this.findOne(pairId);
     const interval = this.resolveIntervalByRange(range);
     const intervalSec = this.resolveIntervalSeconds(interval);
     const rangeMs = range ? MarketsService.RANGE_MS[range] : 7 * 24 * 60 * 60 * 1000;
     const fromDate = new Date(Date.now() - rangeMs);
     const toDate = new Date();
-    const symbol = String(pair.symbol).toUpperCase().replace(/[^A-Z0-9]/g, '') || pair.symbol;
+    const symbol =
+      String(pair.symbol)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '') || pair.symbol;
 
     const candles = await this.ohlcvProviderRegistry.getOHLCVByRange(
       pairId,
@@ -879,9 +879,7 @@ export class MarketsService implements OnModuleInit {
 
     const seconds = map[normalized];
     if (!seconds) {
-      throw new BadRequestException(
-        `Invalid interval. Supported: ${Object.keys(map).join(', ')}`,
-      );
+      throw new BadRequestException(`Invalid interval. Supported: ${Object.keys(map).join(', ')}`);
     }
 
     return seconds;

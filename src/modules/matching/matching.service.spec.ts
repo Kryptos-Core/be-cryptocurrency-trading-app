@@ -1,16 +1,16 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { RedisService } from '@/common/services';
+import { CircuitBreakerService } from './circuit-breaker.service';
+import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
+import type { OrderBookOrder } from './interfaces';
 import { MatchingService } from './matching.service';
 import { OrderBookService } from './orderbook';
 import { MatchingRepository } from './repositories';
-import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
-import { RedisService } from '@/common/services';
-import { OrderBookOrder } from './interfaces';
+import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { AuditTradeVisitor } from './visitors/audit-trade.visitor';
 import { MetricsTradeVisitor } from './visitors/metrics-trade.visitor';
-import { CircuitBreakerService } from './circuit-breaker.service';
-import { ConfigService } from '@nestjs/config';
-import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
 
 function order(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {
@@ -170,7 +170,8 @@ describe('MatchingService', () => {
 
     matchingRepository.getOpenOrdersForPair.mockImplementation(
       async (_pairId: string, side: 'BUY' | 'SELL') => {
-        if (side === 'SELL') return [mkSell('m-a', '100', '0.5'), mkSell('m-b', '110', '0.5', 'user-3')];
+        if (side === 'SELL')
+          return [mkSell('m-a', '100', '0.5'), mkSell('m-b', '110', '0.5', 'user-3')];
         return [];
       },
     );
@@ -240,15 +241,15 @@ describe('MatchingService', () => {
     // Lock acquired with SET NX
     expect(redisClient.set).toHaveBeenCalled();
     const setArgs = redisClient.set.mock.calls[0];
-    const acquiredKey = setArgs[0];    // 'matching:lock:pair-1'
-    const acquiredValue = setArgs[1];  // crypto.randomBytes hex string
+    const acquiredKey = setArgs[0]; // 'matching:lock:pair-1'
+    const acquiredValue = setArgs[1]; // crypto.randomBytes hex string
 
     // Lock released with Lua compare-and-delete
     expect(redisClient.eval).toHaveBeenCalled();
     const evalArgs = redisClient.eval.mock.calls[0];
-    expect(evalArgs[1]).toBe(1);              // KEYS count
-    expect(evalArgs[2]).toBe(acquiredKey);    // same key passed to SET
-    expect(evalArgs[3]).toBe(acquiredValue);  // same value — proves identity check is consistent
+    expect(evalArgs[1]).toBe(1); // KEYS count
+    expect(evalArgs[2]).toBe(acquiredKey); // same key passed to SET
+    expect(evalArgs[3]).toBe(acquiredValue); // same value — proves identity check is consistent
   });
 
   it('does NOT delete another process lock when own lock expired (safe release)', async () => {
@@ -314,7 +315,8 @@ describe('MatchingService', () => {
     expect(matchingRepository.executeTrade).not.toHaveBeenCalled();
   });
 
-  it('only seeds order book from DB on first match for a pair; subsequent matches use in-memory book', async () => {    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
+  it('only seeds order book from DB on first match for a pair; subsequent matches use in-memory book', async () => {
+    matchingRepository.getOpenOrdersForPair.mockResolvedValue([]);
 
     await service.runMatch({
       takerOrder: order({ order_id: 'tk1' }),
@@ -428,10 +430,7 @@ describe('MatchingService', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith(
-      'tk-ioc-partial',
-      'user-1',
-    );
+    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith('tk-ioc-partial', 'user-1');
     // Remainder must NOT be in the book
     expect(orderBookService.size('pair-1', 'BUY')).toBe(0);
   });
@@ -445,7 +444,7 @@ describe('MatchingService', () => {
         side: 'BUY',
         user_id: 'user-1',
         type: 'LIMIT',
-        price: '50',   // price too low, no matching sellers
+        price: '50', // price too low, no matching sellers
         amount: '1',
         remaining: '1',
         time_in_force: 'IOC',
@@ -456,10 +455,7 @@ describe('MatchingService', () => {
       takerFeeRate: '0.001',
     });
 
-    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith(
-      'tk-ioc-no-fill',
-      'user-1',
-    );
+    expect(matchingRepository.cancelIocRemainder).toHaveBeenCalledWith('tk-ioc-no-fill', 'user-1');
   });
 
   it('IOC order fully filled: does not call cancelIocRemainder', async () => {
@@ -519,7 +515,7 @@ describe('MatchingService', () => {
       order_id: 'm-slip-2',
       side: 'SELL',
       user_id: 'user-3',
-      price: '110',       // 10% above first fill price (reference = 100)
+      price: '110', // 10% above first fill price (reference = 100)
       amount: '0.5',
       remaining: '0.5',
       type: 'LIMIT',

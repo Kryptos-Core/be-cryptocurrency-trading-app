@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 
 /**
  * Runs a MySQL CALL that writes to user session variables, then reads them in one SELECT.

@@ -1,14 +1,14 @@
-import {
-  IsInt,
-  IsString,
-  IsBoolean,
-  IsOptional,
-  IsNumber,
-  Min,
-  Max,
-  Matches,
-} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 
 /**
  * Update Market Pair DTO

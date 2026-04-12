@@ -1,30 +1,26 @@
 import {
+  Body,
   Controller,
   Get,
-  Post,
-  Body,
-  Param,
   Headers,
-  UseGuards,
   HttpCode,
   HttpStatus,
+  Param,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiParam,
-} from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/common/guards';
-import { CurrentUser, Public } from '@/common/decorators';
-import {
-  ApiSuccessResponse,
   ApiBadRequestResponse,
+  ApiSuccessResponse,
   ApiUnauthorizedResponse,
+  CurrentUser,
+  Public,
 } from '@/common/decorators';
-import { WalletConnectService } from './wallet-connect.service';
-import { WcInitDto } from './dto';
-import { BlockchainNetwork } from '@/common/enums';
+import type { BlockchainNetwork } from '@/common/enums';
+import { JwtAuthGuard } from '@/common/guards';
+import type { WcInitDto } from './dto';
+import type { WalletConnectService } from './wallet-connect.service';
 
 /**
  * WalletConnect Controller
@@ -57,10 +53,7 @@ export class WalletConnectController {
   @ApiSuccessResponse('WC session URI tạo thành công')
   @ApiBadRequestResponse('Chain không được hỗ trợ qua WalletConnect')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async initSession(
-    @CurrentUser('userId') userId: string,
-    @Body() dto: WcInitDto,
-  ) {
+  async initSession(@CurrentUser('userId') userId: string, @Body() dto: WcInitDto) {
     return this.walletConnectService.initSession(userId, dto.chain);
   }
 

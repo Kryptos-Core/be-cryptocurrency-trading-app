@@ -1,34 +1,41 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DataSource, FindOptionsWhere } from 'typeorm';
-import { ethers } from 'ethers';
-import { TronWeb } from 'tronweb';
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
+import type { ConfigService } from '@nestjs/config';
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  sendAndConfirmTransaction,
+  Transaction,
+} from '@solana/web3.js';
 import bs58 from 'bs58';
 import Decimal from 'decimal.js';
+import { ethers } from 'ethers';
+import { TronWeb } from 'tronweb';
+import type { DataSource, FindOptionsWhere } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
+import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
 import {
   BadRequestException,
   BusinessException,
   ConflictException,
   NotFoundException,
 } from '@/common/exceptions';
-import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
+import type { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
+import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
-import { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
-import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
+import type { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import {
-  TreasuryTransactionWalletRepository,
   TRON_DEPOSIT_UI_CHAINS,
+  type TreasuryTransactionWalletRepository,
   type TronDepositUiChain,
 } from './repositories/treasury-transaction-wallet.repository';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import {
-  BLOCKCHAIN_CHAIN_DB_VALUES,
-  type BlockchainChainDbValue,
-} from '@/common/constants/blockchain-chain-db';
-import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 
 const LIST_CACHE_TTL_SECONDS = 60;
@@ -61,7 +68,8 @@ export interface TreasuryOnChainBalances {
   usdtTrc20Balance?: string;
 }
 
-export interface TreasuryWalletWithBalance extends Omit<TransactionWallet, 'encrypted_private_key'> {
+export interface TreasuryWalletWithBalance
+  extends Omit<TransactionWallet, 'encrypted_private_key'> {
   balance: string;
   symbol: string;
   usdtTrc20Balance?: string;
@@ -78,7 +86,7 @@ export class TransactionWalletService {
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,
-    private readonly configService: ConfigService,
+    readonly _configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
   ) {}
 
@@ -133,15 +141,26 @@ export class TransactionWalletService {
 
     const enriched = await Promise.all(
       wallets.map(async (w) => {
-        const { balance, symbol, usdtTrc20Balance } = await this.getBalanceCached(w.chain, w.address);
+        const { balance, symbol, usdtTrc20Balance } = await this.getBalanceCached(
+          w.chain,
+          w.address,
+        );
         const { encrypted_private_key: _, ...rest } = w;
-        return { ...rest, balance, symbol, ...(usdtTrc20Balance != null ? { usdtTrc20Balance } : {}) } as TreasuryWalletWithBalance;
+        return {
+          ...rest,
+          balance,
+          symbol,
+          ...(usdtTrc20Balance != null ? { usdtTrc20Balance } : {}),
+        } as TreasuryWalletWithBalance;
       }),
     );
     return enriched;
   }
 
-  async getBalanceCached(chain: SupportedTreasuryChain, address: string): Promise<TreasuryOnChainBalances> {
+  async getBalanceCached(
+    chain: SupportedTreasuryChain,
+    address: string,
+  ): Promise<TreasuryOnChainBalances> {
     const cacheKey = `treasury:balance:${chain}:${address}`;
     return this.cacheService.getOrSet(
       cacheKey,
@@ -240,7 +259,10 @@ export class TransactionWalletService {
     };
   }
 
-  async getBalanceByAddress(chain: SupportedTreasuryChain, address: string): Promise<TreasuryOnChainBalances> {
+  async getBalanceByAddress(
+    chain: SupportedTreasuryChain,
+    address: string,
+  ): Promise<TreasuryOnChainBalances> {
     const evmDef = getEvmDefinitionByTreasuryChain(chain);
     if (evmDef) {
       const provider = await jsonRpcProviderForTreasuryEvmChain(chain, this.systemConfigService);
@@ -283,7 +305,9 @@ export class TransactionWalletService {
       };
     }
 
-    throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', { chain });
+    throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', {
+      chain,
+    });
   }
 
   private async readTronUsdtBalance(
@@ -295,9 +319,10 @@ export class TransactionWalletService {
     const contract = tronWeb.contract(TRC20_BALANCE_OF_ABI as unknown as never[], contractAddress);
     // Read-only TronWeb has no defaultAddress; empty `from` yields undefined owner_address on the node.
     const raw = await contract.balanceOf(ownerBase58).call({ from: ownerBase58 });
-    const rawStr = typeof raw === 'object' && raw !== null && 'balance' in raw
-      ? String((raw as { balance: unknown }).balance)
-      : String(raw);
+    const rawStr =
+      typeof raw === 'object' && raw !== null && 'balance' in raw
+        ? String((raw as { balance: unknown }).balance)
+        : String(raw);
     return new Decimal(rawStr).div(new Decimal(10).pow(TRON_USDT_DECIMALS)).toString();
   }
 
@@ -317,7 +342,10 @@ export class TransactionWalletService {
     const key = await this.resolveMainWalletPrivateKey(chain);
     const address = TronWeb.address.fromPrivateKey(key);
     if (!address) {
-      throw new BusinessException('TRON main wallet private key is invalid', 'TRON_MAIN_WALLET_INVALID');
+      throw new BusinessException(
+        'TRON main wallet private key is invalid',
+        'TRON_MAIN_WALLET_INVALID',
+      );
     }
     return address;
   }
@@ -334,8 +362,8 @@ export class TransactionWalletService {
     });
     if (!wallet) {
       throw new BusinessException(
-        `No active default main wallet configured for chain ${chain}. `
-        + `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
+        `No active default main wallet configured for chain ${chain}. ` +
+          `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
         'TREASURY_MAIN_WALLET_NOT_CONFIGURED',
       );
     }
@@ -353,9 +381,7 @@ export class TransactionWalletService {
     return this.treasuryTransactionWalletRepository.findForDepositConfiguration();
   }
 
-  async getDefaultUserDepositWallet(
-    chain: TronDepositUiChain,
-  ): Promise<TransactionWallet | null> {
+  async getDefaultUserDepositWallet(chain: TronDepositUiChain): Promise<TransactionWallet | null> {
     return this.treasuryTransactionWalletRepository.findDefaultUserDepositWallet(chain);
   }
 
@@ -381,7 +407,8 @@ export class TransactionWalletService {
       );
     }
 
-    const updated = await this.treasuryTransactionWalletRepository.setDefaultUserDepositInTransaction(wallet);
+    const updated =
+      await this.treasuryTransactionWalletRepository.setDefaultUserDepositInTransaction(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
     return updated;
   }
@@ -552,15 +579,15 @@ export class TransactionWalletService {
       const decodedKey = bs58.decode(pk);
       const keypair = Keypair.fromSecretKey(decodedKey);
       const lamports = Math.floor(new Decimal(amount).mul(1_000_000_000).toNumber());
-      
+
       const tx = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: keypair.publicKey,
           toPubkey: new PublicKey(toAddress),
           lamports,
-        })
+        }),
       );
-      
+
       const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
       this.logger.log(`Withdrawal SOL sent from tx wallet ${wallet.wallet_id}: ${txHash}`);
       return txHash;
@@ -607,12 +634,16 @@ export class TransactionWalletService {
 
   private assertSupportedChain(chain: string): SupportedTreasuryChain {
     if (!(BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(chain)) {
-      throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', { chain });
+      throw new BadRequestException('Unsupported treasury chain', 'TREASURY_CHAIN_UNSUPPORTED', {
+        chain,
+      });
     }
     return chain as SupportedTreasuryChain;
   }
 
-  private async generateAccount(chain: SupportedTreasuryChain): Promise<{ address: string; privateKey: string }> {
+  private async generateAccount(
+    chain: SupportedTreasuryChain,
+  ): Promise<{ address: string; privateKey: string }> {
     if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
       const keypair = Keypair.generate();
       return {
@@ -636,7 +667,9 @@ export class TransactionWalletService {
     };
   }
 
-  private async buildSolanaConnection(chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET'): Promise<Connection> {
+  private async buildSolanaConnection(
+    chain: 'SOLANA_MAINNET' | 'SOLANA_DEVNET',
+  ): Promise<Connection> {
     if (chain === 'SOLANA_DEVNET') {
       const v = await this.systemConfigService.get<string>('SOLANA_DEVNET_URL');
       const url =

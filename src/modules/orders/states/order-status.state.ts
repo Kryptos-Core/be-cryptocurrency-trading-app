@@ -1,12 +1,7 @@
 /**
  * Order status (State Pattern: possible states)
  */
-export type OrderStatus =
-  | 'OPEN'
-  | 'PARTIAL'
-  | 'FILLED'
-  | 'CANCELLED'
-  | 'REJECTED';
+export type OrderStatus = 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED' | 'REJECTED';
 
 const CANCELLABLE_STATUSES: OrderStatus[] = ['OPEN', 'PARTIAL'];
 

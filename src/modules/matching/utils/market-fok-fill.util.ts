@@ -1,5 +1,5 @@
-import { OrderBookOrder } from '../interfaces';
-import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from './base-units';
+import type { OrderBookOrder } from '../interfaces';
+import { DEFAULT_SCALE, toBaseUnits } from './base-units';
 
 const SCALE_MULTIPLIER = 10n ** BigInt(DEFAULT_SCALE);
 

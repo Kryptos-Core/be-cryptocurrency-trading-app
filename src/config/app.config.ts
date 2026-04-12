@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
-import { EnvironmentVariables } from './env.validation';
 import { Environment } from '@/common/enums';
+import type { EnvironmentVariables } from './env.validation';
 
 /**
  * Application Configuration Interface
@@ -300,7 +300,12 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       : `http://localhost:${env.PORT || 3000}`;
 
   return builder
-    .setApp(env.APP_NAME || 'Cryptocurrency Trading API', env.NODE_ENV || Environment.Development, env.PORT || 3000, appUrl)
+    .setApp(
+      env.APP_NAME || 'Cryptocurrency Trading API',
+      env.NODE_ENV || Environment.Development,
+      env.PORT || 3000,
+      appUrl,
+    )
     .setDatabase(
       env.DB_HOST,
       parseInt(env.DB_PORT, 10),
@@ -308,7 +313,12 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.DB_PASSWORD,
       env.DB_NAME,
     )
-    .setRedis(env.REDIS_HOST || 'localhost', env.REDIS_PORT || 6379, env.REDIS_PASSWORD, env.REDIS_DB || 0)
+    .setRedis(
+      env.REDIS_HOST || 'localhost',
+      env.REDIS_PORT || 6379,
+      env.REDIS_PASSWORD,
+      env.REDIS_DB || 0,
+    )
     .setJwt(
       env.JWT_SECRET,
       env.JWT_EXPIRATION || '24h',
@@ -348,7 +358,9 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.BSC_MAINNET_CHAIN_ID ?? 56,
       {
         onchainOperatorMode:
-          String(env.ONCHAIN_OPERATOR_MODE || 'production').toLowerCase().trim() === 'sandbox'
+          String(env.ONCHAIN_OPERATOR_MODE || 'production')
+            .toLowerCase()
+            .trim() === 'sandbox'
             ? 'sandbox'
             : 'production',
         tronNileFullHost: env.TRON_NILE_FULL_HOST || 'https://nile.trongrid.io',

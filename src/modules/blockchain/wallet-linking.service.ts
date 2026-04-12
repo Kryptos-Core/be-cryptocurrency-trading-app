@@ -1,17 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { CacheService } from '@/common/services';
-import {
-  BadRequestException,
-  BusinessException,
-  ConflictException,
-} from '@/common/exceptions';
-import { BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { LinkedWallet } from '@/entities/linked-wallet.entity';
-import { RequestLinkDto, VerifyLinkDto } from './dto';
+import { type BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
+import { BadRequestException, ConflictException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { BlockchainProviderFactory } from './blockchain-provider.factory';
+import type { RequestLinkDto, VerifyLinkDto } from './dto';
 
 /**
  * Wallet Linking Service
@@ -56,11 +51,7 @@ export class WalletLinkingService {
     }
 
     // Kiểm tra ví đã được liên kết chưa
-    const existing = await this.findVerifiedWallet(
-      userId,
-      dto.chain,
-      dto.address,
-    );
+    const existing = await this.findVerifiedWallet(userId, dto.chain, dto.address);
     if (existing) {
       throw new ConflictException(
         'Ví này đã được liên kết với tài khoản của bạn',
@@ -80,9 +71,7 @@ export class WalletLinkingService {
       WalletLinkingService.NONCE_TTL,
     );
 
-    this.logger.debug(
-      `[RequestLink] userId=${userId}, chain=${dto.chain}, address=${dto.address}`,
-    );
+    this.logger.debug(`[RequestLink] userId=${userId}, chain=${dto.chain}, address=${dto.address}`);
 
     return {
       message,
@@ -119,9 +108,7 @@ export class WalletLinkingService {
       );
     }
 
-    const isTestSignature = dto.signature.startsWith(
-      WalletLinkingService.TEST_SIGNATURE_PREFIX,
-    );
+    const isTestSignature = dto.signature.startsWith(WalletLinkingService.TEST_SIGNATURE_PREFIX);
 
     if (isTestSignature && !(await this.isTestSignatureBypassEnabled())) {
       throw new BadRequestException(
@@ -133,9 +120,7 @@ export class WalletLinkingService {
     let isValid = false;
 
     if (isTestSignature) {
-      const payload = dto.signature
-        .slice(WalletLinkingService.TEST_SIGNATURE_PREFIX.length)
-        .trim();
+      const payload = dto.signature.slice(WalletLinkingService.TEST_SIGNATURE_PREFIX.length).trim();
 
       if (!payload) {
         throw new BadRequestException(
@@ -150,11 +135,7 @@ export class WalletLinkingService {
       );
     } else {
       // Xác minh chữ ký bằng blockchain provider
-      isValid = await provider.verifySignature(
-        dto.address,
-        cached.message,
-        dto.signature,
-      );
+      isValid = await provider.verifySignature(dto.address, cached.message, dto.signature);
     }
 
     if (!isValid) {
@@ -172,17 +153,7 @@ export class WalletLinkingService {
       `INSERT INTO linked_wallets (link_id, user_id, chain, address, label, status, linked_at, created_at)
        VALUES (?, ?, ?, ?, ?, 'VERIFIED', ?, ?)
        ON DUPLICATE KEY UPDATE status = 'VERIFIED', linked_at = ?, label = COALESCE(?, label)`,
-      [
-        linkId,
-        userId,
-        dto.chain,
-        dto.address,
-        cached.label,
-        now,
-        now,
-        now,
-        cached.label,
-      ],
+      [linkId, userId, dto.chain, dto.address, cached.label, now, now, now, cached.label],
     );
 
     // Xoá nonce + invalidate cache danh sách ví
@@ -204,10 +175,7 @@ export class WalletLinkingService {
   /**
    * Huỷ liên kết ví (soft delete → REVOKED)
    */
-  async unlinkWallet(
-    userId: string,
-    linkId: string,
-  ): Promise<{ linkId: string; status: string }> {
+  async unlinkWallet(userId: string, linkId: string): Promise<{ linkId: string; status: string }> {
     const result = await this.dataSource.query(
       `UPDATE linked_wallets SET status = 'REVOKED' WHERE link_id = ? AND user_id = ? AND status = 'VERIFIED'`,
       [linkId, userId],
@@ -260,9 +228,7 @@ export class WalletLinkingService {
           address: r.address,
           label: r.label ?? null,
           status: r.status,
-          linkedAt: r.linked_at
-            ? new Date(r.linked_at).toISOString()
-            : null,
+          linkedAt: r.linked_at ? new Date(r.linked_at).toISOString() : null,
         }));
       },
       WalletLinkingService.LINKED_CACHE_TTL,
@@ -272,10 +238,7 @@ export class WalletLinkingService {
   /**
    * Lấy số dư on-chain của ví liên kết
    */
-  async getLinkedWalletBalance(
-    userId: string,
-    linkId: string,
-  ) {
+  async getLinkedWalletBalance(userId: string, linkId: string) {
     const rows = await this.dataSource.query(
       `SELECT link_id, chain, address, status FROM linked_wallets WHERE link_id = ? AND user_id = ?`,
       [linkId, userId],
@@ -283,22 +246,14 @@ export class WalletLinkingService {
 
     const wallet = rows?.[0];
     if (!wallet) {
-      throw new BadRequestException(
-        'Ví liên kết không tìm thấy',
-        'WALLET_NOT_FOUND',
-      );
+      throw new BadRequestException('Ví liên kết không tìm thấy', 'WALLET_NOT_FOUND');
     }
 
     if (wallet.status !== 'VERIFIED') {
-      throw new BadRequestException(
-        'Ví chưa được xác minh',
-        'WALLET_NOT_VERIFIED',
-      );
+      throw new BadRequestException('Ví chưa được xác minh', 'WALLET_NOT_VERIFIED');
     }
 
-    const provider = this.providerFactory.getProvider(
-      wallet.chain as BlockchainNetwork,
-    );
+    const provider = this.providerFactory.getProvider(wallet.chain as BlockchainNetwork);
     return provider.getBalance(wallet.address);
   }
 
@@ -316,10 +271,7 @@ export class WalletLinkingService {
   }
 
   /** Tìm ví theo linkId */
-  async findByLinkId(
-    userId: string,
-    linkId: string,
-  ): Promise<any | null> {
+  async findByLinkId(userId: string, linkId: string): Promise<any | null> {
     const rows = await this.dataSource.query(
       `SELECT * FROM linked_wallets WHERE link_id = ? AND user_id = ? LIMIT 1`,
       [linkId, userId],
@@ -329,11 +281,7 @@ export class WalletLinkingService {
 
   // ============ Redis Keys ============
 
-  private nonceKey(
-    userId: string,
-    chain: BlockchainNetwork,
-    address: string,
-  ): string {
+  private nonceKey(userId: string, chain: BlockchainNetwork, address: string): string {
     return `wallet:link:nonce:${userId}:${chain}:${address}`;
   }
 
@@ -350,7 +298,9 @@ export class WalletLinkingService {
     const envAllow = ['true', '1', 'yes', 'on'].includes(
       (process.env.BLOCKCHAIN_ALLOW_TEST_SIGNATURE || '').toLowerCase(),
     );
-    const dbRaw = (await this.systemConfigService.getEffectiveString('BLOCKCHAIN_ALLOW_TEST_SIGNATURE')).toLowerCase();
+    const dbRaw = (
+      await this.systemConfigService.getEffectiveString('BLOCKCHAIN_ALLOW_TEST_SIGNATURE')
+    ).toLowerCase();
     const dbAllow = ['true', '1', 'yes', 'on'].includes(dbRaw);
 
     if (nodeEnv === 'production') {

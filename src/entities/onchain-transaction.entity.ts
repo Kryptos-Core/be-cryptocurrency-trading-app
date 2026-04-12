@@ -1,16 +1,16 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   ForeignKey,
   Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
-import { LinkedWallet } from './linked-wallet.entity';
 import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
+import { LinkedWallet } from './linked-wallet.entity';
+import { User } from './user.entity';
 
 @Entity('onchain_transactions')
 @Index('uk_onchain_tx_hash', ['chain', 'tx_hash'], { unique: true })
@@ -84,9 +84,13 @@ export class OnchainTransaction {
   @Column({ type: 'decimal', precision: 36, scale: 18, nullable: true })
   conversion_rate!: string | null;
 
-  @ManyToOne(() => User, (user) => user.onchain_transactions, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => User,
+    (user) => user.onchain_transactions,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   @JoinColumn({ name: 'user_id' })
   user!: User;
 

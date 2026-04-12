@@ -2,7 +2,7 @@
  * Name Helper
  * Các function tiện ích để xử lý tên người dùng
  * Pattern: Helper/Utility Pattern
- * 
+ *
  * Áp dụng SOLID principles:
  * - Single Responsibility: Chỉ xử lý các thao tác liên quan đến tên
  * - Open/Closed: Có thể mở rộng thêm các tiện ích xử lý tên mới
@@ -14,11 +14,11 @@
  */
 export function capitalizeWords(name: string): string {
   if (!name) return '';
-  
+
   return name
     .trim()
     .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
 
@@ -28,7 +28,7 @@ export function capitalizeWords(name: string): string {
  */
 export function sanitizeName(name: string): string {
   if (!name) return '';
-  
+
   return name
     .trim()
     .replace(/\s+/g, ' ') // Thay thế nhiều khoảng trắng bằng một khoảng trắng
@@ -41,7 +41,7 @@ export function sanitizeName(name: string): string {
  */
 export function formatName(name: string | undefined): string | undefined {
   if (!name) return undefined;
-  
+
   const sanitized = sanitizeName(name);
   return sanitized ? capitalizeWords(sanitized) : undefined;
 }
@@ -53,11 +53,11 @@ export function formatName(name: string | undefined): string | undefined {
 export function getFullName(firstName?: string, lastName?: string): string | undefined {
   const formattedFirst = formatName(firstName);
   const formattedLast = formatName(lastName);
-  
+
   if (!formattedFirst && !formattedLast) {
     return undefined;
   }
-  
+
   return [formattedFirst, formattedLast].filter(Boolean).join(' ');
 }
 
@@ -67,7 +67,7 @@ export function getFullName(firstName?: string, lastName?: string): string | und
  */
 export function isValidName(name: string): boolean {
   if (!name) return false;
-  
+
   const nameRegex = /^[a-zA-ZÀ-ỹ\s]+$/;
   return nameRegex.test(name.trim());
 }

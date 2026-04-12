@@ -1,7 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { Order } from '../../entities/order.entity';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
-import { Order } from '../../entities/order.entity';
 
 describe('OrdersController', () => {
   let controller: OrdersController;
@@ -37,9 +37,7 @@ describe('OrdersController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrdersController],
-      providers: [
-        { provide: OrdersService, useValue: mockService },
-      ],
+      providers: [{ provide: OrdersService, useValue: mockService }],
     }).compile();
 
     controller = module.get(OrdersController);

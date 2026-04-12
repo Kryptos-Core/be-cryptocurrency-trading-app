@@ -2,9 +2,7 @@ import { computeMarketBuyMaxQuoteReserve } from './market-buy-reserve.util';
 
 describe('computeMarketBuyMaxQuoteReserve', () => {
   it('returns amount * bestAsk * (1 + slippage) for whole numbers', () => {
-    expect(computeMarketBuyMaxQuoteReserve('100', '1', '0.01')).toBe(
-      '101.000000000000000000',
-    );
+    expect(computeMarketBuyMaxQuoteReserve('100', '1', '0.01')).toBe('101.000000000000000000');
   });
 
   it('handles fractional amount and price', () => {

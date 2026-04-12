@@ -1,15 +1,15 @@
 /// <reference types="jest" />
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { NotFoundException } from '../../common/exceptions';
 import { CacheService } from '../../common/services';
 import { MarketsService } from '../markets/markets.service';
 import { OrdersService } from '../orders/orders.service';
+import { MarketMakerService } from './market-maker.service';
 import { MarketMakerConfigRepository } from './repositories';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
-import { MarketMakerService } from './market-maker.service';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 describe('MarketMakerService', () => {
   let service: MarketMakerService;
@@ -112,7 +112,10 @@ describe('MarketMakerService', () => {
 
   it('returns cached refresh result for same refresh cycle key', async () => {
     configRepository.findByUserPair.mockResolvedValue(mockConfig);
-    cacheService.get.mockResolvedValue({ refreshCycleKey: 'cycle-1', idempotentReplay: false } as any);
+    cacheService.get.mockResolvedValue({
+      refreshCycleKey: 'cycle-1',
+      idempotentReplay: false,
+    } as any);
 
     const result = (await service.refreshMakerOrders('user-1', 'pair-1', 'cycle-1')) as any;
 

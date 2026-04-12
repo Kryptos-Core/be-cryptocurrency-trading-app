@@ -1,13 +1,14 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Run a full CREATE PROCEDURE statement via raw connection so the driver
  * does not split the body by semicolons (avoids ER_PARSE_ERROR on multi-statement procedures).
  */
 async function runProcedureSql(queryRunner: QueryRunner, sql: string): Promise<void> {
-  const conn = queryRunner.connection.driver.options.type === 'mariadb'
-    ? (queryRunner as any).connection.master
-    : (queryRunner as any).connection;
+  const conn =
+    queryRunner.connection.driver.options.type === 'mariadb'
+      ? (queryRunner as any).connection.master
+      : (queryRunner as any).connection;
   const raw = conn?.queryRunner?.connection ?? conn?.connection ?? conn;
   if (raw?.query) {
     await raw.query(sql);

@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import type Decimal from 'decimal.js';
 
 /**
  * Exchange Balance DTO
@@ -84,11 +84,7 @@ export interface IExchangeProvider {
   /**
    * Create withdrawal request
    */
-  createWithdrawal(
-    asset: string,
-    amount: Decimal,
-    address: string,
-  ): Promise<string>; // Returns withdrawal ID
+  createWithdrawal(asset: string, amount: Decimal, address: string): Promise<string>; // Returns withdrawal ID
 
   /**
    * Get exchange name

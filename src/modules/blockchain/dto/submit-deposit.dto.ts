@@ -1,5 +1,5 @@
-import { IsEnum, IsNotEmpty, IsString, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, IsString, Matches } from 'class-validator';
 import { BlockchainNetwork } from '@/common/enums';
 
 /** Nạp tiền thủ công — user submit txHash đã gửi on-chain */

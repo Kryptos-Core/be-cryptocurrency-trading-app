@@ -1,19 +1,19 @@
+import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bull';
+import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
+import { CircuitBreakerService } from './circuit-breaker.service';
+import { MatchingProcessor } from './matching.processor';
 import { MatchingService } from './matching.service';
+import { MATCHING_QUEUE, MatchingQueueService } from './matching-queue.service';
 import { OrderBookService } from './orderbook';
 import { BuyQueueService } from './orderbook/buy-queue.service';
 import { SellQueueService } from './orderbook/sell-queue.service';
 import { MatchingRepository } from './repositories';
-import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
+import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 import { TradeAuditLogRepository } from './visitors/trade-audit-log.repository';
-import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
-import { CircuitBreakerService } from './circuit-breaker.service';
-import { MatchingQueueService, MATCHING_QUEUE } from './matching-queue.service';
-import { MatchingProcessor } from './matching.processor';
 
 /**
  * Matching Module
@@ -41,6 +41,12 @@ import { MatchingProcessor } from './matching.processor';
     MatchingQueueService,
     MatchingProcessor,
   ],
-  exports: [MatchingService, MatchingQueueService, MetricsTradeVisitor, CircuitBreakerService, OrderBookService],
+  exports: [
+    MatchingService,
+    MatchingQueueService,
+    MetricsTradeVisitor,
+    CircuitBreakerService,
+    OrderBookService,
+  ],
 })
 export class MatchingModule {}

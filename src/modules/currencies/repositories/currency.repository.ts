@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { CURRENCY_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { newUuid } from '@/common/utils/uuid.util';
@@ -23,10 +23,9 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   async findById(id: number | string): Promise<Currency | null> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.FIND_BY_ID}(?)`,
-        [id],
-      );
+      const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        id,
+      ]);
       return this.mapProcedureResultToEntity(result[0][0]);
     } catch (error) {
       this.logger.error(`Error finding currency by ID: ${id}`, error);
@@ -57,9 +56,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   async findActive(): Promise<Currency[]> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.FIND_ACTIVE}()`,
-      );
+      const result = await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.FIND_ACTIVE}()`);
       return result[0]?.map((row: any) => this.mapProcedureResultToEntity(row)) || [];
     } catch (error) {
       this.logger.error('Error finding active currencies', error);
@@ -94,10 +91,10 @@ export class CurrencyRepository extends BaseRepository<Currency> {
         }
       }
 
-      await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`,
-        [symbol.toUpperCase(), excludeCurrencyId || null],
-      );
+      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`, [
+        symbol.toUpperCase(),
+        excludeCurrencyId || null,
+      ]);
       const result = await this.dataSource.query('SELECT @exists as exists');
       return result?.[0]?.exists === 1 || result?.[0]?.exists === true;
     } catch (error) {
@@ -114,18 +111,15 @@ export class CurrencyRepository extends BaseRepository<Currency> {
       const currencyId = entity.currency_id ?? newUuid();
       const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
-        [
-          currencyId,
-          symbol,
-          entity.name,
-          entity.precision_scale ?? 8,
-          entity.min_withdraw ?? '0',
-          (entity.is_tradable ?? true) ? 1 : 0,
-          (entity.is_active ?? true) ? 1 : 0,
-        ],
-      );
+      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`, [
+        currencyId,
+        symbol,
+        entity.name,
+        entity.precision_scale ?? 8,
+        entity.min_withdraw ?? '0',
+        (entity.is_tradable ?? true) ? 1 : 0,
+        (entity.is_active ?? true) ? 1 : 0,
+      ]);
 
       const created = await this.findById(currencyId);
       if (!created) {
@@ -145,18 +139,15 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     try {
       const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          symbol,
-          entity.name ?? null,
-          entity.precision_scale ?? null,
-          entity.min_withdraw ?? null,
-          entity.is_tradable ?? null,
-          entity.is_active ?? null,
-        ],
-      );
+      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?)`, [
+        id,
+        symbol,
+        entity.name ?? null,
+        entity.precision_scale ?? null,
+        entity.min_withdraw ?? null,
+        entity.is_tradable ?? null,
+        entity.is_active ?? null,
+      ]);
 
       const updated = await this.findById(id);
       if (!updated) {
@@ -174,9 +165,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   async delete(id: number | string): Promise<void> {
     try {
-      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.DELETE}(?)`, [
-        id,
-      ]);
+      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.DELETE}(?)`, [id]);
     } catch (error) {
       this.logger.error(`Error deleting currency with ID: ${id}`, error);
       throw error;
@@ -200,10 +189,9 @@ export class CurrencyRepository extends BaseRepository<Currency> {
         [skip, limit, includeInactive],
       );
 
-      await this.dataSource.query(
-        `CALL ${CURRENCY_STORE_PROCEDURE.COUNT}(?, @total)`,
-        [includeInactive],
-      );
+      await this.dataSource.query(`CALL ${CURRENCY_STORE_PROCEDURE.COUNT}(?, @total)`, [
+        includeInactive,
+      ]);
       const totalResult = await this.dataSource.query('SELECT @total as total');
       const total = totalResult?.[0]?.total || 0;
 
@@ -283,7 +271,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
    */
   private mapProcedureResultToEntity(row: any): Currency | null {
     if (!row) return null;
-    
+
     const currency = new Currency();
     currency.currency_id = String(row.currency_id ?? '');
     currency.symbol = row.symbol || '';
@@ -292,7 +280,7 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     currency.min_withdraw = row.min_withdraw?.toString() || '0';
     currency.is_tradable = row.is_tradable === 1 || row.is_tradable === true;
     currency.is_active = row.is_active === 1 || row.is_active === true;
-    
+
     return currency;
   }
 }

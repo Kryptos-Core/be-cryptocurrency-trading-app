@@ -1,12 +1,6 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  OneToMany,
-  Index,
-} from 'typeorm';
-import { MarketPair } from './market-pair.entity';
+import { Column, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
 import { CurrencyNetwork } from './currency-network.entity';
+import { MarketPair } from './market-pair.entity';
 
 @Entity('currencies')
 @Index('uk_currency_symbol', ['symbol'], { unique: true })
@@ -32,10 +26,16 @@ export class Currency {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
-  @OneToMany(() => MarketPair, (pair) => pair.base_currency)
+  @OneToMany(
+    () => MarketPair,
+    (pair) => pair.base_currency,
+  )
   base_pairs!: MarketPair[];
 
-  @OneToMany(() => MarketPair, (pair) => pair.quote_currency)
+  @OneToMany(
+    () => MarketPair,
+    (pair) => pair.quote_currency,
+  )
   quote_pairs!: MarketPair[];
 
   @OneToMany('Wallet', 'currency')
@@ -44,7 +44,10 @@ export class Currency {
   @OneToMany('WalletLedger', 'currency')
   wallet_ledgers!: any[];
 
-  @OneToMany(() => CurrencyNetwork, (network) => network.currency)
+  @OneToMany(
+    () => CurrencyNetwork,
+    (network) => network.currency,
+  )
   networks!: CurrencyNetwork[];
 
   @OneToMany('Deposit', 'currency')

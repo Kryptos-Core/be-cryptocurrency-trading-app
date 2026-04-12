@@ -1,15 +1,7 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  CreateDateColumn,
-  OneToMany,
-  Index,
-} from 'typeorm';
-import { UserSession } from './user-session.entity';
-import { Withdrawal } from './withdrawal.entity';
+import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
 import { ManagedWallet } from './managed-wallet.entity';
 import { TreasuryOperation } from './treasury-operation.entity';
+import { UserSession } from './user-session.entity';
 
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
@@ -44,13 +36,7 @@ export class User {
     enum: ['TRADER', 'ADMIN', 'RISK_OFFICER', 'SUPPORT_AGENT', 'MARKET_MAKER', 'FINANCE_MANAGER'],
     default: 'TRADER',
   })
-  role!:
-    | 'TRADER'
-    | 'ADMIN'
-    | 'RISK_OFFICER'
-    | 'SUPPORT_AGENT'
-    | 'MARKET_MAKER'
-    | 'FINANCE_MANAGER';
+  role!: 'TRADER' | 'ADMIN' | 'RISK_OFFICER' | 'SUPPORT_AGENT' | 'MARKET_MAKER' | 'FINANCE_MANAGER';
 
   /** Đã xác minh định danh (CCCD/Passport) — tách khỏi role. */
   @Column({ type: 'tinyint', width: 1, default: 0 })
@@ -75,7 +61,10 @@ export class User {
   @CreateDateColumn()
   created_at!: Date;
 
-  @OneToMany(() => UserSession, (session) => session.user)
+  @OneToMany(
+    () => UserSession,
+    (session) => session.user,
+  )
   sessions!: UserSession[];
 
   @OneToMany('Wallet', 'user')
@@ -102,9 +91,15 @@ export class User {
   @OneToMany('OnchainTransaction', 'user')
   onchain_transactions!: any[];
 
-  @OneToMany(() => ManagedWallet, (managedWallet) => managedWallet.user)
+  @OneToMany(
+    () => ManagedWallet,
+    (managedWallet) => managedWallet.user,
+  )
   managed_wallets!: ManagedWallet[];
 
-  @OneToMany(() => TreasuryOperation, (operation) => operation.actor_user)
+  @OneToMany(
+    () => TreasuryOperation,
+    (operation) => operation.actor_user,
+  )
   treasury_operations!: TreasuryOperation[];
 }

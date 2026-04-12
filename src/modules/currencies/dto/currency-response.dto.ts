@@ -33,12 +33,24 @@ export class CurrencyResponseDto {
   updated_at?: Date;
 
   // Virtual fields mapped từ Market (Ticker)
-  @ApiProperty({ description: 'Giá hiện tại (thường là định giá theo USDT/USD)', example: '69000.50', required: false })
+  @ApiProperty({
+    description: 'Giá hiện tại (thường là định giá theo USDT/USD)',
+    example: '69000.50',
+    required: false,
+  })
   lastPrice?: string;
 
-  @ApiProperty({ description: 'Phần trăm thay đổi giá trị trong 24h qua', example: '+5.24', required: false })
+  @ApiProperty({
+    description: 'Phần trăm thay đổi giá trị trong 24h qua',
+    example: '+5.24',
+    required: false,
+  })
   priceChangePercent24h?: string;
 
-  @ApiProperty({ description: 'Khối lượng giao dịch trong 24h qua', example: '1250000.00', required: false })
+  @ApiProperty({
+    description: 'Khối lượng giao dịch trong 24h qua',
+    example: '1250000.00',
+    required: false,
+  })
   volume24h?: string;
 }

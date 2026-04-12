@@ -1,9 +1,8 @@
 import {
-  OrderBookEvent,
-  OrderPlacedEvent,
-  OrderCancelledEvent,
-  TradeExecutedEvent,
   EventStore,
+  type OrderCancelledEvent,
+  type OrderPlacedEvent,
+  type TradeExecutedEvent,
 } from './event-store';
 
 describe('EventStore', () => {

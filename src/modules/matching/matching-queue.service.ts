@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { OrderBookOrder } from './interfaces';
+import { Injectable } from '@nestjs/common';
+import type { Queue } from 'bull';
+import type { OrderBookOrder } from './interfaces';
 
 export const MATCHING_QUEUE = 'matching';
 export const MATCH_ORDER_JOB = 'match-order';

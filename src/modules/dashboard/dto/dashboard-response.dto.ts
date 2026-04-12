@@ -93,9 +93,15 @@ export class DashboardResponseDto {
   @ApiProperty({ example: 3, description: 'Wallets with non-zero balance' })
   activeWalletCount!: number;
 
-  @ApiProperty({ type: [DashboardMarketDto], description: 'Top markets sorted by 24h quote volume' })
+  @ApiProperty({
+    type: [DashboardMarketDto],
+    description: 'Top markets sorted by 24h quote volume',
+  })
   topMarkets!: DashboardMarketDto[];
 
-  @ApiProperty({ type: [DashboardWalletDto], description: 'User wallets with USD value estimation' })
+  @ApiProperty({
+    type: [DashboardWalletDto],
+    description: 'User wallets with USD value estimation',
+  })
   wallets!: DashboardWalletDto[];
 }

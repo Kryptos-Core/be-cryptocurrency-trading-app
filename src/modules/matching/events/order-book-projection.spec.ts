@@ -1,10 +1,10 @@
-import { OrderBookProjection, ProjectedOrderBook } from './order-book-projection';
 import {
   EventStore,
-  OrderPlacedEvent,
-  OrderCancelledEvent,
-  TradeExecutedEvent,
+  type OrderCancelledEvent,
+  type OrderPlacedEvent,
+  type TradeExecutedEvent,
 } from './event-store';
+import { OrderBookProjection } from './order-book-projection';
 
 describe('OrderBookProjection', () => {
   let store: EventStore;
@@ -134,7 +134,7 @@ describe('OrderBookProjection', () => {
     // o1 had 2, filled 1, remaining 1
     const bid = book.bids.find((b) => b.orderId === 'o1');
     expect(bid).toBeDefined();
-    expect(bid!.remaining).toBe('1.000000000000000000');
+    expect(bid?.remaining).toBe('1.000000000000000000');
     // o2 fully filled (remaining 0) → removed from book
     const ask = book.asks.find((a) => a.orderId === 'o2');
     expect(ask).toBeUndefined();

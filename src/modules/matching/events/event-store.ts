@@ -96,9 +96,7 @@ export class EventStore {
     if (!stream) return [];
 
     const filtered =
-      afterSequence != null
-        ? stream.filter((s) => s.sequence > afterSequence)
-        : stream;
+      afterSequence != null ? stream.filter((s) => s.sequence > afterSequence) : stream;
 
     return filtered.map((s) => s.event);
   }

@@ -1,8 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard, RoleGuard } from '@/common/guards';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { UserRole } from '@/common/enums';
+import { JwtAuthGuard, RoleGuard } from '@/common/guards';
 import { buildAdminEnumsPayload } from './admin-enums.builder';
 
 @ApiTags('Metadata')

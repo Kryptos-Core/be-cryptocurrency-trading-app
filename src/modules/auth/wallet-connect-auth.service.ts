@@ -1,23 +1,23 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { appendFileSync } from 'fs';
-import { createHash } from 'crypto';
-import { resolve } from 'path';
-import bs58 from 'bs58';
+import { createHash } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import type SignClient from '@walletconnect/sign-client';
 import type { SessionTypes } from '@walletconnect/types';
 import { getAddressFromAccount, getChainFromAccount } from '@walletconnect/utils';
+import bs58 from 'bs58';
 import { uuidv7 } from 'uuidv7';
-import { CacheService } from '@/common/services';
-import { BadRequestException } from '@/common/exceptions';
 import { BlockchainNetwork } from '@/common/enums';
+import { BadRequestException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
 import { WcSessionStatus } from '@/modules/blockchain/wallet-connect/dto';
 import { withWalletConnectSignClientLock } from '@/modules/blockchain/wallet-connect/wallet-connect-sign-client-gate';
 import {
   WC_RELAY_PAIRING_CHAINS,
   wcCaip2ForChain,
 } from '@/modules/blockchain/wallet-connect/wc-caip.util';
-import { WalletAuthService, WalletAuthResult } from './wallet-auth.service';
-import type SignClient from '@walletconnect/sign-client';
+import type { WalletAuthResult, WalletAuthService } from './wallet-auth.service';
 
 // #region agent log
 function agentWcAuthDebugLog(payload: {
@@ -26,12 +26,11 @@ function agentWcAuthDebugLog(payload: {
   hypothesisId: string;
   data?: Record<string, unknown>;
 }): void {
-  const line =
-    JSON.stringify({
-      sessionId: 'cb6ec4',
-      timestamp: Date.now(),
-      ...payload,
-    }) + '\n';
+  const line = `${JSON.stringify({
+    sessionId: 'cb6ec4',
+    timestamp: Date.now(),
+    ...payload,
+  })}\n`;
   for (const logPath of [
     resolve(process.cwd(), '..', 'debug-cb6ec4.log'),
     resolve(process.cwd(), 'debug-cb6ec4.log'),
@@ -126,61 +125,66 @@ export class WalletConnectAuthService implements OnModuleInit {
 
     if (this.useRealWcPairing(chain)) {
       try {
-        const { wcUri: pairedUri } = await new Promise<{ wcUri: string }>((resolveHttp, rejectHttp) => {
-          void withWalletConnectSignClientLock(
-            { projectId: this.projectId, relayUrl: this.relayUrl },
-            async (client) => {
-              try {
-                const connectPromise = WalletConnectAuthService.isSolanaWcChain(chain)
-                  ? client.connect({
-                      optionalNamespaces: {
-                        solana: {
-                          chains: [wcCaip2ForChain(chain)],
-                          methods: ['solana_signMessage', 'solana_signTransaction'],
-                          events: [],
+        const { wcUri: pairedUri } = await new Promise<{ wcUri: string }>(
+          (resolveHttp, rejectHttp) => {
+            void withWalletConnectSignClientLock(
+              { projectId: this.projectId, relayUrl: this.relayUrl },
+              async (client) => {
+                try {
+                  const connectPromise = WalletConnectAuthService.isSolanaWcChain(chain)
+                    ? client.connect({
+                        optionalNamespaces: {
+                          solana: {
+                            chains: [wcCaip2ForChain(chain)],
+                            methods: ['solana_signMessage', 'solana_signTransaction'],
+                            events: [],
+                          },
                         },
-                      },
-                    })
-                  : client.connect({
-                      optionalNamespaces: {
-                        eip155: {
-                          chains: [wcCaip2ForChain(chain)],
-                          methods: ['personal_sign', 'eth_sendTransaction'],
-                          events: [],
+                      })
+                    : client.connect({
+                        optionalNamespaces: {
+                          eip155: {
+                            chains: [wcCaip2ForChain(chain)],
+                            methods: ['personal_sign', 'eth_sendTransaction'],
+                            events: [],
+                          },
                         },
-                      },
-                    });
-                const { uri, approval } = await this.withTimeout(
-                  connectPromise,
-                  WalletConnectAuthService.WC_CONNECT_TIMEOUT_MS,
-                  'WC_INIT_CONNECT_TIMEOUT',
-                );
-                if (!uri) {
-                  throw new Error('WalletConnect connect() returned empty uri');
+                      });
+                  const { uri, approval } = await this.withTimeout(
+                    connectPromise,
+                    WalletConnectAuthService.WC_CONNECT_TIMEOUT_MS,
+                    'WC_INIT_CONNECT_TIMEOUT',
+                  );
+                  if (!uri) {
+                    throw new Error('WalletConnect connect() returned empty uri');
+                  }
+                  const sessionData: WcAuthSessionData = {
+                    sessionId,
+                    chain,
+                    wcUri: uri,
+                    nonce,
+                    message,
+                    status: WcSessionStatus.PENDING,
+                    createdAt: Date.now(),
+                  };
+                  await this.saveSession(sessionId, sessionData);
+                  resolveHttp({ wcUri: uri });
+                  void this.runApprovalAndSign(sessionId, chain, message, approval, client).catch(
+                    (e) => {
+                      this.logger.error(
+                        `[WC-Auth] background pairing error sessionId=${sessionId}`,
+                        e,
+                      );
+                    },
+                  );
+                } catch (e) {
+                  rejectHttp(e);
+                  throw e;
                 }
-                const sessionData: WcAuthSessionData = {
-                  sessionId,
-                  chain,
-                  wcUri: uri,
-                  nonce,
-                  message,
-                  status: WcSessionStatus.PENDING,
-                  createdAt: Date.now(),
-                };
-                await this.saveSession(sessionId, sessionData);
-                resolveHttp({ wcUri: uri });
-                void this.runApprovalAndSign(sessionId, chain, message, approval, client).catch(
-                  (e) => {
-                    this.logger.error(`[WC-Auth] background pairing error sessionId=${sessionId}`, e);
-                  },
-                );
-              } catch (e) {
-                rejectHttp(e);
-                throw e;
-              }
-            },
-          ).catch(rejectHttp);
-        });
+              },
+            ).catch(rejectHttp);
+          },
+        );
         wcUri = pairedUri;
       } catch (e) {
         this.logger.error('[WC-Auth] SignClient connect failed', e);
@@ -318,7 +322,9 @@ export class WalletConnectAuthService implements OnModuleInit {
     );
 
     await this.deleteSession(sessionId);
-    this.logger.log(`[WC-Auth] verify OK: sessionId=${sessionId}, chain=${chain}, address=${address}`);
+    this.logger.log(
+      `[WC-Auth] verify OK: sessionId=${sessionId}, chain=${chain}, address=${address}`,
+    );
 
     return result;
   }
@@ -614,7 +620,10 @@ export class WalletConnectAuthService implements OnModuleInit {
     );
   }
 
-  private async patchSession(sessionId: string, partial: Partial<WcAuthSessionData>): Promise<void> {
+  private async patchSession(
+    sessionId: string,
+    partial: Partial<WcAuthSessionData>,
+  ): Promise<void> {
     const existing = await this.loadSession(sessionId);
     if (!existing) return;
 

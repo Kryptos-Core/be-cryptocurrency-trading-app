@@ -1,32 +1,18 @@
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiBody,
-} from '@nestjs/swagger';
-import { NotificationsService } from './notifications.service';
-import { CreateNotificationDto } from './dto/create-notification.dto';
-import { NotificationQueryDto } from './dto/notification-query.dto';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { CurrentUser, RequirePermissions } from '@/common/decorators';
+  ApiBadRequestResponse,
+  ApiSuccessResponse,
+  ApiUnauthorizedResponse,
+  CurrentUser,
+  RequirePermissions,
+} from '@/common/decorators';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
-import {
-  ApiSuccessResponse,
-  ApiBadRequestResponse,
-  ApiUnauthorizedResponse,
-} from '@/common/decorators';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { CreateNotificationDto } from './dto/create-notification.dto';
+import type { NotificationQueryDto } from './dto/notification-query.dto';
+import type { NotificationsService } from './notifications.service';
 
 /**
  * Notifications Controller
@@ -54,10 +40,7 @@ export class NotificationsController {
   @ApiSuccessResponse('Notification broadcasted')
   @ApiBadRequestResponse('Invalid input')
   @ApiUnauthorizedResponse('Unauthorized')
-  async broadcast(
-    @Body() dto: CreateNotificationDto,
-    @CurrentUser('userId') adminId: string,
-  ) {
+  async broadcast(@Body() dto: CreateNotificationDto, @CurrentUser('userId') adminId: string) {
     return this.notificationsService.broadcast(dto, adminId);
   }
 
@@ -109,10 +92,7 @@ export class NotificationsController {
   @ApiParam({ name: 'id', description: 'Notification ID (UUID)' })
   @ApiSuccessResponse('Notification marked as read')
   @ApiUnauthorizedResponse('Unauthorized')
-  async markRead(
-    @Param('id') notificationId: string,
-    @CurrentUser('userId') userId: string,
-  ) {
+  async markRead(@Param('id') notificationId: string, @CurrentUser('userId') userId: string) {
     return this.notificationsService.markRead(notificationId, userId);
   }
 }

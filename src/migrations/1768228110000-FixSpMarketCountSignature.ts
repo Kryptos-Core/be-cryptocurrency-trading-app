@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Fix sp_market_count signature: 2 params only (IN p_include_inactive, OUT p_total).

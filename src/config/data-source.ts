@@ -1,5 +1,5 @@
+import * as path from 'node:path';
 import { DataSource } from 'typeorm';
-import * as path from 'path';
 import { loadEnvFilesForCli } from './load-env-files';
 
 loadEnvFilesForCli();

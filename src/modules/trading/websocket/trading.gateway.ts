@@ -1,40 +1,40 @@
+import { Logger, type OnApplicationBootstrap, UseFilters } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import type { JwtService } from '@nestjs/jwt';
 import {
-  WebSocketGateway,
-  SubscribeMessage,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  WebSocketServer,
   ConnectedSocket,
   MessageBody,
-  OnGatewayInit,
+  type OnGatewayConnection,
+  type OnGatewayDisconnect,
+  type OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
-import { UseFilters, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { Namespace, Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { TradingSubscriptionService } from '../services/trading-subscription.service';
-import { BinancePriceFeedService } from '../services/binance-price-feed.service';
-import { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
-import { WorkspaceService } from '../services/workspace.service';
+import type { Namespace, Server, Socket } from 'socket.io';
+import type { RedisService } from '@/common/services';
 import {
-  WebSocketMessage,
-  AuthMessage,
-  SubscribeMessage as SubscribePayload,
-  UnsubscribeMessage,
-  TickerMessage,
-  OHLCMessage,
-  WebSocketErrorCode,
-  WorkspaceSubscription,
+  type AuthMessage,
   MARKET_EVENTS,
+  type OHLCMessage,
+  type SubscribeMessage as SubscribePayload,
+  type TickerMessage,
+  type UnsubscribeMessage,
+  type WebSocketErrorCode,
+  type WebSocketMessage,
+  type WorkspaceSubscription,
 } from '../interfaces/websocket.interface';
-import { JwtService } from '@nestjs/jwt';
+import type { BinancePriceFeedService } from '../services/binance-price-feed.service';
+import type { DashboardBroadcastService } from '../services/dashboard-broadcast.service';
+import type { TradingSubscriptionService } from '../services/trading-subscription.service';
+import type { WorkspaceService } from '../services/workspace.service';
 import { WebSocketExceptionFilter } from './filters/websocket-exception.filter';
-import { RedisService } from '@/common/services';
 
 /**
  * Trading WebSocket Gateway
  * Handles real-time trading data streaming (ticker, OHLC candles)
- * 
+ *
  * Connection Flow:
  * 1. Client connects to ws://localhost:3000/trading
  * 2. Client sends auth message with JWT token
@@ -56,11 +56,7 @@ import { RedisService } from '@/common/services';
 })
 @UseFilters(WebSocketExceptionFilter)
 export class TradingGateway
-  implements
-    OnGatewayInit,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    OnApplicationBootstrap
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap
 {
   @WebSocketServer()
   server!: Server;
@@ -162,7 +158,7 @@ export class TradingGateway
   ) {
     try {
       const token = message.data?.token;
-      
+
       if (!token) return this.sendError(client, 'AUTH_FAILED', 'Token is required');
 
       // Verify JWT token
@@ -187,9 +183,10 @@ export class TradingGateway
 
       // Restore workspace rooms from Redis (fire-and-forget; errors are logged)
       this.restoreWorkspace(client).catch((err) => {
-        this.logger.warn(`restoreWorkspace error: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(
+          `restoreWorkspace error: ${err instanceof Error ? err.message : String(err)}`,
+        );
       });
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Invalid token';
       return this.sendError(client, 'AUTH_FAILED', errorMessage);
@@ -213,9 +210,11 @@ export class TradingGateway
           client.join(`pair:${sub.pair_id}:ohlc:${sub.interval}`);
           // Register in subscription service so demand-based kline stays active
           const symbol = this.binancePriceFeedService.getSymbolForPair(sub.pair_id);
-          await this.subscriptionService.subscribe(
-            client.id, userId, sub.pair_id, sub.channels, sub.interval, symbol,
-          ).catch(() => { /* already subscribed or limit reached */ });
+          await this.subscriptionService
+            .subscribe(client.id, userId, sub.pair_id, sub.channels, sub.interval, symbol)
+            .catch(() => {
+              /* already subscribed or limit reached */
+            });
         }
       }
     }
@@ -277,7 +276,7 @@ export class TradingGateway
         } else if (channel === 'ohlc') {
           room = `pair:${pair_id}:ohlc:${interval}`;
         }
-        
+
         if (room) client.join(room);
       }
 
@@ -296,7 +295,6 @@ export class TradingGateway
         },
         timestamp: Date.now(),
       } as WebSocketMessage);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Subscription failed';
       return this.sendError(client, 'SERVER_ERROR', errorMessage);
@@ -354,7 +352,6 @@ export class TradingGateway
         },
         timestamp: Date.now(),
       } as WebSocketMessage);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unsubscription failed';
       return this.sendError(client, 'SERVER_ERROR', errorMessage);
@@ -400,7 +397,7 @@ export class TradingGateway
    */
   private broadcastPriceUpdate(ticker: TickerMessage) {
     const room = `pair:${ticker.pair_id}:ticker`;
-    
+
     this.server.to(room).emit('ticker', {
       type: 'ticker',
       data: ticker,
@@ -413,7 +410,7 @@ export class TradingGateway
    */
   private broadcastCandleUpdate(candle: OHLCMessage) {
     const room = `pair:${candle.pair_id}:ohlc:${candle.interval}`;
-    
+
     this.server.to(room).emit('ohlc', {
       type: 'ohlc',
       data: candle,

@@ -1,12 +1,12 @@
 import {
-  ArgumentsHost,
+  type ArgumentsHost,
   Catch,
-  ExceptionFilter,
+  type ExceptionFilter,
   HttpException,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { AppException } from '../exceptions';
 
 /**
@@ -50,7 +50,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         statusCode: status,
         timestamp: new Date().toISOString(),
         path: request.url,
-        ...(typeof exceptionResponse === 'object' ? exceptionResponse : { message: exceptionResponse }),
+        ...(typeof exceptionResponse === 'object'
+          ? exceptionResponse
+          : { message: exceptionResponse }),
       };
     } else if (exception instanceof Error) {
       // Unhandled Error

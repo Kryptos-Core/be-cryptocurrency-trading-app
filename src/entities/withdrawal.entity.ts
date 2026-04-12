@@ -1,15 +1,15 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { Currency } from './currency.entity';
 import { CurrencyNetwork } from './currency-network.entity';
+import { User } from './user.entity';
 
 @Entity('withdrawals')
 @Index('uk_withdraw_idem', ['user_id', 'idempotency_key'], { unique: true })
@@ -58,17 +58,29 @@ export class Withdrawal {
   @Column({ type: 'datetime', nullable: true })
   processed_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.withdrawals, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.withdrawals,
+    { onDelete: 'CASCADE' },
+  )
   user!: User;
 
-  @ManyToOne(() => Currency, (currency) => currency.withdrawals, {
-    onDelete: 'RESTRICT',
-  })
+  @ManyToOne(
+    () => Currency,
+    (currency) => currency.withdrawals,
+    {
+      onDelete: 'RESTRICT',
+    },
+  )
   currency!: Currency;
 
-  @ManyToOne(() => CurrencyNetwork, (network) => network.withdrawals, {
-    onDelete: 'SET NULL',
-    nullable: true,
-  })
+  @ManyToOne(
+    () => CurrencyNetwork,
+    (network) => network.withdrawals,
+    {
+      onDelete: 'SET NULL',
+      nullable: true,
+    },
+  )
   network!: CurrencyNetwork;
 }

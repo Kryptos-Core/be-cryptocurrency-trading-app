@@ -1,13 +1,11 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Unifies user-facing deposit defaults with transaction_wallets:
  * - Adds is_default_user_deposit / default_set_at
  * - Backfills from managed_wallets (match chain+address; import missing rows)
  */
-export class AddTransactionWalletUserDepositDefault1775420000000
-  implements MigrationInterface
-{
+export class AddTransactionWalletUserDepositDefault1775420000000 implements MigrationInterface {
   name = 'AddTransactionWalletUserDepositDefault1775420000000';
 
   private async addColumnIfNotExists(
@@ -92,9 +90,7 @@ export class AddTransactionWalletUserDepositDefault1775420000000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      'ALTER TABLE `transaction_wallets` DROP COLUMN `default_set_at`',
-    );
+    await queryRunner.query('ALTER TABLE `transaction_wallets` DROP COLUMN `default_set_at`');
     await queryRunner.query(
       'ALTER TABLE `transaction_wallets` DROP COLUMN `is_default_user_deposit`',
     );

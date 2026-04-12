@@ -1,9 +1,4 @@
-import {
-  OrderStatus,
-  UserRole,
-  UserStatus,
-  OnchainTxStatus,
-} from '@/common/enums';
+import { OnchainTxStatus, OrderStatus, UserRole, UserStatus } from '@/common/enums';
 
 /** Fiat (PayOS) deposit rows — matches GET /deposits/admin/all filter. */
 export const FIAT_DEPOSIT_ADMIN_STATUSES = ['PENDING', 'PAID', 'CANCELLED'] as const;

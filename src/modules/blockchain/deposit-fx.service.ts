@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { CacheService } from '@/common/services';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
-import { BlockchainNetwork } from '@/common/enums';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
+import type { BlockchainNetwork } from '@/common/enums';
+import type { CacheService } from '@/common/services';
+import type { CurrencyRepository } from '@/modules/currencies/repositories';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 export interface DepositConversionResult {
   /** ID của currency platform cash (USDT) sẽ được credit vào ví user (UUID) */
@@ -62,9 +62,7 @@ export class DepositFxService {
     }
 
     const rate = await this.fetchConversionRate(nativeSymbol, cashCurrencySymbol);
-    const creditAmount = new Decimal(nativeAmount)
-      .mul(rate)
-      .toFixed(8, Decimal.ROUND_DOWN);
+    const creditAmount = new Decimal(nativeAmount).mul(rate).toFixed(8, Decimal.ROUND_DOWN);
 
     this.logger.log(
       `[DepositFx] ${nativeAmount} ${nativeSymbol} → ${creditAmount} ${cashCurrencySymbol} (rate=${rate})`,
@@ -82,10 +80,7 @@ export class DepositFxService {
    * Lấy tỷ giá native→USDT với cache Redis.
    * Thứ tự ưu tiên: Redis cache → Binance API → config fallback.
    */
-  async fetchConversionRate(
-    fromSymbol: string,
-    toSymbol: string,
-  ): Promise<string> {
+  async fetchConversionRate(fromSymbol: string, toSymbol: string): Promise<string> {
     const pair = `${fromSymbol.toUpperCase()}${toSymbol.toUpperCase()}`;
     const cacheKey = `price:oracle:${pair}`;
 
@@ -111,7 +106,7 @@ export class DepositFxService {
     if (!rate) {
       throw new Error(
         `Cannot resolve conversion rate for ${pair}. ` +
-        `Set BLOCKCHAIN_DEPOSIT_${fromSymbol.toUpperCase()}_TO_USDT_RATE in config.`,
+          `Set BLOCKCHAIN_DEPOSIT_${fromSymbol.toUpperCase()}_TO_USDT_RATE in config.`,
       );
     }
 
@@ -129,9 +124,9 @@ export class DepositFxService {
       if (!res.ok) {
         throw new Error(`Binance returned HTTP ${res.status}`);
       }
-      const data = await res.json() as { price?: string };
+      const data = (await res.json()) as { price?: string };
       const price = data?.price;
-      if (!price || isNaN(Number(price)) || Number(price) <= 0) {
+      if (!price || Number.isNaN(Number(price)) || Number(price) <= 0) {
         throw new Error(`Invalid price from Binance: ${price}`);
       }
       return price;
@@ -143,16 +138,16 @@ export class DepositFxService {
   private async getConfigFallbackRate(fromSymbol: string): Promise<string | null> {
     const key = `BLOCKCHAIN_DEPOSIT_${fromSymbol.toUpperCase()}_TO_USDT_RATE`;
     const val = (await this.systemConfigService.get<string>(key))?.trim();
-    if (val && !isNaN(Number(val)) && Number(val) > 0) {
+    if (val && !Number.isNaN(Number(val)) && Number(val) > 0) {
       return val;
     }
     return null;
   }
 
   private async resolveCashCurrencySymbol(): Promise<string> {
-    const sym = (
-      await this.systemConfigService.getEffectiveString('PLATFORM_CASH_CURRENCY_SYMBOL')
-    ).trim().toUpperCase();
+    const sym = (await this.systemConfigService.getEffectiveString('PLATFORM_CASH_CURRENCY_SYMBOL'))
+      .trim()
+      .toUpperCase();
     if (sym !== 'USDT') {
       this.logger.warn(
         `Platform cash is "${sym}" — on-chain deposits will credit that wallet. Expected USDT for typical setups.`,

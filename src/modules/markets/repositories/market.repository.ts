@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { MARKET_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { newUuid } from '@/common/utils/uuid.util';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { Trade } from '@/entities/trade.entity';
-import { IMarketTickerData } from '../interfaces/market-ticker.interface';
+import type { IMarketTickerData } from '../interfaces/market-ticker.interface';
 
 /**
  * Market Repository
@@ -30,7 +30,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       // If options has a where clause with pair_id, use it
       if (options?.where?.pair_id !== undefined) {
         const id = options.where.pair_id;
-        const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [id]);
+        const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+          id,
+        ]);
         if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
           return null;
         }
@@ -57,7 +59,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async findById(id: number | string): Promise<MarketPair | null> {
     try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [id]);
+      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        id,
+      ]);
       if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
         return null;
       }
@@ -74,9 +78,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async findBySymbol(symbol: string): Promise<MarketPair | null> {
     try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_SYMBOL}(?)`, [
-        symbol.toUpperCase(),
-      ]);
+      const result = await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.FIND_BY_SYMBOL}(?)`,
+        [symbol.toUpperCase()],
+      );
       if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
         return null;
       }
@@ -124,14 +129,15 @@ export class MarketRepository extends BaseRepository<MarketPair> {
   ): Promise<{ data: MarketPair[]; total: number; page: number; limit: number }> {
     try {
       const skip = (page - 1) * limit;
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`, [
-        skip,
-        limit,
-        includeInactive,
-      ]);
+      const result = await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.FIND_ALL}(?, ?, ?)`,
+        [skip, limit, includeInactive],
+      );
 
       // Get total count using stored procedure
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.COUNT}(?, @total)`, [includeInactive]);
+      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.COUNT}(?, @total)`, [
+        includeInactive,
+      ]);
       const totalResult = await this.dataSource.query('SELECT @total as total');
       const total = totalResult[0]?.total || 0;
 
@@ -175,12 +181,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
         [skip, limit, includeInactive, search, baseSymbol, quoteSymbol],
       );
 
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.COUNT_FILTERED}(?, ?, ?, ?, @total)`, [
-        includeInactive,
-        search,
-        baseSymbol,
-        quoteSymbol,
-      ]);
+      await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.COUNT_FILTERED}(?, ?, ?, ?, @total)`,
+        [includeInactive, search, baseSymbol, quoteSymbol],
+      );
       const totalResult = await this.dataSource.query('SELECT @total as total');
       const total = totalResult[0]?.total || 0;
 
@@ -254,7 +258,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       const skip = (page - 1) * limit;
       const includeInactive = options.includeInactive ?? false;
       const search = options.search?.trim() ? options.search.trim().toUpperCase() : null;
-      const baseSymbol = options.baseSymbol?.trim() ? options.baseSymbol.trim().toUpperCase() : null;
+      const baseSymbol = options.baseSymbol?.trim()
+        ? options.baseSymbol.trim().toUpperCase()
+        : null;
       const quoteSymbol = options.quoteSymbol?.trim()
         ? options.quoteSymbol.trim().toUpperCase()
         : null;
@@ -284,14 +290,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
         ],
       );
 
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.COUNT_ADVANCED}(?, ?, ?, ?, ?, ?, @total)`, [
-        includeInactive,
-        search,
-        baseSymbol,
-        quoteSymbol,
-        quoteSymbolsCsv,
-        fuzzySearch,
-      ]);
+      await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.COUNT_ADVANCED}(?, ?, ?, ?, ?, ?, @total)`,
+        [includeInactive, search, baseSymbol, quoteSymbol, quoteSymbolsCsv, fuzzySearch],
+      );
       const totalResult = await this.dataSource.query('SELECT @total as total');
       const total = Number(totalResult[0]?.total ?? 0);
       const rows = result?.[0] || [];
@@ -310,9 +312,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async findActive(): Promise<MarketPair[]> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${MARKET_STORE_PROCEDURE.FIND_ACTIVE}()`,
-      );
+      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_ACTIVE}()`);
       if (!result || result.length === 0 || !result[0]) {
         return [];
       }
@@ -333,11 +333,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     excludePairId?: string,
   ): Promise<boolean> {
     try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.PAIR_EXISTS}(?, ?, ?, @exists)`, [
-        baseCurrencyId,
-        quoteCurrencyId,
-        excludePairId || null,
-      ]);
+      const _result = await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.PAIR_EXISTS}(?, ?, ?, @exists)`,
+        [baseCurrencyId, quoteCurrencyId, excludePairId || null],
+      );
       const existsResult = await this.dataSource.query('SELECT @exists as exists');
       return existsResult[0]?.exists === 1 || existsResult[0]?.exists === true;
     } catch (error) {
@@ -352,10 +351,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async symbolExists(symbol: string, excludePairId?: string): Promise<boolean> {
     try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`, [
-        symbol.toUpperCase(),
-        excludePairId || null,
-      ]);
+      const _result = await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.SYMBOL_EXISTS}(?, ?, @exists)`,
+        [symbol.toUpperCase(), excludePairId || null],
+      );
       const existsResult = await this.dataSource.query('SELECT @exists as exists');
       return existsResult[0]?.exists === 1 || existsResult[0]?.exists === true;
     } catch (error) {
@@ -418,10 +417,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Get order book for a market pair
    * Complex Query: Aggregates orders by price level
    */
-  async getOrderBook(
-    pairId: string,
-    limit: number = 20,
-  ): Promise<{ bids: any[]; asks: any[] }> {
+  async getOrderBook(pairId: string, limit: number = 20): Promise<{ bids: any[]; asks: any[] }> {
     try {
       const bidsResult = await this.dataSource.query(
         `CALL ${MARKET_STORE_PROCEDURE.ORDER_BOOK_BIDS}(?, ?)`,
@@ -463,7 +459,9 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async getTicker(pairId: string): Promise<IMarketTickerData> {
     try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.TICKER}(?)`, [pairId]);
+      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.TICKER}(?)`, [
+        pairId,
+      ]);
       const row = result?.[0]?.[0] || {};
 
       const lastPrice = row.last_price?.toString() || '0';
@@ -477,9 +475,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
 
       const changeAmount = parseFloat(lastPrice) - parseFloat(open24h);
       const changePercent =
-        parseFloat(open24h) > 0
-          ? ((changeAmount / parseFloat(open24h)) * 100).toFixed(2)
-          : '0';
+        parseFloat(open24h) > 0 ? ((changeAmount / parseFloat(open24h)) * 100).toFixed(2) : '0';
 
       return {
         lastPrice,
@@ -504,10 +500,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    */
   async getRecentTrades(pairId: string, limit: number = 50): Promise<Trade[]> {
     try {
-      const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.RECENT_TRADES}(?, ?)`, [
-        pairId,
-        limit,
-      ]);
+      const result = await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.RECENT_TRADES}(?, ?)`,
+        [pairId, limit],
+      );
       const rows = result?.[0] || [];
       return rows.map((row: any) => this.mapTradeRow(row));
     } catch (error) {
@@ -525,18 +521,21 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       const pairId = entity.pair_id ?? newUuid();
       const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-        pairId,
-        entity.base_currency_id,
-        entity.quote_currency_id,
-        symbol,
-        entity.price_scale ?? 2,
-        entity.amount_scale ?? 6,
-        entity.min_order_amount ?? '0.0001',
-        entity.maker_fee_rate ?? 0.001,
-        entity.taker_fee_rate ?? 0.001,
-        entity.is_active ?? true,
-      ]);
+      await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          pairId,
+          entity.base_currency_id,
+          entity.quote_currency_id,
+          symbol,
+          entity.price_scale ?? 2,
+          entity.amount_scale ?? 6,
+          entity.min_order_amount ?? '0.0001',
+          entity.maker_fee_rate ?? 0.001,
+          entity.taker_fee_rate ?? 0.001,
+          entity.is_active ?? true,
+        ],
+      );
 
       const createdPair = await this.findById(pairId);
       if (!createdPair) {
@@ -559,18 +558,21 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
 
       // Call stored procedure
-      await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-        id,
-        entity.base_currency_id ?? null,
-        entity.quote_currency_id ?? null,
-        symbol,
-        entity.price_scale ?? null,
-        entity.amount_scale ?? null,
-        entity.min_order_amount ?? null,
-        entity.maker_fee_rate ?? null,
-        entity.taker_fee_rate ?? null,
-        entity.is_active ?? null,
-      ]);
+      await this.dataSource.query(
+        `CALL ${MARKET_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          entity.base_currency_id ?? null,
+          entity.quote_currency_id ?? null,
+          symbol,
+          entity.price_scale ?? null,
+          entity.amount_scale ?? null,
+          entity.min_order_amount ?? null,
+          entity.maker_fee_rate ?? null,
+          entity.taker_fee_rate ?? null,
+          entity.is_active ?? null,
+        ],
+      );
 
       // Fetch the updated pair using stored procedure
       const updatedPair = await this.findById(id);

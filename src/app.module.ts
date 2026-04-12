@@ -1,36 +1,34 @@
+import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bull';
-import { getTypeOrmConfig } from './config/typeorm.config';
-import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
-import { PaymentConfigModule } from './modules/payment-config/payment-config.module';
-
-import { CurrenciesModule } from './modules/currencies/currencies.module';
-import { MarketsModule } from './modules/markets/markets.module';
-import { RedisModule } from './modules/redis/redis.module';
-import { WalletsModule } from './modules/wallets/wallets.module';
-import { OrdersModule } from './modules/orders/orders.module';
-import { MatchingModule } from './modules/matching/matching.module';
-import { TradingModule } from './modules/trading/trading.module';
-import { ExchangeModule } from './modules/exchange/exchange.module';
-import { BlockchainModule } from './modules/blockchain/blockchain.module';
-import { DepositsModule } from './modules/deposits/deposits.module';
-import { ManagedWalletsModule } from './modules/managed-wallets/managed-wallets.module';
-import { DashboardModule } from './modules/dashboard/dashboard.module';
-import { HealthModule } from './health/health.module';
-import { NotificationsModule } from './modules/notifications/notifications.module';
-import { MarketMakerModule } from './modules/market-maker/market-maker.module';
-import { TreasuryModule } from './modules/treasury/treasury.module';
-import { SystemConfigModule } from './modules/system-config/system-config.module';
-import { MetadataModule } from './modules/metadata/metadata.module';
-
+import { TypeOrmModule } from '@nestjs/typeorm';
+import appConfig from './config/app.config';
 import { validateEnvironment } from './config/env.validation';
 import { nestEnvFilePaths } from './config/load-env-files';
-import appConfig from './config/app.config';
+import { getTypeOrmConfig } from './config/typeorm.config';
+import { HealthModule } from './health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { BlockchainModule } from './modules/blockchain/blockchain.module';
+import { CurrenciesModule } from './modules/currencies/currencies.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DepositsModule } from './modules/deposits/deposits.module';
+import { ExchangeModule } from './modules/exchange/exchange.module';
+import { ManagedWalletsModule } from './modules/managed-wallets/managed-wallets.module';
+import { MarketMakerModule } from './modules/market-maker/market-maker.module';
+import { MarketsModule } from './modules/markets/markets.module';
+import { MatchingModule } from './modules/matching/matching.module';
+import { MetadataModule } from './modules/metadata/metadata.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentConfigModule } from './modules/payment-config/payment-config.module';
+import { RedisModule } from './modules/redis/redis.module';
+import { SystemConfigModule } from './modules/system-config/system-config.module';
+import { TradingModule } from './modules/trading/trading.module';
+import { TreasuryModule } from './modules/treasury/treasury.module';
+import { UsersModule } from './modules/users/users.module';
+import { WalletsModule } from './modules/wallets/wallets.module';
 
 @Module({
   imports: [
@@ -84,7 +82,6 @@ import appConfig from './config/app.config';
     TreasuryModule,
     SystemConfigModule,
     MetadataModule,
-
   ],
 })
 export class AppModule {}

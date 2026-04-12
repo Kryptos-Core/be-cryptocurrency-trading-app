@@ -4,7 +4,7 @@ dist/
 .DS_Store
 
 # Environment (do not commit secrets)
-.env
+.env.development
 # .env.*
 
 # Local seed users (copy from src/seed/data/users.json.example)

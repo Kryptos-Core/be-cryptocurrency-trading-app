@@ -1,4 +1,4 @@
-import { OrderBookOrder } from '../interfaces';
+import type { OrderBookOrder } from '../interfaces';
 import { marketOrderCanFullyFillRemaining } from './market-fok-fill.util';
 
 function mk(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {

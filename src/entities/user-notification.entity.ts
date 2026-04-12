@@ -1,13 +1,6 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  CreateDateColumn,
-  ManyToOne,
-  Index,
-} from 'typeorm';
-import { User } from './user.entity';
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Notification } from './notification.entity';
+import { User } from './user.entity';
 
 @Entity('user_notifications')
 @Index('uk_user_notif', ['user_id', 'notification_id'], { unique: true })
@@ -34,6 +27,10 @@ export class UserNotification {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   user!: User;
 
-  @ManyToOne(() => Notification, (n) => n.user_notifications, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => Notification,
+    (n) => n.user_notifications,
+    { onDelete: 'CASCADE' },
+  )
   notification!: Notification;
 }

@@ -1,9 +1,9 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
 
 /**
  * Custom Decorator để lấy current user từ request
  * Dùng sau khi JwtAuthGuard đã inject user vào request
- * 
+ *
  * Usage:
  * @Get('profile')
  * @UseGuards(JwtAuthGuard)

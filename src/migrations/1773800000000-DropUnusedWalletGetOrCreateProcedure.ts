@@ -1,14 +1,10 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class DropUnusedWalletGetOrCreateProcedure1773800000000
-  implements MigrationInterface
-{
+export class DropUnusedWalletGetOrCreateProcedure1773800000000 implements MigrationInterface {
   name = 'DropUnusedWalletGetOrCreateProcedure1773800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      'DROP PROCEDURE IF EXISTS sp_wallet_get_or_create_for_update',
-    );
+    await queryRunner.query('DROP PROCEDURE IF EXISTS sp_wallet_get_or_create_for_update');
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

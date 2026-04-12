@@ -1,22 +1,22 @@
 import {
- Controller,
- Post,
- Body,
- Req,
- UseGuards,
- Get,
- Param,
- Query,
- ParseIntPipe,
- DefaultValuePipe,
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { DepositsService } from './deposits.service';
-import { CreateFiatDepositDto } from './dto/create-deposit.dto';
-import { JwtAuthGuard, RoleGuard, PermissionGuard } from '@/common/guards';
-import { Request } from 'express';
-import { RequireRoles, RequirePermissions } from '@/common/decorators';
-import { UserRole, Permission } from '@/common/enums';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { RequirePermissions, RequireRoles } from '@/common/decorators';
+import { Permission, UserRole } from '@/common/enums';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type { DepositsService } from './deposits.service';
+import type { CreateFiatDepositDto } from './dto/create-deposit.dto';
 
 @ApiTags('Deposits')
 @Controller('deposits')
@@ -27,10 +27,7 @@ export class DepositsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new deposit link using PayOS' })
-  async createDepositLink(
-    @Req() req: Request,
-    @Body() dto: CreateFiatDepositDto,
-  ) {
+  async createDepositLink(@Req() req: Request, @Body() dto: CreateFiatDepositDto) {
     const user = req.user as any;
     return this.depositsService.createPaymentLink(user.userId, dto.amount);
   }
@@ -74,7 +71,10 @@ export class DepositsController {
   @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Admin: List all deposits', description: 'Paginated list of all fiat deposits with optional filters.' })
+  @ApiOperation({
+    summary: 'Admin: List all deposits',
+    description: 'Paginated list of all fiat deposits with optional filters.',
+  })
   @ApiQuery({ name: 'userId', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'PAID', 'CANCELLED'] })
   @ApiQuery({ name: 'page', required: false, type: Number })

@@ -1,16 +1,19 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   ForeignKey,
   Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
 import { User } from './user.entity';
-import { BLOCKCHAIN_CHAIN_DB_VALUES, BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
 @Entity('managed_wallets')
 @Index('uk_managed_wallet_user_chain_addr', ['user_id', 'chain', 'address'], {
@@ -62,7 +65,11 @@ export class ManagedWallet {
   @UpdateDateColumn()
   updated_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.managed_wallets, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.managed_wallets,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'user_id' })
   user!: User;
 }

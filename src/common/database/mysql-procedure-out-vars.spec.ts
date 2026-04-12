@@ -1,11 +1,11 @@
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { selectMysqlUserVars } from './mysql-procedure-out-vars';
 
 describe('selectMysqlUserVars', () => {
   it('builds SELECT from varAliases and returns first row', async () => {
-    const query = jest.fn().mockResolvedValue([
-      { trade_id: 't1', error_code: null, error_message: null },
-    ]);
+    const query = jest
+      .fn()
+      .mockResolvedValue([{ trade_id: 't1', error_code: null, error_message: null }]);
     const dataSource = { query } as unknown as DataSource;
 
     const row = await selectMysqlUserVars(dataSource, {

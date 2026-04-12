@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { UnauthorizedException } from '@/common/exceptions';
-import { Permission, UserRole } from '@/common/enums';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
+import type { Permission, UserRole } from '@/common/enums';
+import { UnauthorizedException } from '@/common/exceptions';
 
 /**
  * JWT Strategy - Xác thực token và inject user vào request

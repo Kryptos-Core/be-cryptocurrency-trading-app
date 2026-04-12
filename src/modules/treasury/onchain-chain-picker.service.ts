@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { buildChainPickerOptions, ChainPickerOptionsDto } from './onchain-chain-picker.util';
+import type { ConfigService } from '@nestjs/config';
+import { buildChainPickerOptions, type ChainPickerOptionsDto } from './onchain-chain-picker.util';
 
 @Injectable()
 export class OnchainChainPickerService {

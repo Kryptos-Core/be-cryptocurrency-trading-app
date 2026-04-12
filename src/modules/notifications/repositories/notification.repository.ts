@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { NOTIFICATION_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { Notification } from '@/entities/notification.entity';
@@ -56,11 +56,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
     }
   }
 
-  async findByUser(
-    userId: string,
-    limit: number,
-    offset: number,
-  ): Promise<NotificationRow[]> {
+  async findByUser(userId: string, limit: number, offset: number): Promise<NotificationRow[]> {
     try {
       const result = await this.dataSource.query(
         `CALL ${NOTIFICATION_STORE_PROCEDURE.FIND_BY_USER}(?, ?, ?)`,
@@ -88,10 +84,10 @@ export class NotificationRepository extends BaseRepository<Notification> {
 
   async markRead(notificationId: string, userId: string): Promise<void> {
     try {
-      await this.dataSource.query(
-        `CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_READ}(?, ?)`,
-        [notificationId, userId],
-      );
+      await this.dataSource.query(`CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_READ}(?, ?)`, [
+        notificationId,
+        userId,
+      ]);
     } catch (error) {
       this.logger.error(
         `Error marking notification read: notif=${notificationId}, user=${userId}`,
@@ -103,10 +99,9 @@ export class NotificationRepository extends BaseRepository<Notification> {
 
   async markAllRead(userId: string): Promise<void> {
     try {
-      await this.dataSource.query(
-        `CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_ALL_READ}(?)`,
-        [userId],
-      );
+      await this.dataSource.query(`CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_ALL_READ}(?)`, [
+        userId,
+      ]);
     } catch (error) {
       this.logger.error(`Error marking all notifications read for user: ${userId}`, error);
       throw error;

@@ -1,37 +1,37 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { uuidv7 } from 'uuidv7';
 import { TronWeb } from 'tronweb';
-import { WalletEncryptionService } from '@/common/services';
+import { uuidv7 } from 'uuidv7';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
+import { BlockchainNetwork, UserRole } from '@/common/enums';
 import {
   BadRequestException,
   BusinessException,
   ForbiddenException,
   NotFoundException,
 } from '@/common/exceptions';
-import { BlockchainNetwork, UserRole } from '@/common/enums';
-import { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import {
+import type { WalletEncryptionService } from '@/common/services';
+import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
+import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
+import type {
+  TreasuryTransactionWalletRepository,
+  TronDepositUiChain,
+} from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
+import type { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import type { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import type {
   CreateManagedWalletDto,
   ManagedWalletResponseDto,
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
 } from './dto';
-import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
-import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
-import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
-import {
-  BLOCKCHAIN_CHAIN_DB_VALUES,
-  type BlockchainChainDbValue,
-} from '@/common/constants/blockchain-chain-db';
-import {
-  TreasuryTransactionWalletRepository,
-  type TronDepositUiChain,
-} from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
-import { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
+import type { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
 
 const MANAGED_TRON_CHAINS = [
   BlockchainNetwork.TRON_MAINNET,
@@ -62,7 +62,9 @@ type DepositMethodItem = {
 export class ManagedWalletsService {
   private readonly logger = new Logger(ManagedWalletsService.name);
   private static readonly RECOMMENDED_CHAIN_KEY = 'deposit.recommended_chain';
-  private static readonly SUPPORTED_CHAINS: SupportedManagedWalletChain[] = [...MANAGED_TRON_CHAINS];
+  private static readonly SUPPORTED_CHAINS: SupportedManagedWalletChain[] = [
+    ...MANAGED_TRON_CHAINS,
+  ];
 
   constructor(
     private readonly managedWalletsDataRepository: ManagedWalletsDataRepository,
@@ -258,7 +260,9 @@ export class ManagedWalletsService {
   }
 
   /** User-visible Tron deposit address from transaction_wallets only. */
-  async getConfiguredDepositWallet(chain: string): Promise<ConfiguredDepositWalletResolution | null> {
+  async getConfiguredDepositWallet(
+    chain: string,
+  ): Promise<ConfiguredDepositWalletResolution | null> {
     if (chain !== BlockchainNetwork.TRON_MAINNET) {
       return null;
     }
@@ -371,17 +375,25 @@ export class ManagedWalletsService {
   private async resolveDepositMethodDisplayAddress(chain: string): Promise<string> {
     const c = chain as BlockchainNetwork;
     if (c === BlockchainNetwork.TRON_MAINNET) {
-      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(BlockchainNetwork.TRON_MAINNET);
+      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(
+        BlockchainNetwork.TRON_MAINNET,
+      );
       return tw?.address ?? '';
     }
     if (c === BlockchainNetwork.TRON_NILE || c === BlockchainNetwork.TRON_SHASTA) {
-      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(c as TronDepositUiChain);
+      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(
+        c as TronDepositUiChain,
+      );
       if (tw?.address) {
         return tw.address;
       }
-      return (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? '';
+      return (
+        (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? ''
+      );
     }
-    return (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? '';
+    return (
+      (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? ''
+    );
   }
 
   private static depositLabelForChain(chain: string): string {

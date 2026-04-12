@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Recreate currency stored procedures for UUID v7 schema.
@@ -156,9 +156,16 @@ export class RecreateCurrenciesProceduresUuidV71768227900000 implements Migratio
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     const procedures = [
-      'sp_currency_find_tradable', 'sp_currency_find_active', 'sp_currency_symbol_exists',
-      'sp_currency_delete', 'sp_currency_update', 'sp_currency_create', 'sp_currency_count',
-      'sp_currency_find_all', 'sp_currency_find_by_symbol', 'sp_currency_find_by_id',
+      'sp_currency_find_tradable',
+      'sp_currency_find_active',
+      'sp_currency_symbol_exists',
+      'sp_currency_delete',
+      'sp_currency_update',
+      'sp_currency_create',
+      'sp_currency_count',
+      'sp_currency_find_all',
+      'sp_currency_find_by_symbol',
+      'sp_currency_find_by_id',
     ];
     for (const name of procedures) {
       await queryRunner.query(`DROP PROCEDURE IF EXISTS \`${name}\``);

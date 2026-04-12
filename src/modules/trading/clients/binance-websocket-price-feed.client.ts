@@ -1,10 +1,7 @@
 import { Logger } from '@nestjs/common';
 import WebSocket from 'ws';
-import { TickerMessage, OHLCMessage, CandleInterval } from '../interfaces/websocket.interface';
-import {
-  IPriceFeedClient,
-  SymbolToPairIdResolver,
-} from '../interfaces/price-feed.interface';
+import type { IPriceFeedClient, SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
+import type { CandleInterval, OHLCMessage, TickerMessage } from '../interfaces/websocket.interface';
 
 const BINANCE_WS_BASE = 'wss://stream.binance.com:9443';
 /** Max symbols in combined stream URL; beyond this URL can exceed server limit (414 URI Too Long). */
@@ -250,10 +247,7 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
 
         this.ws.on('error', (err: Error) => {
           if (this.shouldLog('ws_error')) {
-            this.logger.error(
-              'Binance WebSocket error',
-              err?.message ?? String(err),
-            );
+            this.logger.error('Binance WebSocket error', err?.message ?? String(err));
           }
         });
 
@@ -290,10 +284,7 @@ export class BinanceWebSocketPriceFeedClient implements IPriceFeedClient {
 
   private scheduleReconnect(): void {
     if (this.destroyed || this.reconnectTimer) return;
-    const delay = Math.min(
-      RECONNECT_INITIAL_MS * Math.pow(2, this.reconnectAttempt),
-      RECONNECT_MAX_MS,
-    );
+    const delay = Math.min(RECONNECT_INITIAL_MS * 2 ** this.reconnectAttempt, RECONNECT_MAX_MS);
     this.reconnectAttempt += 1;
     const jitter = Math.floor(delay * 0.2 * Math.random());
     const withJitter = delay + jitter;

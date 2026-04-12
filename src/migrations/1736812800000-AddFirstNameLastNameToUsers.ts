@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: Add first_name and last_name to users table
  * Pattern: Database Migration Pattern
- * 
+ *
  * This migration:
  * 1. Adds first_name and last_name columns to users table
  * 2. Updates sp_user_create procedure to accept first_name and last_name
@@ -45,7 +45,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 2: Drop and recreate sp_user_create with new parameters
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_create`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_create(
         IN p_email VARCHAR(255),
@@ -64,7 +64,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 3: Update sp_user_find_by_id to return first_name and last_name
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_find_by_id`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_id(
         IN p_user_id BIGINT
@@ -79,7 +79,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 4: Update sp_user_find_by_email to return first_name and last_name
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_find_by_email`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_email(
         IN p_email VARCHAR(255)
@@ -94,7 +94,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 5: Update sp_user_find_all to return first_name and last_name
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_find_all`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_all(
         IN p_skip INT,
@@ -112,10 +112,10 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Rollback: Restore original procedures and remove columns
-    
+
     // Step 1: Restore original sp_user_create
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_create`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_create(
         IN p_email VARCHAR(255),
@@ -132,7 +132,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 2: Restore original sp_user_find_by_id
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_find_by_id`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_id(
         IN p_user_id BIGINT
@@ -147,7 +147,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 3: Restore original sp_user_find_by_email
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_find_by_email`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_email(
         IN p_email VARCHAR(255)
@@ -162,7 +162,7 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
 
     // Step 4: Restore original sp_user_find_all
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_user_find_all`);
-    
+
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_all(
         IN p_skip INT,

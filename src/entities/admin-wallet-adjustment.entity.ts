@@ -1,14 +1,14 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { Currency } from './currency.entity';
+import { User } from './user.entity';
 
 @Entity('admin_wallet_adjustments')
 @Index('idx_adj_actor', ['actor_user_id'])

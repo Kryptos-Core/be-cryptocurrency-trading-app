@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { IOrderQueue, OrderBookOrder } from '../interfaces';
-import { toBaseUnits, DEFAULT_SCALE } from '../utils';
+import type { IOrderQueue, OrderBookOrder } from '../interfaces';
+import { DEFAULT_SCALE, toBaseUnits } from '../utils';
 
 /**
  * Sell Queue (Queue Pattern)

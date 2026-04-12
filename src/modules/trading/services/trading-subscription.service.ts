@@ -1,13 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  ClientSubscription,
-  CandleInterval,
-  SubscriptionChannel,
-  OhlcSubscriptionEvent,
+  type CandleInterval,
   MARKET_EVENTS,
+  type OhlcSubscriptionEvent,
+  type SubscriptionChannel,
 } from '../interfaces/websocket.interface';
-import { Server } from 'socket.io';
 
 /** Per-client per-pair subscription detail (for OHLC chart symbol resolution). */
 interface PairSubscriptionDetail {
@@ -49,7 +47,7 @@ export class TradingSubscriptionService {
    */
   async subscribe(
     clientId: string,
-    userId: string,
+    _userId: string,
     pairId: string,
     channels: SubscriptionChannel[],
     interval?: CandleInterval,
@@ -73,17 +71,17 @@ export class TradingSubscriptionService {
     if (!this.clientSubscriptions.has(clientId)) {
       this.clientSubscriptions.set(clientId, new Set());
     }
-    this.clientSubscriptions.get(clientId)!.add(pairId);
+    this.clientSubscriptions.get(clientId)?.add(pairId);
 
     if (!this.pairSubscribers.has(pairId)) {
       this.pairSubscribers.set(pairId, new Set());
     }
-    this.pairSubscribers.get(pairId)!.add(clientId);
+    this.pairSubscribers.get(pairId)?.add(clientId);
 
     if (!this.clientPairDetails.has(clientId)) {
       this.clientPairDetails.set(clientId, new Map());
     }
-    this.clientPairDetails.get(clientId)!.set(pairId, { channels, interval, symbol });
+    this.clientPairDetails.get(clientId)?.set(pairId, { channels, interval, symbol });
 
     // Update subscription count
     this.subscriptionCounts.set(clientId, subscriptionCount + 1);
@@ -109,7 +107,7 @@ export class TradingSubscriptionService {
     channels: SubscriptionChannel[],
   ): Promise<void> {
     const clientSubs = this.clientSubscriptions.get(clientId);
-    if (!clientSubs || !clientSubs.has(pairId)) {
+    if (!clientSubs?.has(pairId)) {
       throw new BadRequestException(`Client not subscribed to pair ${pairId}`);
     }
 
@@ -137,7 +135,11 @@ export class TradingSubscriptionService {
       this.ohlcSubscriberCount.set(key, newCount);
       if (newCount === 0) {
         this.ohlcSubscriberCount.delete(key);
-        const event: OhlcSubscriptionEvent = { symbol: detail.symbol, pair_id: pairId, interval: detail.interval };
+        const event: OhlcSubscriptionEvent = {
+          symbol: detail.symbol,
+          pair_id: pairId,
+          interval: detail.interval,
+        };
         this.eventEmitter.emit(MARKET_EVENTS.OHLC_SUBSCRIPTION_REMOVED, event);
       }
     }
@@ -163,7 +165,11 @@ export class TradingSubscriptionService {
         const newCount = Math.max(0, prevCount - 1);
         if (newCount === 0) {
           this.ohlcSubscriberCount.delete(key);
-          const event: OhlcSubscriptionEvent = { symbol: detail.symbol, pair_id: pairId, interval: detail.interval };
+          const event: OhlcSubscriptionEvent = {
+            symbol: detail.symbol,
+            pair_id: pairId,
+            interval: detail.interval,
+          };
           this.eventEmitter.emit(MARKET_EVENTS.OHLC_SUBSCRIPTION_REMOVED, event);
         } else {
           this.ohlcSubscriberCount.set(key, newCount);

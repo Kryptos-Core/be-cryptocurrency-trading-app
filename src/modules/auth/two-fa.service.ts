@@ -1,14 +1,14 @@
-import { randomInt } from 'crypto';
+import { randomInt } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { CacheService, MailService } from '@/common/services';
 import { BadRequestException, NotFoundException } from '@/common/exceptions';
-import { AuthRepository } from './repositories';
+import type { CacheService, MailService } from '@/common/services';
+import type { AuthRepository } from './repositories';
 
 @Injectable()
 export class TwoFaService {
   private readonly logger = new Logger(TwoFaService.name);
-  private readonly otpTtlSeconds = 300;    // OTP valid for 5 minutes
-  private readonly cooldownSeconds = 30;   // Minimum gap between consecutive sends
+  private readonly otpTtlSeconds = 300; // OTP valid for 5 minutes
+  private readonly cooldownSeconds = 30; // Minimum gap between consecutive sends
 
   constructor(
     private readonly cacheService: CacheService,

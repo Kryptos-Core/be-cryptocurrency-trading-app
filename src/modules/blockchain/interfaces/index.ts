@@ -1,1 +1,5 @@
-export { IBlockchainProvider, BlockchainBalanceDto, BlockchainTxStatusDto } from './blockchain.interface';
+export {
+  BlockchainBalanceDto,
+  BlockchainTxStatusDto,
+  IBlockchainProvider,
+} from './blockchain.interface';

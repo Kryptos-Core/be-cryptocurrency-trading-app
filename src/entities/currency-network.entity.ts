@@ -1,12 +1,4 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  ManyToOne,
-  ForeignKey,
-  Index,
-  OneToMany,
-} from 'typeorm';
+import { Column, Entity, ForeignKey, Index, ManyToOne, OneToMany, PrimaryColumn } from 'typeorm';
 import { Currency } from './currency.entity';
 
 @Entity('currency_networks')
@@ -36,9 +28,13 @@ export class CurrencyNetwork {
   @Column({ type: 'decimal', precision: 36, scale: 18, default: 0 })
   withdraw_fee!: string;
 
-  @ManyToOne(() => Currency, (currency) => currency.networks, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => Currency,
+    (currency) => currency.networks,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   currency!: Currency;
 
   @OneToMany('Deposit', 'network')

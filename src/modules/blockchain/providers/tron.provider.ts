@@ -1,17 +1,16 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
+import { TronWeb, Trx } from 'tronweb';
 import { BlockchainNetwork } from '@/common/enums';
-import {
-  IBlockchainProvider,
+import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
+  IBlockchainProvider,
 } from '../interfaces';
-import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
-
-import { TronWeb, Trx } from 'tronweb';
-import { OnEvent } from '@nestjs/event-emitter';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 import {
   extractTronFirstContractOwnerBase58,
   extractTronNativeTransferMeta,
@@ -55,7 +54,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
 
   async onModuleInit() {
     const fromDb = await this.systemConfigService.get<string>(this.bindings.rpcRuntimeKey);
-    const fullHost = (fromDb && fromDb.trim()) || this.defaultBootstrapHost();
+    const fullHost = fromDb?.trim() || this.defaultBootstrapHost();
     this.tronWeb = new TronWeb({ fullHost });
     this.logger.log(`TronProvider runtime RPC: ${this.bindings.network} → ${fullHost}`);
   }
@@ -112,7 +111,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
   async getTransactionStatus(txHash: string): Promise<BlockchainTxStatusDto> {
     try {
       const tx = await this.tronWeb.trx.getTransaction(txHash);
-      if (!tx || !tx.txID) {
+      if (!tx?.txID) {
         return this.buildNotFound(txHash);
       }
       const receipt = await this.tronWeb.trx.getTransactionInfo(txHash);
@@ -127,8 +126,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
       let status: 'PENDING' | 'CONFIRMED' | 'FAILED' = 'PENDING';
       if (confirmed) {
         const rawResult = receipt?.result as string | undefined;
-        const ok =
-          rawResult == null || String(rawResult).toUpperCase() === 'SUCCESS';
+        const ok = rawResult == null || String(rawResult).toUpperCase() === 'SUCCESS';
         status = ok ? 'CONFIRMED' : 'FAILED';
       }
 

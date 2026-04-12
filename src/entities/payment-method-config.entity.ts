@@ -1,11 +1,4 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 export type PaymentMethodType = 'PAYOS' | 'ETH' | 'TRON' | 'SOL' | 'BSC';
 export type PaymentMethodStatus = 'ACTIVE' | 'TRANSITIONING' | 'INACTIVE';

@@ -1,15 +1,9 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 export enum ConfigCategory {
-  TECH = 'tech',       // RPC URLs, Intervals
+  TECH = 'tech', // RPC URLs, Intervals
   FINANCE = 'finance', // Withdraw Max, Transfer Limits
-  CORE = 'core',       // Default symbols, etc.
+  CORE = 'core', // Default symbols, etc.
 }
 
 export enum ConfigDataType {

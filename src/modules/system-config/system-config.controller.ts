@@ -1,22 +1,15 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { SystemConfigService } from './system-config.service';
-import { UpdateSystemConfigDto } from './dto/update-system-config.dto';
-import { UpdateRuntimeSettingsBulkDto } from './dto/update-runtime-settings-bulk.dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
-import { RoleGuard } from '@/common/guards/role.guard';
-import { PermissionGuard } from '@/common/guards/permission.guard';
-import { RequireRoles } from '@/common/decorators/require-roles.decorator';
-import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { UserRole, Permission } from '@/common/enums';
+import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
+import { RequireRoles } from '@/common/decorators/require-roles.decorator';
+import { Permission, UserRole } from '@/common/enums';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { PermissionGuard } from '@/common/guards/permission.guard';
+import { RoleGuard } from '@/common/guards/role.guard';
+import type { UpdateRuntimeSettingsBulkDto } from './dto/update-runtime-settings-bulk.dto';
+import type { UpdateSystemConfigDto } from './dto/update-system-config.dto';
+import type { SystemConfigService } from './system-config.service';
 
 @ApiTags('System Configs')
 @ApiBearerAuth()

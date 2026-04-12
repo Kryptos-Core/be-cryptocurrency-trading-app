@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { selectMysqlUserVars } from '@/common/database/mysql-procedure-out-vars';
+import type { DataSource } from 'typeorm';
 import { MATCHING_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
-import { OrderBookOrder } from '../interfaces';
+import { selectMysqlUserVars } from '@/common/database/mysql-procedure-out-vars';
+import type { OrderBookOrder } from '../interfaces';
 
 export interface TradeExecuteResult {
   trade_id: string | null;
@@ -20,10 +20,7 @@ export class MatchingRepository {
 
   constructor(private readonly dataSource: DataSource) {}
 
-  async getOpenOrdersForPair(
-    pairId: string,
-    side: 'BUY' | 'SELL',
-  ): Promise<OrderBookOrder[]> {
+  async getOpenOrdersForPair(pairId: string, side: 'BUY' | 'SELL'): Promise<OrderBookOrder[]> {
     const result = await this.dataSource.query(
       `CALL ${MATCHING_STORE_PROCEDURE.ORDERS_OPEN_FOR_PAIR}(?, ?)`,
       [pairId, side],
@@ -104,8 +101,7 @@ export class MatchingRepository {
       status: r.status ?? 'OPEN',
       created_at: r.created_at,
       remaining: String(amount - filled),
-      slippage_tolerance:
-        r.slippage_tolerance != null ? String(r.slippage_tolerance) : null,
+      slippage_tolerance: r.slippage_tolerance != null ? String(r.slippage_tolerance) : null,
     };
   }
 }

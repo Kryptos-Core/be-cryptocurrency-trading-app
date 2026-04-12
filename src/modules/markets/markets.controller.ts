@@ -1,43 +1,36 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
   Body,
-  Query,
+  Controller,
+  Delete,
+  Get,
   Headers,
-  UseGuards,
-  ParseIntPipe,
-  ParseBoolPipe,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseBoolPipe,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiQuery,
-  ApiParam,
-  ApiBody,
-} from '@nestjs/swagger';
-import { MarketsService } from './markets.service';
-import { resolveOhlcvLocale } from './ohlcv-locale.util';
-import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { Public } from '@/common/decorators';
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiSuccessResponse,
+  ApiUnauthorizedResponse,
+  Public,
+} from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
-import {
-  ApiSuccessResponse,
-  ApiCreatedResponse,
-  ApiBadRequestResponse,
-  ApiUnauthorizedResponse,
-  ApiNotFoundResponse,
-  ApiConflictResponse,
-} from '@/common/decorators';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
+import type { MarketsService } from './markets.service';
+import { resolveOhlcvLocale } from './ohlcv-locale.util';
 
 /**
  * Markets Controller
@@ -70,7 +63,8 @@ export class MarketsController {
     required: false,
     type: Boolean,
     example: false,
-    description: 'Include 24h tickers for the returned pairs (one request instead of GET /markets + GET /markets/tickers/all)',
+    description:
+      'Include 24h tickers for the returned pairs (one request instead of GET /markets + GET /markets/tickers/all)',
   })
   @ApiQuery({
     name: 'search',
@@ -337,7 +331,7 @@ export class MarketsController {
 
   /**
    * Get OHLCV by pair ID
-    * GET /markets/:id/ohlcv?limit=100&range=1d
+   * GET /markets/:id/ohlcv?limit=100&range=1d
    * range: 1d | 1M | 3M | 1y | 5y (filter by last 1 day, 1 month, 3 months, 1 year, 5 years)
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
@@ -345,7 +339,8 @@ export class MarketsController {
   @Public()
   @ApiOperation({
     summary: 'Get OHLCV data',
-    description: 'Get candlestick data for a market pair. Use range to filter by time: 1d, 1M, 3M, 1y, 5y',
+    description:
+      'Get candlestick data for a market pair. Use range to filter by time: 1d, 1M, 3M, 1y, 5y',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
@@ -360,7 +355,8 @@ export class MarketsController {
     name: 'locale',
     required: false,
     type: String,
-    description: 'Optional BCP 47 locale (e.g. vi-VN). Overrides Accept-Language for response metadata.',
+    description:
+      'Optional BCP 47 locale (e.g. vi-VN). Overrides Accept-Language for response metadata.',
     example: 'vi-VN',
   })
   @ApiSuccessResponse('OHLCV retrieved successfully')
@@ -489,10 +485,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiConflictResponse('Market pair already exists')
   @ApiUnauthorizedResponse('Unauthorized')
-  async update(
-    @Param('id') id: string,
-    @Body() updateMarketPairDto: UpdateMarketPairDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateMarketPairDto: UpdateMarketPairDto) {
     return this.marketsService.update(id, updateMarketPairDto);
   }
 

@@ -1,17 +1,17 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   ForeignKey,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
+  PrimaryColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { MarketPair } from './market-pair.entity';
+import { User } from './user.entity';
 
 @Entity('orders')
 @Index('uk_order_idem', ['user_id', 'idempotency_key'], { unique: true })
@@ -83,13 +83,21 @@ export class Order {
   @UpdateDateColumn()
   updated_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.orders, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.orders,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @ManyToOne(() => MarketPair, (pair) => pair.orders, {
-    onDelete: 'RESTRICT',
-  })
+  @ManyToOne(
+    () => MarketPair,
+    (pair) => pair.orders,
+    {
+      onDelete: 'RESTRICT',
+    },
+  )
   @JoinColumn({ name: 'pair_id' })
   pair!: MarketPair;
 

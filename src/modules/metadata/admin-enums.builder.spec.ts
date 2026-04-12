@@ -1,8 +1,5 @@
-import { OrderStatus, UserRole, OnchainTxStatus } from '@/common/enums';
-import {
-  buildAdminEnumsPayload,
-  FIAT_DEPOSIT_ADMIN_STATUSES,
-} from './admin-enums.builder';
+import { OnchainTxStatus, OrderStatus, UserRole } from '@/common/enums';
+import { buildAdminEnumsPayload, FIAT_DEPOSIT_ADMIN_STATUSES } from './admin-enums.builder';
 
 describe('buildAdminEnumsPayload', () => {
   it('includes all order statuses', () => {

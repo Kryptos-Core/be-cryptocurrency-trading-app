@@ -11,11 +11,11 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { Permission, UserRole } from '@/common/enums';
-import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { BadRequestException } from '@/common/exceptions';
-import {
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type { TwoFaService } from '@/modules/auth/two-fa.service';
+import type {
   CreateTransactionWalletDto,
   FundWalletDto,
   ImportMainWalletDto,
@@ -27,10 +27,13 @@ import {
   SweepWalletDto,
   UpdateMainWalletDto,
 } from './dto';
-import { SupportedTreasuryChain, TreasuryMainWalletService } from './treasury-main-wallet.service';
-import { TransactionWalletService } from './transaction-wallet.service';
-import { TreasuryOperationsService } from './treasury-operations.service';
-import { OnchainChainPickerService } from './onchain-chain-picker.service';
+import type { OnchainChainPickerService } from './onchain-chain-picker.service';
+import type { TransactionWalletService } from './transaction-wallet.service';
+import type {
+  SupportedTreasuryChain,
+  TreasuryMainWalletService,
+} from './treasury-main-wallet.service';
+import type { TreasuryOperationsService } from './treasury-operations.service';
 
 @ApiTags('treasury')
 @ApiBearerAuth('JWT-auth')
@@ -137,9 +140,7 @@ export class TreasuryController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'List main wallets for a chain (auto-seeded or imported)' })
   async listMainWallets(@Query('chain') chain: string) {
-    return this.treasuryMainWalletService.listByChain(
-      chain as SupportedTreasuryChain,
-    );
+    return this.treasuryMainWalletService.listByChain(chain as SupportedTreasuryChain);
   }
 
   @Get('main-wallets/pending')

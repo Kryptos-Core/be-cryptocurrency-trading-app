@@ -1,26 +1,24 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Queue } from 'bull';
 import { uuidv7 } from 'uuidv7';
-import { WalletEncryptionService } from '@/common/services';
-import { RedisService } from '@/common/services/redis.service';
-import { PaymentMethodConfig, PaymentMethodType } from '@/entities/payment-method-config.entity';
-import { PaymentConfigRepository } from './repositories/payment-config.repository';
-import {
+import type { WalletEncryptionService } from '@/common/services';
+import type { RedisService } from '@/common/services/redis.service';
+import type {
+  PaymentMethodConfig,
+  PaymentMethodType,
+} from '@/entities/payment-method-config.entity';
+import type {
+  ActivatePaymentConfigDto,
   CreatePaymentConfigDto,
   UpdatePaymentConfigDto,
-  ActivatePaymentConfigDto,
 } from './dto';
 import {
-  PaymentGatewayConfig,
-  PaymentConfigEvent,
   PAYMENT_CONFIG_EVENTS_CHANNEL,
+  type PaymentConfigEvent,
+  type PaymentGatewayConfig,
 } from './interfaces/payment-gateway-config.interface';
+import type { PaymentConfigRepository } from './repositories/payment-config.repository';
 
 export const PAYMENT_CONFIG_QUEUE = 'payment-config-activation';
 export const ACTIVATE_JOB = 'activate-config';
@@ -325,9 +323,7 @@ export class PaymentConfigService {
         );
         await this.completeActivation(row.config_id, row.type, row.network, row.updated_by);
       } catch (e) {
-        this.logger.error(
-          `Cron flush failed for ${row.config_id}: ${(e as Error).message}`,
-        );
+        this.logger.error(`Cron flush failed for ${row.config_id}: ${(e as Error).message}`);
       }
     }
   }
@@ -354,10 +350,7 @@ export class PaymentConfigService {
 
   private async publishEvent(event: PaymentConfigEvent): Promise<void> {
     try {
-      await this.redisService.publish(
-        PAYMENT_CONFIG_EVENTS_CHANNEL,
-        JSON.stringify(event),
-      );
+      await this.redisService.publish(PAYMENT_CONFIG_EVENTS_CHANNEL, JSON.stringify(event));
     } catch (error) {
       this.logger.error('Failed to publish payment config event', error);
     }

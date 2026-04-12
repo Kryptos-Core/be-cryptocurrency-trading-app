@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import type { OrderBookOrder } from '../interfaces';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../utils';
 import { BuyQueueService } from './buy-queue.service';
 import { SellQueueService } from './sell-queue.service';
-import { OrderBookOrder } from '../interfaces';
-import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from '../utils';
 
 export interface DepthLevel {
   price: string;
@@ -22,10 +22,7 @@ export interface DepthSnapshot {
  */
 @Injectable()
 export class OrderBookService {
-  private readonly books = new Map<
-    string,
-    { buy: BuyQueueService; sell: SellQueueService }
-  >();
+  private readonly books = new Map<string, { buy: BuyQueueService; sell: SellQueueService }>();
 
   /**
    * Tracks which pairs have been seeded from DB at least once.
@@ -95,7 +92,9 @@ export class OrderBookService {
     });
     // Reset loaded flag: full rebuild means the next incremental window starts fresh.
     this.loadedPairs.delete(key);
-    orders.forEach((o) => this.addOrder(o));
+    for (const o of orders) {
+      this.addOrder(o);
+    }
   }
 
   /**
@@ -143,10 +142,7 @@ export class OrderBookService {
     };
   }
 
-  private aggregateLevels(
-    orders: OrderBookOrder[],
-    depth: number,
-  ): DepthLevel[] {
+  private aggregateLevels(orders: OrderBookOrder[], depth: number): DepthLevel[] {
     // Use a Map to aggregate by price. Orders from getAll() are already sorted.
     // We preserve the insertion order (sorted order) by iterating sequentially.
     const levelMap = new Map<string, { totalBu: bigint; count: number }>();

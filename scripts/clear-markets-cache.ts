@@ -14,10 +14,10 @@ async function clearMarketsCache() {
 
   try {
     console.log('Clearing markets cache...');
-    
+
     // Invalidate all markets cache
     await cacheService.invalidatePattern('markets:*');
-    
+
     console.log('Markets cache cleared successfully!');
     console.log('You can now test the API - it will fetch fresh data from database');
   } catch (error) {

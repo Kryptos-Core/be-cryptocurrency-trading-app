@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, DeepPartial, In, Not } from 'typeorm';
+import { type DataSource, type DeepPartial, In, Not } from 'typeorm';
 import {
   TreasuryMainWallet,
-  TreasuryMainWalletChain,
+  type TreasuryMainWalletChain,
 } from '@/entities/treasury-main-wallet.entity';
 
 /**
@@ -46,7 +46,9 @@ export class TreasuryMainWalletRepository {
     return this.repo().findOne({ where: { chain, address } });
   }
 
-  async findActiveDefaultOnChain(chain: TreasuryMainWalletChain): Promise<TreasuryMainWallet | null> {
+  async findActiveDefaultOnChain(
+    chain: TreasuryMainWalletChain,
+  ): Promise<TreasuryMainWallet | null> {
     return this.repo().findOne({
       where: { chain, is_default: true, status: 'ACTIVE' },
     });
@@ -67,7 +69,11 @@ export class TreasuryMainWalletRepository {
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await manager.update(TreasuryMainWallet, { chain, is_default: true }, { is_default: false });
-      await manager.update(TreasuryMainWallet, { main_wallet_id: mainWalletId }, { is_default: true });
+      await manager.update(
+        TreasuryMainWallet,
+        { main_wallet_id: mainWalletId },
+        { is_default: true },
+      );
     });
   }
 

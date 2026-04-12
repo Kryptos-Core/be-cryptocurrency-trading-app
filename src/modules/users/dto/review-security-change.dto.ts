@@ -1,5 +1,5 @@
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class ReviewSecurityChangeDto {
   @ApiProperty({ description: 'Approve (true) or reject (false)', example: true })

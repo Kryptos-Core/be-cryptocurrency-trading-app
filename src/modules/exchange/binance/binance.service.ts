@@ -1,12 +1,12 @@
+import * as crypto from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
-import * as crypto from 'crypto';
-import {
-  IExchangeProvider,
+import type {
   ExchangeBalanceDto,
   ExchangeOrderParams,
   ExchangeOrderResponse,
+  IExchangeProvider,
 } from '../interfaces/exchange.interface';
 
 /**
@@ -29,14 +29,18 @@ export class BinanceExchangeService implements IExchangeProvider {
 
     if (this.isTestnet) {
       this.apiKey = this.configService.get<string>('app.trading.binance.testnet.apiKey') || '';
-      this.apiSecret = this.configService.get<string>('app.trading.binance.testnet.apiSecret') || '';
-      this.baseUrl = this.configService.get<string>('app.trading.binance.testnet.baseUrl') || 
-                     'https://testnet.binance.vision';
+      this.apiSecret =
+        this.configService.get<string>('app.trading.binance.testnet.apiSecret') || '';
+      this.baseUrl =
+        this.configService.get<string>('app.trading.binance.testnet.baseUrl') ||
+        'https://testnet.binance.vision';
     } else {
       this.apiKey = this.configService.get<string>('app.trading.binance.mainnet.apiKey') || '';
-      this.apiSecret = this.configService.get<string>('app.trading.binance.mainnet.apiSecret') || '';
-      this.baseUrl = this.configService.get<string>('app.trading.binance.mainnet.baseUrl') || 
-                     'https://fapi.binance.com';
+      this.apiSecret =
+        this.configService.get<string>('app.trading.binance.mainnet.apiSecret') || '';
+      this.baseUrl =
+        this.configService.get<string>('app.trading.binance.mainnet.baseUrl') ||
+        'https://fapi.binance.com';
     }
 
     this.logger.log(`Binance Exchange initialized (${this.isTestnet ? 'TESTNET' : 'MAINNET'})`);
@@ -55,7 +59,7 @@ export class BinanceExchangeService implements IExchangeProvider {
       this.timeOffset = serverTime - localTime;
       this.lastTimeSync = localTime;
       this.logger.log(`Time synced with Binance server (offset: ${this.timeOffset}ms)`);
-    } catch (error) {
+    } catch (_error) {
       this.logger.warn('Failed to sync time with Binance server, using local time');
     }
   }
@@ -71,10 +75,7 @@ export class BinanceExchangeService implements IExchangeProvider {
    * Generate signature for Binance API request
    */
   private generateSignature(queryString: string): string {
-    return crypto
-      .createHmac('sha256', this.apiSecret)
-      .update(queryString)
-      .digest('hex');
+    return crypto.createHmac('sha256', this.apiSecret).update(queryString).digest('hex');
   }
 
   /**
@@ -250,11 +251,7 @@ export class BinanceExchangeService implements IExchangeProvider {
     return true;
   }
 
-  async createWithdrawal(
-    asset: string,
-    amount: Decimal,
-    address: string,
-  ): Promise<string> {
+  async createWithdrawal(_asset: string, _amount: Decimal, _address: string): Promise<string> {
     this.logger.warn(`Withdrawal not implemented for ${this.isTestnet ? 'testnet' : 'mainnet'}`);
     throw new Error('Withdrawal not supported in this implementation');
   }

@@ -1,5 +1,5 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsEmail, IsEnum, IsOptional } from 'class-validator';
 import { UserRole } from '@/common/enums';
 
 export class UpdateUserDto {

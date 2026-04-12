@@ -1,15 +1,15 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 import { Currency } from './currency.entity';
 import { CurrencyNetwork } from './currency-network.entity';
+import { User } from './user.entity';
 
 @Entity('deposits')
 @Index('uk_deposit_tx', ['currency_id', 'tx_hash'], { unique: true })
@@ -52,17 +52,29 @@ export class Deposit {
   @Column({ type: 'datetime', nullable: true })
   credited_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.deposits, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.deposits,
+    { onDelete: 'CASCADE' },
+  )
   user!: User;
 
-  @ManyToOne(() => Currency, (currency) => currency.deposits, {
-    onDelete: 'RESTRICT',
-  })
+  @ManyToOne(
+    () => Currency,
+    (currency) => currency.deposits,
+    {
+      onDelete: 'RESTRICT',
+    },
+  )
   currency!: Currency;
 
-  @ManyToOne(() => CurrencyNetwork, (network) => network.deposits, {
-    onDelete: 'SET NULL',
-    nullable: true,
-  })
+  @ManyToOne(
+    () => CurrencyNetwork,
+    (network) => network.deposits,
+    {
+      onDelete: 'SET NULL',
+      nullable: true,
+    },
+  )
   network!: CurrencyNetwork;
 }

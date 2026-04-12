@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
+import { UserRole } from '@/common/enums';
 import { newUuid } from '@/common/utils/uuid.util';
 import { User } from '@/entities/user.entity';
-import { UserRole } from '@/common/enums';
-import { UserFilterDto } from '../dto/user-filter.dto';
+import type { UserFilterDto } from '../dto/user-filter.dto';
 
 /**
  * Users Repository - Data Access Layer
@@ -12,7 +12,7 @@ import { UserFilterDto } from '../dto/user-filter.dto';
  * - Tăng security (SQL injection protection)
  * - Tăng performance (DB-level optimization)
  * - Tách biệt business logic từ database logic
- * 
+ *
  * Áp dụng Repository Pattern + Database Procedure Pattern
  */
 @Injectable()
@@ -26,11 +26,10 @@ export class UsersRepository {
    */
   async findById(userId: string): Promise<User | null> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`,
-        [userId],
-      );
-      
+      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
+        userId,
+      ]);
+
       // Stored procedure returns array of results
       // First element is the actual result set
       return result[0]?.[0] || null;
@@ -45,10 +44,9 @@ export class UsersRepository {
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`,
-        [email.toLowerCase()],
-      );
+      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`, [
+        email.toLowerCase(),
+      ]);
 
       return result[0]?.[0] || null;
     } catch (error) {
@@ -60,10 +58,7 @@ export class UsersRepository {
   /**
    * Get all users with pagination (legacy, no filters)
    */
-  async findAll(
-    page: number = 1,
-    limit: number = 10,
-  ): Promise<{ users: User[]; total: number }> {
+  async findAll(page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> {
     return this.findAllWithFilters({ page, limit });
   }
 
@@ -97,10 +92,7 @@ export class UsersRepository {
 
       if (filters.search) {
         const s = `%${filters.search.trim()}%`;
-        qb.andWhere(
-          '(u.email LIKE :s OR u.first_name LIKE :s OR u.last_name LIKE :s)',
-          { s },
-        );
+        qb.andWhere('(u.email LIKE :s OR u.first_name LIKE :s OR u.last_name LIKE :s)', { s });
       }
 
       if (filters.email) {
@@ -175,10 +167,14 @@ export class UsersRepository {
   async create(email: string, passwordHash: string): Promise<User> {
     try {
       const userId = newUuid();
-      await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`,
-        [userId, email.toLowerCase(), passwordHash, null, null, UserRole.TRADER],
-      );
+      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
+        userId,
+        email.toLowerCase(),
+        passwordHash,
+        null,
+        null,
+        UserRole.TRADER,
+      ]);
       return this.findById(userId) as Promise<User>;
     } catch (error) {
       this.logger.error(`Error creating user: ${email}`, error);
@@ -196,16 +192,13 @@ export class UsersRepository {
     try {
       const idvArg =
         updates.identityVerified === undefined ? null : updates.identityVerified ? 1 : 0;
-      await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?)`,
-        [
-          userId,
-          updates.email ? updates.email.toLowerCase() : null,
-          updates.status || null,
-          updates.role || null,
-          idvArg,
-        ],
-      );
+      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?)`, [
+        userId,
+        updates.email ? updates.email.toLowerCase() : null,
+        updates.status || null,
+        updates.role || null,
+        idvArg,
+      ]);
 
       this.logger.log(`User updated: ${userId}`);
     } catch (error) {
@@ -219,10 +212,7 @@ export class UsersRepository {
    */
   async delete(userId: string): Promise<void> {
     try {
-      await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.DELETE}(?)`,
-        [userId],
-      );
+      await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.DELETE}(?)`, [userId]);
       this.logger.log(`User deleted (soft): ${userId}`);
     } catch (error) {
       this.logger.error(`Error deleting user: ${userId}`, error);
@@ -240,9 +230,7 @@ export class UsersRepository {
     pending: number;
   }> {
     try {
-      const result = await this.dataSource.query(
-        `CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`,
-      );
+      const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`);
 
       const stats = result[0]?.[0] || {
         total: 0,
@@ -278,10 +266,10 @@ export class UsersRepository {
 
   /** Đánh dấu đã xác minh inbox qua OTP (2FA / email liên hệ ví). */
   async setEmailVerified(userId: string, verified: boolean): Promise<void> {
-    await this.dataSource.query(
-      'UPDATE users SET email_verified = ? WHERE user_id = ?',
-      [verified ? 1 : 0, userId],
-    );
+    await this.dataSource.query('UPDATE users SET email_verified = ? WHERE user_id = ?', [
+      verified ? 1 : 0,
+      userId,
+    ]);
   }
 
   /**
@@ -399,10 +387,10 @@ export class UsersRepository {
    */
   async saveFcmToken(userId: string, fcmToken: string | null): Promise<void> {
     try {
-      await this.dataSource.query(
-        'UPDATE users SET fcm_token = ? WHERE user_id = ?',
-        [fcmToken, userId],
-      );
+      await this.dataSource.query('UPDATE users SET fcm_token = ? WHERE user_id = ?', [
+        fcmToken,
+        userId,
+      ]);
     } catch (error) {
       this.logger.error(`Error saving FCM token for user: ${userId}`, error);
       throw error;

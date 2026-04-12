@@ -40,7 +40,12 @@ export function parseAndValidateSeedUsers(raw: string): SeedUserRow[] {
     if (typeof password !== 'string' || !password) {
       throw new Error(`Seed users[${i}] missing "password" for ${email}`);
     }
-    if (status !== undefined && status !== 'ACTIVE' && status !== 'BANNED' && status !== 'PENDING') {
+    if (
+      status !== undefined &&
+      status !== 'ACTIVE' &&
+      status !== 'BANNED' &&
+      status !== 'PENDING'
+    ) {
       throw new Error(`Seed users[${i}] invalid "status" for ${email}`);
     }
     if (typeof role !== 'string' || !role.trim()) {

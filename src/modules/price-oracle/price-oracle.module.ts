@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
 import { OHLCVProviderRegistry } from './ohlcv-provider.registry';
+import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
 
 /**
  * Price Oracle Module

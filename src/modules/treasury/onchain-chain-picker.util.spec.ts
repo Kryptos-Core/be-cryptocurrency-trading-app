@@ -1,18 +1,18 @@
+import { listActionableOnchainChainCodes } from '@/common/constants/chain-registry';
 import {
   buildChainPickerOptions,
   resolveRecommendedChainForDepositPicker,
   resolveSandboxTronDefaultNetwork,
   resolveTreasuryChainsUseMainnetOnly,
 } from './onchain-chain-picker.util';
-import { listActionableOnchainChainCodes } from '@/common/constants/chain-registry';
 
 describe('resolveRecommendedChainForDepositPicker', () => {
   const sandboxChains = listActionableOnchainChainCodes(false, 'TRON_NILE');
 
   it('keeps setting when it is in the on-chain deposit/withdraw picker list', () => {
-    expect(
-      resolveRecommendedChainForDepositPicker('TRON_NILE', sandboxChains, 'TRON_NILE'),
-    ).toBe('TRON_NILE');
+    expect(resolveRecommendedChainForDepositPicker('TRON_NILE', sandboxChains, 'TRON_NILE')).toBe(
+      'TRON_NILE',
+    );
   });
 
   it('maps TRON_MAINNET to sandbox Tron row when mainnet is not in picker', () => {
@@ -29,9 +29,9 @@ describe('resolveRecommendedChainForDepositPicker', () => {
   });
 
   it('falls back to first picker chain when neither setting nor tron default match', () => {
-    expect(resolveRecommendedChainForDepositPicker('TRON_MAINNET', ['BSC_CHAPEL'], 'TRON_NILE')).toBe(
-      'BSC_CHAPEL',
-    );
+    expect(
+      resolveRecommendedChainForDepositPicker('TRON_MAINNET', ['BSC_CHAPEL'], 'TRON_NILE'),
+    ).toBe('BSC_CHAPEL');
   });
 });
 
@@ -55,9 +55,9 @@ describe('resolveTreasuryChainsUseMainnetOnly', () => {
   });
 
   it('blank ONCHAIN falls back to ENV=development → testnets', () => {
-    expect(resolveTreasuryChainsUseMainnetOnly({ onchainOperatorMode: '', env: 'development' })).toBe(
-      false,
-    );
+    expect(
+      resolveTreasuryChainsUseMainnetOnly({ onchainOperatorMode: '', env: 'development' }),
+    ).toBe(false);
   });
 
   it('missing ONCHAIN key falls back to ENV=production → mainnet', () => {
@@ -85,9 +85,9 @@ describe('buildChainPickerOptions', () => {
     });
     expect(resolveSandboxTronDefaultNetwork('TRON_SHASTA')).toBe('TRON_SHASTA');
     expect(dto.tronDefaultNetwork).toBe('TRON_SHASTA');
-    expect(dto.pickers.onchain_deposit_withdraw[dto.pickers.onchain_deposit_withdraw.length - 1]).toBe(
-      'TRON_SHASTA',
-    );
+    expect(
+      dto.pickers.onchain_deposit_withdraw[dto.pickers.onchain_deposit_withdraw.length - 1],
+    ).toBe('TRON_SHASTA');
   });
 
   it('production onchain mode lists all mainnet actionable chains', () => {

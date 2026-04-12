@@ -1,5 +1,5 @@
-import { BlockchainNetwork } from '@/common/enums';
 import { getEvmChainDefinition } from '@/common/constants/evm-chain-definitions';
+import { BlockchainNetwork } from '@/common/enums';
 
 export type ChainFamily = 'evm' | 'solana' | 'tron' | 'ton';
 
@@ -66,17 +66,12 @@ export function resolveSandboxTronNetworkEnum(
 
 function sandboxUiOrder(tronDefaultNetwork?: string): BlockchainNetwork[] {
   const tron = resolveSandboxTronNetworkEnum(tronDefaultNetwork);
-  return SANDBOX_UI_ORDER_BASE.map((n) =>
-    n === BlockchainNetwork.TRON_NILE ? tron : n,
-  );
+  return SANDBOX_UI_ORDER_BASE.map((n) => (n === BlockchainNetwork.TRON_NILE ? tron : n));
 }
 
 function chainFamily(network: BlockchainNetwork): ChainFamily {
   if (isTon(network)) return 'ton';
-  if (
-    network === BlockchainNetwork.SOLANA_MAINNET ||
-    network === BlockchainNetwork.SOLANA_DEVNET
-  ) {
+  if (network === BlockchainNetwork.SOLANA_MAINNET || network === BlockchainNetwork.SOLANA_DEVNET) {
     return 'solana';
   }
   if (

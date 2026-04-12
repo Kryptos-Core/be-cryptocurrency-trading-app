@@ -1,23 +1,23 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'crypto';
-import { OrderBookService } from './orderbook';
-import { MatchingRepository } from './repositories';
-import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
-import { MarketOrderStrategy } from './strategies/market-order.strategy';
-import {
-  OrderBookOrder,
+import { randomBytes } from 'node:crypto';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import type { RedisService } from '@/common/services';
+import type { CircuitBreakerService } from './circuit-breaker.service';
+import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
+import type {
   MatchingContext,
   MatchingReconcileResult,
+  OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
 } from './interfaces';
-import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
-import { RedisService } from '@/common/services';
-import { CircuitBreakerService } from './circuit-breaker.service';
-import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from './utils';
+import type { OrderBookService } from './orderbook';
+import type { MatchingRepository } from './repositories';
+import type { MarketOrderStrategy } from './strategies/market-order.strategy';
+import type { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from './utils';
 import { marketOrderCanFullyFillRemaining } from './utils/market-fok-fill.util';
-import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
+import type { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 
 const LOCK_PREFIX = 'matching:lock:';
 const LOCK_TTL_MS = 10000;
@@ -88,7 +88,8 @@ export class MatchingService implements OnModuleInit {
     takerFeeRate: string;
     slippageTolerance?: string;
   }): Promise<TradeExecutionResult[]> {
-    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } = params;
+    const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } =
+      params;
 
     // Validate fee rates early to avoid silent errors in BigInt arithmetic.
     try {
@@ -128,9 +129,7 @@ export class MatchingService implements OnModuleInit {
 
       const tif = (takerOrder.time_in_force ?? 'GTC').toUpperCase();
       const effectiveSlippage =
-        slippageTolerance?.trim() ||
-        takerOrder.slippage_tolerance?.trim() ||
-        undefined;
+        slippageTolerance?.trim() || takerOrder.slippage_tolerance?.trim() || undefined;
       if (tif === 'FOK') {
         const canFullyFill = await this.canFullyFillOrder({
           pairId,
@@ -143,7 +142,10 @@ export class MatchingService implements OnModuleInit {
           );
           // Cancel the order in DB so it does not remain as OPEN indefinitely.
           try {
-            await this.matchingRepository.cancelIocRemainder(takerOrder.order_id, takerOrder.user_id);
+            await this.matchingRepository.cancelIocRemainder(
+              takerOrder.order_id,
+              takerOrder.user_id,
+            );
           } catch (e) {
             this.logger.warn(
               `FOK cancel failed for order ${takerOrder.order_id}: ${e instanceof Error ? e.message : String(e)}`,
@@ -169,8 +171,14 @@ export class MatchingService implements OnModuleInit {
         const priceBu = toBaseUnits(price, DEFAULT_SCALE);
         const takerRateBu = toBaseUnits(takerFeeRate, DEFAULT_SCALE);
         const makerRateBu = toBaseUnits(makerFeeRate, DEFAULT_SCALE);
-        const takerFee = fromBaseUnits((fillBu * priceBu * takerRateBu) / (SCALE * SCALE), DEFAULT_SCALE);
-        const makerFee = fromBaseUnits((fillBu * priceBu * makerRateBu) / (SCALE * SCALE), DEFAULT_SCALE);
+        const takerFee = fromBaseUnits(
+          (fillBu * priceBu * takerRateBu) / (SCALE * SCALE),
+          DEFAULT_SCALE,
+        );
+        const makerFee = fromBaseUnits(
+          (fillBu * priceBu * makerRateBu) / (SCALE * SCALE),
+          DEFAULT_SCALE,
+        );
         const result = await this.matchingRepository.executeTrade({
           pairId,
           makerOrderId: makerOrder.order_id,
@@ -199,9 +207,13 @@ export class MatchingService implements OnModuleInit {
         };
         this.notifyTradeExecuted(execResult);
         // Record price for circuit breaker monitoring (fire-and-forget; never throws into matching flow).
-        this.circuitBreaker.recordPriceAndCheck(pairId, price, DEFAULT_CIRCUIT_BREAKER_CONFIG).catch(
-          (e) => this.logger.warn(`Circuit breaker recordPrice error: ${e instanceof Error ? e.message : String(e)}`),
-        );
+        this.circuitBreaker
+          .recordPriceAndCheck(pairId, price, DEFAULT_CIRCUIT_BREAKER_CONFIG)
+          .catch((e) =>
+            this.logger.warn(
+              `Circuit breaker recordPrice error: ${e instanceof Error ? e.message : String(e)}`,
+            ),
+          );
         return execResult;
       };
 
@@ -304,8 +316,8 @@ export class MatchingService implements OnModuleInit {
 
         const priceCrosses =
           takerOrder.side === 'BUY'
-            ? (takerPriceBu === null || makerPriceBu <= takerPriceBu)
-            : (takerPriceBu === null || makerPriceBu >= takerPriceBu);
+            ? takerPriceBu === null || makerPriceBu <= takerPriceBu
+            : takerPriceBu === null || makerPriceBu >= takerPriceBu;
         if (!priceCrosses) continue;
       }
 
@@ -388,8 +400,7 @@ export class MatchingService implements OnModuleInit {
       }
 
       const sorted = [...buys, ...sells].sort(
-        (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       );
 
       let progressed = false;

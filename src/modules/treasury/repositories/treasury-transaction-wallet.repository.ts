@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, DeepPartial, FindOptionsWhere, In } from 'typeorm';
+import { type DataSource, type DeepPartial, type FindOptionsWhere, In } from 'typeorm';
+import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 import { NotFoundException } from '@/common/exceptions';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 
 export const TRON_DEPOSIT_UI_CHAINS = ['TRON_MAINNET', 'TRON_NILE', 'TRON_SHASTA'] as const;
 export type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
@@ -90,7 +90,9 @@ export class TreasuryTransactionWalletRepository {
     });
   }
 
-  async findActiveWithdrawalCandidates(chain: BlockchainChainDbValue): Promise<TransactionWallet[]> {
+  async findActiveWithdrawalCandidates(
+    chain: BlockchainChainDbValue,
+  ): Promise<TransactionWallet[]> {
     return this.dataSource.getRepository(TransactionWallet).find({
       where: {
         chain,
@@ -101,7 +103,9 @@ export class TreasuryTransactionWalletRepository {
   }
 
   async deleteByWalletId(walletId: string): Promise<void> {
-    const res = await this.dataSource.getRepository(TransactionWallet).delete({ wallet_id: walletId });
+    const res = await this.dataSource
+      .getRepository(TransactionWallet)
+      .delete({ wallet_id: walletId });
     if (!res.affected) {
       throw new NotFoundException('Transaction wallet', walletId);
     }

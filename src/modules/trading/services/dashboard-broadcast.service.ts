@@ -1,12 +1,7 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Server } from 'socket.io';
-import { TickerMessage, MARKET_EVENTS } from '../interfaces/websocket.interface';
+import type { Server } from 'socket.io';
+import { MARKET_EVENTS, type TickerMessage } from '../interfaces/websocket.interface';
 
 const BROADCAST_INTERVAL_MS = 5_000; // broadcast to dashboard room every 5 seconds
 const DASHBOARD_ROOM = 'dashboard';

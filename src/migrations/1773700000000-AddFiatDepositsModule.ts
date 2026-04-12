@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
   name = 'AddFiatDepositsModule1773700000000';

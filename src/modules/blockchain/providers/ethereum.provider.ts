@@ -1,17 +1,17 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { ConfigService } from '@nestjs/config';
 import { ethers, JsonRpcProvider } from 'ethers';
-import { BlockchainNetwork } from '@/common/enums';
 import type { EvmChainDefinition } from '@/common/constants/evm-chain-definitions';
-import {
-  IBlockchainProvider,
+import { BlockchainNetwork } from '@/common/enums';
+import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
+  IBlockchainProvider,
 } from '../interfaces';
-import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
-import { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 
 /**
  * EVM provider — one Nest instance per chain (JsonRpcProvider + fixed chainId).
@@ -56,8 +56,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     }
     if (this.spec.network === BlockchainNetwork.BSC_CHAPEL) {
       return (
-        this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ??
-        this.spec.defaultRpcUrl
+        this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ?? this.spec.defaultRpcUrl
       );
     }
     const fromEnv = process.env[this.spec.rpcConfigKey]?.trim();
@@ -161,9 +160,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
         value: ethers.formatEther(tx.value),
         blockNumber: receipt.blockNumber,
         timestamp: receipt.blockNumber
-          ? new Date(
-              ((await this.provider.getBlock(receipt.blockNumber))?.timestamp ?? 0) * 1000,
-            )
+          ? new Date(((await this.provider.getBlock(receipt.blockNumber))?.timestamp ?? 0) * 1000)
           : undefined,
       };
     } catch (error) {

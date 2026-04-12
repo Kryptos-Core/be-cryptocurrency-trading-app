@@ -1,18 +1,22 @@
-import { Injectable, Logger, OnModuleInit, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { RedisService } from '@/common/services';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { SystemConfig, ConfigCategory, ConfigDataType } from '@/entities/system-config.entity';
+import type { Repository } from 'typeorm';
 import {
   EVM_CHAIN_DEFINITIONS,
   getEvmDefinitionByTreasuryChain,
 } from '@/common/constants/evm-chain-definitions';
+import type { RedisService } from '@/common/services';
+import {
+  type ConfigCategory,
+  type ConfigDataType,
+  SystemConfig,
+} from '@/entities/system-config.entity';
 import {
   RUNTIME_SETTING_KEY_SET,
   RUNTIME_SETTING_SEEDS,
-  RuntimeSettingKey,
+  type RuntimeSettingKey,
 } from './runtime-settings.definitions';
 
 @Injectable()
@@ -79,7 +83,7 @@ export class SystemConfigService implements OnModuleInit {
     if (subscriber) {
       subscriber.subscribe(this.UPDATE_EVENT, (err) => {
         if (err) {
-          this.logger.error('Failed to subscribe to ' + this.UPDATE_EVENT, err.message);
+          this.logger.error(`Failed to subscribe to ${this.UPDATE_EVENT}`, err.message);
         }
       });
 
@@ -105,7 +109,6 @@ export class SystemConfigService implements OnModuleInit {
         return parseFloat(value);
       case 'bool':
         return value === 'true';
-      case 'string':
       default:
         return value;
     }
@@ -308,7 +311,9 @@ export class SystemConfigService implements OnModuleInit {
       const envFallback = this.resolveEnvFallback(seed.key);
       const effectiveValue = row?.value ?? envFallback;
       const testSigLocked =
-        seed.key === 'BLOCKCHAIN_ALLOW_TEST_SIGNATURE' && nodeEnv === 'production' && !allowUiTestSig;
+        seed.key === 'BLOCKCHAIN_ALLOW_TEST_SIGNATURE' &&
+        nodeEnv === 'production' &&
+        !allowUiTestSig;
       return {
         key: seed.key,
         value: row?.value ?? envFallback,
@@ -350,7 +355,9 @@ export class SystemConfigService implements OnModuleInit {
 
     const config = await this.configRepo.findOne({ where: { key } });
     if (!config) {
-      throw new BadRequestException(`Config key ${key} not found. Restart server to seed runtime keys.`);
+      throw new BadRequestException(
+        `Config key ${key} not found. Restart server to seed runtime keys.`,
+      );
     }
 
     if (config.isReadOnly) {
@@ -361,10 +368,9 @@ export class SystemConfigService implements OnModuleInit {
     const updated = await this.configRepo.save(config);
 
     await this.redisService.getClient().hset(this.REDIS_HASH_KEY, key, newValue);
-    await this.redisService.getClient().publish(
-      this.UPDATE_EVENT,
-      JSON.stringify({ key, value: newValue }),
-    );
+    await this.redisService
+      .getClient()
+      .publish(this.UPDATE_EVENT, JSON.stringify({ key, value: newValue }));
 
     this.logger.log(
       JSON.stringify({

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
+import type {
   IMatchingStrategy,
   MatchingContext,
   OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
 } from '../interfaces';
-import { toBaseUnits, fromBaseUnits, DEFAULT_SCALE } from '../utils';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../utils';
 
 const SCALE_MULTIPLIER = 10n ** BigInt(DEFAULT_SCALE);
 
@@ -85,7 +85,8 @@ export class MarketOrderStrategy implements IMatchingStrategy {
         }
       }
 
-      const fillAmountBu = takerRemainingBu < makerRemainingBu ? takerRemainingBu : makerRemainingBu;
+      const fillAmountBu =
+        takerRemainingBu < makerRemainingBu ? takerRemainingBu : makerRemainingBu;
       const fillAmountStr = fromBaseUnits(fillAmountBu, DEFAULT_SCALE);
       const priceStr = maker.price ?? '0';
 

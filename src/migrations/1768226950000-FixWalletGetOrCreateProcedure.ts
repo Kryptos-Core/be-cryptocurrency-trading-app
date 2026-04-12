@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Fix sp_wallet_get_or_create_for_update: remove internal START TRANSACTION/COMMIT

@@ -3,8 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { MarketMakerService } from './market-maker.service';
-import { PlaceMakerOrdersDto, RefreshMakerOrdersDto, UpsertMarketMakerConfigDto } from './dto';
+import type { PlaceMakerOrdersDto, RefreshMakerOrdersDto, UpsertMarketMakerConfigDto } from './dto';
+import type { MarketMakerService } from './market-maker.service';
 
 @ApiTags('market-maker')
 @ApiBearerAuth('JWT-auth')
@@ -39,10 +39,7 @@ export class MarketMakerController {
   @RequireRoles(UserRole.MARKET_MAKER, UserRole.ADMIN)
   @RequirePermissions(Permission.MARKET_MAKER_CONFIG)
   @ApiOperation({ summary: 'Get market maker config by pair' })
-  getConfigByPair(
-    @CurrentUser('userId') userId: string,
-    @Param('pairId') pairId: string,
-  ) {
+  getConfigByPair(@CurrentUser('userId') userId: string, @Param('pairId') pairId: string) {
     return this.marketMakerService.getConfigByPair(userId, pairId);
   }
 
@@ -64,10 +61,7 @@ export class MarketMakerController {
   @RequireRoles(UserRole.MARKET_MAKER, UserRole.ADMIN)
   @RequirePermissions(Permission.MARKET_MAKER_CONFIG)
   @ApiOperation({ summary: 'Delete market maker config by pair' })
-  deleteConfig(
-    @CurrentUser('userId') userId: string,
-    @Param('pairId') pairId: string,
-  ) {
+  deleteConfig(@CurrentUser('userId') userId: string, @Param('pairId') pairId: string) {
     return this.marketMakerService.deleteConfig(userId, pairId);
   }
 
@@ -75,7 +69,9 @@ export class MarketMakerController {
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.MARKET_MAKER, UserRole.ADMIN)
   @RequirePermissions(Permission.ORDERS_BATCH_PLACE)
-  @ApiOperation({ summary: 'Place two-sided maker orders around Redis mid price (alias of refresh)' })
+  @ApiOperation({
+    summary: 'Place two-sided maker orders around Redis mid price (alias of refresh)',
+  })
   placeMakerOrders(
     @CurrentUser('userId') userId: string,
     @Param('pairId') pairId: string,

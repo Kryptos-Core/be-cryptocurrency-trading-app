@@ -1,1 +1,1 @@
-export { toBaseUnits, fromBaseUnits, comparePriceBigInt, DEFAULT_SCALE } from './base-units';
+export { comparePriceBigInt, DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from './base-units';

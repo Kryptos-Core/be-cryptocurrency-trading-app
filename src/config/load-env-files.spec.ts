@@ -1,4 +1,4 @@
-import * as path from 'path';
+import * as path from 'node:path';
 import { nestEnvFilePaths } from './load-env-files';
 
 describe('nestEnvFilePaths', () => {
@@ -20,9 +20,6 @@ describe('nestEnvFilePaths', () => {
 
   it('appends .env.<NODE_ENV> when NODE_ENV is set', () => {
     process.env.NODE_ENV = 'staging';
-    expect(nestEnvFilePaths(cwd)).toEqual([
-      path.join(cwd, '.env'),
-      path.join(cwd, '.env.staging'),
-    ]);
+    expect(nestEnvFilePaths(cwd)).toEqual([path.join(cwd, '.env'), path.join(cwd, '.env.staging')]);
   });
 });

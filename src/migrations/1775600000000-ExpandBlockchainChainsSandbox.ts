@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /** Restores sandbox chain enum values alongside mainnets (no data rewrite). */
 const expandedChainEnum = `'TRON_NILE','TRON_SHASTA','TRON_MAINNET','SOLANA_DEVNET','SOLANA_MAINNET','ETH_SEPOLIA','ETH_MAINNET','BSC_CHAPEL','BSC_MAINNET'`;
@@ -21,7 +21,7 @@ export class ExpandBlockchainChainsSandbox1775600000000 implements MigrationInte
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     throw new Error('ExpandBlockchainChainsSandbox1775600000000 down() is not supported');
   }
 }

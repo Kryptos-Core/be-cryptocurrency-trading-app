@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { Job } from 'bull';
+import type { OrderBookOrder } from './interfaces';
 import { MatchingProcessor } from './matching.processor';
 import { MatchingService } from './matching.service';
-import { MATCH_ORDER_JOB, MatchOrderJobData } from './matching-queue.service';
-import { Job } from 'bull';
-import { OrderBookOrder } from './interfaces';
+import { MATCH_ORDER_JOB, type MatchOrderJobData } from './matching-queue.service';
 
 function makeOrder(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {
@@ -36,10 +36,7 @@ describe('MatchingProcessor', () => {
     } as unknown as jest.Mocked<MatchingService>;
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MatchingProcessor,
-        { provide: MatchingService, useValue: matchingService },
-      ],
+      providers: [MatchingProcessor, { provide: MatchingService, useValue: matchingService }],
     }).compile();
 
     processor = module.get(MatchingProcessor);

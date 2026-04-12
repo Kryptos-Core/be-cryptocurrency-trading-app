@@ -1,23 +1,22 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
-  ConflictException,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import { PayOS } from '@payos/node';
 import Decimal from 'decimal.js';
-import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
-import { WalletsService } from '@/modules/wallets/wallets.service';
-import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
-import { ConfigService } from '@nestjs/config';
 import { uuidv7 } from 'uuidv7';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
-import { FiatDeposit } from '@/entities/fiat-deposit.entity';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
-import { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
+import type { FiatDeposit } from '@/entities/fiat-deposit.entity';
+import type { CurrencyRepository } from '@/modules/currencies/repositories';
+import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import type { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import type { WalletsService } from '@/modules/wallets/wallets.service';
 import { resolvePayosFiatDepositLimits } from './payos-fiat-limits.util';
-// @ts-ignore
-const { PayOS } = require('@payos/node');
+import type { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 
 interface PayOSInstanceEntry {
   instance: any;
@@ -81,8 +80,7 @@ export class DepositsService {
       quoteCurrencySymbol:
         this.configService.get<string>('PAYOS_DEPOSIT_CURRENCY_SYMBOL')?.trim().toUpperCase() ??
         'USDT',
-      fiatToQuoteRate:
-        this.configService.get<string>('PAYOS_FIAT_TO_QUOTE_RATE') ?? '1',
+      fiatToQuoteRate: this.configService.get<string>('PAYOS_FIAT_TO_QUOTE_RATE') ?? '1',
       fxSpreadBps: this.configService.get<string>('PAYOS_FX_SPREAD_BPS') ?? '0',
       minDepositAmountFiat: this.configService.get<string>('PAYOS_MIN_DEPOSIT_AMOUNT'),
       maxDepositAmountFiat: this.configService.get<string>('PAYOS_MAX_DEPOSIT_AMOUNT'),
@@ -221,9 +219,7 @@ export class DepositsService {
     const { payOS, config } = await this.getPayOSInstance();
 
     if (!config.returnUrl || !config.cancelUrl) {
-      throw new Error(
-        'PayOS callback URLs not configured (returnUrl / cancelUrl)',
-      );
+      throw new Error('PayOS callback URLs not configured (returnUrl / cancelUrl)');
     }
 
     const { minAmount, maxAmount } = this.payosLimits(config);
@@ -244,9 +240,7 @@ export class DepositsService {
       });
     }
 
-    const orderCode = Number(
-      String(Date.now()).slice(-6) + Math.floor(Math.random() * 10000),
-    );
+    const orderCode = Number(String(Date.now()).slice(-6) + Math.floor(Math.random() * 10000));
     const depositId = uuidv7();
 
     const body = {
@@ -292,14 +286,8 @@ export class DepositsService {
         `Received valid webhook data for Order ${verifiedData.orderCode} with status ${verifiedData.code}`,
       );
 
-      if (
-        verifiedData.code === '00' ||
-        verifiedData.desc === 'success' ||
-        verifiedData.success
-      ) {
-        const deposit = await this.fiatDepositRepo.findByOrderCode(
-          Number(verifiedData.orderCode),
-        );
+      if (verifiedData.code === '00' || verifiedData.desc === 'success' || verifiedData.success) {
+        const deposit = await this.fiatDepositRepo.findByOrderCode(Number(verifiedData.orderCode));
         if (!deposit || deposit.status === 'PAID') {
           return { message: 'Order already paid or not found' };
         }

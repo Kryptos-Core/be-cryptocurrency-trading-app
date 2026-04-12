@@ -40,7 +40,9 @@ export class BusinessException extends AppException {
  */
 export class NotFoundException extends AppException {
   constructor(resource: string, identifier?: string | number) {
-    const message = identifier ? `${resource} with id ${identifier} not found` : `${resource} not found`;
+    const message = identifier
+      ? `${resource} with id ${identifier} not found`
+      : `${resource} not found`;
     super('NOT_FOUND', message, 404);
     Object.setPrototypeOf(this, NotFoundException.prototype);
   }

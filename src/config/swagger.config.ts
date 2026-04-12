@@ -1,5 +1,5 @@
+import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { INestApplication } from '@nestjs/common';
 
 /**
  * Swagger Configuration
@@ -45,7 +45,7 @@ export const setupSwagger = (app: INestApplication): void => {
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
-    operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
+    operationIdFactory: (_controllerKey: string, methodKey: string) => methodKey,
     deepScanRoutes: true, // Deep scan routes for better documentation
   });
 

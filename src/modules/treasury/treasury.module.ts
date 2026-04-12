@@ -1,26 +1,26 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
+import { forwardRef, Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { WalletEncryptionService } from '@/common/services';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
-import { WalletEncryptionService } from '@/common/services';
+import { AuthModule } from '@/modules/auth/auth.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
-import { AuthModule } from '@/modules/auth/auth.module';
 import { TREASURY_QUEUE } from './constants';
-import { TreasuryController } from './treasury.controller';
-import { TransactionWalletService } from './transaction-wallet.service';
-import { TreasuryOperationsService } from './treasury-operations.service';
-import { TreasuryMainWalletService } from './treasury-main-wallet.service';
-import { TreasuryProcessor } from './treasury.processor';
+import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
+import { OnchainChainPickerService } from './onchain-chain-picker.service';
+import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
 import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
 import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
-import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
-import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
-import { OnchainChainPickerService } from './onchain-chain-picker.service';
+import { TransactionWalletService } from './transaction-wallet.service';
+import { TreasuryController } from './treasury.controller';
+import { TreasuryProcessor } from './treasury.processor';
+import { TreasuryMainWalletService } from './treasury-main-wallet.service';
+import { TreasuryOperationsService } from './treasury-operations.service';
 
 @Module({
   imports: [

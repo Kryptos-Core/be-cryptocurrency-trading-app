@@ -1,17 +1,17 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
+  IsPort,
   IsString,
   IsUrl,
-  Min,
   Max,
+  Min,
   validateSync,
-  IsBoolean,
-  IsPort,
-  IsIn,
 } from 'class-validator';
 import { Environment } from '@/common/enums';
 
@@ -517,8 +517,6 @@ export class EnvironmentVariables {
   @IsOptional()
   SMTP_FROM?: string;
 
-
-
   /** WalletConnect / Reown — phải có trong envVarKeys để ConfigService nhận từ .env */
   @IsString()
   @IsOptional()
@@ -718,7 +716,9 @@ const DEFAULT_SANDBOX_RPC_URLS: Partial<Record<keyof EnvironmentVariables, strin
 
 /** When ONCHAIN_OPERATOR_MODE=sandbox, fill missing sandbox RPC vars so bootstrap matches app.config defaults. */
 export function applyOnchainSandboxRpcDefaults(config: EnvironmentVariables): void {
-  const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production').toLowerCase().trim();
+  const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production')
+    .toLowerCase()
+    .trim();
   if (mode !== 'sandbox') return;
 
   for (const key of Object.keys(DEFAULT_SANDBOX_RPC_URLS) as Array<keyof EnvironmentVariables>) {
@@ -733,7 +733,9 @@ export function applyOnchainSandboxRpcDefaults(config: EnvironmentVariables): vo
 
 /** When ONCHAIN_OPERATOR_MODE=sandbox, require sandbox RPC endpoints (after defaults). */
 export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): void {
-  const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production').toLowerCase().trim();
+  const mode = String(config.ONCHAIN_OPERATOR_MODE ?? 'production')
+    .toLowerCase()
+    .trim();
   if (mode !== 'sandbox') return;
 
   const required: Array<{ key: keyof EnvironmentVariables; label: string }> = [

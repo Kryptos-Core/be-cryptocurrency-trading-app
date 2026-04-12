@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { WALLET_LEDGER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
@@ -39,10 +39,7 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
   /**
    * Create a ledger entry within optional transaction scope
    */
-  async createEntry(
-    entry: LedgerEntryInput,
-    manager?: EntityManager,
-  ): Promise<WalletLedger> {
+  async createEntry(entry: LedgerEntryInput, manager?: EntityManager): Promise<WalletLedger> {
     const runner = manager ?? this.dataSource;
     const result = await runner.query(
       `CALL ${WALLET_LEDGER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
@@ -73,7 +70,9 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
     userId: string,
     currencyId: string,
     limit: number = 100,
-  ): Promise<Array<{ ref_type: string; ref_id: number; direction: string; amount: string; created_at: Date }>> {
+  ): Promise<
+    Array<{ ref_type: string; ref_id: number; direction: string; amount: string; created_at: Date }>
+  > {
     const rows = await this.dataSource.query(
       `SELECT ref_type, ref_id, direction, amount, created_at
        FROM wallet_ledger
@@ -98,14 +97,8 @@ export class WalletLedgerRepository extends BaseRepository<WalletLedger> {
     base: Omit<LedgerEntryInput, 'direction'>,
     manager?: EntityManager,
   ): Promise<[WalletLedger, WalletLedger]> {
-    const credit = await this.createEntry(
-      { ...base, direction: 'CREDIT' },
-      manager,
-    );
-    const debit = await this.createEntry(
-      { ...base, direction: 'DEBIT' },
-      manager,
-    );
+    const credit = await this.createEntry({ ...base, direction: 'CREDIT' }, manager);
+    const debit = await this.createEntry({ ...base, direction: 'DEBIT' }, manager);
 
     return [credit, debit];
   }

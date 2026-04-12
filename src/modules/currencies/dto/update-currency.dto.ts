@@ -1,13 +1,5 @@
-import {
-  IsString,
-  IsBoolean,
-  IsOptional,
-  IsInt,
-  Min,
-  Max,
-  Matches,
-} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
 /**
  * Update Currency DTO
@@ -15,7 +7,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  */
 export class UpdateCurrencyDto {
   @ApiPropertyOptional({
-    description: 'Currency symbol (e.g., BTC, ETH, USDT). Note: Changing symbol is not recommended.',
+    description:
+      'Currency symbol (e.g., BTC, ETH, USDT). Note: Changing symbol is not recommended.',
     example: 'BTC',
     minLength: 2,
     maxLength: 16,

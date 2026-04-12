@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '@/common/decorators';
 
 /**
@@ -11,7 +11,11 @@ import { Public } from '@/common/decorators';
 export class HealthController {
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Health check', description: 'Returns 200 if API is up. Use to verify backend is reachable (e.g. before login).' })
+  @ApiOperation({
+    summary: 'Health check',
+    description:
+      'Returns 200 if API is up. Use to verify backend is reachable (e.g. before login).',
+  })
   @ApiResponse({ status: 200, description: 'API is running' })
   check() {
     return { ok: true, timestamp: new Date().toISOString() };

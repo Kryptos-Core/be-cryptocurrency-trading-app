@@ -1,6 +1,6 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { MarketRepository } from '@/modules/markets/repositories';
-import { ExchangeInfoSyncService } from './exchange-info-sync.service';
+import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import type { MarketRepository } from '@/modules/markets/repositories';
+import type { ExchangeInfoSyncService } from './exchange-info-sync.service';
 
 @Injectable()
 export class MarketCatalogBootstrapService implements OnApplicationBootstrap {

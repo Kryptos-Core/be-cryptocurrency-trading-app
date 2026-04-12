@@ -1,41 +1,34 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
   Body,
-  Query,
-  UseGuards,
-  ParseIntPipe,
-  ParseBoolPipe,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseBoolPipe,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiQuery,
-  ApiParam,
-  ApiBody,
-} from '@nestjs/swagger';
-import { CurrenciesService } from './currencies.service';
-import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
-import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { Public } from '@/common/decorators';
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiSuccessResponse,
+  ApiUnauthorizedResponse,
+  Public,
+} from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
-import {
-  ApiSuccessResponse,
-  ApiCreatedResponse,
-  ApiBadRequestResponse,
-  ApiUnauthorizedResponse,
-  ApiNotFoundResponse,
-  ApiConflictResponse,
-} from '@/common/decorators';
+import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import type { CurrenciesService } from './currencies.service';
+import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
 
 /**
  * Currencies Controller
@@ -225,10 +218,7 @@ export class CurrenciesController {
   @ApiNotFoundResponse('Currency not found')
   @ApiConflictResponse('Currency symbol already exists')
   @ApiUnauthorizedResponse('Unauthorized')
-  async update(
-    @Param('id') id: string,
-    @Body() updateCurrencyDto: UpdateCurrencyDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateCurrencyDto: UpdateCurrencyDto) {
     return this.currenciesService.update(id, updateCurrencyDto);
   }
 

@@ -1,7 +1,7 @@
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import type { ConfigService } from '@nestjs/config';
+import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
 
 export interface CloudinaryUploadResult {
   url: string;
@@ -22,8 +22,7 @@ export class CloudinaryService {
     const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
     const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
     const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
-    this.folder =
-      this.configService.get<string>('CLOUDINARY_AVATAR_FOLDER') ?? 'avatars';
+    this.folder = this.configService.get<string>('CLOUDINARY_AVATAR_FOLDER') ?? 'avatars';
 
     if (cloudName && apiKey && apiSecret) {
       cloudinary.config({
@@ -49,10 +48,7 @@ export class CloudinaryService {
    * @param buffer - image file buffer
    * @param publicIdPrefix - optional prefix for public_id (e.g. user id) to avoid collisions
    */
-  async upload(
-    buffer: Buffer,
-    publicIdPrefix?: string,
-  ): Promise<CloudinaryUploadResult> {
+  async upload(buffer: Buffer, publicIdPrefix?: string): Promise<CloudinaryUploadResult> {
     if (!this.configured) {
       throw new Error(
         'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.',

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '@/common/services';
-import { WorkspaceState, WorkspaceSubscription } from '../interfaces/websocket.interface';
+import type { RedisService } from '@/common/services';
+import type { WorkspaceState, WorkspaceSubscription } from '../interfaces/websocket.interface';
 
 const WORKSPACE_TTL_SEC = 24 * 3600; // 24 hours
 
@@ -34,7 +34,9 @@ export class WorkspaceService {
       if (!raw) return null;
       return JSON.parse(raw) as WorkspaceState;
     } catch (err) {
-      this.logger.warn(`getWorkspace error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `getWorkspace error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return null;
     }
   }
@@ -58,7 +60,9 @@ export class WorkspaceService {
       const state: WorkspaceState = { user_id: userId, pairs, updated_at: Date.now() };
       await this.redisService.set(this.key(userId), JSON.stringify(state), WORKSPACE_TTL_SEC);
     } catch (err) {
-      this.logger.warn(`upsertPairSubscription error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `upsertPairSubscription error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -73,7 +77,9 @@ export class WorkspaceService {
       const state: WorkspaceState = { ...existing, pairs, updated_at: Date.now() };
       await this.redisService.set(this.key(userId), JSON.stringify(state), WORKSPACE_TTL_SEC);
     } catch (err) {
-      this.logger.warn(`removePairSubscription error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `removePairSubscription error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -84,7 +90,9 @@ export class WorkspaceService {
     try {
       await this.redisService.del(this.key(userId));
     } catch (err) {
-      this.logger.warn(`deleteWorkspace error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `deleteWorkspace error for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

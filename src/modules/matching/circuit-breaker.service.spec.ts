@@ -1,6 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { CircuitBreakerService } from './circuit-breaker.service';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { RedisService } from '@/common/services';
+import { CircuitBreakerService } from './circuit-breaker.service';
 
 /** Simple in-memory Redis mock that actually stores values via set/get. */
 function makeRedisClientMock() {
@@ -111,9 +111,7 @@ describe('CircuitBreakerService', () => {
   describe('resumeTrading', () => {
     it('removes halt key from Redis', async () => {
       await service.resumeTrading('pair-1');
-      expect(redisClient.del).toHaveBeenCalledWith(
-        expect.stringContaining('circuit:halt:pair-1'),
-      );
+      expect(redisClient.del).toHaveBeenCalledWith(expect.stringContaining('circuit:halt:pair-1'));
     });
   });
 });

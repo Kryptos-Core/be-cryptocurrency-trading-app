@@ -1,26 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { uuidv7 } from 'uuidv7';
+import type { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
-import { CacheService } from '@/common/services';
-import {
-  BadRequestException,
-  BusinessException,
-  ConflictException,
-} from '@/common/exceptions';
-import { BlockchainNetwork, OnchainTxStatus } from '@/common/enums';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { WalletLinkingService } from './wallet-linking.service';
-import { DepositFxService } from './deposit-fx.service';
-import { SubmitDepositDto, RequestWithdrawalDto } from './dto';
-import { WalletsService } from '@/modules/wallets/wallets.service';
-import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
-import { ConfigService } from '@nestjs/config';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { NotificationsService } from '@/modules/notifications/notifications.service';
-import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import type { DataSource } from 'typeorm';
+import { uuidv7 } from 'uuidv7';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
+import {
+  BlockchainNetwork,
+  OnchainTxStatus,
+  WalletReferenceType,
+  WalletTransactionAction,
+} from '@/common/enums';
+import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
+import type { CurrencyRepository } from '@/modules/currencies/repositories';
+import type { NotificationsService } from '@/modules/notifications/notifications.service';
+import type { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import type { WalletsService } from '@/modules/wallets/wallets.service';
+import type { BlockchainProviderFactory } from './blockchain-provider.factory';
+import type { DepositFxService } from './deposit-fx.service';
+import type { RequestWithdrawalDto, SubmitDepositDto } from './dto';
+import type { WalletLinkingService } from './wallet-linking.service';
 
 /**
  * Onchain Transfer Service
@@ -33,22 +33,26 @@ export class OnchainTransferService {
   private readonly logger = new Logger(OnchainTransferService.name);
 
   private treasuryLog(event: string, fields: Record<string, unknown>): void {
-    this.logger.log(JSON.stringify({
-      domain: 'treasury',
-      event,
-      at: new Date().toISOString(),
-      ...fields,
-    }));
+    this.logger.log(
+      JSON.stringify({
+        domain: 'treasury',
+        event,
+        at: new Date().toISOString(),
+        ...fields,
+      }),
+    );
   }
 
   private treasuryAlert(event: string, fields: Record<string, unknown>): void {
-    this.logger.warn(JSON.stringify({
-      domain: 'treasury',
-      severity: 'alert',
-      event,
-      at: new Date().toISOString(),
-      ...fields,
-    }));
+    this.logger.warn(
+      JSON.stringify({
+        domain: 'treasury',
+        severity: 'alert',
+        event,
+        at: new Date().toISOString(),
+        ...fields,
+      }),
+    );
   }
 
   /**
@@ -106,17 +110,10 @@ export class OnchainTransferService {
     }
 
     if (txStatus.status === 'FAILED') {
-      throw new BadRequestException(
-        'Giao dịch on-chain đã thất bại.',
-        'TX_FAILED',
-      );
+      throw new BadRequestException('Giao dịch on-chain đã thất bại.', 'TX_FAILED');
     }
 
-    const linked = await this.walletLinkingService.findVerifiedWallet(
-      userId,
-      chain,
-      txStatus.from,
-    );
+    const linked = await this.walletLinkingService.findVerifiedWallet(userId, chain, txStatus.from);
 
     await this.assertTronDepositRecipientMatchesConfiguredDefault(chain, txStatus.to);
 
@@ -146,7 +143,7 @@ export class OnchainTransferService {
     private readonly depositFxService: DepositFxService,
     private readonly walletsService: WalletsService,
     private readonly currencyRepository: CurrencyRepository,
-    private readonly configService: ConfigService,
+    readonly _configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly transactionWalletService: TransactionWalletService,
@@ -182,7 +179,8 @@ export class OnchainTransferService {
   }
 
   private async getWithdrawAutoMaxByChain(chain: BlockchainNetwork): Promise<Decimal> {
-    const globalMax = await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_AUTO_MAX') || '0';
+    const globalMax =
+      (await this.systemConfigService.get<string>('BLOCKCHAIN_WITHDRAW_AUTO_MAX')) || '0';
     const chainKey = `BLOCKCHAIN_WITHDRAW_AUTO_MAX_${chain}`;
     const chainMax = await this.systemConfigService.get<string>(chainKey);
     const resolved = chainMax?.trim() ? chainMax : globalMax;
@@ -385,10 +383,7 @@ export class OnchainTransferService {
       }
 
       if (txStatus.status === 'FAILED') {
-        throw new BadRequestException(
-          'Giao dịch on-chain đã thất bại',
-          'TX_FAILED',
-        );
+        throw new BadRequestException('Giao dịch on-chain đã thất bại', 'TX_FAILED');
       }
 
       await this.assertTronDepositRecipientMatchesConfiguredDefault(dto.chain, txStatus.to);
@@ -423,9 +418,7 @@ export class OnchainTransferService {
       // Tạo bản ghi giao dịch
       const txId = uuidv7();
       const status =
-        txStatus.status === 'CONFIRMED'
-          ? OnchainTxStatus.COMPLETED
-          : OnchainTxStatus.CONFIRMING;
+        txStatus.status === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
 
       await this.dataSource.query(
         `INSERT INTO onchain_transactions
@@ -538,16 +531,10 @@ export class OnchainTransferService {
     }
 
     // Kiểm tra ví liên kết
-    const linkedWallet = await this.walletLinkingService.findByLinkId(
-      userId,
-      dto.linkedWalletId,
-    );
+    const linkedWallet = await this.walletLinkingService.findByLinkId(userId, dto.linkedWalletId);
 
     if (!linkedWallet) {
-      throw new BadRequestException(
-        'Ví liên kết không tìm thấy',
-        'WALLET_NOT_FOUND',
-      );
+      throw new BadRequestException('Ví liên kết không tìm thấy', 'WALLET_NOT_FOUND');
     }
 
     if (linkedWallet.status !== 'VERIFIED') {
@@ -558,10 +545,7 @@ export class OnchainTransferService {
     }
 
     if (linkedWallet.chain !== dto.chain) {
-      throw new BadRequestException(
-        'Mạng blockchain không khớp với ví liên kết',
-        'CHAIN_MISMATCH',
-      );
+      throw new BadRequestException('Mạng blockchain không khớp với ví liên kết', 'CHAIN_MISMATCH');
     }
 
     // Validate amount
@@ -707,11 +691,7 @@ export class OnchainTransferService {
       toAddress: linkedWallet.address,
     };
 
-    await this.cacheService.set(
-      idemCacheKey,
-      result,
-      OnchainTransferService.WITHDRAWAL_IDEM_TTL,
-    );
+    await this.cacheService.set(idemCacheKey, result, OnchainTransferService.WITHDRAWAL_IDEM_TTL);
 
     this.treasuryLog('withdraw.request.result', {
       userId,
@@ -839,7 +819,13 @@ export class OnchainTransferService {
           title: 'Yêu cầu rút tiền đã được xử lý',
           body: `${amount.toString()} ${symbol} — ${status === OnchainTxStatus.CONFIRMING ? 'Đã gửi on-chain' : 'Thất bại'}`,
           type: 'alert',
-          data: { type: 'WITHDRAWAL_STATUS', txId, status, amount: amount.toString(), chain: tx.chain },
+          data: {
+            type: 'WITHDRAWAL_STATUS',
+            txId,
+            status,
+            amount: amount.toString(),
+            chain: tx.chain,
+          },
         },
         actorUserId,
       );
@@ -884,7 +870,10 @@ export class OnchainTransferService {
     }
 
     if (tx.tx_hash) {
-      throw new BadRequestException('Giao dịch đã được gửi on-chain, không thể từ chối', 'WITHDRAWAL_ALREADY_SENT');
+      throw new BadRequestException(
+        'Giao dịch đã được gửi on-chain, không thể từ chối',
+        'WITHDRAWAL_ALREADY_SENT',
+      );
     }
 
     if (tx.status !== OnchainTxStatus.PENDING) {
@@ -923,7 +912,14 @@ export class OnchainTransferService {
           title: 'Yêu cầu rút tiền đã bị từ chối',
           body: `${amount.toString()} ${symbol} — Đã hoàn số dư về ví`,
           type: 'alert',
-          data: { type: 'WITHDRAWAL_STATUS', txId, status: OnchainTxStatus.FAILED, amount: amount.toString(), chain: tx.chain, reason: reason || null },
+          data: {
+            type: 'WITHDRAWAL_STATUS',
+            txId,
+            status: OnchainTxStatus.FAILED,
+            amount: amount.toString(),
+            chain: tx.chain,
+            reason: reason || null,
+          },
         },
         actorUserId,
       );
@@ -951,7 +947,12 @@ export class OnchainTransferService {
   async processPendingManualWithdrawals(
     actorUserId: string,
     limit: number = 20,
-  ): Promise<{ processed: number; success: number; failed: number; items: Array<{ txId: string; status: string }> }> {
+  ): Promise<{
+    processed: number;
+    success: number;
+    failed: number;
+    items: Array<{ txId: string; status: string }>;
+  }> {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const rows = await this.dataSource.query(
       `SELECT tx_id
@@ -1133,9 +1134,7 @@ export class OnchainTransferService {
       amount: String(r.amount ?? '0'),
       status: r.status,
       confirmations: r.confirmations ?? 0,
-      createdAt: r.created_at instanceof Date
-        ? r.created_at.toISOString()
-        : String(r.created_at),
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
       confirmedAt: r.confirmed_at
         ? r.confirmed_at instanceof Date
           ? r.confirmed_at.toISOString()
@@ -1150,10 +1149,7 @@ export class OnchainTransferService {
   /**
    * Lấy chi tiết 1 giao dịch
    */
-  async getTransactionById(
-    userId: string,
-    txId: string,
-  ) {
+  async getTransactionById(userId: string, txId: string) {
     const rows = await this.dataSource.query(
       `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
               confirmations, created_at, confirmed_at,
@@ -1166,10 +1162,7 @@ export class OnchainTransferService {
 
     const r = rows?.[0];
     if (!r) {
-      throw new BadRequestException(
-        'Giao dịch không tìm thấy',
-        'TX_NOT_FOUND',
-      );
+      throw new BadRequestException('Giao dịch không tìm thấy', 'TX_NOT_FOUND');
     }
 
     return {
@@ -1182,9 +1175,7 @@ export class OnchainTransferService {
       amount: String(r.amount ?? '0'),
       status: r.status,
       confirmations: r.confirmations ?? 0,
-      createdAt: r.created_at instanceof Date
-        ? r.created_at.toISOString()
-        : String(r.created_at),
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
       confirmedAt: r.confirmed_at
         ? r.confirmed_at instanceof Date
           ? r.confirmed_at.toISOString()
@@ -1241,7 +1232,7 @@ export class OnchainTransferService {
     }
     if (filters.dateTo) {
       sql += ` AND tx.created_at <= ?`;
-      params.push(filters.dateTo + ' 23:59:59');
+      params.push(`${filters.dateTo} 23:59:59`);
     }
     if (filters.search?.trim()) {
       const s = `%${filters.search.trim()}%`;
@@ -1281,7 +1272,9 @@ export class OnchainTransferService {
       confirmations: r.confirmations ?? 0,
       createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
       confirmedAt: r.confirmed_at
-        ? r.confirmed_at instanceof Date ? r.confirmed_at.toISOString() : String(r.confirmed_at)
+        ? r.confirmed_at instanceof Date
+          ? r.confirmed_at.toISOString()
+          : String(r.confirmed_at)
         : null,
       userEmail: r.user_email ?? null,
       userFirstName: r.user_first_name ?? null,
@@ -1341,7 +1334,9 @@ export class OnchainTransferService {
       confirmations: r.confirmations ?? 0,
       createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
       confirmedAt: r.confirmed_at
-        ? r.confirmed_at instanceof Date ? r.confirmed_at.toISOString() : String(r.confirmed_at)
+        ? r.confirmed_at instanceof Date
+          ? r.confirmed_at.toISOString()
+          : String(r.confirmed_at)
         : null,
       userEmail: r.user_email ?? null,
       userFirstName: r.user_first_name ?? null,

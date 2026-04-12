@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
+import type { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
 
 /**
  * Handles PayOS redirect URLs (success/cancel) — excluded from /api/v1 prefix.

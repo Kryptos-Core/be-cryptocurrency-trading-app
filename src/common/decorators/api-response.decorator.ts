@@ -1,5 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiResponse, ApiResponseOptions } from '@nestjs/swagger';
+import { ApiResponse, type ApiResponseOptions } from '@nestjs/swagger';
 
 /**
  * Extended ApiResponseOptions to support schema

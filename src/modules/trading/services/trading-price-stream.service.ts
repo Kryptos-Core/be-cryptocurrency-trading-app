@@ -1,14 +1,14 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { RedisService } from '@/common/services';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
+import type { RedisService } from '@/common/services';
 import {
-  PriceUpdateEvent,
-  CandleUpdateEvent,
-  RedisPubSubMessage,
-  TickerMessage,
-  OHLCMessage,
-  CandleInterval,
+  type CandleInterval,
+  type CandleUpdateEvent,
   MARKET_EVENTS,
+  type OHLCMessage,
+  type PriceUpdateEvent,
+  type RedisPubSubMessage,
+  type TickerMessage,
 } from '../interfaces/websocket.interface';
 
 const RATE_LIMIT_LOG_MS = 60_000;
@@ -56,38 +56,37 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    * Initialize Redis Pub/Sub subscriber
    */
   private async initializeRedisSubscriber() {
-    try {
-      // Get subscriber client from RedisService
-      const subscriber = this.redisService.getSubscriber();
+    // Get subscriber client from RedisService
+    const subscriber = this.redisService.getSubscriber();
 
-      // Subscribe to trading channels
-      await subscriber.subscribe('trading:price_update', 'trading:candle_update');
+    // Subscribe to trading channels
+    await subscriber.subscribe('trading:price_update', 'trading:candle_update');
 
-      // Listen for messages
-      subscriber.on('message', (channel: string, message: string) => {
-        try {
-          const data = JSON.parse(message) as RedisPubSubMessage;
-          
-          if (channel === 'trading:price_update') {
-            this.handlePriceUpdate(data.data as PriceUpdateEvent);
-          } else if (channel === 'trading:candle_update') {
-            this.handleCandleUpdate(data.data as CandleUpdateEvent);
-          }
-        } catch (err) {
-          if (this.shouldLog('subscriber_message')) {
-            this.logger.warn('Redis subscriber message parse failed', err instanceof Error ? err.stack : String(err));
-          }
+    // Listen for messages
+    subscriber.on('message', (channel: string, message: string) => {
+      try {
+        const data = JSON.parse(message) as RedisPubSubMessage;
+
+        if (channel === 'trading:price_update') {
+          this.handlePriceUpdate(data.data as PriceUpdateEvent);
+        } else if (channel === 'trading:candle_update') {
+          this.handleCandleUpdate(data.data as CandleUpdateEvent);
         }
-      });
-
-      subscriber.on('error', (err: Error) => {
-        if (this.shouldLog('subscriber_error')) {
-          this.logger.error('Redis subscriber error', err?.stack ?? err?.message ?? String(err));
+      } catch (err) {
+        if (this.shouldLog('subscriber_message')) {
+          this.logger.warn(
+            'Redis subscriber message parse failed',
+            err instanceof Error ? err.stack : String(err),
+          );
         }
-      });
-    } catch (error) {
-      throw error;
-    }
+      }
+    });
+
+    subscriber.on('error', (err: Error) => {
+      if (this.shouldLog('subscriber_error')) {
+        this.logger.error('Redis subscriber error', err?.stack ?? err?.message ?? String(err));
+      }
+    });
   }
 
   /**
@@ -130,23 +129,23 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       const pairIntervalKey = `${event.pair_id}:${interval}`;
       const currentKey = this.candleKeyByPairInterval.get(pairIntervalKey);
 
-      if (!currentKey || !currentKey.endsWith(`:${openTime}`)) {
+      if (!currentKey?.endsWith(`:${openTime}`)) {
         if (currentKey) {
           const prev = this.candleCache.get(currentKey);
           if (prev) {
-        const closed = {
-          ...prev,
-          close_time: openTime,
-          is_closed: true,
-        };
-        this.candleCache.set(currentKey, closed);
-        if (!this.shouldSkipAggregateForPairInterval(event.pair_id, interval)) {
-          void this.publishCandleUpdate(closed, { source: 'aggregated' });
+            const closed = {
+              ...prev,
+              close_time: openTime,
+              is_closed: true,
+            };
+            this.candleCache.set(currentKey, closed);
+            if (!this.shouldSkipAggregateForPairInterval(event.pair_id, interval)) {
+              void this.publishCandleUpdate(closed, { source: 'aggregated' });
+            }
+          }
         }
-      }
-    }
 
-    const newKey = `${pairIntervalKey}:${openTime}`;
+        const newKey = `${pairIntervalKey}:${openTime}`;
         const candle: OHLCMessage = {
           pair_id: event.pair_id,
           symbol: event.ticker.symbol,
@@ -277,7 +276,10 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
    * Publish candle update to Redis (real-time only; no DB persist). Uses retry.
    * source: 'binance_kline' so downstream can prefer it over aggregated ticker.
    */
-  async publishCandleUpdate(candle: OHLCMessage, options?: { source?: 'binance_kline' | 'aggregated' }) {
+  async publishCandleUpdate(
+    candle: OHLCMessage,
+    options?: { source?: 'binance_kline' | 'aggregated' },
+  ) {
     const message: RedisPubSubMessage = {
       event: 'candle_update',
       data: {

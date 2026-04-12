@@ -1,11 +1,11 @@
 import {
-  Entity,
-  PrimaryColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
+  Entity,
   ForeignKey,
   Index,
+  ManyToOne,
+  PrimaryColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 
@@ -35,8 +35,12 @@ export class UserSession {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.sessions, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => User,
+    (user) => user.sessions,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   user!: User;
 }

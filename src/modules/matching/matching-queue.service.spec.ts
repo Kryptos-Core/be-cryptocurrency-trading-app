@@ -1,8 +1,13 @@
 import { getQueueToken } from '@nestjs/bull';
-import { Test, TestingModule } from '@nestjs/testing';
-import { Queue } from 'bull';
-import { MatchingQueueService, MATCHING_QUEUE, MATCH_ORDER_JOB, MatchOrderJobData } from './matching-queue.service';
-import { OrderBookOrder } from './interfaces';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { Queue } from 'bull';
+import type { OrderBookOrder } from './interfaces';
+import {
+  MATCH_ORDER_JOB,
+  MATCHING_QUEUE,
+  MatchingQueueService,
+  type MatchOrderJobData,
+} from './matching-queue.service';
 
 function makeOrder(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
   return {

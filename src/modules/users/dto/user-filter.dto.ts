@@ -1,10 +1,13 @@
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { UserRole, UserStatus } from '@/common/enums';
 
 export class UserFilterDto {
-  @ApiPropertyOptional({ description: 'Full-text search across email, first_name, last_name', example: 'nguyen' })
+  @ApiPropertyOptional({
+    description: 'Full-text search across email, first_name, last_name',
+    example: 'nguyen',
+  })
   @IsOptional()
   @IsString()
   search?: string;

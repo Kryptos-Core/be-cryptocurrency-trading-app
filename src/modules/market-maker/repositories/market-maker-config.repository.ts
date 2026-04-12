@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { BaseRepository } from '@/common/repositories';
 import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
 

@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Recreate market stored procedures for UUID v7 schema.
@@ -306,10 +306,21 @@ export class RecreateMarketsProceduresUuidV71768227700000 implements MigrationIn
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     const procedures = [
-      'sp_market_recent_trades', 'sp_market_ticker', 'sp_market_order_book_asks', 'sp_market_order_book_bids',
-      'sp_market_find_by_currencies', 'sp_market_find_active', 'sp_market_pair_exists', 'sp_market_symbol_exists',
-      'sp_market_delete', 'sp_market_update', 'sp_market_create', 'sp_market_count', 'sp_market_find_all',
-      'sp_market_find_by_symbol', 'sp_market_find_by_id',
+      'sp_market_recent_trades',
+      'sp_market_ticker',
+      'sp_market_order_book_asks',
+      'sp_market_order_book_bids',
+      'sp_market_find_by_currencies',
+      'sp_market_find_active',
+      'sp_market_pair_exists',
+      'sp_market_symbol_exists',
+      'sp_market_delete',
+      'sp_market_update',
+      'sp_market_create',
+      'sp_market_count',
+      'sp_market_find_all',
+      'sp_market_find_by_symbol',
+      'sp_market_find_by_id',
     ];
     for (const name of procedures) {
       await queryRunner.query(`DROP PROCEDURE IF EXISTS \`${name}\``);

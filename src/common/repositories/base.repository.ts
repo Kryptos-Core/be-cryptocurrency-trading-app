@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
+import type {
   DataSource,
+  DeepPartial,
   EntityTarget,
   FindManyOptions,
   FindOneOptions,
   FindOptionsWhere,
-  Repository,
-  DeepPartial,
   ObjectLiteral,
+  Repository,
 } from 'typeorm';
-import { IRepository } from './interfaces/irepository.interface';
+import type { IRepository } from './interfaces/irepository.interface';
 
 /**
  * Base Repository

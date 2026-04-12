@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTreasuryMainWallets1775410000000 implements MigrationInterface {
   name = 'CreateTreasuryMainWallets1775410000000';

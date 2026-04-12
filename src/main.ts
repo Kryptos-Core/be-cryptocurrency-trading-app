@@ -1,10 +1,9 @@
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { RequestMethod } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters';
-import { ResponseInterceptor, LoggingInterceptor } from './common/interceptors';
+import { LoggingInterceptor, ResponseInterceptor } from './common/interceptors';
 import { setupSwagger } from './config/swagger.config';
 
 const logger = new Logger('Bootstrap');

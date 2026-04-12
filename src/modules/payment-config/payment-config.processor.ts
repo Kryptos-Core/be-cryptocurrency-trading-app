@@ -1,8 +1,12 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { PaymentMethodType } from '@/entities/payment-method-config.entity';
-import { PaymentConfigService, PAYMENT_CONFIG_QUEUE, ACTIVATE_JOB } from './payment-config.service';
+import type { Job } from 'bull';
+import type { PaymentMethodType } from '@/entities/payment-method-config.entity';
+import {
+  ACTIVATE_JOB,
+  PAYMENT_CONFIG_QUEUE,
+  type PaymentConfigService,
+} from './payment-config.service';
 
 interface ActivateJobData {
   configId: string;
@@ -26,9 +30,7 @@ export class PaymentConfigProcessor {
   @Process(ACTIVATE_JOB)
   async handleActivation(job: Job<ActivateJobData>): Promise<void> {
     const { configId, type, network, userId } = job.data;
-    this.logger.log(
-      `Processing activation job for configId=${configId} (${type}/${network})`,
-    );
+    this.logger.log(`Processing activation job for configId=${configId} (${type}/${network})`);
 
     try {
       await this.paymentConfigService.completeActivation(configId, type, network, userId);

@@ -1,9 +1,12 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import { NotificationRepository } from './repositories/notification.repository';
-import { CreateNotificationDto } from './dto/create-notification.dto';
-import { NotificationQueryDto } from './dto/notification-query.dto';
-import { INotificationStrategy, NOTIFICATION_STRATEGIES } from './strategies/notification.strategy';
+import type { CreateNotificationDto } from './dto/create-notification.dto';
+import type { NotificationQueryDto } from './dto/notification-query.dto';
+import type { NotificationRepository } from './repositories/notification.repository';
+import {
+  type INotificationStrategy,
+  NOTIFICATION_STRATEGIES,
+} from './strategies/notification.strategy';
 
 export const NOTIFICATIONS_CHANNEL = 'notifications:broadcast';
 export const NOTIFICATIONS_TARGETED_CHANNEL = 'notifications:targeted';
@@ -15,8 +18,6 @@ export const NOTIFICATIONS_TARGETED_CHANNEL = 'notifications:targeted';
  */
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name);
-
   constructor(
     private readonly notificationRepo: NotificationRepository,
     @Inject(NOTIFICATION_STRATEGIES) private readonly strategies: INotificationStrategy[],
@@ -46,7 +47,9 @@ export class NotificationsService {
 
     // Execute all registered strategies (Strategy Pattern)
     await Promise.all(
-      this.strategies.map(strategy => strategy.sendToUser(targetUserId, notificationId, dto, token ?? undefined))
+      this.strategies.map((strategy) =>
+        strategy.sendToUser(targetUserId, notificationId, dto, token ?? undefined),
+      ),
     );
   }
 
@@ -66,7 +69,7 @@ export class NotificationsService {
 
     // Execute all registered strategies (Strategy Pattern)
     await Promise.all(
-      this.strategies.map(strategy => strategy.broadcast(notificationId, dto, tokens))
+      this.strategies.map((strategy) => strategy.broadcast(notificationId, dto, tokens)),
     );
 
     return notification;

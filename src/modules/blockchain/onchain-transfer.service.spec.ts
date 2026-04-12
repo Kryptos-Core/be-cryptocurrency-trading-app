@@ -1,17 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { OnchainTransferService } from './onchain-transfer.service';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
+import { BlockchainNetwork, OnchainTxStatus, WalletTransactionAction } from '@/common/enums';
 import { CacheService } from '@/common/services';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { WalletLinkingService } from './wallet-linking.service';
-import { DepositFxService } from './deposit-fx.service';
-import { WalletsService } from '@/modules/wallets/wallets.service';
 import { CurrencyRepository } from '@/modules/currencies/repositories';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
-import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { BlockchainNetwork, OnchainTxStatus, WalletTransactionAction } from '@/common/enums';
+import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import { WalletsService } from '@/modules/wallets/wallets.service';
+import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { DepositFxService } from './deposit-fx.service';
+import { OnchainTransferService } from './onchain-transfer.service';
+import { WalletLinkingService } from './wallet-linking.service';
 
 describe('OnchainTransferService', () => {
   let service: OnchainTransferService;
@@ -317,7 +317,10 @@ describe('OnchainTransferService', () => {
 
   it('settleDepositByTxId should credit wallet once when tx becomes confirmed', async () => {
     dataSource.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM onchain_transactions') && sql.includes('WHERE tx_id = ? AND user_id = ?')) {
+      if (
+        sql.includes('FROM onchain_transactions') &&
+        sql.includes('WHERE tx_id = ? AND user_id = ?')
+      ) {
         return [
           {
             tx_id: 'tx-dep-1',

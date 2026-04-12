@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { DashboardController } from './dashboard.controller';
-import { DashboardService } from './dashboard.service';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { DashboardController } from './dashboard.controller';
+import { DashboardService } from './dashboard.service';
 
 /**
  * Dashboard Module

@@ -1,24 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
+import type { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
-import { OrderRepository } from './repositories';
-import { OrderValidationStrategy } from './strategies';
-import { CreateOrderCommand } from './commands/create-order.command';
-import { CancelOrderCommand } from './commands/cancel-order.command';
-import { CreateBatchOrderDto, CancelBatchOrderDto } from './dto';
-import { canCancelOrder } from './states';
-import { CacheService } from '@/common/services';
-import {
-  NotFoundException,
-  BusinessException,
-  ForbiddenException,
-} from '@/common/exceptions';
-import { computeMarketBuyMaxQuoteReserve } from './utils/market-buy-reserve.util';
 import { Order } from '@/entities/order.entity';
-import { MarketRepository } from '@/modules/markets/repositories';
-import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
-import { MatchingService } from '@/modules/matching/matching.service';
-import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
-import { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
+import type { MarketRepository } from '@/modules/markets/repositories';
+import type { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
+import type { MatchingService } from '@/modules/matching/matching.service';
+import type { MatchingQueueService } from '@/modules/matching/matching-queue.service';
+import type { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import type { CancelOrderCommand } from './commands/cancel-order.command';
+import type { CreateOrderCommand } from './commands/create-order.command';
+import type { CancelBatchOrderDto, CreateBatchOrderDto } from './dto';
+import type { OrderRepository } from './repositories';
+import { canCancelOrder } from './states';
+import type { OrderValidationStrategy } from './strategies';
+import { computeMarketBuyMaxQuoteReserve } from './utils/market-buy-reserve.util';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400; // 24h
@@ -52,10 +48,7 @@ export class OrdersService {
       return this.mapToOrder(cached);
     }
 
-    const existing = await this.orderRepository.findByUserIdempotency(
-      userId,
-      dto.idempotencyKey,
-    );
+    const existing = await this.orderRepository.findByUserIdempotency(userId, dto.idempotencyKey);
     if (existing) {
       await this.cacheService.set(cacheKey, this.orderToPlain(existing), IDEMPOTENCY_TTL_SEC);
       return existing;
@@ -68,14 +61,8 @@ export class OrdersService {
 
     const baseCurrencyId = pair.base_currency_id;
     const quoteCurrencyId = pair.quote_currency_id;
-    const quoteWallet = await this.walletRepository.findByUserCurrency(
-      userId,
-      quoteCurrencyId,
-    );
-    const baseWallet = await this.walletRepository.findByUserCurrency(
-      userId,
-      baseCurrencyId,
-    );
+    const quoteWallet = await this.walletRepository.findByUserCurrency(userId, quoteCurrencyId);
+    const baseWallet = await this.walletRepository.findByUserCurrency(userId, baseCurrencyId);
     const availableQuote = quoteWallet?.available ?? '0';
     const availableBase = baseWallet?.available ?? '0';
 
@@ -93,10 +80,7 @@ export class OrdersService {
       }
       const bestAsk = await this.orderRepository.findBestLimitSellPrice(dto.pairId);
       if (!bestAsk) {
-        throw new BusinessException(
-          'No sell-side limit liquidity for this pair',
-          'NO_LIQUIDITY',
-        );
+        throw new BusinessException('No sell-side limit liquidity for this pair', 'NO_LIQUIDITY');
       }
       const maxQuote = computeMarketBuyMaxQuoteReserve(bestAsk, dto.amount, slip);
       requiredQuoteForBuy = maxQuote;
@@ -138,24 +122,20 @@ export class OrdersService {
     });
 
     if (result.error_code) {
-      this.throwFromProcedureError(
-        result.error_code,
-        result.error_message ?? undefined,
-      );
+      this.throwFromProcedureError(result.error_code, result.error_message ?? undefined);
     }
 
     if (result.order_id == null) {
       throw new BusinessException('Order creation failed', 'ORDER_CREATE_FAILED');
     }
 
-    let order = await this.orderRepository.findById(result.order_id);
+    const order = await this.orderRepository.findById(result.order_id);
     if (!order) {
       throw new BusinessException('Order created but not found', 'ORDER_NOT_FOUND');
     }
 
     if (order.status === 'OPEN' || order.status === 'PARTIAL') {
-      const remaining =
-        parseFloat(order.amount) - parseFloat(order.filled_amount ?? '0');
+      const remaining = parseFloat(order.amount) - parseFloat(order.filled_amount ?? '0');
       if (remaining > 0) {
         try {
           // Phase 2 #6: Enqueue match job instead of blocking the HTTP thread.
@@ -174,7 +154,7 @@ export class OrdersService {
           });
         } catch (e) {
           this.logger.warn(
-            `Matching enqueue failed after order create ${result.order_id}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`,
+            `Matching enqueue failed after order create ${result.order_id}: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`,
           );
         }
       }
@@ -203,16 +183,10 @@ export class OrdersService {
     const pairId = order.pair_id;
     const side = order.side;
 
-    const result = await this.orderRepository.cancelOrderViaProcedure(
-      orderId,
-      userId,
-    );
+    const result = await this.orderRepository.cancelOrderViaProcedure(orderId, userId);
 
     if (result.error_code) {
-      this.throwFromProcedureError(
-        result.error_code,
-        result.error_message ?? undefined,
-      );
+      this.throwFromProcedureError(result.error_code, result.error_message ?? undefined);
     }
 
     if (!result.cancelled) {
@@ -236,10 +210,7 @@ export class OrdersService {
     return updated;
   }
 
-  async createBatch(command: {
-    userId: string;
-    dto: CreateBatchOrderDto;
-  }): Promise<{
+  async createBatch(command: { userId: string; dto: CreateBatchOrderDto }): Promise<{
     created: Order[];
     count: number;
   }> {
@@ -261,10 +232,7 @@ export class OrdersService {
     };
   }
 
-  async cancelBatch(command: {
-    userId: string;
-    dto: CancelBatchOrderDto;
-  }): Promise<{
+  async cancelBatch(command: { userId: string; dto: CancelBatchOrderDto }): Promise<{
     cancelled: Order[];
     count: number;
   }> {
@@ -325,11 +293,7 @@ export class OrdersService {
     return order;
   }
 
-  getOrderBook(
-    pairId: string,
-    side: 'BUY' | 'SELL',
-    limit: number = 50,
-  ) {
+  getOrderBook(pairId: string, side: 'BUY' | 'SELL', limit: number = 50) {
     return this.orderRepository.getOrderBook(pairId, side, limit);
   }
 
@@ -372,12 +336,7 @@ export class OrdersService {
   }
 
   /** Admin: orders for a specific user */
-  async findOrdersByUser(
-    userId: string,
-    page: number = 1,
-    limit: number = 20,
-    status?: string,
-  ) {
+  async findOrdersByUser(userId: string, page: number = 1, limit: number = 20, status?: string) {
     const skip = (page - 1) * limit;
     const { items, total } = await this.orderRepository.findByUserForAdmin(
       userId,

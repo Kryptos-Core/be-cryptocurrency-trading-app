@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { DataSource } from 'typeorm';
 import Decimal from 'decimal.js';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
-import { WalletsService } from '../src/modules/wallets/wallets.service';
 import { SystemConfigService } from '../src/modules/system-config/system-config.service';
+import { WalletsService } from '../src/modules/wallets/wallets.service';
 
 type Severity = 'critical' | 'warning';
 
@@ -35,8 +35,11 @@ async function main() {
   const staleConfirmingMinutes = envNumber('TREASURY_ALERT_STALE_CONFIRMING_MINUTES', 30);
   const failedWithdrawLimit = envNumber('TREASURY_ALERT_FAILED_WITHDRAWALS_24H', 10);
   const reconcileLimit = envNumber('TREASURY_RECONCILE_PAIR_LIMIT', 100);
-  const discrepancyThreshold = await systemConfig.getEffectiveString('WALLET_RECONCILIATION_THRESHOLD');
-  const failOnCritical = (process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true';
+  const discrepancyThreshold = await systemConfig.getEffectiveString(
+    'WALLET_RECONCILIATION_THRESHOLD',
+  );
+  const failOnCritical =
+    (process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true';
 
   try {
     const staleManualRows = await dataSource.query(
@@ -114,7 +117,10 @@ async function main() {
 
     for (const pair of walletPairs || []) {
       try {
-        const result = await walletsService.reconcileBalance(String(pair.user_id), String(pair.currency_id));
+        const result = await walletsService.reconcileBalance(
+          String(pair.user_id),
+          String(pair.currency_id),
+        );
         reconcileResults.push({
           userId: String(pair.user_id),
           currencyId: String(pair.currency_id),
@@ -165,7 +171,6 @@ async function main() {
       alerts,
     };
 
-    // eslint-disable-next-line no-console
     console.log(JSON.stringify(report, null, 2));
 
     if (failOnCritical && alerts.some((x) => x.severity === 'critical')) {
@@ -177,7 +182,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

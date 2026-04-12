@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PaymentConfigService } from './payment-config.service';
+import type { PaymentConfigService } from './payment-config.service';
 
 /**
  * Ensures grace-period activations complete even if Bull delayed jobs never run

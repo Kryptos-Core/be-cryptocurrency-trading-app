@@ -1,21 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
+import type { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User } from '@/entities/user.entity';
-import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
-import { AuthRepository } from './repositories';
-import { TwoFaService } from './two-fa.service';
-import {
-  BadRequestException,
-  ConflictException,
-  UnauthorizedException,
-  BusinessException,
-} from '@/common/exceptions';
-import { formatName } from '@/utils/helpers';
-import { Permission, UserRole } from '@/common/enums';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
+import type { Permission } from '@/common/enums';
+import {
+  BadRequestException,
+  BusinessException,
+  ConflictException,
+  UnauthorizedException,
+} from '@/common/exceptions';
+import type { User } from '@/entities/user.entity';
+import { formatName } from '@/utils/helpers';
+import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
+import type { AuthRepository } from './repositories';
+import type { TwoFaService } from './two-fa.service';
 
 /**
  * Auth Service - Business Logic Layer
@@ -32,7 +32,7 @@ export class AuthService {
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    readonly _configService: ConfigService,
     private readonly twoFaService: TwoFaService,
   ) {}
 
@@ -58,10 +58,10 @@ export class AuthService {
 
     // Create user via repository (stored procedure)
     const user = await this.authRepository.createUser(
-      email, 
-      passwordHash, 
-      formattedFirstName, 
-      formattedLastName
+      email,
+      passwordHash,
+      formattedFirstName,
+      formattedLastName,
     );
 
     this.logger.log(`New user registered: ${email}`);
@@ -112,7 +112,7 @@ export class AuthService {
   /**
    * Get user profile by ID
    */
-  async getProfile(userId: string): Promise<Partial<User>> {
+  async getProfile(_userId: string): Promise<Partial<User>> {
     // Note: This would also use a repository method if needed
     // For now, service handles the error, repository would be called if we had this in repo
     throw new UnauthorizedException('User profile endpoint should be called from users service');
