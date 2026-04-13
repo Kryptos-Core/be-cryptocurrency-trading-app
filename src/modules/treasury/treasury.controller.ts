@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
+import { CurrentUser, Public, RequirePermissions, RequireRoles } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
@@ -53,6 +53,7 @@ export class TreasuryController {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   @Get('chain-picker-options')
+  @Public()
   @ApiOperation({
     summary:
       'Chain codes for treasury / hot-wallet / withdrawal / managed-wallet / user on-chain deposit-withdraw pickers (ONCHAIN_OPERATOR_MODE, TRON_DEFAULT_NETWORK, ENV)',
