@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "ecc.install.v1",
+  "installedAt": "2026-04-06T09:39:38.197Z",
+  "target": {
+    "id": "cursor-project",
+    "target": "cursor",
+    "kind": "project",
+    "root": "D:\\Sources\\cryptocurrency-trading-app\\.cursor",
+    "installStatePath": "D:\\Sources\\cryptocurrency-trading-app\\.cursor\\ecc-install-state.json"
+  },
+  "request": {
+    "profile": null,
+    "modules": [],
+    "includeComponents": [],
+    "excludeComponents": [],
+    "legacyLanguages": [
+      "typescript"
+    ],
+    "legacyMode": true
+  },
+  "resolution": {
+    "selectedModules": [
+      "rules-core",
+      "agents-core",
+      "commands-core",
+      "hooks-runtime",
+      "platform-configs",
+      "framework-language",
+      "workflow-quality"
+    ],
+    "skippedModules": []
+  },
+  "source": {
+    "repoVersion": "1.10.0",
+    "repoCommit": "7dfdbe0b1704a79669a6e24e2dbe76433caf5795",
+    "manifestVersion": 1
+  },
+  "operations": [],
+  "operationsNote": "Truncated by project cleanup; full log was 913 operations. Re-run ECC install.ps1 if you need to diff against source."
+}

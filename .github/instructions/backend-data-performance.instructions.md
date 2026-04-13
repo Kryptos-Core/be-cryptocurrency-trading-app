@@ -1,0 +1,169 @@
+---
+name: "backend-data-performance"
+description: "Chuẩn CSDL — hybrid data access (raw, QueryBuilder, procedure) xuyên suốt dự án; integrity, index, cache/MQ"
+applyTo: "**/*.{ts,js,sql}"
+---
+
+# Dữ liệu, truy vấn & hiệu năng
+
+**Nguồn chuẩn** cho DB, transaction, hybrid access, index, Redis/MQ. Persona chỉ tóm tắt “khi nào nghĩ Redis” — chi tiết kỹ thuật nằm ở đây.
+
+## Toàn vẹn & ràng buộc (ưu tiên trước tối ưu)
+
+- **Ràng buộc trong DB** (PK, FK, UNIQUE, CHECK, NOT NULL) là “pháo đài cuối”; không chỉ dựa vào validate ở app.
+- **FK**: `ON DELETE/UPDATE` rõ ràng (`RESTRICT`, `CASCADE`, `SET NULL`…) — tránh orphan; cân nhắc chi phí lock khi cascade lớn.
+- **UNIQUE** cho invariant nghiệp vụ (email active, idempotency key, external_id) — kết hợp **partial unique index** khi có soft delete / trạng thái.
+- **Surrogate key** (BIGSERIAL/UUID) vs **natural key**: thường surrogate + unique constraint trên business key.
+- **NULL**: nhớ logic **3-valued** (`TRUE/FALSE/UNKNOWN`); `WHERE col = NULL` sai — dùng `IS NULL`. Nullable tăng phức tạp index và query.
+
+## ACID, transaction & isolation
+
+- **Atomicity**: nhóm thao tác liên quan trong một transaction; rollback path rõ ràng.
+- **Isolation**: hiểu mức mặc định của engine (READ COMMITTED vs REPEATABLE READ vs SERIALIZABLE) và hiện tượng **dirty read / non-repeatable read / phantom**.
+- **Đọc không nhất quán có chủ đích**: biết khi nào chấp nhận **stale read** (replica lag) và khi nào bắt buộc đọc primary / strong consistency.
+- **Tránh transaction dài**: giữ lock, làm nghẽn pool, tăng deadlock — tách batch, xử lý async khi hợp lý.
+- **Optimistic locking**: cột `version` / `updated_at` + `WHERE id AND version` để tránh lost update khi không muốn khóa bi quan dài.
+- **Pessimistic lock** (`SELECT … FOR UPDATE`): chỉ trong phạm vi cần thiết, thứ tự lock thống nhất để giảm deadlock.
+
+## Chiến lược hybrid — bắt buộc áp dụng xuyên suốt dự án
+
+Dự án **không** chọn một kiểu duy nhất (chỉ ORM hoặc chỉ raw). Luôn dùng **hybrid**: chọn lớp phù hợp từng use case, nhưng **quy ước và phong cách** (đặt query ở đâu, naming, transaction, error mapping) **thống nhất cả repo** — xem `docs/BASE_REPOSITORY_USAGE.md` và `BaseRepository`.
+
+### 1. ORM / Repository (TypeORM + `BaseRepository`)
+
+- **CRUD, filter đơn giản, phân trang chuẩn** qua entity/repository (`find`, `findOne`, `findWithPagination`, `save`, v.v.).
+- Không nhồi logic nghiệp vụ nặng vào hook entity; **luôn kiểm tra SQL sinh ra** (slow query log, dev).
+
+### 2. QueryBuilder (TypeORM)
+
+- Dùng khi cần **JOIN động**, điều kiện lắp ghép, projection có kiểm soát, hoặc SQL **vừa phức tạp vừa cần type-safe / tái sử dụng trong TS** — tốt hơn chuỗi raw dài trong code.
+- **Chọn một phong cách** (ví dụ: method trong repository trả về `SelectQueryBuilder`, hoặc private builder helpers) và **dùng cùng cách** cho các module tương tự; tránh xen kẽ nhiều kiểu viết không cần thiết.
+
+### 3. Raw SQL (`query()` / driver tương đương)
+
+- Dùng khi **QueryBuilder quá cồng kềnh**, cần **cú pháp đặc thù engine** (CTE, `LATERAL`, hint…), hoặc **tối ưu plan** đã đo được.
+- Chỉ qua **parameterized** / placeholder — **cấm** nối trực tiếp input user vào chuỗi SQL.
+- Gói trong repository/service có tên method rõ **ý đồ nghiệp vụ** (không scatter magic string khắp codebase).
+
+### 4. Stored procedure / function (DB)
+
+- Dùng cho **tính năng phức tạp phù hợp**: báo cáo/tổng hợp nặng, batch ổn định gần data, giảm round-trip nhiều bước, logic đã “chốt” theo schema.
+- Gọi từ app qua lớp đã quy ước (ví dụ `BaseRepository.query` / tương đương) — **versioning + review** như code; document tham số và contract trả về.
+- Cân nhắc **lock-in engine** và khó test local; không đẩy toàn bộ domain vào procedure.
+
+### Nguyên tắc chung
+
+- **Một luồng nghiệp vụ**: transaction và ranh giới rõ (đã có `transaction(...)` trên base thì dùng nhất quán).
+- **Không** “phát minh lại” tầng data access mới cho từng feature — bám **BaseRepository + hybrid ba nhánh trên**.
+- Mọi đường đến SQL đều **parameterized**, có log/review cho path nóng và migration khi đổi procedure.
+
+## Chuẩn hóa, mô hình & scale dữ liệu
+
+- Xuất phát **~3NF** (giảm redundancy, update anomaly); document khi cố tình vi phạm.
+- **Denormalize** khi có đo lường: đọc hot, SLA rõ, có **single source of truth** + cơ chế đồng bộ (job, event, **materialized view**, read model).
+- **Wide table vs nhiều bảng**: cân bằng join cost vs độ rộng row / update hotspot.
+- **JSON/JSONB** (nếu dùng): chỉ cột ít query/filter; index path có chủ đích; tránh “DB thành document store” không kiểm soát schema.
+
+## Index — bảng nhanh & lỗi thường gặp
+
+| Ngữ cảnh | Gợi ý |
+|----------|--------|
+| `WHERE id =` | B-Tree / PK |
+| `WHERE` + `ORDER BY` cùng chiều lọc | **Composite** — thứ tự cột: **selectivity**, equality trước range, sort |
+| Filter cố định (active, tenant_id) | Đưa cột filter vào đầu composite hoặc **partial index** |
+| Soft delete `deleted_at IS NULL` | **Partial** trên row “sống” |
+| Text search | **Full-text** / engine chuyên trách (OpenSearch, v.v.) |
+| Lookup đúng bằng, cực nhiều, không range | **Hash** (tùy engine; hiếm) |
+
+- **Covering index** / **INCLUDE** (nếu engine hỗ trợ): giảm round-trip heap khi chỉ cần vài cột — đánh đổi kích thước index.
+- **Không lạm dụng index**: bảng ghi nặng → mỗi index là chi phí insert/update; index trên cột **cardinality thấp** (boolean, status 2-3 giá trị) thường kém hiệu quả trừ khi partial/kết hợp.
+- **Trùng / redundant index**: định kỳ rà soát; composite `(a,b)` thường phủ `(a)` tùy engine.
+- Mọi index mới: bắt buộc **lý do từ query production** + `EXPLAIN (ANALYZE)` / plan thực tế; theo dõi **write amplification**.
+
+## Hash table — Map/Set trong code, Redis HASH, index DB
+
+- **Bản chất**: ánh xạ key → bucket; **trung bình** O(1) cho lookup/insert/delete; trường hợp xấu phụ thuộc load factor, collision policy và implementation (engine/runtime).
+- **Trong Node/TS**: `Map` / `Set` cho key bất kỳ (object reference…); `Object` chỉ key string/symbol — tránh nhầm prototype; **WeakMap** khi cần GC theo object key (metadata, không iterate toàn bộ).
+- **Khi nên dùng**: membership (`Set`), đếm/tần suất (`Map`), dedupe, **index trong RAM** (id → entity), nhóm theo key trong batch nhỏ/vừa, routing table đơn giản.
+- **Khi không đủ**: cần **range / prefix / sort** theo key → dùng array + sort, cấu trúc có thứ tự, hoặc **B-Tree index** trên DB; cần **LIKE '%x%'** full scan logic → full-text/trigram.
+- **Bộ nhớ & scale**: overhead mỗi entry; dataset lớn hơn RAM hoặc cần persistence/query phức tạp → **DB/cache có eviction**, stream/chunk, không giữ mọi thứ trong một `Map` khổng lồ.
+- **Determinism & key**: key phải **ổn định và so sánh nhất quán** (normalize string trước khi dùng làm key nếu case/unicode khác nhau); tránh dùng float làm key equality nếu không kiểm soát precision.
+- **Đồng thời**: event loop đơn luồng giảm race trong một process; **worker / multi-instance** — không dùng in-process `Map` làm source of truth chung; dùng **Redis/DB** hoặc message + idempotency.
+- **Redis HASH** (`HSET`/`HGET`/…): object nhiều field, cập nhật từng field O(1); vẫn cần **TTL**, **hot key**, invalidation như mọi cache key.
+- **Index hash trên DB**: chỉ tối ưu **equality** trên cột index; không thay B-Tree cho `ORDER BY`/range — xem bảng Index phía trên.
+
+## Truy vấn — anti-pattern cần tránh
+
+- `SELECT *` trên bảng lớn / hot path — chỉ lấy cột cần.
+- **Function trên cột indexed** (`WHERE LOWER(email)=…`, `WHERE DATE(created_at)=…`) — hay làm **không dùng index**; chuẩn hóa dữ liệu hoặc expression index có chủ đích.
+- **Implicit cast** (so sánh string với number, uuid) — plan xấu, sai ngầm.
+- **`OR` trên nhiều cột khác index** — cân nhắc `UNION ALL`, rewrite, hoặc index phù hợp.
+- **`LIKE '%xxx'`** (leading wildcard) — không range scan B-Tree tốt; full-text hoặc trigram tùy case.
+- **Offset lớn** (`LIMIT x OFFSET y`) — chậm; ưu tiên **keyset / seek** pagination khi danh sách dài — chi tiết từng trường hợp: rule **`pagination-best-practices.mdc`**.
+- **Subquery tương quan** nặng — kiểm tra rewrite JOIN / LATERAL.
+- **N+1**: eager load, batch, join, DataLoader; đo số query/request.
+
+## Khóa, deadlock & đồng thời
+
+- Thứ tự truy cập bảng/hàng **nhất quán** giữa các transaction để giảm deadlock.
+- Khóa theo **đúng grain** (không `FOR UPDATE` cả bảng nếu chỉ cần vài row).
+- Hiểu **MVCC** (PostgreSQL-style) vs lock-heavy — hành vi vacuum / long transaction khác nhau.
+- **Advisory lock** / distributed lock (Redis, v.v.) khi cần serialize across services — có TTL và xử lý holder chết.
+
+## Kết nối, pool & timeout
+
+- **Pool size** cân với `max_connections` DB và số instance app — tránh “connection storm”.
+- **`statement_timeout`** / **`idle_in_transaction`** (tùy engine) — chặn query treo và transaction mở quên đóng.
+- Đóng connection đúng cách; retry **chỉ** cho lỗi transient, có giới hạn và **idempotent** write.
+
+## Replica, consistency & “đọc sau ghi”
+
+- **Replication lag**: UI “save xong đọc lại” có thể không thấy — đọc primary, **read-your-writes**, hoặc đợi replicate (ít dùng).
+- **Multi-region**: latency + conflict; hiểu **last-write-wins** vs **CRDT**/merge — không giả định strong everywhere.
+
+## Partitioning & archiving
+
+- **Partition** khi bảng rất lớn và query **luôn có điều kiện partition key**; tránh partition quá nhiều / quá ít.
+- **Archive / TTL** row cũ — giảm kích thước, vacuum, backup; policy pháp lý (retention).
+
+## Migration schema & zero-downtime
+
+- Ưu tiên **expand → deploy code → contract** (backward compatible); tránh drop/rename breaking một bước.
+- **Index tạo** trên bảng lớn: `CONCURRENTLY` (PG) / online index tùy engine — tránh lock bảng lâu.
+- **Default mới + NOT NULL**: thêm nullable/default, backfill, rồi mới siết constraint.
+- **Data backfill** tách batch, có checkpoint; không một transaction khổng lồ.
+
+## Charset, collation, thời gian
+
+- **UTF-8** (`utf8mb4` MySQL); collation rõ ràng cho so sánh / unique / index.
+- Lưu **timestamp UTC**; convert timezone ở edge/UI; tránh local time “ngầm” trong DB.
+
+## Thống kê & bảo trì
+
+- **ANALYZE** / cập nhật statistics sau thay đổi lớn — plan sai khi stats cũ.
+- **Vacuum / rebuild / optimize** tùm engine — theo dõi bloat, dead tuple, fragmentation.
+
+## Redis (cache & session)
+
+- Cấu trúc phù hợp (string, hash, set, zset, stream); **TTL** + **invalidation** (event, version key); tránh **hot key**.
+- **Cache stampede**: lock/mutex ngắn, early expire, jitter; không cache lỗi vô hạn.
+- **Đọc qua cache**: invalidation khi write; hiểu **cache-aside** vs **write-through** trade-off.
+
+## Message broker (RabbitMQ, v.v.)
+
+- **Exchange/queue/binding** đúng semantics; **ack/nack**, **DLQ**, **prefetch**; consumer **idempotent**; versioning message.
+
+## Bảo mật & vận hành
+
+- **Least privilege** DB user cho app; tách user migration vs runtime.
+- Không log **PII** / secret; mask trong query log nếu cần.
+- **Backup + restore đã drill**; RPO/RTO rõ; PITR nếu business cần.
+
+## Checklist trước khi merge (mở rộng)
+
+- Plan (`EXPLAIN`) có sequential scan không mong đợi trên bảng lớn?
+- Có **N+1**, lock escalation risk, deadlock tiềm ẩn?
+- Migration có **rollback / backward compat**?
+- Index mới: tác động ghi, kích thước, duplicate?
+- Replica lag / cache có làm UX sai sau ghi?
+- Connection pool & timeout có an toàn dưới tải?
