@@ -6,6 +6,7 @@ import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
   type BlockchainChainDbValue,
 } from '@/common/constants/blockchain-chain-db';
+import { listActionableOnchainChainCodes } from '@/common/constants/chain-registry';
 import { BlockchainNetwork, UserRole } from '@/common/enums';
 import {
   BadRequestException,
@@ -62,9 +63,6 @@ type DepositMethodItem = {
 export class ManagedWalletsService {
   private readonly logger = new Logger(ManagedWalletsService.name);
   private static readonly RECOMMENDED_CHAIN_KEY = 'deposit.recommended_chain';
-  private static readonly SUPPORTED_CHAINS: SupportedManagedWalletChain[] = [
-    ...MANAGED_TRON_CHAINS,
-  ];
 
   constructor(
     private readonly managedWalletsDataRepository: ManagedWalletsDataRepository,
@@ -91,13 +89,17 @@ export class ManagedWalletsService {
   }
 
   async getDepositDefaults(): Promise<{
-    recommended_chain: SupportedManagedWalletChain;
+    recommended_chain: BlockchainChainDbValue;
     defaults: ManagedWalletResponseDto[];
   }> {
+    const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
+    const chains = (pickerDto.pickers.managed_wallets ?? []).filter((c): c is BlockchainChainDbValue =>
+      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    );
     const recommendedChain = await this.getRecommendedChain();
     const defaults: ManagedWalletResponseDto[] = [];
 
-    for (const chain of ManagedWalletsService.SUPPORTED_CHAINS) {
+    for (const chain of chains) {
       const tw = await this.transactionWalletService.getDefaultUserDepositWallet(chain);
       if (tw) {
         defaults.push(this.mapTransactionWallet(tw));
@@ -239,8 +241,8 @@ export class ManagedWalletsService {
 
   async setRecommendedChain(
     dto: UpdateRecommendedChainDto,
-  ): Promise<{ recommended_chain: SupportedManagedWalletChain }> {
-    const chain = this.assertSupportedChain(dto.chain);
+  ): Promise<{ recommended_chain: BlockchainChainDbValue }> {
+    const chain = this.assertRecommendedChainAllowed(dto.chain);
     await this.managedWalletsDataRepository.upsertAppSettingKeyValue(
       ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
       chain,
@@ -288,8 +290,13 @@ export class ManagedWalletsService {
     const fromPicker = pickerList.filter((c): c is BlockchainChainDbValue =>
       (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
     );
-    const chains: string[] =
-      fromPicker.length > 0 ? fromPicker : [...ManagedWalletsService.SUPPORTED_CHAINS];
+    const fallback = listActionableOnchainChainCodes(
+      pickerDto.operatorMode === 'production',
+      pickerDto.tronDefaultNetwork,
+    ).filter((c): c is BlockchainChainDbValue =>
+      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    );
+    const chains: string[] = fromPicker.length > 0 ? fromPicker : fallback;
 
     const settingRecommended = await this.getRecommendedChain();
     const recommendedChain = resolveRecommendedChainForDepositPicker(
@@ -324,12 +331,23 @@ export class ManagedWalletsService {
     };
   }
 
-  async getRecommendedChain(): Promise<SupportedManagedWalletChain> {
+  async getRecommendedChain(): Promise<BlockchainChainDbValue> {
     const v = await this.managedWalletsDataRepository.findAppSettingValueByKey(
       ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
     );
-
-    return this.assertSupportedChain(v ?? BlockchainNetwork.TRON_MAINNET);
+    const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
+    const allowed = (pickerDto.pickers.managed_wallets ?? []).filter((c): c is BlockchainChainDbValue =>
+      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    );
+    const raw = (v?.trim() || BlockchainNetwork.TRON_MAINNET) as string;
+    if (!(BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(raw)) {
+      return resolveRecommendedChainForDepositPicker(
+        BlockchainNetwork.TRON_MAINNET,
+        allowed,
+        pickerDto.tronDefaultNetwork,
+      ) as BlockchainChainDbValue;
+    }
+    return resolveRecommendedChainForDepositPicker(raw, allowed, pickerDto.tronDefaultNetwork) as BlockchainChainDbValue;
   }
 
   private async requireTransactionWalletForActor(
@@ -493,6 +511,25 @@ export class ManagedWalletsService {
     return amount.toString();
   }
 
+  private assertRecommendedChainAllowed(chain: string): BlockchainChainDbValue {
+    if (!(BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(chain)) {
+      throw new BadRequestException(
+        `Unsupported chain code: ${chain}`,
+        'UNSUPPORTED_MANAGED_WALLET_CHAIN',
+      );
+    }
+    const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
+    const allowed = pickerDto.pickers.managed_wallets ?? [];
+    if (!allowed.includes(chain)) {
+      throw new BadRequestException(
+        `Chain ${chain} is not enabled for the current on-chain operator mode`,
+        'RECOMMENDED_CHAIN_NOT_IN_PICKER',
+      );
+    }
+    return chain as BlockchainChainDbValue;
+  }
+
+  /** Tron-only send path — unchanged. */
   private assertSupportedChain(chain: string): SupportedManagedWalletChain {
     if (!(MANAGED_TRON_CHAINS as readonly string[]).includes(chain)) {
       throw new BadRequestException(

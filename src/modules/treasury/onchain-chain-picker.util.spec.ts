@@ -113,9 +113,11 @@ describe('buildChainPickerOptions', () => {
     expect(dto.pickers.withdrawal_admin_filter).toEqual(dto.pickers.onchain_deposit_withdraw);
   });
 
-  it('managed_wallets production is TRON_MAINNET only', () => {
-    const dto = buildChainPickerOptions({ onchainOperatorMode: 'production' });
-    expect(dto.pickers.managed_wallets).toEqual(['TRON_MAINNET']);
+  it('managed_wallets matches onchain_deposit_withdraw (sandbox and production)', () => {
+    const sandbox = buildChainPickerOptions({ onchainOperatorMode: 'sandbox' });
+    expect(sandbox.pickers.managed_wallets).toEqual(sandbox.pickers.onchain_deposit_withdraw);
+    const prod = buildChainPickerOptions({ onchainOperatorMode: 'production' });
+    expect(prod.pickers.managed_wallets).toEqual(prod.pickers.onchain_deposit_withdraw);
   });
 
   it('networkCatalog first row is TON with deposit disabled in production', () => {

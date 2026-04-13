@@ -33,8 +33,6 @@ export interface ChainPickerOptionsDto {
   networkCatalog: ChainNetworkCatalogItemDto[];
 }
 
-const MANAGED_WALLETS_TESTNET = ['TRON_MAINNET', 'TRON_NILE', 'TRON_SHASTA'] as const;
-
 /** Same rule as Flutter [treasuryChainsUseMainnetOnly]. */
 export function resolveTreasuryChainsUseMainnetOnly(input: ChainPickerEnvInput): boolean {
   const raw = input.onchainOperatorMode?.trim();
@@ -51,13 +49,6 @@ export function resolveSandboxTronDefaultNetwork(
   if (u === 'TRON_SHASTA') return 'TRON_SHASTA';
   if (u === 'TRON_NILE') return 'TRON_NILE';
   return 'TRON_NILE';
-}
-
-function managedWalletsChainsForCurrentEnv(mainnetOnly: boolean): string[] {
-  if (mainnetOnly) {
-    return ['TRON_MAINNET'];
-  }
-  return [...MANAGED_WALLETS_TESTNET];
 }
 
 /**
@@ -97,7 +88,8 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
       treasury_main_wallet: [...treasuryList],
       treasury_history_filter: [...treasuryList],
       withdrawal_admin_filter: [...actionable],
-      managed_wallets: managedWalletsChainsForCurrentEnv(mainnetOnly),
+      /** Same universe as [onchain_deposit_withdraw] — admin “Nạp tiền & ví quản lý” vs user deposit tab. */
+      managed_wallets: [...actionable],
       onchain_deposit_withdraw: [...actionable],
     },
   };

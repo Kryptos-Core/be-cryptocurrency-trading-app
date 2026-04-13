@@ -381,7 +381,7 @@ export class TransactionWalletService {
     return this.treasuryTransactionWalletRepository.findForDepositConfiguration();
   }
 
-  async getDefaultUserDepositWallet(chain: TronDepositUiChain): Promise<TransactionWallet | null> {
+  async getDefaultUserDepositWallet(chain: BlockchainChainDbValue): Promise<TransactionWallet | null> {
     return this.treasuryTransactionWalletRepository.findDefaultUserDepositWallet(chain);
   }
 
