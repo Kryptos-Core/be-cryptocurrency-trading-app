@@ -147,6 +147,9 @@ export class DepositsService {
     if (!fxSpreadBps.isFinite() || fxSpreadBps.lt(0)) {
       throw new Error('fxSpreadBps must be >= 0');
     }
+    if (fxSpreadBps.gt(10000)) {
+      throw new Error('fxSpreadBps must be <= 10000');
+    }
 
     const fiatAmount = new Decimal(amount);
     const grossQuote = fiatAmount.mul(fiatToQuoteRate);
@@ -163,6 +166,37 @@ export class DepositsService {
       currencyId,
       creditAmount: netQuote.toFixed(8, Decimal.ROUND_DOWN),
       effectiveRate: fiatToQuoteRate.mul(spreadFactor).toString(),
+    };
+  }
+
+  async getDepositPreview(amount: string, fiatSymbol = 'VND') {
+    const { config } = await this.getPayOSInstance();
+    const normalizedFiat = fiatSymbol.trim().toUpperCase();
+    if (config.fiatSymbol !== normalizedFiat) {
+      throw new BadRequestException(`Unsupported fiat symbol ${normalizedFiat}`);
+    }
+
+    const fiatAmount = new Decimal(amount);
+    if (!fiatAmount.isFinite() || fiatAmount.lte(0)) {
+      throw new BadRequestException('fiatAmount must be a positive number');
+    }
+
+    const fiatToQuoteRate = new Decimal(config.fiatToQuoteRate);
+    const fxSpreadBps = new Decimal(config.fxSpreadBps);
+    const grossAmount = fiatAmount.mul(fiatToQuoteRate);
+    const spreadAmount = grossAmount.mul(fxSpreadBps.div(10000));
+    const conversion = await this.resolveConvertedCredit(amount, config);
+
+    return {
+      fiatAmount: fiatAmount.toString(),
+      fiatSymbol: normalizedFiat,
+      quoteCurrency: config.quoteCurrencySymbol,
+      grossAmount: grossAmount.toFixed(8, Decimal.ROUND_DOWN),
+      spreadBps: fxSpreadBps.toString(),
+      spreadAmount: spreadAmount.toFixed(8, Decimal.ROUND_DOWN),
+      netAmount: conversion.creditAmount,
+      effectiveRate: conversion.effectiveRate,
+      validUntil: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     };
   }
 
@@ -357,3 +391,5 @@ export class DepositsService {
     return { orderCode, localStatus: deposit.status, payosStatus, updated: false };
   }
 }
+
+

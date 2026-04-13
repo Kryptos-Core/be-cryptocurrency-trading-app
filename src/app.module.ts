@@ -17,6 +17,7 @@ import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DepositsModule } from './modules/deposits/deposits.module';
 import { ExchangeModule } from './modules/exchange/exchange.module';
+import { ExchangeRateModule } from './modules/exchange-rate/exchange-rate.module';
 import { ManagedWalletsModule } from './modules/managed-wallets/managed-wallets.module';
 import { MarketMakerModule } from './modules/market-maker/market-maker.module';
 import { MarketsModule } from './modules/markets/markets.module';
@@ -69,6 +70,7 @@ import { WalletsModule } from './modules/wallets/wallets.module';
     MatchingModule,
     TradingModule,
     ExchangeModule,
+    ExchangeRateModule,
     BlockchainModule,
     DepositsModule,
     ManagedWalletsModule,
@@ -83,3 +85,4 @@ import { WalletsModule } from './modules/wallets/wallets.module';
   ],
 })
 export class AppModule {}
+

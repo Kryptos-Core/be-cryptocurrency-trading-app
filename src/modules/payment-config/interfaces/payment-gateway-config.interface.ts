@@ -17,6 +17,16 @@ export interface PayosGatewayConfig {
   fiatToQuoteRate: string;
   /** Basis points deducted from gross amount, e.g. '0' */
   fxSpreadBps: string;
+  /** Whether fiatToQuoteRate should be auto-synced from external source. */
+  autoSyncEnabled?: boolean;
+  /** Auto-sync interval in minutes. */
+  autoSyncIntervalMinutes?: number;
+  /** Auto-sync source provider. */
+  autoSyncSource?: 'coingecko' | 'exchangerate_host';
+  /** Last successful sync timestamp (ISO-8601). */
+  lastSyncAt?: string;
+  /** Alert threshold in percentage for sudden rate change. */
+  rateChangeAlertThresholdPct?: number;
   /** Minimum fiat amount for a single deposit (e.g. '10000' for VND). Optional; server/env default applies. */
   minDepositAmountFiat?: string;
   /** Maximum fiat amount for a single deposit; optional. */

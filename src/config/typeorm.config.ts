@@ -9,6 +9,7 @@ import { AppSetting } from '../entities/app-setting.entity';
 import { Currency } from '../entities/currency.entity';
 import { CurrencyNetwork } from '../entities/currency-network.entity';
 import { Deposit } from '../entities/deposit.entity';
+import { ExchangeRateAuditLog } from '../entities/exchange-rate-audit-log.entity';
 import { FiatDeposit } from '../entities/fiat-deposit.entity';
 import { LinkedWallet } from '../entities/linked-wallet.entity';
 import { ManagedWallet } from '../entities/managed-wallet.entity';
@@ -35,6 +36,7 @@ const ALL_ENTITIES = [
   Currency,
   CurrencyNetwork,
   Deposit,
+  ExchangeRateAuditLog,
   FiatDeposit,
   LinkedWallet,
   ManagedWallet,
@@ -81,3 +83,4 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     },
   };
 };
+
