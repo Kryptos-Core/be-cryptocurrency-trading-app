@@ -1,10 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
-import {
-  resolveOhlcvInterval,
-  intervalLookbackMs,
-  VALID_INTERVALS,
-} from './ohlcv-interval.util';
 import { BadRequestException } from '@nestjs/common';
+import { intervalLookbackMs, resolveOhlcvInterval, VALID_INTERVALS } from './ohlcv-interval.util';
 
 describe('resolveOhlcvInterval', () => {
   describe('direct interval mode (interval param takes priority)', () => {
@@ -45,12 +41,8 @@ describe('resolveOhlcvInterval', () => {
     });
 
     it('throws BadRequestException for unknown interval', () => {
-      expect(() => resolveOhlcvInterval({ interval: '2h' })).toThrow(
-        BadRequestException,
-      );
-      expect(() => resolveOhlcvInterval({ interval: '2h' })).toThrow(
-        /Invalid interval/,
-      );
+      expect(() => resolveOhlcvInterval({ interval: '2h' })).toThrow(BadRequestException);
+      expect(() => resolveOhlcvInterval({ interval: '2h' })).toThrow(/Invalid interval/);
     });
 
     it('throws BadRequestException listing supported intervals in message', () => {
@@ -102,9 +94,7 @@ describe('resolveOhlcvInterval', () => {
     });
 
     it('throws BadRequestException for invalid range', () => {
-      expect(() => resolveOhlcvInterval({ range: 'invalid' })).toThrow(
-        BadRequestException,
-      );
+      expect(() => resolveOhlcvInterval({ range: 'invalid' })).toThrow(BadRequestException);
     });
   });
 

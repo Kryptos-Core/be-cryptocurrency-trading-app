@@ -1,6 +1,6 @@
 # Vibe Code — NestJS backend
 
-**Vibe Code** là tên gọi chuẩn AI-assisted development của team: cùng một bộ rules, skills, hooks và hướng dẫn agent (ECC-aligned) để mọi người dùng Cursor / Copilot / Claude Code / Codex vẫn thống nhất style, bảo mật và quy trình.
+**Vibe Code** là tên gọi chuẩn AI-assisted development của team: cùng một bộ rules, skills, hooks và hướng dẫn agent (ECC-aligned) để mọi người dùng Cursor, Claude Code và Codex CLI vẫn thống nhất style, bảo mật và quy trình.
 
 ## Workspace (cách mở repo — chuẩn team)
 
@@ -15,8 +15,6 @@
 | `.cursor/rules/` | Rules Cursor — **nguồn chính** (TypeScript, API, DB, performance, common…) |
 | `.cursor/hooks/` + `hooks.json` | Hook Cursor |
 | `.cursor/agents/`, `.cursor/commands/` | Agent & slash command ECC trên Cursor |
-| `.github/instructions/` | Mirror cho **GitHub Copilot Chat / Agent** |
-| `.github/copilot-instructions.md` | Điểm vào Copilot |
 | `.agents/skills/` | Skills **Codex CLI** |
 | `.codex/` | Codex config + MCP + multi-agent |
 | `.claude/CLAUDE.md` | Bối cảnh nhanh **Claude Code** (API, module nhạy cảm) |
@@ -31,8 +29,8 @@
 
 ## Ưu tiên rule theo ngữ cảnh (NestJS / API)
 
-1. `typescript-*`, `api-design-architecture-patterns.mdc`, `modern-api-system-design-standards.mdc`
-2. `backend-data-performance.mdc`, `pagination-best-practices.mdc`
+1. `typescript-*`, skill **nestjs-patterns**, **backend-patterns**, **api-design**
+2. CSDL / migration / hiệu năng query: **database-migrations**, **postgres-patterns**; cache & tải: **performance-optimizer** khi cần
 3. `common-*` (security, testing, git, patterns)
 
 ## Vùng nhạy cảm (bắt buộc đọc trước khi sửa)
@@ -42,17 +40,16 @@
 - **Env**: mọi biến mới vào `ConfigService` phải có trong `src/config/env.validation.ts`.
 - **UserRole**: chỉ giá trị đã định nghĩa trong `src/common/enums`.
 
-## Glob / `applyTo` (Cursor & Copilot)
+## Glob (Cursor — rules trong `.cursor/rules/`)
 
-`globs` / `applyTo` **tính từ root repo backend** (folder workspace bạn mở), **không** dùng tiền tố `be-.../` của layout monorepo nhiều project.
+Pattern áp rule **tính từ root repo backend** (folder workspace), **không** dùng tiền tố `be-.../` của layout monorepo nhiều project.
 
 - **DB / hiệu năng CSDL:** `**/*.{ts,js,sql}`
 - **API / contract / config:** `**/*.{ts,tsx,js,mjs,cjs,json,yml,yaml,md}`
 
 ## Việc cần làm khi chỉnh rule
 
-1. Sửa **`.cursor/rules/`**.
-2. Cập nhật **`.github/instructions/`** tương ứng (`applyTo` khớp `globs`).
+1. Sửa **`.cursor/rules/`** và rà lại glob nếu copy rule từ repo khác.
 
 ## Codex / MCP
 
@@ -77,4 +74,4 @@ Chi tiết chạy local, Docker, migration: [README.md](./README.md).
 
 ## Đồng bộ giữa các bản sao Vibe Code (tùy chọn)
 
-Có thể copy `.cursor/`, `.github/`, … từ bản mẫu nội bộ rồi **rà lại glob/`applyTo` và bỏ rule không thuộc stack Nest** (giống repo này). Nguồn chuẩn cho team BE là **repo backend này**.
+Có thể copy `.cursor/`, `.agents/`, `.codex/`, `.claude/` từ bản mẫu nội bộ rồi **rà lại glob và bỏ rule không thuộc stack Nest** (giống repo này). Nguồn chuẩn cho team BE là **repo backend này**.

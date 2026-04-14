@@ -2,7 +2,7 @@
 
 **Mở đúng folder repo backend** làm workspace (có `package.json` Nest) để rules/hooks khớp đường dẫn.
 
-Chuẩn AI của team: **[VIBE_CODE.md](../VIBE_CODE.md)**. Ưu tiên rule API & TS: `typescript-*.md`, `api-design-architecture-patterns.mdc`, `backend-data-performance.mdc`, `pagination-best-practices.mdc`, `modern-api-system-design-standards.mdc`, `common-*.md`.
+Chuẩn AI của team: **[VIBE_CODE.md](../VIBE_CODE.md)**. Ưu tiên rule API & TS: `typescript-*.md`, skill **nestjs-patterns**, **backend-patterns**, **api-design**, `common-*.md`.
 
 ---
 
