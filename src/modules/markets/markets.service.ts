@@ -17,6 +17,7 @@ import {
 import { BinanceOHLCVProvider } from '@/modules/price-oracle';
 import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
 import type { IMarketTickerData } from './interfaces/market-ticker.interface';
+import { resolveOhlcvInterval } from './ohlcv-interval.util';
 import { MarketRepository } from './repositories';
 
 /** Default string for missing/zero price (repository contract). */
@@ -764,14 +765,20 @@ export class MarketsService implements OnModuleInit {
 
   /**
    * Get OHLCV data for a market pair (on-demand from Price Oracle; no DB).
-   * @param range Optional: 1d | 1M | 3M | 1y | 5y — filter candles to this time range
+   * @param interval Optional direct interval: 1m | 5m | 15m | 1h | 4h | 1d — takes priority over range.
+   * @param range Optional legacy range: 1d | 1M | 3M | 1y | 5y — for backward compatibility.
    */
-  async getOHLCV(pairId: string, limit: number = 100, range?: string, locale: string = 'en') {
+  async getOHLCV(
+    pairId: string,
+    limit: number = 100,
+    range?: string,
+    locale: string = 'en',
+    interval?: string,
+  ) {
     const pair = await this.findOne(pairId);
-    const interval = this.resolveIntervalByRange(range);
-    const intervalSec = this.resolveIntervalSeconds(interval);
-    const rangeMs = range ? MarketsService.RANGE_MS[range] : 7 * 24 * 60 * 60 * 1000;
-    const fromDate = new Date(Date.now() - rangeMs);
+    const resolution = resolveOhlcvInterval({ interval, range });
+    const intervalSec = this.resolveIntervalSeconds(resolution.interval);
+    const fromDate = new Date(Date.now() - resolution.lookbackMs);
     const toDate = new Date();
     const symbol =
       String(pair.symbol)
@@ -789,7 +796,7 @@ export class MarketsService implements OnModuleInit {
 
     return {
       pair_id: pairId,
-      interval,
+      interval: resolution.interval,
       interval_sec: intervalSec,
       range: range ?? null,
       locale,

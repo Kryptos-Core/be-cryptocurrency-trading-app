@@ -54,6 +54,26 @@ npm run start:dev
 | `npm run start:prod` | Production (cần `npm run build` trước) |
 | `npm run migration:run` / `migration:revert` / `migration:show` | TypeORM migrations |
 | `npm run db:seed` / `db:clean` | Seed / truncate toàn bộ bảng (kể cả `migrations`) |
+
+## Sau khi `npm run db:clean`
+
+Lệnh **truncate toàn bộ bảng** (kể cả bảng migration) — ứng dụng mất catalog cặp (`market_pairs`, v.v.) cho đến khi khôi phục schema và dữ liệu tối thiểu.
+
+1. Chạy lại migration (bắt buộc vì bảng migration cũng bị xóa):
+
+   ```bash
+   npm run migration:run
+   ```
+
+2. (Khuyến nghị) Nạp seed tài khoản / cấu hình cơ bản:
+
+   ```bash
+   npm run db:seed
+   ```
+
+3. Khởi động API (`npm run start:dev`). Backend có bootstrap đồng bộ catalog Binance khi DB trống; nếu **vẫn không thấy cặp** (rate limit, mạng), người có quyền **`exchange:sync`** gọi đồng bộ thủ công qua API hoặc từ app (Cài đặt / màn Thị trường khi danh sách trống).
+
+4. Tab Markets trên client chỉ hiển thị dữ liệu sau khi catalog đã có ít nhất một cặp active.
 | `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
 | `npm run test` | Jest |
 

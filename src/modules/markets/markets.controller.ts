@@ -332,7 +332,9 @@ export class MarketsController {
   /**
    * Get OHLCV by pair ID
    * GET /markets/:id/ohlcv?limit=100&range=1d
-   * range: 1d | 1M | 3M | 1y | 5y (filter by last 1 day, 1 month, 3 months, 1 year, 5 years)
+   * GET /markets/:id/ohlcv?interval=5m          ← new: direct crypto-style interval
+   * range: 1d | 1M | 3M | 1y | 5y (legacy: filter by time window)
+   * interval: 1m | 5m | 15m | 1h | 4h | 1d (new: direct interval with preset lookback)
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
    */
   @Get(':id/ohlcv')
@@ -340,15 +342,22 @@ export class MarketsController {
   @ApiOperation({
     summary: 'Get OHLCV data',
     description:
-      'Get candlestick data for a market pair. Use range to filter by time: 1d, 1M, 3M, 1y, 5y',
+      'Get candlestick data for a market pair. Use `interval` for crypto-style timeframes (1m/5m/15m/1h/4h/1d) or legacy `range` (1d/1M/3M/1y/5y). `interval` takes priority when both are supplied.',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
   @ApiQuery({
+    name: 'interval',
+    required: false,
+    type: String,
+    description: 'Crypto-style interval: 1m, 5m, 15m, 1h, 4h, 1d. Takes priority over range.',
+    example: '1h',
+  })
+  @ApiQuery({
     name: 'range',
     required: false,
     type: String,
-    description: 'Time range: 1d, 1M, 3M, 1y, 5y',
+    description: 'Legacy time range: 1d, 1M, 3M, 1y, 5y',
     example: '1d',
   })
   @ApiQuery({
@@ -361,7 +370,7 @@ export class MarketsController {
   })
   @ApiSuccessResponse('OHLCV retrieved successfully')
   @ApiNotFoundResponse('Market pair not found')
-  @ApiBadRequestResponse('Invalid range')
+  @ApiBadRequestResponse('Invalid range or interval')
   @ApiUnauthorizedResponse('Unauthorized')
   async getOHLCV(
     @Param('id') id: string,
@@ -369,9 +378,10 @@ export class MarketsController {
     @Query('range') range?: string,
     @Query('locale') locale?: string,
     @Headers('accept-language') acceptLanguage?: string,
+    @Query('interval') interval?: string,
   ) {
     const resolved = resolveOhlcvLocale(locale, acceptLanguage);
-    return this.marketsService.getOHLCV(id, limit, range, resolved);
+    return this.marketsService.getOHLCV(id, limit, range, resolved, interval);
   }
 
   /**
