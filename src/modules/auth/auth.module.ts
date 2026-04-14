@@ -5,6 +5,11 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MailService } from '@/common/services';
 import { User } from '@/entities/user.entity';
+import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
+import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
+import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
+import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
+import { BcryptPasswordHasherAdapter } from '@/modules/auth/infrastructure/providers/bcrypt-password-hasher.adapter';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { AuthController } from './auth.controller';
@@ -44,6 +49,14 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     AuthRepository,
     JwtStrategy,
     MailService,
+    RegisterUserUseCase,
+    LoginWithPasswordUseCase,
+    ChangePasswordUseCase,
+    BcryptPasswordHasherAdapter,
+    {
+      provide: PASSWORD_HASHER,
+      useExisting: BcryptPasswordHasherAdapter,
+    },
   ],
   controllers: [AuthController],
   exports: [AuthService, AuthRepository, TwoFaService, JwtModule, MailService],

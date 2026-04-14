@@ -1,0 +1,45 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@/common/exceptions';
+import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
+import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
+import type { ChangePasswordDto } from '@/modules/auth/dto';
+import { AuthRepository } from '@/modules/auth/repositories';
+import { TwoFaService } from '@/modules/auth/two-fa.service';
+import { UsersRepository } from '@/modules/users/repositories';
+
+@Injectable()
+export class ChangePasswordUseCase {
+  private readonly logger = new Logger(ChangePasswordUseCase.name);
+
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly authRepository: AuthRepository,
+    private readonly twoFaService: TwoFaService,
+    @Inject(PASSWORD_HASHER)
+    private readonly passwordHasher: PasswordHasherPort,
+  ) {}
+
+  async execute(userId: string, dto: ChangePasswordDto): Promise<{ success: boolean }> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (user.two_fa_enabled !== 1) {
+      throw new BadRequestException(
+        'Vui long bat xac thuc hai buoc trong Cai dat truoc khi doi mat khau.',
+        'TWO_FA_REQUIRED',
+      );
+    }
+
+    const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
+    if (!otpValid) {
+      throw new BadRequestException('OTP khong hop le hoac da het han', 'INVALID_OTP');
+    }
+
+    const passwordHash = await this.passwordHasher.hash(dto.newPassword);
+    await this.authRepository.updatePassword(userId, passwordHash);
+
+    this.logger.log(`Password changed for user=${userId}`);
+    return { success: true };
+  }
+}
