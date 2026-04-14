@@ -5,7 +5,7 @@ export class AddExchangeRateAuditLog1776200000000 implements MigrationInterface 
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE exchange_rate_audit_log (
+      CREATE TABLE IF NOT EXISTS exchange_rate_audit_log (
         audit_id char(36) NOT NULL,
         changed_by char(36) NOT NULL,
         action varchar(32) NOT NULL,
@@ -25,6 +25,6 @@ export class AddExchangeRateAuditLog1776200000000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP TABLE exchange_rate_audit_log');
+    await queryRunner.query('DROP TABLE IF EXISTS exchange_rate_audit_log');
   }
 }

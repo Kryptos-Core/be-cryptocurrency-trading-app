@@ -53,7 +53,7 @@ npm run start:dev
 | `npm run dev:staging` / `start:staging` | `NODE_ENV=staging` |
 | `npm run start:prod` | Production (cần `npm run build` trước) |
 | `npm run migration:run` / `migration:revert` / `migration:show` | TypeORM migrations |
-| `npm run db:seed` / `db:clean` | Seed / dọn dữ liệu seed |
+| `npm run db:seed` / `db:clean` | Seed / truncate toàn bộ bảng (kể cả `migrations`) |
 | `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
 | `npm run test` | Jest |
 
