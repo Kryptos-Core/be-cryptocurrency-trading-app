@@ -1,11 +1,15 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import type { Order } from '../../entities/order.entity';
+import { FindMyOrdersQuery } from './application/queries/find-my-orders.query';
+import { ReconcileMatchingForPairUseCase } from './application/use-cases/reconcile-matching-for-pair.use-case';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
 describe('OrdersController', () => {
   let controller: OrdersController;
   let ordersService: jest.Mocked<OrdersService>;
+  let findMyOrdersQuery: jest.Mocked<FindMyOrdersQuery>;
+  let reconcileMatchingForPairUseCase: jest.Mocked<ReconcileMatchingForPairUseCase>;
 
   const mockOrder = {
     order_id: 1,
@@ -31,17 +35,30 @@ describe('OrdersController', () => {
       cancel: jest.fn(),
       findOne: jest.fn(),
       getOrderBook: jest.fn(),
-      findMyOrders: jest.fn(),
-      reconcileMatchingForPair: jest.fn(),
+    };
+    const mockFindMyOrdersQuery = {
+      execute: jest.fn(),
+    };
+    const mockReconcileMatchingForPairUseCase = {
+      execute: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrdersController],
-      providers: [{ provide: OrdersService, useValue: mockService }],
+      providers: [
+        { provide: OrdersService, useValue: mockService },
+        { provide: FindMyOrdersQuery, useValue: mockFindMyOrdersQuery },
+        {
+          provide: ReconcileMatchingForPairUseCase,
+          useValue: mockReconcileMatchingForPairUseCase,
+        },
+      ],
     }).compile();
 
     controller = module.get(OrdersController);
     ordersService = module.get(OrdersService);
+    findMyOrdersQuery = module.get(FindMyOrdersQuery);
+    reconcileMatchingForPairUseCase = module.get(ReconcileMatchingForPairUseCase);
     jest.clearAllMocks();
   });
 
@@ -77,11 +94,11 @@ describe('OrdersController', () => {
   });
 
   describe('findMyOrders', () => {
-    it('calls service.findMyOrders with userId, page, limit, status', async () => {
+    it('calls query.execute with userId, page, limit, status', async () => {
       const payload = { data: [mockOrder], total: 1, page: 1, limit: 20 };
-      ordersService.findMyOrders.mockResolvedValue(payload);
+      findMyOrdersQuery.execute.mockResolvedValue(payload);
       const result = await controller.findMyOrders('u1', 1, 20, 'OPEN');
-      expect(ordersService.findMyOrders).toHaveBeenCalledWith('u1', 1, 20, 'OPEN');
+      expect(findMyOrdersQuery.execute).toHaveBeenCalledWith('u1', 1, 20, 'OPEN');
       expect(result).toEqual(payload);
     });
   });
@@ -96,7 +113,7 @@ describe('OrdersController', () => {
   });
 
   describe('reconcileMatchingForPair', () => {
-    it('calls service.reconcileMatchingForPair with pairId', async () => {
+    it('calls use-case.execute with pairId', async () => {
       const summary = {
         pairId: 'pair-uuid',
         tradesExecuted: 1,
@@ -104,9 +121,9 @@ describe('OrdersController', () => {
         openOrdersRemaining: 0,
         stoppedReason: 'all_matched' as const,
       };
-      ordersService.reconcileMatchingForPair.mockResolvedValue(summary);
+      reconcileMatchingForPairUseCase.execute.mockResolvedValue(summary);
       const result = await controller.reconcileMatchingForPair('pair-uuid');
-      expect(ordersService.reconcileMatchingForPair).toHaveBeenCalledWith('pair-uuid');
+      expect(reconcileMatchingForPairUseCase.execute).toHaveBeenCalledWith('pair-uuid');
       expect(result).toEqual(summary);
     });
   });

@@ -13,6 +13,8 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { FindMyOrdersQuery } from '@/modules/orders/application/queries/find-my-orders.query';
+import { ReconcileMatchingForPairUseCase } from '@/modules/orders/application/use-cases/reconcile-matching-for-pair.use-case';
 import type {
   CancelBatchOrderDto,
   CancelOrderDto,
@@ -30,7 +32,11 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly findMyOrdersQuery: FindMyOrdersQuery,
+    private readonly reconcileMatchingForPairUseCase: ReconcileMatchingForPairUseCase,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -98,7 +104,7 @@ export class OrdersController {
     description: 'Market pair_id (UUID) or trading symbol BASE/QUOTE (e.g. OG/USDT, URL-encoded)',
   })
   async reconcileMatchingForPair(@Param('pairId') pairId: string) {
-    return this.ordersService.reconcileMatchingForPair(pairId);
+    return this.reconcileMatchingForPairUseCase.execute(pairId);
   }
 
   @Get('book/:pairId')
@@ -132,7 +138,7 @@ export class OrdersController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('status') status?: string,
   ) {
-    return this.ordersService.findMyOrders(userId, page, limit, status);
+    return this.findMyOrdersQuery.execute(userId, page, limit, status);
   }
 
   @Get(':orderId')
