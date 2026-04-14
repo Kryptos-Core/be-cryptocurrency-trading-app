@@ -62,12 +62,24 @@ Pattern áp rule **tính từ root repo backend** (folder workspace), **không**
 - **Claude Code:** repo này có `.claude/CLAUDE.md`. Full skill/hook/command của ECC: cài plugin `ecc@ecc` từ marketplace upstream hoặc chạy `install.ps1` / `install.sh` trong clone upstream (xem upstream README).
 - Bảng tóm tắt: [AGENTS.md](./AGENTS.md) mục “Upstream ECC”; chi tiết: [AGENTS.md ở monorepo cha](../AGENTS.md).
 
+## Tài liệu Team (đọc theo thứ tự)
+
+| Tài liệu | Mục đích |
+|----------|----------|
+| [docs/onboarding/day-1-setup.md](./docs/onboarding/day-1-setup.md) | Setup môi trường ngày 1 |
+| [docs/onboarding/ai-assisted-dev.md](./docs/onboarding/ai-assisted-dev.md) | Hướng dẫn vibe code với AI |
+| [docs/onboarding/ecc-commands-quick-ref.md](./docs/onboarding/ecc-commands-quick-ref.md) | Tra cứu slash commands |
+| [docs/security-zones.md](./docs/security-zones.md) | Security zones — ĐỌC TRƯỚC KHI SỬA sensitive modules |
+| [CONTRIBUTING-RULES.md](./CONTRIBUTING-RULES.md) | Conventions + PR rules |
+| [README.md](./README.md) | Full setup + module docs |
+
 ## Backend — checklist nhanh
 
 ```bash
 npm install
-npm run lint   # hoặc biome/eslint theo README
-npm test
+npm run lint       # Biome check
+npx tsc --noEmit   # TypeScript
+npm test           # Jest
 ```
 
 Chi tiết chạy local, Docker, migration: [README.md](./README.md).

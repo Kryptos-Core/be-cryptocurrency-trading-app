@@ -70,6 +70,40 @@ Sample role configs in this repo:
 Since Codex lacks hooks, security enforcement is instruction-based:
 1. Always validate inputs at system boundaries
 2. Never hardcode secrets — use environment variables
-3. Run `npm audit` / `pip audit` before committing
+3. Run `npm run lint` + `npm test` before committing
 4. Review `git diff` before every push
 5. Use `sandbox_mode = "workspace-write"` in config
+
+## Quality Gates (NestJS Backend)
+
+Trước khi coi một feature hoàn thành, **bắt buộc** chạy:
+
+```bash
+npm run lint        # hoặc npx biome check src/
+npx tsc --noEmit    # type check
+npm test            # unit + integration tests
+```
+
+### Checklist tự kiểm tra (Codex)
+
+Trước khi báo "done":
+- [ ] TypeScript compile không có lỗi
+- [ ] `npm test` pass, coverage >= 80%
+- [ ] Không có `console.log` trong production code (dùng NestJS Logger)
+- [ ] Không có hardcode secret, connection string, private key
+- [ ] Mỗi endpoint mới có `@UseGuards(JwtAuthGuard)` hoặc có lý do rõ ràng để public
+- [ ] DTO mới có `@IsXxx()` validators từ `class-validator`
+- [ ] Migration mới không xóa column đang dùng, không thêm NOT NULL vào bảng có data
+
+## Sensitive Module Warning
+
+Nếu task liên quan đến `matching/`, `orders/`, `wallets/`, `treasury/`, `blockchain/`:
+
+1. Đọc rule `nestjs-sensitive-zones.md` trước khi implement
+2. Viết risk assessment vào `docs/risk-<feature>.md`
+3. Test coverage 100% cho business logic paths của module đó
+4. Không tự merge — cần 2 reviewers
+
+## Stack Reminder (NestJS/TypeScript only)
+
+Repo này là **NestJS backend**. Không tạo Flutter widget, Dart code, hay Playwright UI test trong repo này. API contract thay đổi phải được versioned và thông báo cho team FE.

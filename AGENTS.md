@@ -4,9 +4,13 @@
 
 Mở **đúng thư mục gốc repo NestJS này** làm folder workspace (cùng cấp `package.json`). Team BE clone repo backend, làm việc độc lập; **đồng nhất Vibe Code** nhờ `.cursor/`, `.agents/`, `.codex/`, `.claude/` trong repo — không cần mở monorepo cha.
 
-## Vibe Code
+## Tài liệu team
 
-**Chuẩn AI chung của team:** [VIBE_CODE.md](./VIBE_CODE.md). Cursor, Claude Code và Codex CLI trong repo này bám theo `.cursor/`, `.agents/`, `.codex/`, `.claude/`.
+- [VIBE_CODE.md](./VIBE_CODE.md) — Chuẩn AI coding của team BE
+- [CONTRIBUTING-RULES.md](./CONTRIBUTING-RULES.md) — Conventions + PR process
+- [docs/security-zones.md](./docs/security-zones.md) — **ĐỌC TRƯỚC KHI SỬA** sensitive modules
+- [docs/onboarding/](./docs/onboarding/) — Onboarding guides (day-1, ai-dev, ecc-ref)
+- [README.md](./README.md) — Full setup + module docs
 
 ## Stack
 

@@ -1,0 +1,95 @@
+# Onboarding NestJS Backend — Ngày 1
+
+## 1. Prerequisites
+
+```bash
+# Kiểm tra versions
+node --version    # >= 18.x
+npm --version
+docker --version
+docker compose version
+```
+
+## 2. Clone và Setup
+
+```bash
+git clone <be-repo-url>
+cd be-cryptocurrency-trading-app
+
+# Tạo .env từ template development
+cp .env.development.example .env.development
+# Điền DB_*, REDIS_*, JWT_*, ... — hỏi Tech Lead
+
+# Khởi động infrastructure (MySQL + Redis)
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d
+
+# Kiểm tra containers
+docker compose -f docker-compose.infrastructure.yml ps
+
+# Cài dependencies
+npm install
+
+# Chạy migrations
+npm run migration:run
+
+# Seed data (optional, dev only)
+npm run db:seed
+
+# Khởi động server
+npm run start:dev
+```
+
+## 3. Verify Setup
+
+```bash
+# Health check
+curl http://127.0.0.1:3000/api/v1/health
+# Expected: {"status": "ok"}
+
+# Swagger docs
+# Mở trình duyệt: http://127.0.0.1:3000/api/docs
+```
+
+## 4. Cài IDE
+
+### Cursor (Khuyến nghị)
+
+1. `File → Open Folder` → `be-cryptocurrency-trading-app/` (cùng cấp `package.json`)
+2. Cursor tự load `.cursor/rules/` với NestJS/TypeScript rules
+3. Extensions: TypeScript, Prettier (đã có config trong `biome.json`)
+
+### Claude Code (CLI)
+
+```bash
+npm install -g @anthropic-ai/claude-code
+cd be-cryptocurrency-trading-app
+claude   # Đọc .claude/CLAUDE.md tự động
+```
+
+## 5. Cấu trúc Dự án
+
+```
+src/
+├── modules/        # 23 bounded contexts (auth, orders, matching, ...)
+│   ├── orders/     # ⚠ SENSITIVE — đọc VIBE_CODE.md trước khi sửa
+│   ├── matching/   # ⚠ CRITICAL — Redis lock, circuit breaker, STP
+│   └── ...
+├── common/         # Guards, interceptors, decorators, RBAC
+├── config/         # Env validation (thêm biến mới vào đây)
+├── migrations/     # TypeORM migrations (KHÔNG xóa migration đã chạy)
+└── entities/       # Shared database entities
+```
+
+## 6. Module quan trọng cần đọc đầu tiên
+
+Trước khi code, đọc:
+- [VIBE_CODE.md](../../VIBE_CODE.md) — quy trình AI coding của team
+- [README.md](../../README.md) — full setup + module docs
+- `.cursor/rules/nestjs-sensitive-zones.md` — modules cực nhạy cảm
+
+## 7. Task đầu tiên
+
+Good First Issues cho BE dev mới:
+- Thêm field vào DTO (không đụng matching/orders core)
+- Viết unit test cho service có sẵn
+- Tạo endpoint read-only mới với swagger docs
