@@ -6,6 +6,7 @@ import { Order } from '@/entities/order.entity';
 import { User } from '@/entities/user.entity';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 import { UsersRepository } from '@/modules/users/infrastructure/persistence';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
@@ -28,6 +29,10 @@ import { UsersService } from './users.service';
     },
     CloudinaryService,
     OrderRepository,
+    {
+      provide: ORDER_REPOSITORY,
+      useExisting: OrderRepository,
+    },
     ContactEmailVerificationService,
   ],
   controllers: [UsersController],
