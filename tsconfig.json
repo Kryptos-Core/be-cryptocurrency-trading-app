@@ -6,7 +6,7 @@
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "ignoreDeprecations": "5.0",
+     "ignoreDeprecations": "6.0",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
