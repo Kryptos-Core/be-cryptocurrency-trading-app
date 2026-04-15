@@ -27,6 +27,8 @@ import {
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { DepositFxService } from './deposit-fx.service';
+import { LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
+import { LinkedWalletRepository, OnchainTransactionRepository } from './infrastructure/persistence';
 import { OnchainDepositService } from './onchain-deposit.service';
 import { OnchainTransferQueryService } from './onchain-transfer-query.service';
 import { OnchainWithdrawalService } from './onchain-withdrawal.service';
@@ -144,6 +146,11 @@ import { WalletLinkingService } from './wallet-linking.service';
       inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
     },
     BlockchainProviderFactory,
+
+    LinkedWalletRepository,
+    OnchainTransactionRepository,
+    { provide: LINKED_WALLET_REPOSITORY, useExisting: LinkedWalletRepository },
+    { provide: ONCHAIN_TRANSACTION_REPOSITORY, useExisting: OnchainTransactionRepository },
 
     DepositFxService,
     WalletLinkingService,
