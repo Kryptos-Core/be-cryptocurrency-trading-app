@@ -1,10 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
-import type { Repository } from 'typeorm';
 import { ExchangeRateAuditLog } from '@/entities/exchange-rate-audit-log.entity';
 import { RedisService } from '@/common/services/redis.service';
+import { EXCHANGE_RATE_AUDIT_REPOSITORY, type ExchangeRateAuditRepositoryPort } from './domain/ports';
 import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { DepositsService } from '@/modules/deposits/deposits.service';
@@ -58,8 +57,8 @@ export class ExchangeRateService {
     private readonly depositsService: DepositsService,
     private readonly paymentConfigService: PaymentConfigService,
     private readonly usersService: UsersService,
-    @InjectRepository(ExchangeRateAuditLog)
-    private readonly auditRepository: Pick<Repository<ExchangeRateAuditLog>, 'save' | 'find'>,
+    @Inject(EXCHANGE_RATE_AUDIT_REPOSITORY)
+    private readonly auditRepository: ExchangeRateAuditRepositoryPort,
   ) {}
 
   async getMarketPrices(query: MarketPricesDto) {
@@ -480,10 +479,8 @@ export class ExchangeRateService {
   }
 
   private async resolveLatestUpdaterEmail(): Promise<string | null> {
-    const [latestAudit] = await this.auditRepository.find({
-      order: { created_at: 'DESC' },
-      take: 1,
-    });
+    const latestAudits = await this.auditRepository.findLatest(1);
+    const latestAudit = latestAudits[0];
 
     if (!latestAudit?.changed_by) {
       return null;

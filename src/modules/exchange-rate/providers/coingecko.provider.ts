@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services/redis.service';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import type {
   MarketPriceItem,
   MarketPricesSnapshot,
@@ -34,7 +37,8 @@ export class CoinGeckoProvider {
 
   constructor(
     private readonly redisService: RedisService,
-    private readonly currencyRepository: CurrencyRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
   ) {}
 
   async getMarketPrices(symbols?: string[]): Promise<MarketPricesSnapshot> {
@@ -145,10 +149,7 @@ export class CoinGeckoProvider {
     return symbols.every((symbol) => available.has(symbol));
   }
 
-  private mapPrice(
-    id: string,
-    payload?: { usd?: number; vnd?: number },
-  ): MarketPriceItem | null {
+  private mapPrice(id: string, payload?: { usd?: number; vnd?: number }): MarketPriceItem | null {
     const symbol = ID_TO_SYMBOL[id];
     if (!symbol || payload?.usd == null || payload.vnd == null) {
       return null;

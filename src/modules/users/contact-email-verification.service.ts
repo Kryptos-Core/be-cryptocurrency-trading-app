@@ -1,10 +1,10 @@
 import { randomInt } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import type { User } from '@/entities/user.entity';
-import { UsersRepository } from './repositories';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 
 /**
  * OTP gửi thẳng tới email mới để gắn email liên hệ cho tài khoản đăng nhập ví (email @*.wallet).
@@ -16,7 +16,8 @@ export class ContactEmailVerificationService {
   private readonly cooldownSeconds = 30;
 
   constructor(
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly mailService: MailService,
   ) {}

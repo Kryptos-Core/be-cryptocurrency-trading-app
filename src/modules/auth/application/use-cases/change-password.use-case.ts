@@ -5,14 +5,15 @@ import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hashe
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import type { ChangePasswordDto } from '@/modules/auth/dto';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 
 @Injectable()
 export class ChangePasswordUseCase {
   private readonly logger = new Logger(ChangePasswordUseCase.name);
 
   constructor(
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: AuthRepositoryPort,
     private readonly twoFaService: TwoFaService,

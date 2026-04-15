@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { UnauthorizedException } from '@/common/exceptions';
 import type { User } from '@/entities/user.entity';
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
 import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
 import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
-import { UsersRepository } from '@/modules/users/repositories';
 
 /**
  * Transitional facade that keeps the current controller contract while
@@ -17,7 +17,8 @@ export class AuthService {
     private readonly registerUserUseCase: RegisterUserUseCase,
     private readonly loginWithPasswordUseCase: LoginWithPasswordUseCase,
     private readonly changePasswordUseCase: ChangePasswordUseCase,
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
   ) {}
 
   register(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {

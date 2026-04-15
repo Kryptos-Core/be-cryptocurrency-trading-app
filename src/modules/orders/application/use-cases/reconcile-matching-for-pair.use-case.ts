@@ -1,13 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundException } from '@/common/exceptions';
-import { MarketRepository } from '@/modules/markets/repositories';
+import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 import type { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
 import { MatchingService } from '@/modules/matching/matching.service';
 
 @Injectable()
 export class ReconcileMatchingForPairUseCase {
   constructor(
-    private readonly marketRepository: MarketRepository,
+    @Inject(MARKET_REPOSITORY)
+    private readonly marketRepository: MarketRepositoryPort,
     private readonly matchingService: MatchingService,
   ) {}
 

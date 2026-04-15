@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,12 +13,15 @@ import { uuidv7 } from 'uuidv7';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import type { FiatDeposit } from '@/entities/fiat-deposit.entity';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
+import { FIAT_DEPOSIT_REPOSITORY, type FiatDepositRepositoryPort } from './domain/ports';
 import { resolvePayosFiatDepositLimits } from './payos-fiat-limits.util';
-import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
 
 interface PayOSInstanceEntry {
   instance: any;
@@ -42,10 +46,12 @@ export class DepositsService {
   private payOSCache: PayOSInstanceEntry | null = null;
 
   constructor(
-    private readonly fiatDepositRepo: FiatDepositRepository,
+    @Inject(FIAT_DEPOSIT_REPOSITORY)
+    private readonly fiatDepositRepo: FiatDepositRepositoryPort,
     private readonly walletsService: WalletsService,
     private readonly configService: ConfigService,
-    private readonly currencyRepository: CurrencyRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly paymentConfigService: PaymentConfigService,
   ) {}
 
@@ -391,5 +397,3 @@ export class DepositsService {
     return { orderCode, localStatus: deposit.status, payosStatus, updated: false };
   }
 }
-
-

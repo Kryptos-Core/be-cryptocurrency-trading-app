@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from './domain/ports';
 
 @Injectable()
@@ -14,7 +14,8 @@ export class TwoFaService {
   constructor(
     private readonly cacheService: CacheService,
     private readonly mailService: MailService,
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: AuthRepositoryPort,
   ) {}

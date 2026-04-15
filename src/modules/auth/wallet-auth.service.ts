@@ -10,7 +10,7 @@ import { newUuid } from '@/common/utils/uuid.util';
 import type { User } from '@/entities/user.entity';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 
 /** Response for wallet auth (login or register) */
 export interface WalletAuthResult {
@@ -33,7 +33,8 @@ export class WalletAuthService {
   constructor(
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: AuthRepositoryPort,
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly jwtService: JwtService,

@@ -3,8 +3,8 @@ import { ConflictException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import type { Currency } from '@/entities/currency.entity';
 import { MarketsService } from '@/modules/markets/markets.service';
+import { CURRENCY_REPOSITORY, type CurrencyRepositoryPort } from './domain/ports';
 import type { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
-import { CurrencyRepository } from './repositories';
 
 /**
  * Currencies Service - Business Logic Layer
@@ -19,7 +19,8 @@ export class CurrenciesService {
   private readonly CACHE_TTL = 3600; // 1 hour
 
   constructor(
-    private readonly currencyRepository: CurrencyRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly cacheService: CacheService,
     @Inject(forwardRef(() => MarketsService))
     private readonly marketsService: MarketsService,

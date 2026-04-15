@@ -1,9 +1,15 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { RedisService } from '@/common/services';
 import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
-import { MarketRepository } from '@/modules/markets/repositories';
+import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 import { BinanceWebSocketPriceFeedClient } from '../clients/binance-websocket-price-feed.client';
 import type { SymbolToPairIdResolver } from '../interfaces/price-feed.interface';
 import {
@@ -47,7 +53,8 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     private readonly redisService: RedisService,
     private readonly tradingPriceStreamService: TradingPriceStreamService,
     private readonly tradingSubscriptionService: TradingSubscriptionService,
-    private readonly marketRepository: MarketRepository,
+    @Inject(MARKET_REPOSITORY)
+    private readonly marketRepository: MarketRepositoryPort,
   ) {
     this.priceFeedClient = new BinanceWebSocketPriceFeedClient();
   }

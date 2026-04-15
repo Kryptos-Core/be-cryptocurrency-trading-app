@@ -15,10 +15,10 @@ import {
   OrderBookService,
 } from '@/modules/matching/orderbook/order-book.service';
 import { BinanceOHLCVProvider } from '@/modules/price-oracle';
+import { MARKET_REPOSITORY, type MarketRepositoryPort } from './domain/ports';
 import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
 import type { IMarketTickerData } from './interfaces/market-ticker.interface';
 import { resolveOhlcvInterval } from './ohlcv-interval.util';
-import { MarketRepository } from './repositories';
 
 /** Default string for missing/zero price (repository contract). */
 const TICKER_ZERO = '0';
@@ -45,7 +45,8 @@ export class MarketsService implements OnModuleInit {
   private readonly TICKER_CACHE_TTL = 60; // 1 minute for ticker (real-time data)
 
   constructor(
-    private readonly marketRepository: MarketRepository,
+    @Inject(MARKET_REPOSITORY)
+    private readonly marketRepository: MarketRepositoryPort,
     private readonly cacheService: CacheService,
     @Inject(forwardRef(() => CurrenciesService))
     private readonly currenciesService: CurrenciesService,
@@ -180,7 +181,7 @@ export class MarketsService implements OnModuleInit {
       cacheKey,
       async () => {
         const found = await this.marketRepository.findOne({
-          where: { pair_id: pairId } as any,
+          where: { pair_id: pairId },
           relations: ['base_currency', 'quote_currency'],
         });
         if (!found) {

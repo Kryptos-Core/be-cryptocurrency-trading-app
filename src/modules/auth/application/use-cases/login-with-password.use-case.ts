@@ -1,11 +1,11 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { BusinessException, UnauthorizedException } from '@/common/exceptions';
 import type { User } from '@/entities/user.entity';
-import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
+import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { LoginDto } from '@/modules/auth/dto';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import { buildAuthAccessTokenPayload, sanitizeAuthUser } from './shared/auth-response.util';
 
 @Injectable()
@@ -13,7 +13,8 @@ export class LoginWithPasswordUseCase {
   private readonly logger = new Logger(LoginWithPasswordUseCase.name);
 
   constructor(
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
     private readonly jwtService: JwtService,
     @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,

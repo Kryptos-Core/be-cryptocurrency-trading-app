@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
@@ -8,8 +8,9 @@ import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-emai
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { User } from '@/entities/user.entity';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 import { WalletsService } from '@/modules/wallets/wallets.service';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 import type {
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
@@ -17,7 +18,6 @@ import type {
   UpdateUserDto,
   UserFilterDto,
 } from './dto';
-import { UsersRepository } from './repositories';
 
 /**
  * Users Service - Business Logic Layer
@@ -34,12 +34,14 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
   constructor(
-    private readonly usersRepository: UsersRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
     private readonly cloudinaryService: CloudinaryService,
     private readonly twoFaService: TwoFaService,
     private readonly walletsService: WalletsService,
     private readonly dataSource: DataSource,
-    private readonly orderRepository: OrderRepository,
+    @Inject(ORDER_REPOSITORY)
+    private readonly orderRepository: OrderRepositoryPort,
   ) {}
 
   /**

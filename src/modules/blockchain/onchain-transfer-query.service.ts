@@ -2,7 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import { BlockchainNetwork } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   type AdminWithdrawalFilters,
@@ -15,7 +18,8 @@ export class OnchainTransferQueryService {
   constructor(
     @Inject(ONCHAIN_TRANSACTION_REPOSITORY)
     private readonly onchainTxRepo: OnchainTransactionRepositoryPort,
-    private readonly currencyRepository: CurrencyRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly systemConfigService: SystemConfigService,
   ) {}
 

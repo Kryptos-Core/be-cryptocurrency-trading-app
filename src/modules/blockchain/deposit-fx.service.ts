@@ -1,10 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import type { BlockchainNetwork } from '@/common/enums';
 import { CacheService } from '@/common/services';
 import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 export interface DepositConversionResult {
@@ -36,7 +39,8 @@ export class DepositFxService {
 
   constructor(
     private readonly cacheService: CacheService,
-    private readonly currencyRepository: CurrencyRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly systemConfigService: SystemConfigService,
     private readonly binanceRestClient: BinanceRestClient,
   ) {}

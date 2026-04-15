@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { calcSkip } from '@/common/utils/pagination.util';
+import { NOTIFICATION_REPOSITORY, type NotificationRepositoryPort } from './domain/ports';
 import type { CreateNotificationDto } from './dto/create-notification.dto';
 import type { NotificationQueryDto } from './dto/notification-query.dto';
-import { NotificationRepository } from './repositories/notification.repository';
 import {
   type INotificationStrategy,
   NOTIFICATION_STRATEGIES,
@@ -22,7 +22,8 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
-    private readonly notificationRepo: NotificationRepository,
+    @Inject(NOTIFICATION_REPOSITORY)
+    private readonly notificationRepo: NotificationRepositoryPort,
     @Inject(NOTIFICATION_STRATEGIES) private readonly strategies: INotificationStrategy[],
   ) {}
 

@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bull';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bull';
 import { uuidv7 } from 'uuidv7';
@@ -9,6 +9,7 @@ import type {
   PaymentMethodConfig,
   PaymentMethodType,
 } from '@/entities/payment-method-config.entity';
+import { PAYMENT_CONFIG_REPOSITORY, type PaymentConfigRepositoryPort } from './domain/ports';
 import type {
   ActivatePaymentConfigDto,
   CreatePaymentConfigDto,
@@ -24,7 +25,6 @@ import {
   isPaymentConfigTypeNetworkPairAllowed,
   resolvePaymentConfigFormOptionsEnv,
 } from './payment-config-form-options.util';
-import { PaymentConfigRepository } from './repositories/payment-config.repository';
 
 export const PAYMENT_CONFIG_QUEUE = 'payment-config-activation';
 export const ACTIVATE_JOB = 'activate-config';
@@ -52,7 +52,8 @@ export class PaymentConfigService {
   private readonly memCache = new Map<string, CacheEntry>();
 
   constructor(
-    private readonly repo: PaymentConfigRepository,
+    @Inject(PAYMENT_CONFIG_REPOSITORY)
+    private readonly repo: PaymentConfigRepositoryPort,
     private readonly encryptionService: WalletEncryptionService,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,

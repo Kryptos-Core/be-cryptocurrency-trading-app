@@ -10,7 +10,10 @@ import {
 } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
@@ -39,7 +42,8 @@ export class OnchainWithdrawalService {
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly walletLinkingService: WalletLinkingService,
     private readonly walletsService: WalletsService,
-    private readonly currencyRepository: CurrencyRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly systemConfigService: SystemConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly transactionWalletService: TransactionWalletService,

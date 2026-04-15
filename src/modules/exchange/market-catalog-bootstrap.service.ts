@@ -1,5 +1,5 @@
-import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { MarketRepository } from '@/modules/markets/repositories';
+import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 import { ExchangeInfoSyncService } from './exchange-info-sync.service';
 
 @Injectable()
@@ -8,7 +8,8 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
   private bootstrapStarted = false;
 
   constructor(
-    private readonly marketRepository: MarketRepository,
+    @Inject(MARKET_REPOSITORY)
+    private readonly marketRepository: MarketRepositoryPort,
     private readonly exchangeInfoSyncService: ExchangeInfoSyncService,
   ) {}
 

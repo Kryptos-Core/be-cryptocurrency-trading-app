@@ -4,16 +4,11 @@ import { MarketPair } from '@/entities/market-pair.entity';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { MatchingModule } from '@/modules/matching/matching.module';
 import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
+import { MARKET_REPOSITORY } from './domain/ports';
 import { MarketsController } from './markets.controller';
 import { MarketsService } from './markets.service';
 import { MarketRepository } from './repositories';
 
-/**
- * Markets Module
- * Module Pattern: Encapsulate markets feature
- * OHLCV/ticker from Price Oracle (on-demand; no DB persist).
- * Depth snapshot: delegates to OrderBookService (from MatchingModule) for real-time in-memory depth.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([MarketPair]),
@@ -21,8 +16,15 @@ import { MarketRepository } from './repositories';
     PriceOracleModule,
     forwardRef(() => MatchingModule),
   ],
-  providers: [MarketsService, MarketRepository],
+  providers: [
+    MarketRepository,
+    {
+      provide: MARKET_REPOSITORY,
+      useExisting: MarketRepository,
+    },
+    MarketsService,
+  ],
   controllers: [MarketsController],
-  exports: [MarketsService, MarketRepository],
+  exports: [MarketsService, MARKET_REPOSITORY, MarketRepository],
 })
 export class MarketsModule {}

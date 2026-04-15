@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
@@ -6,8 +6,11 @@ import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
 import { MarketsService } from '@/modules/markets/markets.service';
 import { OrdersService } from '@/modules/orders/orders.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import {
+  MARKET_MAKER_CONFIG_REPOSITORY,
+  type MarketMakerConfigRepositoryPort,
+} from './domain/ports';
 import type { UpsertMarketMakerConfigDto } from './dto';
-import { MarketMakerConfigRepository } from './repositories';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 const MM_REFRESH_IDEMPOTENCY_TTL_SEC = 300;
@@ -15,7 +18,8 @@ const MM_REFRESH_IDEMPOTENCY_TTL_SEC = 300;
 @Injectable()
 export class MarketMakerService {
   constructor(
-    private readonly configRepository: MarketMakerConfigRepository,
+    @Inject(MARKET_MAKER_CONFIG_REPOSITORY)
+    private readonly configRepository: MarketMakerConfigRepositoryPort,
     private readonly marketsService: MarketsService,
     private readonly cacheService: CacheService,
     private readonly ordersService: OrdersService,

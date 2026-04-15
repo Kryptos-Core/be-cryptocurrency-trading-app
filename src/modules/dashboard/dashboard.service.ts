@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services';
 import type { MarketPair } from '@/entities/market-pair.entity';
 import { MarketsService } from '@/modules/markets/markets.service';
-import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
 import type {
   DashboardMarketDto,
   DashboardResponseDto,
@@ -39,7 +39,8 @@ export class DashboardService {
 
   constructor(
     private readonly marketsService: MarketsService,
-    private readonly walletRepository: WalletRepository,
+    @Inject(WALLET_REPOSITORY)
+    private readonly walletRepository: WalletRepositoryPort,
     private readonly redisService: RedisService,
   ) {}
 

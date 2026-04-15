@@ -1,8 +1,6 @@
-import { BadRequestException, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
 import {
   EVM_CHAIN_DEFINITIONS,
   getEvmDefinitionByTreasuryChain,
@@ -13,6 +11,7 @@ import {
   type ConfigDataType,
   SystemConfig,
 } from '@/entities/system-config.entity';
+import { SYSTEM_CONFIG_REPOSITORY, type SystemConfigRepositoryPort } from './domain/ports';
 import {
   RUNTIME_SETTING_KEY_SET,
   RUNTIME_SETTING_SEEDS,
@@ -26,8 +25,8 @@ export class SystemConfigService implements OnModuleInit {
   private readonly UPDATE_EVENT = 'system_config.updated';
 
   constructor(
-    @InjectRepository(SystemConfig)
-    private readonly configRepo: Repository<SystemConfig>,
+    @Inject(SYSTEM_CONFIG_REPOSITORY)
+    private readonly configRepo: SystemConfigRepositoryPort,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
@@ -35,7 +34,7 @@ export class SystemConfigService implements OnModuleInit {
 
   async onModuleInit() {
     this.logger.log('Initializing system configs (runtime keys + Redis sync)...');
-    const runner = this.configRepo.manager.connection.createQueryRunner();
+    const runner = this.configRepo.createQueryRunner();
     await runner.connect();
     try {
       if (!(await runner.hasTable('system_configs'))) {

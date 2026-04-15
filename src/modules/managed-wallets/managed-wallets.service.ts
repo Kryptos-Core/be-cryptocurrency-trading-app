@@ -18,22 +18,25 @@ import { WalletEncryptionService } from '@/common/services';
 import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
-import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
 import {
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
   type TreasuryTransactionWalletRepositoryPort,
 } from '@/modules/treasury/domain/ports';
 import type { TronDepositUiChain } from '@/modules/treasury/infrastructure/persistence/treasury-transaction-wallet.repository';
+import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
+import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import {
+  MANAGED_WALLETS_DATA_REPOSITORY,
+  type ManagedWalletsDataRepositoryPort,
+} from './domain/ports';
 import type {
   CreateManagedWalletDto,
   ManagedWalletResponseDto,
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
 } from './dto';
-import { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
 
 const MANAGED_TRON_CHAINS = [
   BlockchainNetwork.TRON_MAINNET,
@@ -66,7 +69,8 @@ export class ManagedWalletsService {
   private static readonly RECOMMENDED_CHAIN_KEY = 'deposit.recommended_chain';
 
   constructor(
-    private readonly managedWalletsDataRepository: ManagedWalletsDataRepository,
+    @Inject(MANAGED_WALLETS_DATA_REPOSITORY)
+    private readonly managedWalletsDataRepository: ManagedWalletsDataRepositoryPort,
     @Inject(TREASURY_TRANSACTION_WALLET_REPOSITORY)
     private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepositoryPort,
     private readonly walletEncryptionService: WalletEncryptionService,
@@ -95,8 +99,9 @@ export class ManagedWalletsService {
     defaults: ManagedWalletResponseDto[];
   }> {
     const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
-    const chains = (pickerDto.pickers.managed_wallets ?? []).filter((c): c is BlockchainChainDbValue =>
-      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    const chains = (pickerDto.pickers.managed_wallets ?? []).filter(
+      (c): c is BlockchainChainDbValue =>
+        (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
     );
     const recommendedChain = await this.getRecommendedChain();
     const defaults: ManagedWalletResponseDto[] = [];
@@ -338,8 +343,9 @@ export class ManagedWalletsService {
       ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
     );
     const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
-    const allowed = (pickerDto.pickers.managed_wallets ?? []).filter((c): c is BlockchainChainDbValue =>
-      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    const allowed = (pickerDto.pickers.managed_wallets ?? []).filter(
+      (c): c is BlockchainChainDbValue =>
+        (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
     );
     const raw = (v?.trim() || BlockchainNetwork.TRON_MAINNET) as string;
     if (!(BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(raw)) {
@@ -349,7 +355,11 @@ export class ManagedWalletsService {
         pickerDto.tronDefaultNetwork,
       ) as BlockchainChainDbValue;
     }
-    return resolveRecommendedChainForDepositPicker(raw, allowed, pickerDto.tronDefaultNetwork) as BlockchainChainDbValue;
+    return resolveRecommendedChainForDepositPicker(
+      raw,
+      allowed,
+      pickerDto.tronDefaultNetwork,
+    ) as BlockchainChainDbValue;
   }
 
   private async requireTransactionWalletForActor(

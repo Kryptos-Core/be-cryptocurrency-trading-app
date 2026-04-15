@@ -1,13 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundException } from '@/common/exceptions';
-import { MarketRepository } from '@/modules/markets/repositories';
-import { WalletRepository } from '@/modules/wallets/repositories/wallet.repository';
+import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
+import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
 
 @Injectable()
 export class PrepareCreateOrderContextService {
   constructor(
-    private readonly marketRepository: MarketRepository,
-    private readonly walletRepository: WalletRepository,
+    @Inject(MARKET_REPOSITORY)
+    private readonly marketRepository: MarketRepositoryPort,
+    @Inject(WALLET_REPOSITORY)
+    private readonly walletRepository: WalletRepositoryPort,
   ) {}
 
   async execute(userId: string, pairId: string) {
@@ -16,8 +18,14 @@ export class PrepareCreateOrderContextService {
       throw new NotFoundException('Market pair', pairId);
     }
 
-    const quoteWallet = await this.walletRepository.findByUserCurrency(userId, pair.quote_currency_id);
-    const baseWallet = await this.walletRepository.findByUserCurrency(userId, pair.base_currency_id);
+    const quoteWallet = await this.walletRepository.findByUserCurrency(
+      userId,
+      pair.quote_currency_id,
+    );
+    const baseWallet = await this.walletRepository.findByUserCurrency(
+      userId,
+      pair.base_currency_id,
+    );
 
     return {
       pair,

@@ -7,6 +7,7 @@ import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import { DepositMethodsController } from './deposit-methods.controller';
+import { MANAGED_WALLETS_DATA_REPOSITORY } from './domain/ports';
 import { ManagedWalletsController } from './managed-wallets.controller';
 import { ManagedWalletsService } from './managed-wallets.service';
 import { ManagedWalletsDataRepository } from './repositories/managed-wallets-data.repository';
@@ -18,7 +19,15 @@ import { ManagedWalletsDataRepository } from './repositories/managed-wallets-dat
     SystemConfigModule,
   ],
   controllers: [ManagedWalletsController, DepositMethodsController],
-  providers: [ManagedWalletsService, ManagedWalletsDataRepository, WalletEncryptionService],
+  providers: [
+    ManagedWalletsDataRepository,
+    {
+      provide: MANAGED_WALLETS_DATA_REPOSITORY,
+      useExisting: ManagedWalletsDataRepository,
+    },
+    ManagedWalletsService,
+    WalletEncryptionService,
+  ],
   exports: [ManagedWalletsService],
 })
 export class ManagedWalletsModule {}

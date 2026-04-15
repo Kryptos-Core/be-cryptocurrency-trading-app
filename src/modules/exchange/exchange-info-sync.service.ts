@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ServiceUnavailableException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
-import { MarketRepository } from '@/modules/markets/repositories';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
+import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 
 /** Cache exchangeInfo 1 hour to avoid Binance request weight / IP ban (418). */
 const EXCHANGE_INFO_CACHE_KEY = 'exchange:binance:exchangeInfo';
@@ -48,8 +51,10 @@ export class ExchangeInfoSyncService {
   private readonly logger = new Logger(ExchangeInfoSyncService.name);
 
   constructor(
-    private readonly currencyRepository: CurrencyRepository,
-    private readonly marketRepository: MarketRepository,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
+    @Inject(MARKET_REPOSITORY)
+    private readonly marketRepository: MarketRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly binanceRestClient: BinanceRestClient,
   ) {}
