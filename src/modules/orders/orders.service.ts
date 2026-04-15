@@ -89,9 +89,7 @@ export class OrdersService {
     if (openOrders.length === 0) {
       return [];
     }
-    return Promise.all(
-      openOrders.map((order) => this.cancel({ userId, orderId: order.order_id })),
-    );
+    return Promise.all(openOrders.map((order) => this.cancel({ userId, orderId: order.order_id })));
   }
 
   findOne(orderId: string, userId: string): Promise<Order> {

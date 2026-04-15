@@ -91,7 +91,9 @@ describe('OrdersService', () => {
 
       const result = await service.cancel({ userId: 'u1', orderId: 'o1' });
 
-      expect(cancelOrderUseCase.execute).toHaveBeenCalledWith(new CancelOrderCommand('u1', 'o1', undefined));
+      expect(cancelOrderUseCase.execute).toHaveBeenCalledWith(
+        new CancelOrderCommand('u1', 'o1', undefined),
+      );
       expect(result.status).toBe('CANCELLED');
     });
   });
