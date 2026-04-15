@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { FindMyOrdersQuery } from '@/modules/orders/application/queries/find-my-orders.query';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
 describe('FindMyOrdersQuery', () => {
   const orderRepository = {
@@ -15,7 +15,7 @@ describe('FindMyOrdersQuery', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         FindMyOrdersQuery,
-        { provide: OrderRepository, useValue: orderRepository },
+        { provide: ORDER_REPOSITORY, useValue: orderRepository },
       ],
     }).compile();
 

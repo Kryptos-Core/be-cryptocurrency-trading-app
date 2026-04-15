@@ -6,7 +6,7 @@ import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/creat
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
 describe('CreateOrderUseCase', () => {
   const orderRepository = {
@@ -39,7 +39,7 @@ describe('CreateOrderUseCase', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         CreateOrderUseCase,
-        { provide: OrderRepository, useValue: orderRepository },
+        { provide: ORDER_REPOSITORY, useValue: orderRepository },
         { provide: CacheService, useValue: cacheService },
         { provide: OrderValidationService, useValue: validationStrategy },
         { provide: MatchingQueueService, useValue: matchingQueueService },

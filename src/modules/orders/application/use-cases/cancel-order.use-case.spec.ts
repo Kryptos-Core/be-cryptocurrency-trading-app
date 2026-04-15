@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
 import { MatchingService } from '@/modules/matching/matching.service';
 import { CancelOrderUseCase } from '@/modules/orders/application/use-cases/cancel-order.use-case';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
 describe('CancelOrderUseCase', () => {
   const orderRepository = {
@@ -20,7 +20,7 @@ describe('CancelOrderUseCase', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         CancelOrderUseCase,
-        { provide: OrderRepository, useValue: orderRepository },
+        { provide: ORDER_REPOSITORY, useValue: orderRepository },
         { provide: MatchingService, useValue: matchingService },
       ],
     }).compile();

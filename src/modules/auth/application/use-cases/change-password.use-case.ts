@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, UnauthorizedException } from '@/common/exceptions';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
+import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import type { ChangePasswordDto } from '@/modules/auth/dto';
-import { AuthRepository } from '@/modules/auth/repositories';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { UsersRepository } from '@/modules/users/repositories';
 
@@ -13,7 +13,8 @@ export class ChangePasswordUseCase {
 
   constructor(
     private readonly usersRepository: UsersRepository,
-    private readonly authRepository: AuthRepository,
+    @Inject(AUTH_REPOSITORY)
+    private readonly authRepository: AuthRepositoryPort,
     private readonly twoFaService: TwoFaService,
     @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,

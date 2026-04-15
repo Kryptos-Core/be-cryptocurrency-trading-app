@@ -1,0 +1,150 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import Decimal from 'decimal.js';
+import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
+import { BusinessException, ConflictException } from '@/common/exceptions';
+import { newUuid } from '@/common/utils/uuid.util';
+import {
+  WALLET_REPOSITORY,
+  type WalletRepositoryPort,
+  WALLET_LEDGER_REPOSITORY,
+  type WalletLedgerRepositoryPort,
+  ADMIN_ADJUSTMENT_REPOSITORY,
+  type AdminAdjustmentRepositoryPort,
+  WALLET_EVENT_PUBLISHER,
+  type WalletEventPublisherPort,
+  CURRENCY_LOOKUP,
+  type CurrencyLookupPort,
+} from '@/modules/wallets/domain/ports';
+import {
+  BalanceCalculationService,
+  BalanceValidationError,
+} from '@/modules/wallets/domain/services/balance-calculation.service';
+import type {
+  AdminAdjustWalletDto,
+  AdminAdjustWalletResponseDto,
+} from '@/modules/wallets/dto/admin-adjust-wallet.dto';
+import { BadRequestException } from '@/common/exceptions';
+
+@Injectable()
+export class AdminAdjustBalanceUseCase {
+  private readonly logger = new Logger(AdminAdjustBalanceUseCase.name);
+
+  constructor(
+    @Inject(WALLET_REPOSITORY) private readonly walletRepo: WalletRepositoryPort,
+    @Inject(WALLET_LEDGER_REPOSITORY) private readonly ledgerRepo: WalletLedgerRepositoryPort,
+    @Inject(ADMIN_ADJUSTMENT_REPOSITORY) private readonly adjustmentRepo: AdminAdjustmentRepositoryPort,
+    @Inject(WALLET_EVENT_PUBLISHER) private readonly eventPublisher: WalletEventPublisherPort,
+    @Inject(CURRENCY_LOOKUP) private readonly currencyLookup: CurrencyLookupPort,
+    private readonly balanceCalc: BalanceCalculationService,
+  ) {}
+
+  async execute(actorUserId: string, dto: AdminAdjustWalletDto): Promise<AdminAdjustWalletResponseDto> {
+    const adjustmentId = newUuid();
+    let amount: Decimal;
+    try {
+      amount = this.balanceCalc.parsePositiveAmount(dto.amount);
+    } catch (err) {
+      if (err instanceof BalanceValidationError) {
+        throw new BadRequestException(err.message, err.code);
+      }
+      throw err;
+    }
+
+    let updatedBalance: { available: string; frozen: string } | null = null;
+
+    try {
+      const result = await this.walletRepo.transaction(async (manager) => {
+        const adjustment = await this.adjustmentRepo.createAdjustment(
+          {
+            adjustmentId,
+            actorUserId,
+            targetUserId: dto.userId,
+            currencyId: dto.currencyId,
+            amount: amount.toString(),
+            type: dto.type,
+            note: dto.note,
+          },
+          manager,
+        );
+
+        const action =
+          dto.type === 'DEPOSIT' ? WalletTransactionAction.CREDIT : WalletTransactionAction.DEBIT;
+
+        const wallet = await this.walletRepo.getOrCreateForUpdate(dto.userId, dto.currencyId, manager);
+
+        const updated = await this.applyDelta(
+          wallet.wallet_id,
+          action === WalletTransactionAction.CREDIT ? amount : amount.negated(),
+          new Decimal(0),
+          manager,
+        );
+
+        updatedBalance = { available: updated.available, frozen: updated.frozen };
+
+        await this.ledgerRepo.createEntry(
+          {
+            userId: dto.userId,
+            currencyId: dto.currencyId,
+            refType: WalletReferenceType.ADJUST,
+            refId: adjustmentId,
+            direction: action === WalletTransactionAction.CREDIT ? 'CREDIT' : 'DEBIT',
+            amount: amount.toString(),
+            balanceAfter: this.balanceCalc.calculateTotal(updated.available, updated.frozen),
+          },
+          manager,
+        );
+
+        this.logger.log(
+          `[AdminAdjust] actor=${actorUserId} type=${dto.type} amount=${dto.amount} target=${dto.userId} currency=${dto.currencyId} adjustmentId=${adjustmentId}`,
+        );
+
+        return adjustment;
+      });
+
+      const balanceSnapshot = updatedBalance as { available: string; frozen: string } | null;
+      if (balanceSnapshot) {
+        const symbol = await this.currencyLookup.getSymbol(dto.currencyId);
+        await this.eventPublisher.publishBalanceChange({
+          userId: dto.userId,
+          currencyId: dto.currencyId,
+          symbol,
+          available: balanceSnapshot.available,
+          frozen: balanceSnapshot.frozen,
+          total: this.balanceCalc.calculateTotal(balanceSnapshot.available, balanceSnapshot.frozen),
+        });
+      }
+
+      return result;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+        throw new ConflictException(
+          'Duplicate transaction reference. Please try again.',
+          'DUPLICATE_LEDGER_ENTRY',
+        );
+      }
+      throw err;
+    }
+  }
+
+  private async applyDelta(
+    walletId: string,
+    deltaAvailable: Decimal,
+    deltaFrozen: Decimal,
+    manager: any,
+  ) {
+    try {
+      return await this.walletRepo.applyBalanceDelta(
+        walletId,
+        deltaAvailable.toString(),
+        deltaFrozen.toString(),
+        manager,
+      );
+    } catch (error: any) {
+      if (error?.message?.includes('Insufficient')) {
+        throw new BusinessException('Insufficient balance', 'INSUFFICIENT_BALANCE');
+      }
+      throw error;
+    }
+  }
+}

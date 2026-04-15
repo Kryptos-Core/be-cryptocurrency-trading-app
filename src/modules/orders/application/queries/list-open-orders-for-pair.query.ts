@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { Order } from '@/entities/order.entity';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { Inject, Injectable } from '@nestjs/common';
+import type { Order } from '@/entities/order.entity';
+import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 
 @Injectable()
 export class ListOpenOrdersForPairQuery {
-  constructor(private readonly orderRepository: OrderRepository) {}
+  constructor(
+    @Inject(ORDER_REPOSITORY)
+    private readonly orderRepository: OrderRepositoryPort,
+  ) {}
 
   execute(userId: string, pairId: string): Promise<Order[]> {
     return this.orderRepository.findOpenByUserPair(userId, pairId);

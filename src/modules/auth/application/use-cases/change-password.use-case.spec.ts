@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, UnauthorizedException } from '@/common/exceptions';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
-import { AuthRepository } from '@/modules/auth/repositories';
+import { AUTH_REPOSITORY } from '@/modules/auth/domain/ports';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { UsersRepository } from '@/modules/users/repositories';
 
@@ -30,7 +30,7 @@ describe('ChangePasswordUseCase', () => {
       providers: [
         ChangePasswordUseCase,
         { provide: UsersRepository, useValue: usersRepository },
-        { provide: AuthRepository, useValue: authRepository },
+        { provide: AUTH_REPOSITORY, useValue: authRepository },
         { provide: TwoFaService, useValue: twoFaService },
         { provide: PASSWORD_HASHER, useValue: passwordHasher },
       ],

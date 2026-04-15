@@ -1,17 +1,22 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException } from '@/common/exceptions';
 import type { Order } from '@/entities/order.entity';
+import { FindAllOrdersAdminQuery } from '@/modules/orders/application/queries/find-all-orders-admin.query';
+import { FindOneOrderQuery } from '@/modules/orders/application/queries/find-one-order.query';
+import { FindOrdersByUserQuery } from '@/modules/orders/application/queries/find-orders-by-user.query';
+import { GetOrderBookQuery } from '@/modules/orders/application/queries/get-order-book.query';
 import { ListOpenOrdersForPairQuery } from '@/modules/orders/application/queries/list-open-orders-for-pair.query';
 import { CancelOrderUseCase } from '@/modules/orders/application/use-cases/cancel-order.use-case';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
 import { OrdersService } from '@/modules/orders/orders.service';
-import { OrderRepository } from '@/modules/orders/repositories';
 
 describe('OrdersService', () => {
   let service: OrdersService;
-  let orderRepository: jest.Mocked<OrderRepository>;
   let createOrderUseCase: jest.Mocked<CreateOrderUseCase>;
   let cancelOrderUseCase: jest.Mocked<CancelOrderUseCase>;
+  let findOneOrderQuery: jest.Mocked<FindOneOrderQuery>;
+  let getOrderBookQuery: jest.Mocked<GetOrderBookQuery>;
+  let findAllOrdersAdminQuery: jest.Mocked<FindAllOrdersAdminQuery>;
+  let findOrdersByUserQuery: jest.Mocked<FindOrdersByUserQuery>;
   let listOpenOrdersForPairQuery: jest.Mocked<ListOpenOrdersForPairQuery>;
 
   const mockOrder = {
@@ -34,36 +39,26 @@ describe('OrdersService', () => {
   } as unknown as Order;
 
   beforeEach(async () => {
-    const mockOrderRepo = {
-      findById: jest.fn(),
-      getOrderBook: jest.fn(),
-      findAllForAdmin: jest.fn(),
-      findByUserForAdmin: jest.fn(),
-    };
-    const mockCreateUseCase = {
-      execute: jest.fn(),
-    };
-    const mockCancelUseCase = {
-      execute: jest.fn(),
-    };
-    const mockListOpenOrdersForPairQuery = {
-      execute: jest.fn(),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
-        { provide: OrderRepository, useValue: mockOrderRepo },
-        { provide: CreateOrderUseCase, useValue: mockCreateUseCase },
-        { provide: CancelOrderUseCase, useValue: mockCancelUseCase },
-        { provide: ListOpenOrdersForPairQuery, useValue: mockListOpenOrdersForPairQuery },
+        { provide: CreateOrderUseCase, useValue: { execute: jest.fn() } },
+        { provide: CancelOrderUseCase, useValue: { execute: jest.fn() } },
+        { provide: FindOneOrderQuery, useValue: { execute: jest.fn() } },
+        { provide: GetOrderBookQuery, useValue: { execute: jest.fn() } },
+        { provide: FindAllOrdersAdminQuery, useValue: { execute: jest.fn() } },
+        { provide: FindOrdersByUserQuery, useValue: { execute: jest.fn() } },
+        { provide: ListOpenOrdersForPairQuery, useValue: { execute: jest.fn() } },
       ],
     }).compile();
 
     service = module.get(OrdersService);
-    orderRepository = module.get(OrderRepository);
     createOrderUseCase = module.get(CreateOrderUseCase);
     cancelOrderUseCase = module.get(CancelOrderUseCase);
+    findOneOrderQuery = module.get(FindOneOrderQuery);
+    getOrderBookQuery = module.get(GetOrderBookQuery);
+    findAllOrdersAdminQuery = module.get(FindAllOrdersAdminQuery);
+    findOrdersByUserQuery = module.get(FindOrdersByUserQuery);
     listOpenOrdersForPairQuery = module.get(ListOpenOrdersForPairQuery);
     jest.clearAllMocks();
   });
@@ -178,16 +173,37 @@ describe('OrdersService', () => {
   });
 
   describe('findOne', () => {
-    it('throws NotFoundException when order not found', async () => {
-      orderRepository.findById.mockResolvedValue(null);
+    it('delegates to FindOneOrderQuery', async () => {
+      findOneOrderQuery.execute.mockResolvedValue(mockOrder);
 
-      await expect(service.findOne('o1', 'u1')).rejects.toBeInstanceOf(NotFoundException);
+      const result = await service.findOne('o1', 'u1');
+
+      expect(findOneOrderQuery.execute).toHaveBeenCalledWith('o1', 'u1');
+      expect(result).toEqual(mockOrder);
     });
+  });
 
-    it('throws ForbiddenException when order belongs to another user', async () => {
-      orderRepository.findById.mockResolvedValue({ ...mockOrder, user_id: 'u2' } as Order);
+  describe('getOrderBook', () => {
+    it('delegates to GetOrderBookQuery', async () => {
+      const bookLevels = [{ price: '50000', remaining: '1.5', order_count: 3 }];
+      getOrderBookQuery.execute.mockResolvedValue(bookLevels);
 
-      await expect(service.findOne('o1', 'u1')).rejects.toBeInstanceOf(ForbiddenException);
+      const result = await service.getOrderBook('p1', 'BUY', 50);
+
+      expect(getOrderBookQuery.execute).toHaveBeenCalledWith('p1', 'BUY', 50);
+      expect(result).toEqual(bookLevels);
+    });
+  });
+
+  describe('findAllForAdmin', () => {
+    it('delegates to FindAllOrdersAdminQuery', async () => {
+      const adminResult = { data: [mockOrder], total: 1, page: 1, limit: 20 };
+      findAllOrdersAdminQuery.execute.mockResolvedValue(adminResult);
+
+      const result = await service.findAllForAdmin({ page: 1, limit: 20 });
+
+      expect(findAllOrdersAdminQuery.execute).toHaveBeenCalledWith({ page: 1, limit: 20 });
+      expect(result).toEqual(adminResult);
     });
   });
 });

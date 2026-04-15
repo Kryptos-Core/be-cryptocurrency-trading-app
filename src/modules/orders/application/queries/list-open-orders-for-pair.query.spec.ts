@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ListOpenOrdersForPairQuery } from '@/modules/orders/application/queries/list-open-orders-for-pair.query';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
 describe('ListOpenOrdersForPairQuery', () => {
   const orderRepository = {
@@ -14,7 +14,7 @@ describe('ListOpenOrdersForPairQuery', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ListOpenOrdersForPairQuery,
-        { provide: OrderRepository, useValue: orderRepository },
+        { provide: ORDER_REPOSITORY, useValue: orderRepository },
       ],
     }).compile();
 

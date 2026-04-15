@@ -1,14 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
 import { MatchingService } from '@/modules/matching/matching.service';
 import { CancelOrderCommand } from '@/modules/orders/commands/cancel-order.command';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 import { canCancelOrder } from '@/modules/orders/states';
 
 @Injectable()
 export class CancelOrderUseCase {
   constructor(
-    private readonly orderRepository: OrderRepository,
+    @Inject(ORDER_REPOSITORY)
+    private readonly orderRepository: OrderRepositoryPort,
     private readonly matchingService: MatchingService,
   ) {}
 

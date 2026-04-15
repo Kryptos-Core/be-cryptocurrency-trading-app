@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
@@ -8,9 +8,9 @@ import { BadRequestException, BusinessException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import type { User } from '@/entities/user.entity';
+import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
 import { UsersRepository } from '@/modules/users/repositories';
-import { AuthRepository } from './repositories';
 
 /** Response for wallet auth (login or register) */
 export interface WalletAuthResult {
@@ -31,7 +31,8 @@ export class WalletAuthService {
   private static readonly AUTH_NONCE_PREFIX = 'wallet:auth:nonce:';
 
   constructor(
-    private readonly authRepository: AuthRepository,
+    @Inject(AUTH_REPOSITORY)
+    private readonly authRepository: AuthRepositoryPort,
     private readonly usersRepository: UsersRepository,
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,

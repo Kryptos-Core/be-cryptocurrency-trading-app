@@ -5,16 +5,17 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MailService } from '@/common/services';
 import { User } from '@/entities/user.entity';
-import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
-import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
-import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import { BcryptPasswordHasherAdapter } from '@/modules/auth/infrastructure/providers/bcrypt-password-hasher.adapter';
+import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
+import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
+import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
+import { AUTH_REPOSITORY } from '@/modules/auth/domain/ports';
+import { AuthRepositoryImpl } from '@/modules/auth/infrastructure/persistence';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { AuthRepository } from './repositories';
 import { JwtStrategy } from './strategies';
 import { TwoFaService } from './two-fa.service';
 import { WalletAuthService } from './wallet-auth.service';
@@ -46,7 +47,6 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     WalletAuthService,
     WalletConnectAuthService,
     TwoFaService,
-    AuthRepository,
     JwtStrategy,
     MailService,
     RegisterUserUseCase,
@@ -57,8 +57,13 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
       provide: PASSWORD_HASHER,
       useExisting: BcryptPasswordHasherAdapter,
     },
+    AuthRepositoryImpl,
+    {
+      provide: AUTH_REPOSITORY,
+      useExisting: AuthRepositoryImpl,
+    },
   ],
   controllers: [AuthController],
-  exports: [AuthService, AuthRepository, TwoFaService, JwtModule, MailService],
+  exports: [AuthService, AUTH_REPOSITORY, TwoFaService, JwtModule, MailService],
 })
 export class AuthModule {}

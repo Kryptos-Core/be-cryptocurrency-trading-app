@@ -1,9 +1,9 @@
 import { randomInt } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
 import { UsersRepository } from '@/modules/users/repositories';
-import { AuthRepository } from './repositories';
+import { AUTH_REPOSITORY, type AuthRepositoryPort } from './domain/ports';
 
 @Injectable()
 export class TwoFaService {
@@ -15,7 +15,8 @@ export class TwoFaService {
     private readonly cacheService: CacheService,
     private readonly mailService: MailService,
     private readonly usersRepository: UsersRepository,
-    private readonly authRepository: AuthRepository,
+    @Inject(AUTH_REPOSITORY)
+    private readonly authRepository: AuthRepositoryPort,
   ) {}
 
   private otpKey(userId: string): string {

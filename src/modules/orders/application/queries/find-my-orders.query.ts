@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { calcSkip } from '@/common/utils/pagination.util';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 
 @Injectable()
 export class FindMyOrdersQuery {
-  constructor(private readonly orderRepository: OrderRepository) {}
+  constructor(
+    @Inject(ORDER_REPOSITORY)
+    private readonly orderRepository: OrderRepositoryPort,
+  ) {}
 
   async execute(userId: string, page: number = 1, limit: number = 20, status?: string) {
     const skip = calcSkip(page, limit);

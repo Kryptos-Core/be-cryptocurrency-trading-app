@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException, BusinessException } from '@/common/exceptions';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
@@ -8,7 +8,7 @@ import { CreateOrderCommand } from '@/modules/orders/commands/create-order.comma
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400;
@@ -18,7 +18,8 @@ export class CreateOrderUseCase {
   private readonly logger = new Logger(CreateOrderUseCase.name);
 
   constructor(
-    private readonly orderRepository: OrderRepository,
+    @Inject(ORDER_REPOSITORY)
+    private readonly orderRepository: OrderRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly validationService: OrderValidationService,
     private readonly matchingQueueService: MatchingQueueService,
