@@ -4,7 +4,7 @@
 
 ```bash
 # Kiểm tra versions
-node --version    # >= 18.x
+node --version # >= 18.x
 npm --version
 docker --version
 docker compose version
@@ -44,7 +44,7 @@ npm run start:dev
 ```bash
 # Health check
 curl http://127.0.0.1:3000/api/v1/health
-# Expected: {"status": "ok"}
+# Expected: {"status":"ok"}
 
 # Swagger docs
 # Mở trình duyệt: http://127.0.0.1:3000/api/docs
@@ -63,22 +63,38 @@ curl http://127.0.0.1:3000/api/v1/health
 ```bash
 npm install -g @anthropic-ai/claude-code
 cd be-cryptocurrency-trading-app
-claude   # Đọc .claude/CLAUDE.md tự động
+claude # Đọc .claude/CLAUDE.md tự động
 ```
 
 ## 5. Cấu trúc Dự án
 
 ```
 src/
-├── modules/        # 23 bounded contexts (auth, orders, matching, ...)
-│   ├── orders/     # ⚠ SENSITIVE — đọc VIBE_CODE.md trước khi sửa
-│   ├── matching/   # ⚠ CRITICAL — Redis lock, circuit breaker, STP
-│   └── ...
-├── common/         # Guards, interceptors, decorators, RBAC
-├── config/         # Env validation (thêm biến mới vào đây)
-├── migrations/     # TypeORM migrations (KHÔNG xóa migration đã chạy)
-└── entities/       # Shared database entities
+├── modules/ # 23 bounded contexts
+│ ├── auth/ # ✓ Clean Architecture: domain/, application/, infrastructure/
+│ ├── orders/ # ✓ Clean Architecture + CQRS (use-cases, queries, commands)
+│ ├── matching/ # ⚠ SENSITIVE — đọc VIBE_CODE.md trước khi sửa
+│ ├── wallets/ # Hybrid: BaseRepository + stored procedures
+│ ├── users/ # Hybrid
+│ └── ...
+├── common/
+│ ├── repositories/ # BaseRepository
+│ ├── services/ # RedisService, CloudinaryService, MailService, …
+│ ├── types/ # TransactionContext (opaque interface)
+│ └── utils/ # Pagination helpers
+├── config/ # Env validation (thêm biến mới vào env.validation.ts)
+├── migrations/ # TypeORM migrations (KHÔNG xóa migration đã chạy)
+└── entities/ # Shared database entities (typed relations ✓)
 ```
+
+### Clean Architecture — 2 module đầu tiên
+
+- **auth**: `domain/ports/`, `application/use-cases/`, `infrastructure/providers/` (JwtTokenIssuerAdapter)
+- **orders**: `domain/ports/`, `application/use-cases/`, `infrastructure/persistence/` (OrderRepositoryImpl)
+
+**Port Pattern:** Domain định nghĩa interface (ví dụ `TokenIssuerPort`). Infrastructure cung cấp implementation (`JwtTokenIssuerAdapter`). Use-case inject qua Symbol token (`TOKEN_ISSUER`). Không bao giờ import implementation trực tiếp vào domain.
+
+**TransactionContext:** Domain dùng `TransactionContext` thay vì `EntityManager`. Infrastructure cast về `EntityManager` qua `toEntityManager()`. Xem: [docs/DATA_ACCESS_PATTERNS.md](../DATA_ACCESS_PATTERNS.md).
 
 ## 6. Module quan trọng cần đọc đầu tiên
 

@@ -19,24 +19,27 @@ Nó cung cấp các hàm generic cho CRUD, phân trang, hỗ trợ transaction v
 - updateMany
 - delete
 - deleteMany
-- hardDelete
 - save
 - saveMany
 - transaction
 - query
+- getRepository
+- getDataSource
+
+**Lưu ý:** `hardDelete` đã được xóa khỏi BaseRepository (cùng logic với `delete`). Nếu cần soft delete, implement riêng trong subclass.
 
 ## Ví dụ cơ bản
 
 ```typescript
 @Injectable()
 export class CurrencyRepository extends BaseRepository<Currency> {
-  constructor(dataSource: DataSource) {
-    super(Currency, dataSource);
-  }
+ constructor(dataSource: DataSource) {
+ super(Currency, dataSource);
+ }
 
-  async findBySymbol(symbol: string) {
-    return this.findOne({ where: { symbol } as any });
-  }
+ async findBySymbol(symbol: string) {
+ return this.findOne({ where: { symbol } as any });
+ }
 }
 ```
 

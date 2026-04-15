@@ -87,7 +87,23 @@ Production: `npm run build` rồi `npm run start:prod`.
 | Health | `GET http://127.0.0.1:3000/api/v1/health` |
 | Swagger | `http://127.0.0.1:3000/api/docs` (thường tắt khi `NODE_ENV=production`) |
 
-## Tài khoản demo sau seed
+## Scripts bổ sung
+
+| Script | Ý nghĩa |
+|--------|----------|
+| `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
+| `npm run test` | Jest unit + integration tests |
+| `npm run test:cov` | Jest với coverage report |
+
+Production: `npm run build` rồi `npm run start:prod`.
+
+## Kiến trúc mã nguồn
+
+Module `auth` và `orders` sử dụng **Clean Architecture**: `domain/` (ports) → `application/` (use-cases, queries) → `infrastructure/` (persistence adapters, providers) → presentation (`orders.controller.ts`, `auth.controller.ts`).
+
+Các module khác (`wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`) dùng hybrid pattern với `BaseRepository`.
+
+Chi tiết: [docs/DATA_ACCESS_PATTERNS.md](docs/DATA_ACCESS_PATTERNS.md).
 
 Seed dùng `src/seed/data/users.json` nếu có; không thì dùng `users.json.example` (copy thành `users.json` và đổi mật khẩu ngoài môi trường dev). Có thể trỏ `SEED_USERS_JSON` sang file khác.
 

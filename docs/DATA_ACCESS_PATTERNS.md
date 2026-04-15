@@ -11,9 +11,34 @@ Tài liệu này mô tả **khi nào** dùng `BaseRepository`, **repository tùy
 | Lựa chọn | Khi nào dùng | Ví dụ trong codebase |
 |----------|----------------|------------------------|
 | **Extend `BaseRepository<T>`** | CRUD / `QueryBuilder` đơn giản trên **một entity**, cần tái sử dụng `findById`, `transaction`, `query`, phân trang | `CurrencyRepository`, `WalletRepository`, `OrderRepository` |
-| **Repository tùy biến (không extend Base)** | Chủ yếu gọi **stored procedure** (`CALL sp_*`) hoặc SQL đặc thù; ít dùng `repository.save` trực tiếp | `UsersRepository`, `AuthRepository`, `MatchingRepository` |
+| **Repository tùy biến (không extend Base)** | Chủ yếu gọi **stored procedure** (`CALL sp_*`) hoặc SQL đặc thù; ít dùng `repository.save` trực tiếp | `UsersRepository`, `AuthRepositoryImpl`, `MatchingRepository` |
 | **Repository class + `DataSource` / `getRepository`** | Đã tách lớp data access nhưng logic không map gọn vào `BaseRepository` (multi-entity transaction, QB phức tạp) | `TreasuryOperationRepository`, `TreasuryTransactionWalletRepository` |
 | **Service + `DataSource` trực tiếp** | Chỉ nên là **tạm thời** hoặc **legacy**; chuẩn dài hạn là đưa xuống repository | Ưu tiên refactor về repository (ví dụ `TreasuryMainWalletRepository`, `ManagedWalletsDataRepository`) |
+
+---
+
+## TransactionContext — Opaque Interface
+
+Domain **không bao giờ import `EntityManager`** trực tiếp. Dùng `TransactionContext` (empty interface):
+
+```typescript
+// src/common/types/transaction-context.ts
+export interface TransactionContext {}
+```
+
+Domain port nhận `TransactionContext`, infrastructure cast về `EntityManager`:
+
+```typescript
+// infrastructure/persistence/wallet-ledger.repository.impl.ts
+function toEntityManager(ctx: TransactionContext): EntityManager {
+ return ctx as unknown as EntityManager;
+}
+
+async createEntry(entry: LedgerEntryInput, ctx?: TransactionContext): Promise<WalletLedger> {
+ const runner = ctx ? toEntityManager(ctx) : this.dataSource;
+ // ...
+}
+```
 
 ---
 
@@ -33,7 +58,7 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 | Module / bounded context | Ghi chú ngắn |
 |--------------------------|--------------|
 | **Orders / Matching** | SP cho khớp lệnh / sổ lệnh; TS gọi qua repository + helper OUT param ([mysql-procedure-out-vars](../src/common/database/mysql-procedure-out-vars.ts)) |
-| **Users / Auth** | Chủ yếu SP + chỗ filter list dùng QueryBuilder (`UsersRepository`) |
+| **Users / Auth** | Chủ yếu SP + chỗ filter list dùng QueryBuilder (`UsersRepository`); Auth dùng **Clean Architecture** (`domain/ports/`, `application/use-cases/`) |
 | **Markets / Currencies / Wallets** | SP + `BaseRepository` tùy endpoint |
 | **Treasury main wallet** | ORM qua `TreasuryMainWalletRepository`; service không `getRepository` |
 | **Managed wallets (deposit UI)** | `ManagedWalletsDataRepository` + `TreasuryTransactionWalletRepository` |
@@ -46,7 +71,7 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 | Vị trí | Khi nào |
 |--------|---------|
 | **Repository** (ưu tiên) | Một aggregate / một nhóm bảng cố định trong module; ví dụ `clearDefaultAndSetMainWallet`, `setDefaultUserDepositInTransaction`. |
-| **Service** (exception) | Orchestration **xuyên** nhiều repository không muốn gom transaction chung vào một “god repository”; phải **ghi rõ trong PR** và đảm bảo không trộn `CALL` + ORM trên hai connection khác nhau. |
+| **Service** (exception) | Orchestration **xuyên** nhiều repository không muốn gom transaction chung vào một "god repository"; phải **ghi rõ trong PR** và đảm bảo không trộn `CALL` + ORM trên hai connection khác nhau. |
 
 ---
 
@@ -90,6 +115,5 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 ## Liên kết
 
-- [DATA_ACCESS_HYBRID_STRATEGY_PLAN.md](./DATA_ACCESS_HYBRID_STRATEGY_PLAN.md) — plan hybrid đầy đủ (kết luận, gap, lộ trình củng cố).
 - [BASE_REPOSITORY_USAGE.md](./BASE_REPOSITORY_USAGE.md) — method list của `BaseRepository`.
 - [REDIS_USAGE.md](./REDIS_USAGE.md) — cache / lock (không thay thế repository, bổ sung cho performance).

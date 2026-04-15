@@ -17,25 +17,64 @@
 
 ### Module Structure
 
+**Clean Architecture** (auth, orders — full layered):
 ```
 src/modules/feature-name/
-├── feature.module.ts
-├── feature.controller.ts       # Thin — chỉ route + auth guard
-├── feature.service.ts          # Business logic
-├── feature.repository.ts       # Data access
+├── domain/
+│ ├── ports/ # Interface — không import infrastructure
+│ │ └── *.port.ts
+│ └── services/ # Domain services, invariants
+│ └── *.service.ts
+├── application/
+│ ├── use-cases/ # Business use-cases (phụ thuộc domain port)
+│ │ └── *.use-case.ts
+│ ├── queries/ # Read-only queries
+│ │ └── *.query.ts
+│ └── ports/ # Abstract port (interface only, no implementation)
+│ └── *.port.ts
+├── infrastructure/
+│ ├── persistence/ # Repository implementations
+│ │ └── *.repository.impl.ts
+│ └── providers/ # External service adapters (JWT, password, etc.)
+│ └── *.adapter.ts
 ├── dto/
-│   ├── create-feature.dto.ts
-│   ├── update-feature.dto.ts
-│   └── feature-response.dto.ts
+│ ├── create-feature.dto.ts
+│ ├── update-feature.dto.ts
+│ └── feature-response.dto.ts
+├── commands/ # Command objects (CQRS pattern)
+│ └── *.command.ts
+├── states/ # State machine (optional)
+│ └── *.state.ts
+├── feature.module.ts
+├── feature.controller.ts # Thin — chỉ route + auth guard
+├── feature.service.ts # Facade — orchestration layer
 └── __tests__/
-    ├── feature.service.spec.ts
-    └── feature.controller.spec.ts
+ ├── feature.service.spec.ts
+ └── feature.controller.spec.ts
+```
+
+**Hybrid pattern** (wallets, users, markets, currencies, deposits, blockchain, treasury, matching):
+```
+src/modules/feature-name/
+├── domain/
+│ └── ports/ # Repository port interfaces
+│ └── *.port.ts
+├── dto/
+│ └── *.dto.ts
+├── infrastructure/
+│ └── persistence/ # BaseRepository subclass + stored procedures
+│ └── *.repository.impl.ts
+├── feature.module.ts
+├── feature.controller.ts
+├── feature.service.ts
+└── __tests__/
+ └── *.spec.ts
 ```
 
 ### Naming
 
 | Loại | Convention | Ví dụ |
-|------|-----------|-------|
+|------|-----------|--------|
 | Classes | PascalCase | `OrdersService`, `CreateOrderDto` |
 | Variables/functions | camelCase | `userId`, `createOrder()` |
 | Constants | UPPER_SNAKE | `MAX_ORDER_RETRIES` |
@@ -49,7 +88,7 @@ src/modules/feature-name/
 async createOrder(userId: string, dto: CreateOrderDto): Promise<Order> {}
 
 // ✓ Enums từ common/enums
-import { OrderStatus, UserRole } from '../../common/enums';
+import { OrderStatus, UserRole } from '@/common/enums';
 
 // ✓ Immutable patterns — không mutate object nhận vào
 const updatedOrder = { ...order, status: OrderStatus.FILLED };
@@ -66,9 +105,9 @@ const data: any = ...; // BAD
 - Database operations: integration test với test DB
 
 ```bash
-npm test                      # Tất cả tests
-npx jest --coverage           # Với coverage report
-npx jest --testPathPattern=orders  # Chỉ orders module
+npm test # Tất cả tests
+npx jest --coverage # Với coverage report
+npx jest --testPathPattern=orders # Chỉ orders module
 ```
 
 ## Database/Migration Rules
