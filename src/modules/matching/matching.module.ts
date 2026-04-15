@@ -10,11 +10,10 @@ import { MATCHING_QUEUE, MatchingQueueService } from './matching-queue.service';
 import { OrderBookService } from './orderbook';
 import { BuyQueueService } from './orderbook/buy-queue.service';
 import { SellQueueService } from './orderbook/sell-queue.service';
-import { MatchingRepository } from './repositories';
+import { MatchingRepository, TradeAuditLogRepository } from './infrastructure/persistence';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
-import { TradeAuditLogRepository } from './visitors/trade-audit-log.repository';
 
 /**
  * Matching Module

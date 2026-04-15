@@ -4,7 +4,8 @@ import { Currency } from '@/entities/currency.entity';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { CurrenciesController } from './currencies.controller';
 import { CurrenciesService } from './currencies.service';
-import { CurrencyRepository } from './repositories';
+import { CURRENCY_REPOSITORY } from './domain/ports';
+import { CurrencyRepository } from './infrastructure/persistence/currency.repository';
 
 /**
  * Currencies Module
@@ -13,8 +14,13 @@ import { CurrencyRepository } from './repositories';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Currency]), forwardRef(() => MarketsModule)],
-  providers: [CurrenciesService, CurrencyRepository],
+  providers: [
+    CurrenciesService,
+    CurrencyRepository,
+    // Port → Adapter binding
+    { provide: CURRENCY_REPOSITORY, useExisting: CurrencyRepository },
+  ],
   controllers: [CurrenciesController],
-  exports: [CurrenciesService, CurrencyRepository], // Export for use in other modules
+  exports: [CurrenciesService, CurrencyRepository, CURRENCY_REPOSITORY],
 })
 export class CurrenciesModule {}

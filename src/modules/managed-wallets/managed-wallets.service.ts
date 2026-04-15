@@ -24,7 +24,7 @@ import {
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
   type TreasuryTransactionWalletRepositoryPort,
 } from '@/modules/treasury/domain/ports';
-import type { TronDepositUiChain } from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
+import type { TronDepositUiChain } from '@/modules/treasury/infrastructure/persistence/treasury-transaction-wallet.repository';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {

@@ -18,10 +18,12 @@ import {
 } from './domain/ports';
 import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
 import { OnchainChainPickerService } from './onchain-chain-picker.service';
-import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
-import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
-import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
-import { TreasuryTransactionWalletRepository } from './repositories/treasury-transaction-wallet.repository';
+import {
+  TreasuryMainWalletRepository,
+  TreasuryOnchainReadRepository,
+  TreasuryOperationRepository,
+  TreasuryTransactionWalletRepository,
+} from './infrastructure/persistence';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { TreasuryController } from './treasury.controller';
 import { TreasuryProcessor } from './treasury.processor';

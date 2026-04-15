@@ -1,1 +1,1 @@
-export * from './currency.repository';
+export { CurrencyRepository } from './currency.repository';
