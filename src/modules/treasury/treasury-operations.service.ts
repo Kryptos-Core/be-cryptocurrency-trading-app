@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bull';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Connection,
@@ -28,9 +28,13 @@ import {
   TREASURY_QUEUE,
   TREASURY_SWEEP_JOB,
 } from './constants';
+import {
+  TREASURY_ONCHAIN_READ_REPOSITORY,
+  TREASURY_OPERATION_REPOSITORY,
+  type TreasuryOnchainReadRepositoryPort,
+  type TreasuryOperationRepositoryPort,
+} from './domain/ports';
 import type { FundWalletDto, ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from './dto';
-import { TreasuryOnchainReadRepository } from './repositories/treasury-onchain-read.repository';
-import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 import {
@@ -55,8 +59,10 @@ export class TreasuryOperationsService {
     private readonly treasuryMainWalletService: TreasuryMainWalletService,
     readonly _configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
-    private readonly treasuryOperationRepository: TreasuryOperationRepository,
-    private readonly treasuryOnchainReadRepository: TreasuryOnchainReadRepository,
+    @Inject(TREASURY_OPERATION_REPOSITORY)
+    private readonly treasuryOperationRepository: TreasuryOperationRepositoryPort,
+    @Inject(TREASURY_ONCHAIN_READ_REPOSITORY)
+    private readonly treasuryOnchainReadRepository: TreasuryOnchainReadRepositoryPort,
     @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: Queue,
   ) {}
 

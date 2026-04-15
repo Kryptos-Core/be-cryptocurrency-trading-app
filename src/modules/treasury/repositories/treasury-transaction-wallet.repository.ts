@@ -3,12 +3,15 @@ import { DataSource, type DeepPartial, type FindOptionsWhere, In } from 'typeorm
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 import { NotFoundException } from '@/common/exceptions';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { TreasuryTransactionWalletRepositoryPort } from '../domain/ports';
 
 export const TRON_DEPOSIT_UI_CHAINS = ['TRON_MAINNET', 'TRON_NILE', 'TRON_SHASTA'] as const;
 export type TronDepositUiChain = (typeof TRON_DEPOSIT_UI_CHAINS)[number];
 
 @Injectable()
-export class TreasuryTransactionWalletRepository {
+export class TreasuryTransactionWalletRepository
+  implements TreasuryTransactionWalletRepositoryPort
+{
   constructor(private readonly dataSource: DataSource) {}
 
   async createAndSave(partial: DeepPartial<TransactionWallet>): Promise<TransactionWallet> {

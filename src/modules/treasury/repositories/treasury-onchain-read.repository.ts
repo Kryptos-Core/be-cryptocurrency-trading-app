@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { TreasuryOnchainReadRepositoryPort } from '../domain/ports';
 import type { ListTreasuryTransactionsDto } from '../dto';
 
 @Injectable()
-export class TreasuryOnchainReadRepository {
+export class TreasuryOnchainReadRepository implements TreasuryOnchainReadRepositoryPort {
   constructor(private readonly dataSource: DataSource) {}
 
   async listFundSweepTransactions(filter: ListTreasuryTransactionsDto): Promise<{

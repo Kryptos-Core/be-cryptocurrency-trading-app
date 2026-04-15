@@ -2,11 +2,11 @@ import { ConfigService } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { RedisService } from '@/common/services';
 import { CircuitBreakerService } from './circuit-breaker.service';
+import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from './domain/ports';
 import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
 import type { OrderBookOrder } from './interfaces';
 import { MatchingService } from './matching.service';
 import { OrderBookService } from './orderbook';
-import { MatchingRepository } from './repositories';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { AuditTradeVisitor } from './visitors/audit-trade.visitor';
@@ -32,7 +32,7 @@ function order(overrides: Partial<OrderBookOrder> & { order_id: string }): Order
 describe('MatchingService', () => {
   let service: MatchingService;
   let orderBookService: OrderBookService;
-  let matchingRepository: jest.Mocked<MatchingRepository>;
+  let matchingRepository: jest.Mocked<MatchingRepositoryPort>;
   let circuitBreaker: jest.Mocked<CircuitBreakerService>;
   let redisClient: { set: jest.Mock; eval: jest.Mock };
 
@@ -47,7 +47,7 @@ describe('MatchingService', () => {
         MatchingService,
         OrderBookService,
         {
-          provide: MatchingRepository,
+          provide: MATCHING_REPOSITORY,
           useValue: {
             getOpenOrdersForPair: jest.fn().mockResolvedValue([]),
             executeTrade: jest.fn().mockResolvedValue({
@@ -82,7 +82,7 @@ describe('MatchingService', () => {
 
     service = module.get(MatchingService);
     orderBookService = module.get(OrderBookService);
-    matchingRepository = module.get(MatchingRepository);
+    matchingRepository = module.get(MATCHING_REPOSITORY);
     circuitBreaker = module.get(CircuitBreakerService);
   });
 

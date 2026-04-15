@@ -10,6 +10,12 @@ import { AuthModule } from '@/modules/auth/auth.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { TREASURY_QUEUE } from './constants';
+import {
+  TREASURY_MAIN_WALLET_REPOSITORY,
+  TREASURY_ONCHAIN_READ_REPOSITORY,
+  TREASURY_OPERATION_REPOSITORY,
+  TREASURY_TRANSACTION_WALLET_REPOSITORY,
+} from './domain/ports';
 import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
 import { OnchainChainPickerService } from './onchain-chain-picker.service';
 import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
@@ -40,10 +46,11 @@ import { TreasuryOperationsService } from './treasury-operations.service';
   controllers: [TreasuryController],
   providers: [
     WalletEncryptionService,
-    TreasuryTransactionWalletRepository,
-    TreasuryMainWalletRepository,
-    TreasuryOperationRepository,
-    TreasuryOnchainReadRepository,
+    // Port → Implementation bindings
+    { provide: TREASURY_TRANSACTION_WALLET_REPOSITORY, useClass: TreasuryTransactionWalletRepository },
+    { provide: TREASURY_MAIN_WALLET_REPOSITORY, useClass: TreasuryMainWalletRepository },
+    { provide: TREASURY_OPERATION_REPOSITORY, useClass: TreasuryOperationRepository },
+    { provide: TREASURY_ONCHAIN_READ_REPOSITORY, useClass: TreasuryOnchainReadRepository },
     TransactionWalletService,
     TreasuryMainWalletService,
     TreasuryOperationsService,
@@ -56,7 +63,7 @@ import { TreasuryOperationsService } from './treasury-operations.service';
     TreasuryMainWalletService,
     TreasuryOperationsService,
     OnchainChainPickerService,
-    TreasuryTransactionWalletRepository,
+    TREASURY_TRANSACTION_WALLET_REPOSITORY,
   ],
 })
 export class TreasuryModule {}

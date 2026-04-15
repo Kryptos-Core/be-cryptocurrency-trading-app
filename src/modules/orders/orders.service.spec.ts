@@ -159,11 +159,14 @@ describe('OrdersService', () => {
         mockOrder,
         { ...mockOrder, order_id: 'o2' } as Order,
       ]);
-      cancelOrderUseCase.execute.mockImplementation(async ({ orderId }) => ({
-        ...mockOrder,
-        order_id: orderId,
-        status: 'CANCELLED',
-      }) as Order);
+      cancelOrderUseCase.execute.mockImplementation(
+        async ({ orderId }) =>
+          ({
+            ...mockOrder,
+            order_id: orderId,
+            status: 'CANCELLED',
+          }) as Order,
+      );
 
       const result = await service.cancelOpenOrdersForPair('u1', 'p1');
 

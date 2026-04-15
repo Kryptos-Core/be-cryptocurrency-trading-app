@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Connection,
@@ -29,11 +29,15 @@ import { CacheService, RedisService, WalletEncryptionService } from '@/common/se
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import {
+  TREASURY_OPERATION_REPOSITORY,
+  TREASURY_TRANSACTION_WALLET_REPOSITORY,
+  type TreasuryOperationRepositoryPort,
+  type TreasuryTransactionWalletRepositoryPort,
+} from './domain/ports';
 import type { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
-import { TreasuryOperationRepository } from './repositories/treasury-operation.repository';
 import {
   TRON_DEPOSIT_UI_CHAINS,
-  TreasuryTransactionWalletRepository,
   type TronDepositUiChain,
 } from './repositories/treasury-transaction-wallet.repository';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
@@ -81,8 +85,10 @@ export class TransactionWalletService {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepository,
-    private readonly treasuryOperationRepository: TreasuryOperationRepository,
+    @Inject(TREASURY_TRANSACTION_WALLET_REPOSITORY)
+    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepositoryPort,
+    @Inject(TREASURY_OPERATION_REPOSITORY)
+    private readonly treasuryOperationRepository: TreasuryOperationRepositoryPort,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,

@@ -13,10 +13,7 @@ describe('FindMyOrdersQuery', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        FindMyOrdersQuery,
-        { provide: ORDER_REPOSITORY, useValue: orderRepository },
-      ],
+      providers: [FindMyOrdersQuery, { provide: ORDER_REPOSITORY, useValue: orderRepository }],
     }).compile();
 
     query = moduleRef.get(FindMyOrdersQuery);

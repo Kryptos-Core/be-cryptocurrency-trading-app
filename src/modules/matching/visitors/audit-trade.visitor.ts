@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  TRADE_AUDIT_LOG_REPOSITORY,
+  type TradeAuditLogRepositoryPort,
+} from '../domain/ports';
 import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
-import { TradeAuditLogRepository } from './trade-audit-log.repository';
 
 /**
  * Visitor Pattern: Audit log visitor for trade execution results.
@@ -11,7 +14,10 @@ import { TradeAuditLogRepository } from './trade-audit-log.repository';
 export class AuditTradeVisitor implements ITradeResultVisitor {
   private readonly logger = new Logger(AuditTradeVisitor.name);
 
-  constructor(private readonly auditLogRepository: TradeAuditLogRepository) {}
+  constructor(
+    @Inject(TRADE_AUDIT_LOG_REPOSITORY)
+    private readonly auditLogRepository: TradeAuditLogRepositoryPort,
+  ) {}
 
   async visit(trade: TradeExecutionResult): Promise<void> {
     try {

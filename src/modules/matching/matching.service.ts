@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
 import { CircuitBreakerService } from './circuit-breaker.service';
+import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from './domain/ports';
 import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
 import type {
   MatchingContext,
@@ -12,7 +13,6 @@ import type {
   TradeExecutor,
 } from './interfaces';
 import { OrderBookService } from './orderbook';
-import { MatchingRepository } from './repositories';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from './utils';
@@ -62,7 +62,8 @@ export class MatchingService implements OnModuleInit {
 
   constructor(
     private readonly orderBookService: OrderBookService,
-    private readonly matchingRepository: MatchingRepository,
+    @Inject(MATCHING_REPOSITORY)
+    private readonly matchingRepository: MatchingRepositoryPort,
     private readonly priceTimeStrategy: PriceTimePriorityStrategy,
     private readonly marketOrderStrategy: MarketOrderStrategy,
     private readonly redisService: RedisService,

@@ -4,10 +4,10 @@ import { ORDER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names
 import { BaseRepository } from '@/common/repositories';
 import { Order } from '@/entities/order.entity';
 import type {
-  OrderRepositoryPort,
-  OrderBookLevel,
-  CreateOrderProcedureResult,
   CancelOrderProcedureResult,
+  CreateOrderProcedureResult,
+  OrderBookLevel,
+  OrderRepositoryPort,
 } from '@/modules/orders/domain/ports';
 
 /**

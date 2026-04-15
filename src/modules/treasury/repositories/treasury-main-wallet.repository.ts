@@ -4,13 +4,14 @@ import {
   TreasuryMainWallet,
   type TreasuryMainWalletChain,
 } from '@/entities/treasury-main-wallet.entity';
+import type { TreasuryMainWalletRepositoryPort } from '../domain/ports';
 
 /**
  * Persistence for treasury main wallets — keeps TypeORM usage out of TreasuryMainWalletService.
- * @see docs/DATA_ACCESS_PATTERNS.md
+ * Implements TreasuryMainWalletRepositoryPort for DIP compliance.
  */
 @Injectable()
-export class TreasuryMainWalletRepository {
+export class TreasuryMainWalletRepository implements TreasuryMainWalletRepositoryPort {
   constructor(private readonly dataSource: DataSource) {}
 
   private repo() {

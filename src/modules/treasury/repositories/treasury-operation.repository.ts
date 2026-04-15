@@ -5,12 +5,13 @@ import { calcSkip } from '@/common/utils/pagination.util';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
+import type { TreasuryOperationRepositoryPort } from '../domain/ports';
 import type { ListTreasuryOperationsDto } from '../dto';
 
 type TreasuryOperationType = 'SWEEP' | 'FUND';
 
 @Injectable()
-export class TreasuryOperationRepository {
+export class TreasuryOperationRepository implements TreasuryOperationRepositoryPort {
   constructor(private readonly dataSource: DataSource) {}
 
   async createPendingOperation(params: {

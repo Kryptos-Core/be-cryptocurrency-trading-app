@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { TRADE_AUDIT_LOG_REPOSITORY, type TradeAuditLogRepositoryPort } from '../domain/ports';
 import type { TradeExecutionResult } from '../interfaces';
 import { AuditTradeVisitor } from './audit-trade.visitor';
-import { TradeAuditLogRepository } from './trade-audit-log.repository';
 
 function makeTradeResult(overrides: Partial<TradeExecutionResult> = {}): TradeExecutionResult {
   return {
@@ -21,7 +21,7 @@ function makeTradeResult(overrides: Partial<TradeExecutionResult> = {}): TradeEx
 
 describe('AuditTradeVisitor', () => {
   let visitor: AuditTradeVisitor;
-  let auditRepo: jest.Mocked<TradeAuditLogRepository>;
+  let auditRepo: jest.Mocked<TradeAuditLogRepositoryPort>;
 
   beforeEach(async () => {
     auditRepo = {
@@ -29,7 +29,7 @@ describe('AuditTradeVisitor', () => {
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AuditTradeVisitor, { provide: TradeAuditLogRepository, useValue: auditRepo }],
+      providers: [AuditTradeVisitor, { provide: TRADE_AUDIT_LOG_REPOSITORY, useValue: auditRepo }],
     }).compile();
 
     visitor = module.get(AuditTradeVisitor);

@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { ethers } from 'ethers';
@@ -25,8 +25,11 @@ import type {
 } from '@/entities/treasury-main-wallet.entity';
 import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import {
+  TREASURY_MAIN_WALLET_REPOSITORY,
+  type TreasuryMainWalletRepositoryPort,
+} from './domain/ports';
 import type { ImportMainWalletDto } from './dto';
-import { TreasuryMainWalletRepository } from './repositories/treasury-main-wallet.repository';
 import { TransactionWalletService } from './transaction-wallet.service';
 
 export type SupportedTreasuryChain = TreasuryMainWalletChain;
@@ -60,7 +63,8 @@ export class TreasuryMainWalletService implements OnModuleInit {
   private readonly logger = new Logger(TreasuryMainWalletService.name);
 
   constructor(
-    private readonly mainWalletRepository: TreasuryMainWalletRepository,
+    @Inject(TREASURY_MAIN_WALLET_REPOSITORY)
+    private readonly mainWalletRepository: TreasuryMainWalletRepositoryPort,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly redisService: RedisService,
     private readonly paymentConfigService: PaymentConfigService,

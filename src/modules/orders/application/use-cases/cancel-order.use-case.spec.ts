@@ -46,8 +46,20 @@ describe('CancelOrderUseCase', () => {
 
   it('cancels and reloads the updated order', async () => {
     orderRepository.findById
-      .mockResolvedValueOnce({ order_id: 'o1', user_id: 'u1', pair_id: 'p1', side: 'BUY', status: 'OPEN' })
-      .mockResolvedValueOnce({ order_id: 'o1', user_id: 'u1', pair_id: 'p1', side: 'BUY', status: 'CANCELLED' });
+      .mockResolvedValueOnce({
+        order_id: 'o1',
+        user_id: 'u1',
+        pair_id: 'p1',
+        side: 'BUY',
+        status: 'OPEN',
+      })
+      .mockResolvedValueOnce({
+        order_id: 'o1',
+        user_id: 'u1',
+        pair_id: 'p1',
+        side: 'BUY',
+        status: 'CANCELLED',
+      });
     orderRepository.cancelOrderViaProcedure.mockResolvedValue({ cancelled: 1, error_code: null });
 
     const result = await useCase.execute({ userId: 'u1', orderId: 'o1' } as any);

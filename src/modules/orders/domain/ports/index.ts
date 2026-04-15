@@ -1,7 +1,7 @@
 export {
-  ORDER_REPOSITORY,
-  type OrderRepositoryPort,
-  type OrderBookLevel,
-  type CreateOrderProcedureResult,
   type CancelOrderProcedureResult,
+  type CreateOrderProcedureResult,
+  ORDER_REPOSITORY,
+  type OrderBookLevel,
+  type OrderRepositoryPort,
 } from './order-repository.port';

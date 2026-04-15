@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, UnauthorizedException } from '@/common/exceptions';
-import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
+import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import type { ChangePasswordDto } from '@/modules/auth/dto';
 import { TwoFaService } from '@/modules/auth/two-fa.service';

@@ -45,17 +45,9 @@ export interface OrderRepositoryPort {
     marketBuyReservedQuote: string | null;
   }): Promise<CreateOrderProcedureResult>;
 
-  cancelOrderViaProcedure(
-    orderId: string,
-    userId: string,
-  ): Promise<CancelOrderProcedureResult>;
+  cancelOrderViaProcedure(orderId: string, userId: string): Promise<CancelOrderProcedureResult>;
 
-  findByUser(
-    userId: string,
-    status: string | null,
-    skip: number,
-    limit: number,
-  ): Promise<Order[]>;
+  findByUser(userId: string, status: string | null, skip: number, limit: number): Promise<Order[]>;
 
   countByUser(userId: string, status: string | null): Promise<number>;
 

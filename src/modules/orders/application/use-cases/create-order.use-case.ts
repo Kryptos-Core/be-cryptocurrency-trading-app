@@ -1,14 +1,14 @@
-import { ForbiddenException, NotFoundException, BusinessException } from '@/common/exceptions';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
 import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
-import { CreateOrderCommand } from '@/modules/orders/commands/create-order.command';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
+import { CreateOrderCommand } from '@/modules/orders/commands/create-order.command';
+import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
-import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400;
@@ -43,7 +43,7 @@ export class CreateOrderUseCase {
     }
 
     const { pair, availableQuote, availableBase } =
-        await this.prepareCreateOrderContextService.execute(userId, dto.pairId);
+      await this.prepareCreateOrderContextService.execute(userId, dto.pairId);
 
     const bestLimitSellPrice =
       dto.type === 'MARKET' && dto.side === 'BUY'
@@ -88,7 +88,12 @@ export class CreateOrderUseCase {
       this.throwFromProcedureError('ORDER_NOT_FOUND');
     }
 
-    await this.enqueueMatching(order!, pair.quote_currency_id, pair.maker_fee_rate, pair.taker_fee_rate);
+    await this.enqueueMatching(
+      order!,
+      pair.quote_currency_id,
+      pair.maker_fee_rate,
+      pair.taker_fee_rate,
+    );
     await this.cacheService.set(cacheKey, this.orderToPlain(order!), IDEMPOTENCY_TTL_SEC);
     return order!;
   }

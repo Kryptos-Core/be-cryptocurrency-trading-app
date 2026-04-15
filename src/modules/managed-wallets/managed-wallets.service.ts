@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { TronWeb } from 'tronweb';
 import { uuidv7 } from 'uuidv7';
@@ -21,9 +21,10 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
 import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
 import {
-  TreasuryTransactionWalletRepository,
-  type TronDepositUiChain,
-} from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
+  TREASURY_TRANSACTION_WALLET_REPOSITORY,
+  type TreasuryTransactionWalletRepositoryPort,
+} from '@/modules/treasury/domain/ports';
+import type { TronDepositUiChain } from '@/modules/treasury/repositories/treasury-transaction-wallet.repository';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
@@ -66,7 +67,8 @@ export class ManagedWalletsService {
 
   constructor(
     private readonly managedWalletsDataRepository: ManagedWalletsDataRepository,
-    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepository,
+    @Inject(TREASURY_TRANSACTION_WALLET_REPOSITORY)
+    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepositoryPort,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly transactionWalletService: TransactionWalletService,
     private readonly systemConfigService: SystemConfigService,

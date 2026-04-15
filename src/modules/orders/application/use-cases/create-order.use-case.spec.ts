@@ -1,12 +1,12 @@
 import { Test } from '@nestjs/testing';
-import { CacheService } from '@/common/services';
 import { BusinessException, NotFoundException } from '@/common/exceptions';
+import { CacheService } from '@/common/services';
 import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
-import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
+import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
-import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
 describe('CreateOrderUseCase', () => {
   const orderRepository = {
@@ -145,7 +145,14 @@ describe('CreateOrderUseCase', () => {
     await expect(
       useCase.execute({
         userId: 'u1',
-        dto: { pairId: 'p1', side: 'BUY', type: 'LIMIT', price: '100', amount: '1', idempotencyKey: 'same-key' },
+        dto: {
+          pairId: 'p1',
+          side: 'BUY',
+          type: 'LIMIT',
+          price: '100',
+          amount: '1',
+          idempotencyKey: 'same-key',
+        },
       } as any),
     ).rejects.toBeInstanceOf(BusinessException);
   });
@@ -173,7 +180,14 @@ describe('CreateOrderUseCase', () => {
     await expect(
       useCase.execute({
         userId: 'u1',
-        dto: { pairId: 'p1', side: 'BUY', type: 'LIMIT', price: '100', amount: '1', idempotencyKey: 'same-key' },
+        dto: {
+          pairId: 'p1',
+          side: 'BUY',
+          type: 'LIMIT',
+          price: '100',
+          amount: '1',
+          idempotencyKey: 'same-key',
+        },
       } as any),
     ).rejects.toBeInstanceOf(NotFoundException);
   });

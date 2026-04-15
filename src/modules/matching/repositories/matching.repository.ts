@@ -2,20 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { MATCHING_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { selectMysqlUserVars } from '@/common/database/mysql-procedure-out-vars';
+import type { MatchingRepositoryPort, TradeExecuteResult } from '../domain/ports';
 import type { OrderBookOrder } from '../interfaces';
-
-export interface TradeExecuteResult {
-  trade_id: string | null;
-  error_code: string | null;
-  error_message: string | null;
-}
 
 /**
  * Matching Repository (Database Procedure Pattern)
+ * Infrastructure implementation of MatchingRepositoryPort.
  * sp_orders_open_for_pair, sp_trade_execute
  */
 @Injectable()
-export class MatchingRepository {
+export class MatchingRepository implements MatchingRepositoryPort {
   private readonly logger = new Logger(MatchingRepository.name);
 
   constructor(private readonly dataSource: DataSource) {}
