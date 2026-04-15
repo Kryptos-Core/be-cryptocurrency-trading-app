@@ -12,7 +12,7 @@ import bs58 from 'bs58';
 import Decimal from 'decimal.js';
 import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
-import { DataSource, type FindOptionsWhere } from 'typeorm';
+import { type FindOptionsWhere } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
@@ -27,11 +27,12 @@ import {
 } from '@/common/exceptions';
 import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
+  TREASURY_MAIN_WALLET_REPOSITORY,
   TREASURY_OPERATION_REPOSITORY,
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
+  type TreasuryMainWalletRepositoryPort,
   type TreasuryOperationRepositoryPort,
   type TreasuryTransactionWalletRepositoryPort,
 } from './domain/ports';
@@ -84,11 +85,12 @@ export class TransactionWalletService {
   private readonly logger = new Logger(TransactionWalletService.name);
 
   constructor(
-    private readonly dataSource: DataSource,
     @Inject(TREASURY_TRANSACTION_WALLET_REPOSITORY)
     private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepositoryPort,
     @Inject(TREASURY_OPERATION_REPOSITORY)
     private readonly treasuryOperationRepository: TreasuryOperationRepositoryPort,
+    @Inject(TREASURY_MAIN_WALLET_REPOSITORY)
+    private readonly treasuryMainWalletRepo: TreasuryMainWalletRepositoryPort,
     private readonly walletEncryptionService: WalletEncryptionService,
     private readonly cacheService: CacheService,
     private readonly redisService: RedisService,
@@ -358,14 +360,11 @@ export class TransactionWalletService {
 
   /**
    * Resolve the private key for the active default main wallet on a given chain.
-   * Reads directly from treasury_main_wallets table to avoid circular dependency
+   * Uses TreasuryMainWalletRepositoryPort (injected as port) to avoid circular dependency
    * with TreasuryMainWalletService (which injects TransactionWalletService for balance queries).
    */
   async resolveMainWalletPrivateKey(chain: SupportedTreasuryChain): Promise<string> {
-    const repo = this.dataSource.getRepository(TreasuryMainWallet);
-    const wallet = await repo.findOne({
-      where: { chain, is_default: true, status: 'ACTIVE' } as any,
-    });
+    const wallet = await this.treasuryMainWalletRepo.findActiveDefaultOnChain(chain as any);
     if (!wallet) {
       throw new BusinessException(
         `No active default main wallet configured for chain ${chain}. ` +

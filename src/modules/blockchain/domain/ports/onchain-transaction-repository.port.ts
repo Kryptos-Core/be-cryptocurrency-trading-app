@@ -71,6 +71,29 @@ export interface OnchainTransactionRepositoryPort {
   /** Cập nhật thông tin credit sau khi ví được nạp thành công. */
   updateCreditInfo(txId: string, creditTxId: string, creditedAt: Date): Promise<void>;
 
+  /** Tìm transaction theo txId (không cần userId — dùng cho internal/admin flow). */
+  findById(txId: string): Promise<OnchainTransaction | null>;
+
+  /** Cập nhật thông tin quy đổi (credited_currency_id, credited_amount, conversion_rate). */
+  updateCreditConversion(
+    txId: string,
+    creditCurrencyId: string,
+    creditAmount: string,
+    conversionRate: string,
+  ): Promise<void>;
+
+  /** Cập nhật sau khi admin approve manual withdrawal (gán txHash, fromAddress, status). */
+  updateAfterManualApproval(
+    txId: string,
+    txHash: string | null,
+    fromAddress: string,
+    status: string,
+    confirmedAt: Date | null,
+  ): Promise<void>;
+
+  /** Tìm pending withdrawal chưa có txHash (manual review queue). */
+  findPendingManualWithdrawals(limit: number): Promise<OnchainTransaction[]>;
+
   // ─── Read-model queries (cho OnchainTransferQueryService) ─────────────
 
   /** Lấy lịch sử giao dịch on-chain của user (read-model, không có pagination đầy đủ) */

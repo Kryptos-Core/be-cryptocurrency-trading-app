@@ -39,6 +39,27 @@ import { WalletConnectController } from './wallet-connect/wallet-connect.control
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
 import { WalletLinkingService } from './wallet-linking.service';
+import {
+  RequestLinkWalletUseCase,
+  VerifyLinkWalletUseCase,
+  UnlinkWalletUseCase,
+  SubmitDepositUseCase,
+  PreviewDepositUseCase,
+  SettleDepositUseCase,
+  RequestWithdrawalUseCase,
+  ApproveWithdrawalUseCase,
+  RejectWithdrawalUseCase,
+  ProcessPendingWithdrawalsUseCase,
+} from './application/use-cases';
+import {
+  GetLinkedWalletsQuery,
+  GetLinkedWalletBalanceQuery,
+  GetTransactionsQuery,
+  GetTransactionByIdQuery,
+  GetAdminWithdrawalsQuery,
+  GetAdminWithdrawalByIdQuery,
+  GetAdminWithdrawalStatsQuery,
+} from './application/queries';
 
 /**
  * Blockchain Module — Tron / Solana / EVM (mainnet + sandbox chains).
@@ -160,6 +181,27 @@ import { WalletLinkingService } from './wallet-linking.service';
     OnchainTransferService,
     WalletConnectSessionManager,
     WalletConnectService,
+
+    // ─── Application: Use Cases ──────────────────────────────────────────
+    RequestLinkWalletUseCase,
+    VerifyLinkWalletUseCase,
+    UnlinkWalletUseCase,
+    SubmitDepositUseCase,
+    PreviewDepositUseCase,
+    SettleDepositUseCase,
+    RequestWithdrawalUseCase,
+    ApproveWithdrawalUseCase,
+    RejectWithdrawalUseCase,
+    ProcessPendingWithdrawalsUseCase,
+
+    // ─── Application: Queries ────────────────────────────────────────────
+    GetLinkedWalletsQuery,
+    GetLinkedWalletBalanceQuery,
+    GetTransactionsQuery,
+    GetTransactionByIdQuery,
+    GetAdminWithdrawalsQuery,
+    GetAdminWithdrawalByIdQuery,
+    GetAdminWithdrawalStatsQuery,
   ],
   exports: [
     BlockchainProviderFactory,

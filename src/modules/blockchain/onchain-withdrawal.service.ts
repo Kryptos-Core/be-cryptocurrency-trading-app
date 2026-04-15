@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import {
@@ -17,6 +16,10 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import {
+  ONCHAIN_TRANSACTION_REPOSITORY,
+  type OnchainTransactionRepositoryPort,
+} from './domain/ports';
 import type { RequestWithdrawalDto } from './dto';
 import { WalletLinkingService } from './wallet-linking.service';
 
@@ -30,7 +33,8 @@ export class OnchainWithdrawalService {
   private static readonly WITHDRAWAL_IDEM_TTL = 24 * 60 * 60; // 24 giờ
 
   constructor(
-    private readonly dataSource: DataSource,
+    @Inject(ONCHAIN_TRANSACTION_REPOSITORY)
+    private readonly onchainTxRepo: OnchainTransactionRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly walletLinkingService: WalletLinkingService,
@@ -282,21 +286,18 @@ export class OnchainWithdrawalService {
     if (!shouldAutoSend) {
       const payout = await this.resolveWithdrawalPayout(dto.chain);
 
-      await this.dataSource.query(
-        `INSERT INTO onchain_transactions
-         (tx_id, user_id, linked_wallet_id, chain, type, tx_hash, from_address, to_address, amount, status)
-         VALUES (?, ?, ?, ?, 'WITHDRAWAL', NULL, ?, ?, ?, ?)`,
-        [
-          txId,
-          userId,
-          dto.linkedWalletId,
-          dto.chain,
-          payout.fromAddress,
-          linkedWallet.address,
-          amount.toString(),
-          OnchainTxStatus.PENDING,
-        ],
-      );
+      await this.onchainTxRepo.create({
+        tx_id: txId,
+        user_id: userId,
+        linked_wallet_id: dto.linkedWalletId,
+        chain: dto.chain,
+        type: 'WITHDRAWAL',
+        tx_hash: undefined,
+        from_address: payout.fromAddress,
+        to_address: linkedWallet.address,
+        amount: amount.toString() as any,
+        status: OnchainTxStatus.PENDING as any,
+      });
 
       const manualResult = {
         txId,
@@ -341,7 +342,6 @@ export class OnchainWithdrawalService {
     } catch (error) {
       this.logger.error(`[Withdrawal] Gửi on-chain thất bại cho userId=${userId}:`, error);
       status = OnchainTxStatus.FAILED;
-      // Trong thực tế, có thể cần cơ chế bù tiền hoặc thông báo cho admin ở đây
       this.treasuryAlert('withdraw.request.send_failed', {
         userId,
         txId,
@@ -360,22 +360,18 @@ export class OnchainWithdrawalService {
       status === OnchainTxStatus.CONFIRMING,
     );
 
-    await this.dataSource.query(
-      `INSERT INTO onchain_transactions
-       (tx_id, user_id, linked_wallet_id, chain, type, tx_hash, from_address, to_address, amount, status)
-       VALUES (?, ?, ?, ?, 'WITHDRAWAL', ?, ?, ?, ?, ?)`,
-      [
-        txId,
-        userId,
-        dto.linkedWalletId,
-        dto.chain,
-        txHash,
-        payout.fromAddress,
-        linkedWallet.address,
-        amount.toString(),
-        status,
-      ],
-    );
+    await this.onchainTxRepo.create({
+      tx_id: txId,
+      user_id: userId,
+      linked_wallet_id: dto.linkedWalletId,
+      chain: dto.chain,
+      type: 'WITHDRAWAL',
+      tx_hash: txHash ?? undefined,
+      from_address: payout.fromAddress,
+      to_address: linkedWallet.address,
+      amount: amount.toString() as any,
+      status: status as any,
+    });
 
     // Cache trạng thái để FE poll nhanh
     await this.cacheService.set(
@@ -427,14 +423,7 @@ export class OnchainWithdrawalService {
       txId,
     });
 
-    const rows = await this.dataSource.query(
-      `SELECT tx_id, user_id, chain, type, tx_hash, from_address, to_address, amount, status
-       FROM onchain_transactions
-       WHERE tx_id = ?
-       LIMIT 1`,
-      [txId],
-    );
-    const tx = rows?.[0];
+    const tx = await this.onchainTxRepo.findById(txId);
     if (!tx || tx.type !== 'WITHDRAWAL') {
       throw new BadRequestException('Yêu cầu rút tiền không tồn tại', 'WITHDRAWAL_NOT_FOUND');
     }
@@ -491,18 +480,12 @@ export class OnchainWithdrawalService {
       status === OnchainTxStatus.CONFIRMING,
     );
 
-    await this.dataSource.query(
-      `UPDATE onchain_transactions
-       SET tx_hash = ?, from_address = ?, status = ?, confirmations = ?, confirmed_at = ?
-       WHERE tx_id = ?`,
-      [
-        txHash,
-        payout.fromAddress,
-        status,
-        status === OnchainTxStatus.CONFIRMING ? 0 : 0,
-        null,
-        txId,
-      ],
+    await this.onchainTxRepo.updateAfterManualApproval(
+      txId,
+      txHash,
+      payout.fromAddress,
+      status,
+      null,
     );
 
     const result = {
@@ -562,14 +545,7 @@ export class OnchainWithdrawalService {
       reason: reason || null,
     });
 
-    const rows = await this.dataSource.query(
-      `SELECT tx_id, user_id, chain, type, tx_hash, amount, status
-       FROM onchain_transactions
-       WHERE tx_id = ?
-       LIMIT 1`,
-      [txId],
-    );
-    const tx = rows?.[0];
+    const tx = await this.onchainTxRepo.findById(txId);
     if (!tx || tx.type !== 'WITHDRAWAL') {
       throw new BadRequestException('Yêu cầu rút tiền không tồn tại', 'WITHDRAWAL_NOT_FOUND');
     }
@@ -592,12 +568,7 @@ export class OnchainWithdrawalService {
     const currencyId = await this.resolveWithdrawalCurrencyId(tx.chain as BlockchainNetwork);
     await this.settleWithdrawalLedger(txId, tx.user_id, currencyId, amount, false);
 
-    await this.dataSource.query(
-      `UPDATE onchain_transactions
-       SET status = ?, confirmed_at = ?
-       WHERE tx_id = ?`,
-      [OnchainTxStatus.FAILED, null, txId],
-    );
+    await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.FAILED);
 
     this.logger.log(
       `[Withdrawal-ManualReject] txId=${txId}, actor=${actorUserId}, reason=${reason || 'N/A'}`,
@@ -658,21 +629,13 @@ export class OnchainWithdrawalService {
     failed: number;
     items: Array<{ txId: string; status: string }>;
   }> {
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
-    const rows = await this.dataSource.query(
-      `SELECT tx_id
-       FROM onchain_transactions
-       WHERE type = 'WITHDRAWAL' AND status = 'PENDING' AND tx_hash IS NULL
-       ORDER BY created_at ASC
-       LIMIT ?`,
-      [safeLimit],
-    );
+    const txList = await this.onchainTxRepo.findPendingManualWithdrawals(limit);
 
     const items: Array<{ txId: string; status: string }> = [];
     let success = 0;
     let failed = 0;
 
-    for (const row of rows || []) {
+    for (const row of txList) {
       try {
         const result = await this.approveManualWithdrawal(actorUserId, String(row.tx_id));
         items.push({ txId: result.txId, status: result.status });
@@ -691,7 +654,7 @@ export class OnchainWithdrawalService {
     }
 
     return {
-      processed: (rows || []).length,
+      processed: txList.length,
       success,
       failed,
       items,

@@ -104,6 +104,54 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     );
   }
 
+  async findById(txId: string): Promise<OnchainTransaction | null> {
+    return this.dataSource.getRepository(OnchainTransaction).findOne({
+      where: { tx_id: txId },
+    });
+  }
+
+  async updateCreditConversion(
+    txId: string,
+    creditCurrencyId: string,
+    creditAmount: string,
+    conversionRate: string,
+  ): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE onchain_transactions
+       SET credited_currency_id = ?, credited_amount = ?, conversion_rate = ?
+       WHERE tx_id = ?`,
+      [creditCurrencyId, creditAmount, conversionRate, txId],
+    );
+  }
+
+  async updateAfterManualApproval(
+    txId: string,
+    txHash: string | null,
+    fromAddress: string,
+    status: string,
+    confirmedAt: Date | null,
+  ): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE onchain_transactions
+       SET tx_hash = ?, from_address = ?, status = ?, confirmations = 0, confirmed_at = ?
+       WHERE tx_id = ?`,
+      [txHash, fromAddress, status, confirmedAt, txId],
+    );
+  }
+
+  async findPendingManualWithdrawals(limit: number): Promise<OnchainTransaction[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.dataSource.query(
+      `SELECT *
+       FROM onchain_transactions
+       WHERE type = 'WITHDRAWAL' AND status = 'PENDING' AND tx_hash IS NULL
+       ORDER BY created_at ASC
+       LIMIT ?`,
+      [safeLimit],
+    );
+    return rows || [];
+  }
+
   // ─── Read-model queries ─────────────────────────────────────────────────
 
   async listByUser(userId: string, limit: number): Promise<OnchainTxRowDto[]> {

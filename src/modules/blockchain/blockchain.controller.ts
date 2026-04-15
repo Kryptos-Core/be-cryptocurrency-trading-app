@@ -11,7 +11,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { DataSource } from 'typeorm';
 import {
   ApiBadRequestResponse,
   ApiSuccessResponse,
@@ -25,6 +24,27 @@ import { BlockchainNetwork, Permission } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
+import {
+  GetLinkedWalletsQuery,
+  GetLinkedWalletBalanceQuery,
+  GetTransactionsQuery,
+  GetTransactionByIdQuery,
+  GetAdminWithdrawalsQuery,
+  GetAdminWithdrawalByIdQuery,
+  GetAdminWithdrawalStatsQuery,
+} from './application/queries';
+import {
+  RequestLinkWalletUseCase,
+  VerifyLinkWalletUseCase,
+  UnlinkWalletUseCase,
+  PreviewDepositUseCase,
+  SubmitDepositUseCase,
+  SettleDepositUseCase,
+  RequestWithdrawalUseCase,
+  ApproveWithdrawalUseCase,
+  RejectWithdrawalUseCase,
+  ProcessPendingWithdrawalsUseCase,
+} from './application/use-cases';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import type {
   ManualWithdrawalActionDto,
@@ -33,12 +53,10 @@ import type {
   SubmitDepositDto,
   VerifyLinkDto,
 } from './dto';
-import { OnchainTransferService } from './onchain-transfer.service';
-import { WalletLinkingService } from './wallet-linking.service';
 
 /**
  * Blockchain Controller
- * Endpoints cho liên kết ví, nạp/rút tiền on-chain
+ * Thin HTTP layer — delegates to application use-cases and queries.
  */
 @ApiTags('blockchain')
 @ApiBearerAuth('JWT-auth')
@@ -46,11 +64,28 @@ import { WalletLinkingService } from './wallet-linking.service';
 @UseGuards(JwtAuthGuard)
 export class BlockchainController {
   constructor(
-    private readonly walletLinkingService: WalletLinkingService,
-    private readonly onchainTransferService: OnchainTransferService,
+    // ─── Use Cases ─────────────────────────────────────────────────────
+    private readonly requestLinkWallet: RequestLinkWalletUseCase,
+    private readonly verifyLinkWallet: VerifyLinkWalletUseCase,
+    private readonly unlinkWalletUc: UnlinkWalletUseCase,
+    private readonly previewDeposit: PreviewDepositUseCase,
+    private readonly submitDepositUc: SubmitDepositUseCase,
+    private readonly settleDepositUc: SettleDepositUseCase,
+    private readonly requestWithdrawal: RequestWithdrawalUseCase,
+    private readonly approveWithdrawal: ApproveWithdrawalUseCase,
+    private readonly rejectWithdrawal: RejectWithdrawalUseCase,
+    private readonly processPendingWithdrawals: ProcessPendingWithdrawalsUseCase,
+    // ─── Queries ───────────────────────────────────────────────────────
+    private readonly getLinkedWalletsQuery: GetLinkedWalletsQuery,
+    private readonly getLinkedWalletBalanceQuery: GetLinkedWalletBalanceQuery,
+    private readonly getTransactionsQuery: GetTransactionsQuery,
+    private readonly getTransactionByIdQuery: GetTransactionByIdQuery,
+    private readonly getAdminWithdrawalsQuery: GetAdminWithdrawalsQuery,
+    private readonly getAdminWithdrawalByIdQuery: GetAdminWithdrawalByIdQuery,
+    private readonly getAdminWithdrawalStatsQuery: GetAdminWithdrawalStatsQuery,
+    // ─── Infrastructure ────────────────────────────────────────────────
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly managedWalletsService: ManagedWalletsService,
-    readonly _dataSource: DataSource,
   ) {}
 
   // ============ WALLET LINKING ============
@@ -69,7 +104,7 @@ export class BlockchainController {
   @ApiBadRequestResponse('Địa chỉ ví không hợp lệ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async requestLink(@CurrentUser('userId') userId: string, @Body() dto: RequestLinkDto) {
-    return this.walletLinkingService.requestLink(userId, dto);
+    return this.requestLinkWallet.execute(userId, dto);
   }
 
   /**
@@ -85,7 +120,7 @@ export class BlockchainController {
   @ApiBadRequestResponse('Chữ ký không hợp lệ hoặc nonce hết hạn')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async verifyLink(@CurrentUser('userId') userId: string, @Body() dto: VerifyLinkDto) {
-    return this.walletLinkingService.verifyLink(userId, dto);
+    return this.verifyLinkWallet.execute(userId, dto);
   }
 
   /**
@@ -100,7 +135,7 @@ export class BlockchainController {
   @ApiSuccessResponse('Danh sách ví liên kết')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getLinkedWallets(@CurrentUser('userId') userId: string) {
-    return this.walletLinkingService.getLinkedWallets(userId);
+    return this.getLinkedWalletsQuery.execute(userId);
   }
 
   /**
@@ -120,7 +155,7 @@ export class BlockchainController {
     @CurrentUser('userId') userId: string,
     @Param('linkId') linkId: string,
   ) {
-    return this.walletLinkingService.getLinkedWalletBalance(userId, linkId);
+    return this.getLinkedWalletBalanceQuery.execute(userId, linkId);
   }
 
   /**
@@ -137,7 +172,7 @@ export class BlockchainController {
   @ApiBadRequestResponse('Ví liên kết không tìm thấy')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async unlinkWallet(@CurrentUser('userId') userId: string, @Param('linkId') linkId: string) {
-    return this.walletLinkingService.unlinkWallet(userId, linkId);
+    return this.unlinkWalletUc.execute(userId, linkId);
   }
 
   // ============ NẠP / RÚT TIỀN ============
@@ -208,7 +243,7 @@ export class BlockchainController {
   @ApiSuccessResponse('Thông tin preview giao dịch nạp')
   @ApiBadRequestResponse('Thiếu chain/txHash hoặc txHash không hợp lệ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async previewDeposit(
+  async previewDepositTx(
     @CurrentUser('userId') userId: string,
     @Query('chain') chain?: string,
     @Query('txHash') txHash?: string,
@@ -221,7 +256,7 @@ export class BlockchainController {
     }
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
-    return this.onchainTransferService.previewDepositTx(userId, normalizedChain, txHash);
+    return this.previewDeposit.execute(userId, normalizedChain, txHash);
   }
 
   /**
@@ -238,7 +273,7 @@ export class BlockchainController {
   @ApiBadRequestResponse('TxHash không hợp lệ hoặc giao dịch lỗi')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async submitDeposit(@CurrentUser('userId') userId: string, @Body() dto: SubmitDepositDto) {
-    return this.onchainTransferService.submitDeposit(userId, dto);
+    return this.submitDepositUc.execute(userId, dto);
   }
 
   /**
@@ -255,7 +290,7 @@ export class BlockchainController {
   @ApiBadRequestResponse('Giao dịch nạp không hợp lệ hoặc chưa confirm')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async settleDeposit(@CurrentUser('userId') userId: string, @Param('txId') txId: string) {
-    return this.onchainTransferService.settleDepositByTxId(userId, txId);
+    return this.settleDepositUc.execute(userId, txId);
   }
 
   /**
@@ -270,11 +305,11 @@ export class BlockchainController {
   @ApiSuccessResponse('Yêu cầu rút tiền đã tiếp nhận')
   @ApiBadRequestResponse('Ví chưa xác minh hoặc balance không đủ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
-  async requestWithdrawal(
+  async requestWithdrawalEndpoint(
     @CurrentUser('userId') userId: string,
     @Body() dto: RequestWithdrawalDto,
   ) {
-    return this.onchainTransferService.requestWithdrawal(userId, dto);
+    return this.requestWithdrawal.execute(userId, dto);
   }
 
   /**
@@ -299,7 +334,7 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() _dto: ManualWithdrawalActionDto,
   ) {
-    return this.onchainTransferService.approveManualWithdrawal(actorUserId, txId);
+    return this.approveWithdrawal.execute(actorUserId, txId);
   }
 
   /**
@@ -323,7 +358,7 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() dto: ManualWithdrawalActionDto,
   ) {
-    return this.onchainTransferService.rejectManualWithdrawal(actorUserId, txId, dto.reason);
+    return this.rejectWithdrawal.execute(actorUserId, txId, dto.reason);
   }
 
   /**
@@ -347,7 +382,7 @@ export class BlockchainController {
     @Query('limit') limit?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.onchainTransferService.processPendingManualWithdrawals(actorUserId, parsedLimit);
+    return this.processPendingWithdrawals.execute(actorUserId, parsedLimit);
   }
 
   // ============ LỊCH SỬ GIAO DỊCH ============
@@ -366,7 +401,7 @@ export class BlockchainController {
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getTransactions(@CurrentUser('userId') userId: string, @Query('limit') limit?: string) {
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
-    return this.onchainTransferService.getTransactions(userId, parsedLimit);
+    return this.getTransactionsQuery.execute(userId, parsedLimit);
   }
 
   /**
@@ -383,7 +418,7 @@ export class BlockchainController {
   @ApiBadRequestResponse('Giao dịch không tìm thấy')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getTransaction(@CurrentUser('userId') userId: string, @Param('txId') txId: string) {
-    return this.onchainTransferService.getTransactionById(userId, txId);
+    return this.getTransactionByIdQuery.execute(userId, txId);
   }
 
   // ============ ADMIN ============
@@ -401,7 +436,7 @@ export class BlockchainController {
     description: 'Pending count and total amount by chain.',
   })
   async getAdminWithdrawalStats() {
-    return this.onchainTransferService.getAdminWithdrawalStats();
+    return this.getAdminWithdrawalStatsQuery.execute();
   }
 
   /**
@@ -418,7 +453,7 @@ export class BlockchainController {
   })
   @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền' })
   async getAdminWithdrawalDetail(@Param('txId') txId: string) {
-    return this.onchainTransferService.getAdminWithdrawalById(txId);
+    return this.getAdminWithdrawalByIdQuery.execute(txId);
   }
 
   /**
@@ -460,7 +495,7 @@ export class BlockchainController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
-    return this.onchainTransferService.getAdminWithdrawals({
+    return this.getAdminWithdrawalsQuery.execute({
       userId,
       status,
       chain,
