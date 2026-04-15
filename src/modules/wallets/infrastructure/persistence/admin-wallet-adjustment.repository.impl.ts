@@ -2,12 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { AdminWalletAdjustment } from '@/entities/admin-wallet-adjustment.entity';
 import type { AdminAdjustWalletResponseDto } from '@/modules/wallets/dto/admin-adjust-wallet.dto';
 import type {
   AdminAdjustmentRepositoryPort,
   CreateAdjustmentParams,
 } from '@/modules/wallets/domain/ports';
+
+function toEntityManager(ctx: TransactionContext): EntityManager {
+  return ctx as unknown as EntityManager;
+}
 
 /**
  * Infrastructure: Admin Wallet Adjustment Repository (TypeORM + stored procedures)
@@ -24,9 +29,10 @@ export class AdminWalletAdjustmentRepositoryImpl
 
   async createAdjustment(
     params: CreateAdjustmentParams,
-    manager?: EntityManager,
+    ctx?: TransactionContext,
   ): Promise<AdminAdjustWalletResponseDto> {
-    const result = await (manager ?? this.dataSource).query(
+    const runner = ctx ? toEntityManager(ctx) : this.dataSource;
+    const result = await runner.query(
       `CALL ${ADMIN_WALLET_ADJUSTMENT_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
       [
         params.adjustmentId,

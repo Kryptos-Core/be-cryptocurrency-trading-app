@@ -1,4 +1,4 @@
-import type { EntityManager } from 'typeorm';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { AdminAdjustWalletResponseDto } from '@/modules/wallets/dto/admin-adjust-wallet.dto';
 
 export interface CreateAdjustmentParams {
@@ -18,7 +18,7 @@ export interface CreateAdjustmentParams {
 export interface AdminAdjustmentRepositoryPort {
   createAdjustment(
     params: CreateAdjustmentParams,
-    manager?: EntityManager,
+    ctx?: TransactionContext,
   ): Promise<AdminAdjustWalletResponseDto>;
 
   findByTarget(

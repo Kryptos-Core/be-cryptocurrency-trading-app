@@ -1,4 +1,4 @@
-import type { EntityManager } from 'typeorm';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { Order } from '@/entities/order.entity';
 
 export interface OrderBookLevel {
@@ -69,7 +69,7 @@ export interface OrderRepositoryPort {
   findOpenByUserPair(userId: string, pairId: string): Promise<Order[]>;
 
   /** Transactional helper (from BaseRepository) */
-  transaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T>;
+  transaction<T>(work: (ctx: TransactionContext) => Promise<T>): Promise<T>;
 }
 
 export const ORDER_REPOSITORY = Symbol('ORDER_REPOSITORY');

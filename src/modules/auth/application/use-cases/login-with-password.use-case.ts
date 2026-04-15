@@ -1,9 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { BusinessException, UnauthorizedException } from '@/common/exceptions';
 import type { User } from '@/entities/user.entity';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
+import type { TokenIssuerPort } from '@/modules/auth/application/ports/token-issuer.port';
+import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
 import type { LoginDto } from '@/modules/auth/dto';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import { buildAuthAccessTokenPayload, sanitizeAuthUser } from './shared/auth-response.util';
@@ -15,7 +16,8 @@ export class LoginWithPasswordUseCase {
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: UsersRepositoryPort,
-    private readonly jwtService: JwtService,
+    @Inject(TOKEN_ISSUER)
+    private readonly tokenIssuer: TokenIssuerPort,
     @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,
   ) {}
@@ -40,7 +42,7 @@ export class LoginWithPasswordUseCase {
     this.logger.log(`User logged in: ${email}`);
 
     return {
-      accessToken: this.jwtService.sign(buildAuthAccessTokenPayload(user)),
+      accessToken: this.tokenIssuer.sign(buildAuthAccessTokenPayload(user)),
       user: sanitizeAuthUser(user),
     };
   }

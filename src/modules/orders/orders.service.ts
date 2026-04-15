@@ -8,9 +8,9 @@ import { GetOrderBookQuery } from '@/modules/orders/application/queries/get-orde
 import { ListOpenOrdersForPairQuery } from '@/modules/orders/application/queries/list-open-orders-for-pair.query';
 import { CancelOrderUseCase } from '@/modules/orders/application/use-cases/cancel-order.use-case';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
-import type { CancelOrderCommand } from './commands/cancel-order.command';
-import type { CreateOrderCommand } from './commands/create-order.command';
-import type { CancelBatchOrderDto, CreateBatchOrderDto } from './dto';
+import { CancelOrderCommand } from './commands/cancel-order.command';
+import { CreateOrderCommand } from './commands/create-order.command';
+import type { CancelBatchOrderDto, CreateBatchOrderDto, CreateOrderDto } from './dto';
 
 const MAX_BATCH_ORDERS = 20;
 
@@ -30,12 +30,14 @@ export class OrdersService {
     private readonly listOpenOrdersForPairQuery: ListOpenOrdersForPairQuery,
   ) {}
 
-  create(command: CreateOrderCommand): Promise<Order> {
-    return this.createOrderUseCase.execute(command as any);
+  create(input: { userId: string; dto: CreateOrderDto }): Promise<Order> {
+    return this.createOrderUseCase.execute(new CreateOrderCommand(input.userId, input.dto));
   }
 
-  cancel(command: CancelOrderCommand): Promise<Order> {
-    return this.cancelOrderUseCase.execute(command as any);
+  cancel(input: { userId: string; orderId: string; idempotencyKey?: string }): Promise<Order> {
+    return this.cancelOrderUseCase.execute(
+      new CancelOrderCommand(input.userId, input.orderId, input.idempotencyKey),
+    );
   }
 
   async createBatch(command: { userId: string; dto: CreateBatchOrderDto }): Promise<{
@@ -51,7 +53,7 @@ export class OrdersService {
     }
 
     const created = await Promise.all(
-      dto.orders.map((orderDto) => this.create({ userId, dto: orderDto } as any)),
+      dto.orders.map((orderDto) => this.create({ userId, dto: orderDto })),
     );
 
     return { created, count: created.length };
@@ -71,7 +73,7 @@ export class OrdersService {
 
     const cancelled = await Promise.all(
       dto.orderIds.map((orderId) =>
-        this.cancel({ userId, orderId, idempotencyKey: dto.idempotencyKey } as any),
+        this.cancel({ userId, orderId, idempotencyKey: dto.idempotencyKey }),
       ),
     );
 
@@ -88,7 +90,7 @@ export class OrdersService {
       return [];
     }
     return Promise.all(
-      openOrders.map((order) => this.cancel({ userId, orderId: order.order_id } as any)),
+      openOrders.map((order) => this.cancel({ userId, orderId: order.order_id })),
     );
   }
 

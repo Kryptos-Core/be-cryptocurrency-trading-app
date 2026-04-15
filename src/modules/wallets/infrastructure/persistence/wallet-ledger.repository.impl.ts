@@ -2,8 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { WALLET_LEDGER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
 import type { LedgerEntryInput, WalletLedgerRepositoryPort } from '@/modules/wallets/domain/ports';
+
+function toEntityManager(ctx: TransactionContext): EntityManager {
+  return ctx as unknown as EntityManager;
+}
 
 /**
  * Infrastructure: Wallet Ledger Repository (TypeORM + stored procedures)
@@ -18,8 +23,8 @@ export class WalletLedgerRepositoryImpl
     super(WalletLedger, dataSource);
   }
 
-  async createEntry(entry: LedgerEntryInput, manager?: EntityManager): Promise<WalletLedger> {
-    const runner = manager ?? this.dataSource;
+  async createEntry(entry: LedgerEntryInput, ctx?: TransactionContext): Promise<WalletLedger> {
+    const runner = ctx ? toEntityManager(ctx) : this.dataSource;
     const result = await runner.query(
       `CALL ${WALLET_LEDGER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -67,10 +72,10 @@ export class WalletLedgerRepositoryImpl
 
   async createDoubleEntry(
     base: Omit<LedgerEntryInput, 'direction'>,
-    manager?: EntityManager,
+    ctx?: TransactionContext,
   ): Promise<[WalletLedger, WalletLedger]> {
-    const credit = await this.createEntry({ ...base, direction: 'CREDIT' }, manager);
-    const debit = await this.createEntry({ ...base, direction: 'DEBIT' }, manager);
+    const credit = await this.createEntry({ ...base, direction: 'CREDIT' }, ctx);
+    const debit = await this.createEntry({ ...base, direction: 'DEBIT' }, ctx);
     return [credit, debit];
   }
 }

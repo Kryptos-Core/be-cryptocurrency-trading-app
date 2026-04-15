@@ -7,6 +7,8 @@ import { GetOrderBookQuery } from '@/modules/orders/application/queries/get-orde
 import { ListOpenOrdersForPairQuery } from '@/modules/orders/application/queries/list-open-orders-for-pair.query';
 import { CancelOrderUseCase } from '@/modules/orders/application/use-cases/cancel-order.use-case';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
+import { CancelOrderCommand } from '@/modules/orders/commands/cancel-order.command';
+import { CreateOrderCommand } from '@/modules/orders/commands/create-order.command';
 import { OrdersService } from '@/modules/orders/orders.service';
 
 describe('OrdersService', () => {
@@ -64,36 +66,32 @@ describe('OrdersService', () => {
   });
 
   describe('create', () => {
-    it('delegates to CreateOrderUseCase', async () => {
-      const command = {
-        userId: 'u1',
-        dto: {
-          pairId: 'p1',
-          side: 'BUY',
-          type: 'LIMIT',
-          price: '50000',
-          amount: '0.01',
-          idempotencyKey: 'key-1',
-        },
-      } as any;
+    it('delegates to CreateOrderUseCase with a CreateOrderCommand', async () => {
+      const dto = {
+        pairId: 'p1',
+        side: 'BUY' as const,
+        type: 'LIMIT' as const,
+        price: '50000',
+        amount: '0.01',
+        idempotencyKey: 'key-1',
+      };
       createOrderUseCase.execute.mockResolvedValue(mockOrder);
 
-      const result = await service.create(command);
+      const result = await service.create({ userId: 'u1', dto });
 
-      expect(createOrderUseCase.execute).toHaveBeenCalledWith(command);
+      expect(createOrderUseCase.execute).toHaveBeenCalledWith(new CreateOrderCommand('u1', dto));
       expect(result).toEqual(mockOrder);
     });
   });
 
   describe('cancel', () => {
-    it('delegates to CancelOrderUseCase', async () => {
+    it('delegates to CancelOrderUseCase with a CancelOrderCommand', async () => {
       const cancelled = { ...mockOrder, status: 'CANCELLED' } as Order;
-      const command = { userId: 'u1', orderId: 'o1' } as any;
       cancelOrderUseCase.execute.mockResolvedValue(cancelled);
 
-      const result = await service.cancel(command);
+      const result = await service.cancel({ userId: 'u1', orderId: 'o1' });
 
-      expect(cancelOrderUseCase.execute).toHaveBeenCalledWith(command);
+      expect(cancelOrderUseCase.execute).toHaveBeenCalledWith(new CancelOrderCommand('u1', 'o1', undefined));
       expect(result.status).toBe('CANCELLED');
     });
   });
@@ -107,23 +105,23 @@ describe('OrdersService', () => {
           orders: [
             {
               pairId: 'p1',
-              side: 'BUY',
-              type: 'LIMIT',
+              side: 'BUY' as const,
+              type: 'LIMIT' as const,
               price: '50000',
               amount: '0.01',
               idempotencyKey: 'k1',
             },
             {
               pairId: 'p1',
-              side: 'SELL',
-              type: 'LIMIT',
+              side: 'SELL' as const,
+              type: 'LIMIT' as const,
               price: '51000',
               amount: '0.01',
               idempotencyKey: 'k2',
             },
           ],
         },
-      } as any;
+      };
 
       const result = await service.createBatch(command);
 

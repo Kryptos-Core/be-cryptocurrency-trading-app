@@ -1,12 +1,9 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CloudinaryService } from '@/common/services';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import { Order } from '@/entities/order.entity';
 import { User } from '@/entities/user.entity';
 import { AuthModule } from '@/modules/auth/auth.module';
-import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { OrdersModule } from '@/modules/orders/orders.module';
 import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 import { UsersRepository } from '@/modules/users/infrastructure/persistence';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
@@ -16,8 +13,9 @@ import { UsersService } from './users.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, OnchainTransaction, Order]),
+    TypeOrmModule.forFeature([User]),
     forwardRef(() => AuthModule),
+    forwardRef(() => OrdersModule),
     WalletsModule,
   ],
   providers: [
@@ -28,11 +26,6 @@ import { UsersService } from './users.service';
       useExisting: UsersRepository,
     },
     CloudinaryService,
-    OrderRepository,
-    {
-      provide: ORDER_REPOSITORY,
-      useExisting: OrderRepository,
-    },
     ContactEmailVerificationService,
   ],
   controllers: [UsersController],

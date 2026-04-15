@@ -440,7 +440,7 @@ export class UsersController {
   }
 
   /**
-   * Update user by ID (Admin only - TODO: Add role guard)
+   * Update user by ID (Admin only)
    * PATCH /users/:id
    */
   @Patch(':id')
@@ -519,7 +519,7 @@ export class UsersController {
   }
 
   /**
-   * Delete user (Admin only - TODO: Add role guard)
+   * Delete user (Admin only)
    * DELETE /users/:id
    */
   @Delete(':id')

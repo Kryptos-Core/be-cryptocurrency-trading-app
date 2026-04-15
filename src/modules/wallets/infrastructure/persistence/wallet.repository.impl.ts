@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { WALLET_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Wallet } from '@/entities/wallet.entity';
 import type { WalletRepositoryPort } from '@/modules/wallets/domain/ports';
+
+function toEntityManager(ctx: TransactionContext): EntityManager {
+  return ctx as unknown as EntityManager;
+}
 
 /**
  * Infrastructure: Wallet Repository (TypeORM + stored procedures)
@@ -40,9 +45,10 @@ export class WalletRepositoryImpl extends BaseRepository<Wallet> implements Wall
   async findByUserCurrency(
     userId: string,
     currencyId: string,
-    manager?: EntityManager,
+    ctx?: TransactionContext,
   ): Promise<Wallet | null> {
-    const result = await (manager ?? this.dataSource).query(
+    const runner = ctx ? toEntityManager(ctx) : this.dataSource;
+    const result = await runner.query(
       `CALL ${WALLET_STORE_PROCEDURE.FIND_BY_USER_CURRENCY}(?, ?)`,
       [userId, currencyId],
     );
@@ -54,8 +60,9 @@ export class WalletRepositoryImpl extends BaseRepository<Wallet> implements Wall
   async getOrCreateForUpdate(
     userId: string,
     currencyId: string,
-    manager: EntityManager,
+    ctx: TransactionContext,
   ): Promise<Wallet> {
+    const manager = toEntityManager(ctx);
     const rows = await manager.query(
       `SELECT wallet_id, user_id, currency_id, available, frozen, updated_at
        FROM wallets WHERE user_id = ? AND currency_id = ? LIMIT 1 FOR UPDATE`,
@@ -91,8 +98,9 @@ export class WalletRepositoryImpl extends BaseRepository<Wallet> implements Wall
     walletId: string,
     deltaAvailable: string,
     deltaFrozen: string,
-    manager: EntityManager,
+    ctx: TransactionContext,
   ): Promise<Wallet> {
+    const manager = toEntityManager(ctx);
     const result = await manager.query(
       `CALL ${WALLET_STORE_PROCEDURE.APPLY_BALANCE_DELTA}(?, ?, ?)`,
       [walletId, deltaAvailable, deltaFrozen],

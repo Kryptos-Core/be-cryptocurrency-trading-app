@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { BusinessException, UnauthorizedException } from '@/common/exceptions';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
+import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
 import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 
 describe('LoginWithPasswordUseCase', () => {
   const usersRepository = {
@@ -13,7 +13,7 @@ describe('LoginWithPasswordUseCase', () => {
     hash: jest.fn(),
     compare: jest.fn(),
   };
-  const jwtService = {
+  const tokenIssuer = {
     sign: jest.fn(),
   };
 
@@ -25,8 +25,8 @@ describe('LoginWithPasswordUseCase', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         LoginWithPasswordUseCase,
-        { provide: UsersRepository, useValue: usersRepository },
-        { provide: JwtService, useValue: jwtService },
+        { provide: USERS_REPOSITORY, useValue: usersRepository },
+        { provide: TOKEN_ISSUER, useValue: tokenIssuer },
         { provide: PASSWORD_HASHER, useValue: passwordHasher },
       ],
     }).compile();
@@ -46,7 +46,7 @@ describe('LoginWithPasswordUseCase', () => {
       two_fa_secret: '2fa',
     });
     passwordHasher.compare.mockResolvedValue(true);
-    jwtService.sign.mockReturnValue('jwt-token');
+    tokenIssuer.sign.mockReturnValue('jwt-token');
 
     const result = await useCase.execute({
       email: 'john@example.com',

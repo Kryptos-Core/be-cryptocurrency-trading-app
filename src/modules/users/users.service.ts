@@ -1,11 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { User } from '@/entities/user.entity';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
@@ -39,7 +38,6 @@ export class UsersService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly twoFaService: TwoFaService,
     private readonly walletsService: WalletsService,
-    private readonly dataSource: DataSource,
     @Inject(ORDER_REPOSITORY)
     private readonly orderRepository: OrderRepositoryPort,
   ) {}
@@ -71,14 +69,11 @@ export class UsersService {
   ): Promise<{ items: OnchainTransaction[]; total: number; page: number; limit: number }> {
     await this.findOne(userId);
     const skip = calcSkip(page, limit);
-    const [items, total] = await this.dataSource
-      .getRepository(OnchainTransaction)
-      .createQueryBuilder('tx')
-      .where('tx.user_id = :userId', { userId })
-      .orderBy('tx.created_at', 'DESC')
-      .skip(skip)
-      .take(limit)
-      .getManyAndCount();
+    const { items, total } = await this.usersRepository.findOnchainTransactionsByUser(
+      userId,
+      skip,
+      limit,
+    );
     return { items, total, page, limit };
   }
 

@@ -1,17 +1,17 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
 import type { User } from '@/entities/user.entity';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
-import { OrderRepository } from '@/modules/orders/repositories';
+import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { WalletsService } from '@/modules/wallets/wallets.service';
+import { USERS_REPOSITORY } from './domain/ports';
 import type {
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
   UpdateMyProfileBasicDto,
 } from './dto';
-import { UsersRepository } from './repositories';
+import { UsersRepository } from './infrastructure/persistence';
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
@@ -59,11 +59,11 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: UsersRepository, useValue: mockRepo },
+        { provide: USERS_REPOSITORY, useValue: mockRepo },
         { provide: CloudinaryService, useValue: mockCloudinary },
         { provide: TwoFaService, useValue: mockTwoFa },
         { provide: WalletsService, useValue: {} },
-        { provide: DataSource, useValue: {} },
-        { provide: OrderRepository, useValue: {} },
+        { provide: ORDER_REPOSITORY, useValue: {} },
       ],
     }).compile();
 

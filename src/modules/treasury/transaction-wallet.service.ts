@@ -40,7 +40,7 @@ import type { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
 import {
   TRON_DEPOSIT_UI_CHAINS,
   type TronDepositUiChain,
-} from './repositories/treasury-transaction-wallet.repository';
+} from './infrastructure/persistence/treasury-transaction-wallet.repository';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 
 const LIST_CACHE_TTL_SECONDS = 60;
@@ -386,7 +386,9 @@ export class TransactionWalletService {
     return this.treasuryTransactionWalletRepository.findForDepositConfiguration();
   }
 
-  async getDefaultUserDepositWallet(chain: BlockchainChainDbValue): Promise<TransactionWallet | null> {
+  async getDefaultUserDepositWallet(
+    chain: BlockchainChainDbValue,
+  ): Promise<TransactionWallet | null> {
     return this.treasuryTransactionWalletRepository.findDefaultUserDepositWallet(chain);
   }
 

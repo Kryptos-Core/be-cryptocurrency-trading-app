@@ -1,6 +1,13 @@
 import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
+import { Deposit } from './deposit.entity';
+import { LinkedWallet } from './linked-wallet.entity';
 import { ManagedWallet } from './managed-wallet.entity';
+import { OnchainTransaction } from './onchain-transaction.entity';
+import { Order } from './order.entity';
 import { TreasuryOperation } from './treasury-operation.entity';
+import { Wallet } from './wallet.entity';
+import { WalletLedger } from './wallet-ledger.entity';
+import { Withdrawal } from './withdrawal.entity';
 
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
@@ -61,25 +68,25 @@ export class User {
   created_at!: Date;
 
   @OneToMany('Wallet', 'user')
-  wallets!: any[];
+  wallets!: Wallet[];
 
   @OneToMany('Order', 'user')
-  orders!: any[];
+  orders!: Order[];
 
   @OneToMany('Deposit', 'user')
-  deposits!: any[];
+  deposits!: Deposit[];
 
   @OneToMany('Withdrawal', 'user')
-  withdrawals!: any[];
+  withdrawals!: Withdrawal[];
 
   @OneToMany('WalletLedger', 'user')
-  wallet_ledgers!: any[];
+  wallet_ledgers!: WalletLedger[];
 
   @OneToMany('LinkedWallet', 'user')
-  linked_wallets!: any[];
+  linked_wallets!: LinkedWallet[];
 
   @OneToMany('OnchainTransaction', 'user')
-  onchain_transactions!: any[];
+  onchain_transactions!: OnchainTransaction[];
 
   @OneToMany(
     () => ManagedWallet,

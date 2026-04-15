@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { ConflictException } from '@/common/exceptions';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
+import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
 import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 
 describe('RegisterUserUseCase', () => {
   const usersRepository = {
@@ -14,7 +14,7 @@ describe('RegisterUserUseCase', () => {
     hash: jest.fn(),
     compare: jest.fn(),
   };
-  const jwtService = {
+  const tokenIssuer = {
     sign: jest.fn(),
   };
 
@@ -26,8 +26,8 @@ describe('RegisterUserUseCase', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         RegisterUserUseCase,
-        { provide: UsersRepository, useValue: usersRepository },
-        { provide: JwtService, useValue: jwtService },
+        { provide: USERS_REPOSITORY, useValue: usersRepository },
+        { provide: TOKEN_ISSUER, useValue: tokenIssuer },
         { provide: PASSWORD_HASHER, useValue: passwordHasher },
       ],
     }).compile();
@@ -50,7 +50,7 @@ describe('RegisterUserUseCase', () => {
       password_hash: 'secret',
       two_fa_secret: '2fa',
     });
-    jwtService.sign.mockReturnValue('jwt-token');
+    tokenIssuer.sign.mockReturnValue('jwt-token');
 
     const result = await useCase.execute({
       email: 'john@example.com',

@@ -1,4 +1,4 @@
-import type { EntityManager } from 'typeorm';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { Wallet } from '@/entities/wallet.entity';
 
 /**
@@ -15,25 +15,25 @@ export interface WalletRepositoryPort {
   findByUserCurrency(
     userId: string,
     currencyId: string,
-    manager?: EntityManager,
+    ctx?: TransactionContext,
   ): Promise<Wallet | null>;
 
   getOrCreateForUpdate(
     userId: string,
     currencyId: string,
-    manager: EntityManager,
+    ctx: TransactionContext,
   ): Promise<Wallet>;
 
   applyBalanceDelta(
     walletId: string,
     deltaAvailable: string,
     deltaFrozen: string,
-    manager: EntityManager,
+    ctx: TransactionContext,
   ): Promise<Wallet>;
 
   findWalletPairs(limit: number): Promise<Array<{ userId: string; currencyId: string }>>;
 
-  transaction<R>(fn: (manager: EntityManager) => Promise<R>): Promise<R>;
+  transaction<R>(fn: (ctx: TransactionContext) => Promise<R>): Promise<R>;
 }
 
 export const WALLET_REPOSITORY = Symbol('WALLET_REPOSITORY');

@@ -5,6 +5,7 @@ import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-res
 import { UserRole } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
+import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { User } from '@/entities/user.entity';
 import type { UserFilterDto } from '@/modules/users/dto/user-filter.dto';
 
@@ -141,6 +142,25 @@ export class UsersRepository {
     );
     const total = Number(countResult[0]?.total ?? 0);
     return { items: rows ?? [], total };
+  }
+
+  /**
+   * Find paginated onchain transactions for a specific user (admin view)
+   */
+  async findOnchainTransactionsByUser(
+    userId: string,
+    skip: number,
+    limit: number,
+  ): Promise<{ items: OnchainTransaction[]; total: number }> {
+    const [items, total] = await this.dataSource
+      .getRepository(OnchainTransaction)
+      .createQueryBuilder('tx')
+      .where('tx.user_id = :userId', { userId })
+      .orderBy('tx.created_at', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+    return { items, total };
   }
 
   /**

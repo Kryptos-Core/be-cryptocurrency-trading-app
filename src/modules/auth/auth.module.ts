@@ -6,12 +6,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MailService } from '@/common/services';
 import { User } from '@/entities/user.entity';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
+import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
 import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
 import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
 import { AUTH_REPOSITORY } from '@/modules/auth/domain/ports';
 import { AuthRepositoryImpl } from '@/modules/auth/infrastructure/persistence';
 import { BcryptPasswordHasherAdapter } from '@/modules/auth/infrastructure/providers/bcrypt-password-hasher.adapter';
+import { JwtTokenIssuerAdapter } from '@/modules/auth/infrastructure/providers/jwt-token-issuer.adapter';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { AuthController } from './auth.controller';
@@ -56,6 +58,11 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     {
       provide: PASSWORD_HASHER,
       useExisting: BcryptPasswordHasherAdapter,
+    },
+    JwtTokenIssuerAdapter,
+    {
+      provide: TOKEN_ISSUER,
+      useExisting: JwtTokenIssuerAdapter,
     },
     AuthRepositoryImpl,
     {

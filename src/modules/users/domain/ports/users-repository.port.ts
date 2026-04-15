@@ -1,4 +1,5 @@
 import type { UserRole } from '@/common/enums';
+import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { User } from '@/entities/user.entity';
 
 /**
@@ -26,6 +27,13 @@ export interface UsersRepositoryPort {
     page?: number,
     limit?: number,
   ): Promise<{ items: any[]; total: number }>;
+
+  /** Find paginated onchain transactions for a specific user */
+  findOnchainTransactionsByUser(
+    userId: string,
+    skip: number,
+    limit: number,
+  ): Promise<{ items: OnchainTransaction[]; total: number }>;
 
   /** Create new user with optional profile fields */
   createUser(

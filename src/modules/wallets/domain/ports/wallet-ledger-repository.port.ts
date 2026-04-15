@@ -1,4 +1,4 @@
-import type { EntityManager } from 'typeorm';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { WalletLedger } from '@/entities/wallet-ledger.entity';
 
 export interface LedgerEntryInput {
@@ -16,11 +16,11 @@ export interface LedgerEntryInput {
  * Domain-level abstraction for wallet ledger persistence.
  */
 export interface WalletLedgerRepositoryPort {
-  createEntry(entry: LedgerEntryInput, manager?: EntityManager): Promise<WalletLedger>;
+  createEntry(entry: LedgerEntryInput, ctx?: TransactionContext): Promise<WalletLedger>;
 
   createDoubleEntry(
     base: Omit<LedgerEntryInput, 'direction'>,
-    manager?: EntityManager,
+    ctx?: TransactionContext,
   ): Promise<[WalletLedger, WalletLedger]>;
 
   findRecentByUserAndCurrency(
