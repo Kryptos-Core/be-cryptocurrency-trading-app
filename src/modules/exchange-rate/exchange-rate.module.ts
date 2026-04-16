@@ -5,11 +5,13 @@ import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { DepositsModule } from '@/modules/deposits/deposits.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { UsersModule } from '@/modules/users/users.module';
+import { GetExchangeRateQuery } from './application/queries';
+import { SyncExchangeRateUseCase, UpdateExchangeRateConfigUseCase } from './application/use-cases';
 import { EXCHANGE_RATE_AUDIT_REPOSITORY } from './domain/ports';
-import { ExchangeRateAuditRepositoryImpl } from './infrastructure/persistence';
-import { ExchangeRateAutoSyncScheduler } from './exchange-rate-auto-sync.scheduler';
 import { ExchangeRateController } from './exchange-rate.controller';
 import { ExchangeRateService } from './exchange-rate.service';
+import { ExchangeRateAutoSyncScheduler } from './exchange-rate-auto-sync.scheduler';
+import { ExchangeRateAuditRepositoryImpl } from './infrastructure/persistence';
 import { CoinGeckoProvider } from './providers/coingecko.provider';
 import { FiatRateProvider } from './providers/fiat-rate.provider';
 
@@ -31,6 +33,11 @@ import { FiatRateProvider } from './providers/fiat-rate.provider';
       provide: EXCHANGE_RATE_AUDIT_REPOSITORY,
       useClass: ExchangeRateAuditRepositoryImpl,
     },
+    // Queries
+    GetExchangeRateQuery,
+    // Use-cases
+    SyncExchangeRateUseCase,
+    UpdateExchangeRateConfigUseCase,
   ],
   exports: [ExchangeRateService],
 })

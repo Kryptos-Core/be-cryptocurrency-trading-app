@@ -4,6 +4,11 @@ import { FcmService } from '@/common/services/fcm.service';
 import { Notification } from '@/entities/notification.entity';
 import { UserNotification } from '@/entities/user-notification.entity';
 import { AuthModule } from '@/modules/auth/auth.module';
+import { GetNotificationsQuery } from './application/queries/get-notifications.query';
+import { BroadcastNotificationUseCase } from './application/use-cases/broadcast-notification.use-case';
+import { MarkAllNotificationsReadUseCase } from './application/use-cases/mark-all-notifications-read.use-case';
+import { MarkNotificationReadUseCase } from './application/use-cases/mark-notification-read.use-case';
+import { SendNotificationUseCase } from './application/use-cases/send-notification.use-case';
 import { NOTIFICATION_REPOSITORY } from './domain/ports';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
@@ -40,6 +45,11 @@ import {
       ],
       inject: [InAppNotificationStrategy, PushNotificationStrategy],
     },
+    GetNotificationsQuery,
+    BroadcastNotificationUseCase,
+    MarkNotificationReadUseCase,
+    MarkAllNotificationsReadUseCase,
+    SendNotificationUseCase,
   ],
   exports: [NotificationsService],
 })

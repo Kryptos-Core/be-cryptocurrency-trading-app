@@ -10,22 +10,30 @@ import {
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { GetNotificationsQuery } from './application/queries/get-notifications.query';
+import { BroadcastNotificationUseCase } from './application/use-cases/broadcast-notification.use-case';
+import { MarkAllNotificationsReadUseCase } from './application/use-cases/mark-all-notifications-read.use-case';
+import { MarkNotificationReadUseCase } from './application/use-cases/mark-notification-read.use-case';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import type { NotificationQueryDto } from './dto/notification-query.dto';
-import { NotificationsService } from './notifications.service';
 
 /**
  * Notifications Controller
  * REST API for notification management.
- * POST /notifications  — ADMIN only (notifications:broadcast permission)
- * GET/PATCH            — any authenticated user (own notifications)
+ * POST /notifications — ADMIN only (notifications:broadcast permission)
+ * GET/PATCH — any authenticated user (own notifications)
  */
 @ApiTags('notifications')
 @ApiBearerAuth('JWT-auth')
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly getNotificationsQuery: GetNotificationsQuery,
+    private readonly broadcastNotificationUseCase: BroadcastNotificationUseCase,
+    private readonly markNotificationReadUseCase: MarkNotificationReadUseCase,
+    private readonly markAllNotificationsReadUseCase: MarkAllNotificationsReadUseCase,
+  ) {}
 
   /**
    * POST /notifications
@@ -41,7 +49,7 @@ export class NotificationsController {
   @ApiBadRequestResponse('Invalid input')
   @ApiUnauthorizedResponse('Unauthorized')
   async broadcast(@Body() dto: CreateNotificationDto, @CurrentUser('userId') adminId: string) {
-    return this.notificationsService.broadcast(dto, adminId);
+    return this.broadcastNotificationUseCase.execute(dto, adminId);
   }
 
   /**
@@ -56,7 +64,7 @@ export class NotificationsController {
     @CurrentUser('userId') userId: string,
     @Query() query: NotificationQueryDto,
   ) {
-    return this.notificationsService.findByUser(userId, query);
+    return this.getNotificationsQuery.findByUser(userId, query);
   }
 
   /**
@@ -68,7 +76,7 @@ export class NotificationsController {
   @ApiSuccessResponse('Unread count retrieved')
   @ApiUnauthorizedResponse('Unauthorized')
   async getUnreadCount(@CurrentUser('userId') userId: string) {
-    return this.notificationsService.countUnread(userId);
+    return this.getNotificationsQuery.countUnread(userId);
   }
 
   /**
@@ -80,7 +88,7 @@ export class NotificationsController {
   @ApiSuccessResponse('All notifications marked as read')
   @ApiUnauthorizedResponse('Unauthorized')
   async markAllRead(@CurrentUser('userId') userId: string) {
-    return this.notificationsService.markAllRead(userId);
+    return this.markAllNotificationsReadUseCase.execute(userId);
   }
 
   /**
@@ -93,6 +101,6 @@ export class NotificationsController {
   @ApiSuccessResponse('Notification marked as read')
   @ApiUnauthorizedResponse('Unauthorized')
   async markRead(@Param('id') notificationId: string, @CurrentUser('userId') userId: string) {
-    return this.notificationsService.markRead(notificationId, userId);
+    return this.markNotificationReadUseCase.execute(notificationId, userId);
   }
 }

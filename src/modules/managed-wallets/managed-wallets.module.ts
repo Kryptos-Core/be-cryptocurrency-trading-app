@@ -6,6 +6,15 @@ import { CurrencyNetwork } from '@/entities/currency-network.entity';
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
+import { GetManagedWalletsQuery } from './application/queries';
+import {
+  ClearDepositDefaultUseCase,
+  CreateManagedWalletUseCase,
+  DeactivateManagedWalletUseCase,
+  SendManagedWalletTransactionUseCase,
+  SetDepositDefaultUseCase,
+  SetRecommendedChainUseCase,
+} from './application/use-cases';
 import { DepositMethodsController } from './deposit-methods.controller';
 import { MANAGED_WALLETS_DATA_REPOSITORY } from './domain/ports';
 import { ManagedWalletsController } from './managed-wallets.controller';
@@ -27,6 +36,15 @@ import { ManagedWalletsDataRepository } from './repositories/managed-wallets-dat
     },
     ManagedWalletsService,
     WalletEncryptionService,
+    // Queries
+    GetManagedWalletsQuery,
+    // Use-cases
+    CreateManagedWalletUseCase,
+    SendManagedWalletTransactionUseCase,
+    SetDepositDefaultUseCase,
+    ClearDepositDefaultUseCase,
+    SetRecommendedChainUseCase,
+    DeactivateManagedWalletUseCase,
   ],
   exports: [ManagedWalletsService],
 })

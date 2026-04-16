@@ -3,15 +3,27 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, RequirePermissions, RequireRoles } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import { GetMarketMakerQuery } from './application/queries';
+import {
+  DeleteMarketMakerConfigUseCase,
+  PlaceMakerOrdersUseCase,
+  RefreshMakerOrdersUseCase,
+  UpsertMarketMakerConfigUseCase,
+} from './application/use-cases';
 import type { PlaceMakerOrdersDto, RefreshMakerOrdersDto, UpsertMarketMakerConfigDto } from './dto';
-import { MarketMakerService } from './market-maker.service';
 
 @ApiTags('market-maker')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 @Controller('market-maker')
 export class MarketMakerController {
-  constructor(private readonly marketMakerService: MarketMakerService) {}
+  constructor(
+    private readonly getMarketMakerQuery: GetMarketMakerQuery,
+    private readonly upsertMarketMakerConfigUseCase: UpsertMarketMakerConfigUseCase,
+    private readonly deleteMarketMakerConfigUseCase: DeleteMarketMakerConfigUseCase,
+    private readonly placeMakerOrdersUseCase: PlaceMakerOrdersUseCase,
+    private readonly refreshMakerOrdersUseCase: RefreshMakerOrdersUseCase,
+  ) {}
 
   @Get('defaults')
   @UseGuards(RoleGuard, PermissionGuard)
@@ -22,7 +34,7 @@ export class MarketMakerController {
     description: 'Spread / alert / order amount from system_configs (or env MM_DEFAULT_*).',
   })
   getFormDefaults() {
-    return this.marketMakerService.getFormDefaults();
+    return this.getMarketMakerQuery.getFormDefaults();
   }
 
   @Get('config')
@@ -31,7 +43,7 @@ export class MarketMakerController {
   @RequirePermissions(Permission.MARKET_MAKER_CONFIG)
   @ApiOperation({ summary: 'List market maker configs for current user' })
   getConfig(@CurrentUser('userId') userId: string) {
-    return this.marketMakerService.getConfigList(userId);
+    return this.getMarketMakerQuery.getConfigList(userId);
   }
 
   @Get('config/:pairId')
@@ -40,7 +52,7 @@ export class MarketMakerController {
   @RequirePermissions(Permission.MARKET_MAKER_CONFIG)
   @ApiOperation({ summary: 'Get market maker config by pair' })
   getConfigByPair(@CurrentUser('userId') userId: string, @Param('pairId') pairId: string) {
-    return this.marketMakerService.getConfigByPair(userId, pairId);
+    return this.getMarketMakerQuery.getConfigByPair(userId, pairId);
   }
 
   @Put('config/:pairId')
@@ -53,7 +65,7 @@ export class MarketMakerController {
     @Param('pairId') pairId: string,
     @Body() dto: UpsertMarketMakerConfigDto,
   ) {
-    return this.marketMakerService.upsertConfig(userId, pairId, dto);
+    return this.upsertMarketMakerConfigUseCase.execute(userId, pairId, dto);
   }
 
   @Delete('config/:pairId')
@@ -62,7 +74,7 @@ export class MarketMakerController {
   @RequirePermissions(Permission.MARKET_MAKER_CONFIG)
   @ApiOperation({ summary: 'Delete market maker config by pair' })
   deleteConfig(@CurrentUser('userId') userId: string, @Param('pairId') pairId: string) {
-    return this.marketMakerService.deleteConfig(userId, pairId);
+    return this.deleteMarketMakerConfigUseCase.execute(userId, pairId);
   }
 
   @Post('place/:pairId')
@@ -77,12 +89,7 @@ export class MarketMakerController {
     @Param('pairId') pairId: string,
     @Body() dto: PlaceMakerOrdersDto,
   ) {
-    return this.marketMakerService.refreshMakerOrders(
-      userId,
-      pairId,
-      undefined,
-      dto.order_amount_override,
-    );
+    return this.placeMakerOrdersUseCase.execute(userId, pairId, dto.order_amount_override);
   }
 
   @Post('refresh/:pairId')
@@ -95,12 +102,7 @@ export class MarketMakerController {
     @Param('pairId') pairId: string,
     @Body() dto: RefreshMakerOrdersDto,
   ) {
-    return this.marketMakerService.refreshMakerOrders(
-      userId,
-      pairId,
-      dto.refresh_cycle_key,
-      dto.order_amount_override,
-    );
+    return this.refreshMakerOrdersUseCase.execute(userId, pairId, dto);
   }
 
   @Get('dashboard')
@@ -109,6 +111,6 @@ export class MarketMakerController {
   @RequirePermissions(Permission.MARKET_MAKER_DASHBOARD)
   @ApiOperation({ summary: 'Get market maker dashboard summary' })
   getDashboard(@CurrentUser('userId') userId: string) {
-    return this.marketMakerService.getDashboard(userId);
+    return this.getMarketMakerQuery.getDashboard(userId);
   }
 }

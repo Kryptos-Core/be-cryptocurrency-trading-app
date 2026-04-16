@@ -2,13 +2,13 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
-import { ManagedWalletsService } from './managed-wallets.service';
+import { GetManagedWalletsQuery } from './application/queries';
 
 @ApiTags('deposit')
 @Controller('deposit')
 @UseGuards(JwtAuthGuard)
 export class DepositMethodsController {
-  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
+  constructor(private readonly getManagedWalletsQuery: GetManagedWalletsQuery) {}
 
   @Get('methods')
   @Public()
@@ -16,6 +16,6 @@ export class DepositMethodsController {
     summary: 'Get public deposit methods and the recommended chain',
   })
   async getDepositMethods() {
-    return this.managedWalletsService.getDepositMethods();
+    return this.getManagedWalletsQuery.getDepositMethods();
   }
 }

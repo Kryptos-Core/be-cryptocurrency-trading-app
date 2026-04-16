@@ -7,6 +7,14 @@ import { OrdersModule } from '@/modules/orders/orders.module';
 import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 import { UsersRepository } from '@/modules/users/infrastructure/persistence';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { GetUsersQuery } from './application/queries/get-users.query';
+import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case';
+import { RequestSecurityChangeUseCase } from './application/use-cases/request-security-change.use-case';
+import { ReviewSecurityChangeUseCase } from './application/use-cases/review-security-change.use-case';
+import { SaveFcmTokenUseCase } from './application/use-cases/save-fcm-token.use-case';
+import { UpdateProfileBasicUseCase } from './application/use-cases/update-profile-basic.use-case';
+import { UpdateUserUseCase } from './application/use-cases/update-user.use-case';
+import { UploadAvatarUseCase } from './application/use-cases/upload-avatar.use-case';
 import { ContactEmailVerificationService } from './contact-email-verification.service';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -27,6 +35,14 @@ import { UsersService } from './users.service';
     },
     CloudinaryService,
     ContactEmailVerificationService,
+    GetUsersQuery,
+    UpdateUserUseCase,
+    DeleteUserUseCase,
+    UpdateProfileBasicUseCase,
+    RequestSecurityChangeUseCase,
+    ReviewSecurityChangeUseCase,
+    UploadAvatarUseCase,
+    SaveFcmTokenUseCase,
   ],
   controllers: [UsersController],
   exports: [UsersService, UsersRepository, USERS_REPOSITORY],

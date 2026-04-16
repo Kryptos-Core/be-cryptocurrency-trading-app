@@ -17,42 +17,52 @@ import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { PermissionGuard } from '@/common/guards/permission.guard';
 import { RoleGuard } from '@/common/guards/role.guard';
+import { GetPaymentConfigsQuery } from './application/queries/get-payment-configs.query';
+import { ActivatePaymentConfigUseCase } from './application/use-cases/activate-payment-config.use-case';
+import { CreatePaymentConfigUseCase } from './application/use-cases/create-payment-config.use-case';
+import { DeactivatePaymentConfigUseCase } from './application/use-cases/deactivate-payment-config.use-case';
+import { UpdatePaymentConfigUseCase } from './application/use-cases/update-payment-config.use-case';
 import type {
   ActivatePaymentConfigDto,
   CreatePaymentConfigDto,
   UpdatePaymentConfigDto,
 } from './dto';
-import { PaymentConfigService } from './payment-config.service';
 
 @Controller('payment-configs')
 @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
 @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
 @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
 export class PaymentConfigController {
-  constructor(private readonly service: PaymentConfigService) {}
+  constructor(
+    private readonly getPaymentConfigsQuery: GetPaymentConfigsQuery,
+    private readonly createPaymentConfigUseCase: CreatePaymentConfigUseCase,
+    private readonly updatePaymentConfigUseCase: UpdatePaymentConfigUseCase,
+    private readonly activatePaymentConfigUseCase: ActivatePaymentConfigUseCase,
+    private readonly deactivatePaymentConfigUseCase: DeactivatePaymentConfigUseCase,
+  ) {}
 
   /** List all payment method configs (encrypted_config is excluded from response) */
   @Get()
   async list() {
-    return this.service.listConfigs();
+    return this.getPaymentConfigsQuery.list();
   }
 
   /** Types and networks for create/edit form (no secrets). */
   @Get('options')
   async formOptions() {
-    return this.service.getFormOptions();
+    return this.getPaymentConfigsQuery.getFormOptions();
   }
 
   /** Single config for edit UI — includes decrypted `config` object (secrets). */
   @Get(':id')
   async getOne(@Param('id') configId: string) {
-    return this.service.getConfigByIdForEdit(configId);
+    return this.getPaymentConfigsQuery.getConfigByIdForEdit(configId);
   }
 
   /** Create a new payment method config (starts as INACTIVE) */
   @Post()
   async create(@Body() dto: CreatePaymentConfigDto, @CurrentUser('userId') userId: string) {
-    return this.service.createConfig(dto, userId);
+    return this.createPaymentConfigUseCase.execute(dto, userId);
   }
 
   /** Update display name, config values, grace period, or sort order */
@@ -62,7 +72,7 @@ export class PaymentConfigController {
     @Body() dto: UpdatePaymentConfigDto,
     @CurrentUser('userId') userId: string,
   ) {
-    return this.service.updateConfig(configId, dto, userId);
+    return this.updatePaymentConfigUseCase.execute(configId, dto, userId);
   }
 
   /**
@@ -78,14 +88,13 @@ export class PaymentConfigController {
     @Body() dto: ActivatePaymentConfigDto,
     @CurrentUser('userId') userId: string,
   ) {
-    return this.service.activateWithGracePeriod(configId, dto, userId);
+    return this.activatePaymentConfigUseCase.execute(configId, dto, userId);
   }
 
   /** Immediately deactivate a config */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deactivate(@Param('id') configId: string, @CurrentUser('userId') userId: string) {
-    await this.service.deactivateConfig(configId, userId);
-    return { success: true };
+    return this.deactivatePaymentConfigUseCase.execute(configId, userId);
   }
 }
