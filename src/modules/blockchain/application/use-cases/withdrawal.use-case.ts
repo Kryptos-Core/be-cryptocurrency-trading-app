@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { OnchainWithdrawalService } from '../../onchain-withdrawal.service';
 import type { RequestWithdrawalDto } from '../../dto';
+import { OnchainWithdrawalService } from '../../onchain-withdrawal.service';
 
 @Injectable()
 export class RequestWithdrawalUseCase {

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BlockchainNetwork } from '@/common/enums';
-import { OnchainDepositService } from '../../onchain-deposit.service';
 import type { SubmitDepositDto } from '../../dto';
+import { OnchainDepositService } from '../../onchain-deposit.service';
 
 @Injectable()
 export class SubmitDepositUseCase {

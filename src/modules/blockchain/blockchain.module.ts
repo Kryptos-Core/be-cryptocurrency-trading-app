@@ -16,6 +16,27 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import {
+  GetAdminWithdrawalByIdQuery,
+  GetAdminWithdrawalStatsQuery,
+  GetAdminWithdrawalsQuery,
+  GetLinkedWalletBalanceQuery,
+  GetLinkedWalletsQuery,
+  GetTransactionByIdQuery,
+  GetTransactionsQuery,
+} from './application/queries';
+import {
+  ApproveWithdrawalUseCase,
+  PreviewDepositUseCase,
+  ProcessPendingWithdrawalsUseCase,
+  RejectWithdrawalUseCase,
+  RequestLinkWalletUseCase,
+  RequestWithdrawalUseCase,
+  SettleDepositUseCase,
+  SubmitDepositUseCase,
+  UnlinkWalletUseCase,
+  VerifyLinkWalletUseCase,
+} from './application/use-cases';
 import { BlockchainController } from './blockchain.controller';
 import {
   BC_SOLANA_DEVNET,
@@ -39,27 +60,6 @@ import { WalletConnectController } from './wallet-connect/wallet-connect.control
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
 import { WalletLinkingService } from './wallet-linking.service';
-import {
-  RequestLinkWalletUseCase,
-  VerifyLinkWalletUseCase,
-  UnlinkWalletUseCase,
-  SubmitDepositUseCase,
-  PreviewDepositUseCase,
-  SettleDepositUseCase,
-  RequestWithdrawalUseCase,
-  ApproveWithdrawalUseCase,
-  RejectWithdrawalUseCase,
-  ProcessPendingWithdrawalsUseCase,
-} from './application/use-cases';
-import {
-  GetLinkedWalletsQuery,
-  GetLinkedWalletBalanceQuery,
-  GetTransactionsQuery,
-  GetTransactionByIdQuery,
-  GetAdminWithdrawalsQuery,
-  GetAdminWithdrawalByIdQuery,
-  GetAdminWithdrawalStatsQuery,
-} from './application/queries';
 
 /**
  * Blockchain Module — Tron / Solana / EVM (mainnet + sandbox chains).

@@ -12,7 +12,8 @@
       "Bash(npm run migration:*)",
       "Bash(npm run db:seed:*)",
       "Bash(npm run start:dev:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(dir /b src\\\\\\\\modules)"
     ],
     "deny": [
       "Bash(flutter:*)",

@@ -25,25 +25,25 @@ import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import {
-  GetLinkedWalletsQuery,
-  GetLinkedWalletBalanceQuery,
-  GetTransactionsQuery,
-  GetTransactionByIdQuery,
-  GetAdminWithdrawalsQuery,
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalStatsQuery,
+  GetAdminWithdrawalsQuery,
+  GetLinkedWalletBalanceQuery,
+  GetLinkedWalletsQuery,
+  GetTransactionByIdQuery,
+  GetTransactionsQuery,
 } from './application/queries';
 import {
-  RequestLinkWalletUseCase,
-  VerifyLinkWalletUseCase,
-  UnlinkWalletUseCase,
-  PreviewDepositUseCase,
-  SubmitDepositUseCase,
-  SettleDepositUseCase,
-  RequestWithdrawalUseCase,
   ApproveWithdrawalUseCase,
-  RejectWithdrawalUseCase,
+  PreviewDepositUseCase,
   ProcessPendingWithdrawalsUseCase,
+  RejectWithdrawalUseCase,
+  RequestLinkWalletUseCase,
+  RequestWithdrawalUseCase,
+  SettleDepositUseCase,
+  SubmitDepositUseCase,
+  UnlinkWalletUseCase,
+  VerifyLinkWalletUseCase,
 } from './application/use-cases';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import type {
