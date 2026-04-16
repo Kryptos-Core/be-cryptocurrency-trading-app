@@ -106,7 +106,7 @@ npm run start:dev
 | Nạp-rút / PayOS | `deposits/`, `payment-config/` |
 | Treasury / vận hành | `treasury/`, `managed-wallets/` |
 | MM batch | `market-maker/` |
-| Queue / cache | `redis/`, Bull theo module |
+| Queue / cache | `redis/`, Bull theo module; Bull Board: `/admin/queues` (admin-only) |
 
 Cấu trúc chi tiết: [README.md](../README.md).
 

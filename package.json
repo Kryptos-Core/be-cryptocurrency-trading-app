@@ -45,6 +45,7 @@
     "postman:build": "node postman/build-collection.mjs"
   },
   "dependencies": {
+    "@bull-board/express": "^7.0.0",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^10.2.10",
     "@nestjs/config": "^3.1.1",

@@ -7,11 +7,13 @@ const DEFAULT_MIN_THREADS = 1;
 const DEFAULT_MAX_THREADS = Math.max(1, os.cpus().length - 1);
 
 export interface WorkerPoolOptions {
-  /** Relative path from this file to the worker script. */
+  /** Absolute path to the compiled worker script (.js in production, .ts in dev). */
   workerFile: string;
   minThreads?: number;
   maxThreads?: number;
   idleTimeout?: number;
+  /** Extra arguments passed to the Node.js worker thread (e.g. ['-r', 'ts-node/register']). */
+  execArgv?: string[];
 }
 
 /**
@@ -42,12 +44,13 @@ export class WorkerPoolService implements OnModuleDestroy {
       minThreads: options.minThreads ?? DEFAULT_MIN_THREADS,
       maxThreads: options.maxThreads ?? DEFAULT_MAX_THREADS,
       idleTimeout: options.idleTimeout ?? 30_000,
+      ...(options.execArgv ? { execArgv: options.execArgv } : {}),
     });
 
     this.logger.log(
       `WorkerPool initialised — minThreads=${options.minThreads ?? DEFAULT_MIN_THREADS} ` +
-        `maxThreads=${options.maxThreads ?? DEFAULT_MAX_THREADS} ` +
-        `worker=${options.workerFile}`,
+      `maxThreads=${options.maxThreads ?? DEFAULT_MAX_THREADS} ` +
+      `worker=${options.workerFile}`,
     );
   }
 

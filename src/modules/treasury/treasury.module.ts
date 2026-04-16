@@ -1,7 +1,16 @@
+import * as path from 'node:path';
 import { BullModule } from '@nestjs/bull';
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WalletEncryptionService } from '@/common/services';
+import { WorkerPoolModule } from '@/common/worker-pool/worker-pool.module';
+
+/** Resolve the crypto-account worker path for both dev (ts-node) and production (compiled JS). */
+const isTs = __filename.endsWith('.ts');
+const workerExt = isTs ? '.ts' : '.js';
+const cryptoWorkerFile = path.resolve(__dirname, 'workers', `crypto-account.worker${workerExt}`);
+const workerExecArgv = isTs ? ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register'] : [];
+
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
@@ -58,6 +67,11 @@ import { TreasuryOperationsService } from './treasury-operations.service';
       TreasuryOperation,
       OnchainTransaction,
     ]),
+    WorkerPoolModule.forRoot({
+      workerFile: cryptoWorkerFile,
+      execArgv: workerExecArgv,
+      maxThreads: 2, // 2 threads sufficient — wallets created one-at-a-time per request
+    }),
     PaymentConfigModule,
     SystemConfigModule,
     forwardRef(() => AuthModule), // forwardRef avoids potential circular deps

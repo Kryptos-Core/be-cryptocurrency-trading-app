@@ -26,6 +26,7 @@ import {
   NotFoundException,
 } from '@/common/exceptions';
 import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
+import { WorkerPoolService } from '@/common/worker-pool/worker-pool.service';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
@@ -96,7 +97,8 @@ export class TransactionWalletService {
     private readonly redisService: RedisService,
     readonly _configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
-  ) {}
+    private readonly workerPool: WorkerPoolService,
+  ) { }
 
   async createWallet(dto: CreateTransactionWalletDto): Promise<TransactionWallet> {
     const chain = this.assertSupportedChain(dto.chain);
@@ -368,7 +370,7 @@ export class TransactionWalletService {
     if (!wallet) {
       throw new BusinessException(
         `No active default main wallet configured for chain ${chain}. ` +
-          `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
+        `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
         'TREASURY_MAIN_WALLET_NOT_CONFIGURED',
       );
     }
@@ -652,21 +654,22 @@ export class TransactionWalletService {
     chain: SupportedTreasuryChain,
   ): Promise<{ address: string; privateKey: string }> {
     if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') {
-      const keypair = Keypair.generate();
-      return {
-        address: keypair.publicKey.toBase58(),
-        privateKey: bs58.encode(keypair.secretKey),
-      };
+      // Offload Ed25519 key generation to worker thread
+      return this.workerPool.run<
+        { type: 'solana'; data: { chain: string } },
+        { address: string; privateKey: string }
+      >({ type: 'solana', data: { chain } });
     }
 
     if (getEvmDefinitionByTreasuryChain(chain)) {
-      const wallet = ethers.Wallet.createRandom();
-      return {
-        address: wallet.address,
-        privateKey: wallet.privateKey,
-      };
+      // Offload ECDSA/secp256k1 key generation to worker thread
+      return this.workerPool.run<
+        { type: 'evm'; data: { chain: string } },
+        { address: string; privateKey: string }
+      >({ type: 'evm', data: { chain } });
     }
 
+    // Tron: async HTTP call — keep on main thread
     const account = await TronWeb.createAccount();
     return {
       address: account.address.base58,

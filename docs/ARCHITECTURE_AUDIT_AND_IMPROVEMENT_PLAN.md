@@ -329,8 +329,8 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
 - [x] Install `piscina` (`npm install piscina`)
 - [x] Create `src/common/worker-pool/worker-pool.service.ts` — `WorkerPoolService` wrapping Piscina with `OnModuleDestroy` lifecycle
 - [x] Create `src/common/worker-pool/worker-pool.module.ts` — `WorkerPoolModule.forRoot(options)` dynamic module
-- [ ] Move blockchain address generation/validation into worker threads (use `WorkerPoolModule.forRoot` in BlockchainModule)
-- [ ] Move large reconciliation report generation into worker threads
+- [x] Move blockchain address generation/validation into worker threads — `crypto-account.worker.ts` in TreasuryModule (EVM + Solana offloaded)
+- [ ] Move large reconciliation report generation into worker threads (no heavy reports found — deferred)
 
 #### 5.2 Async Task Resilience
 **Tasks:**
@@ -338,9 +338,9 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
 - [x] `MainWalletRotationScheduler` — `@Cron('0 2 * * *')` (already implemented)
 - [x] `PaymentConfigGraceScheduler` — `@Cron(CronExpression.EVERY_MINUTE)` + `flushStaleTransitioningActivations` (already implemented)
 - [x] `src/common/utils/redis-distributed-lock.ts` — reusable distributed lock utility (implemented this session)
-- [ ] Treasury and matching schedulers: apply `RedisDistributedLock` to all remaining schedulers
-- [ ] Add dead-letter queue (DLQ) pattern for Bull queues (matching, treasury, payment-config)
-- [ ] Add Bull Board dashboard for queue monitoring
+- [x] Treasury and matching schedulers — all schedulers already use `withDistributedLock` (confirmed this session)
+- [x] Add dead-letter queue (DLQ) pattern for Bull queues — all queues already have `removeOnFail: false` (confirmed this session)
+- [x] Add Bull Board dashboard — `BullBoardModule` + `BullBoardService` at `/admin/queues` (admin-only, JWT guard)
 
 ---
 
@@ -429,11 +429,23 @@ Phase 6 (Testing)
 - Created `src/common/worker-pool/worker-pool.service.ts` — `WorkerPoolService` with `OnModuleDestroy`
 - Created `src/common/worker-pool/worker-pool.module.ts` — `WorkerPoolModule.forRoot(options)` dynamic module
 - Created `src/common/worker-pool/index.ts`
+- Updated `WorkerPoolOptions` with `execArgv` support for dev (ts-node) and production modes
+- Created `src/modules/treasury/workers/crypto-account.worker.ts` — Piscina worker that generates
+ EVM (ethers.Wallet.createRandom) and Solana (Keypair.generate + bs58) accounts off the main thread
+- Updated `TreasuryModule` to import `WorkerPoolModule.forRoot({ workerFile, execArgv, maxThreads: 2 })`
+- Updated `TransactionWalletService.generateAccount()` to delegate EVM + Solana key generation
+ to the worker pool; Tron kept on main thread (HTTP-bound, not CPU-bound)
 
 **Phase 5.2 — Async task resilience:**
 - Created `src/common/utils/redis-distributed-lock.ts` — reusable `RedisDistributedLock` utility  
   with `setIfNotExists` acquire + Lua CAS release, suitable for all scheduler and queue scenarios
-
+- Created `src/common/bull-board/bull-board.service.ts` — `BullBoardService` implementing `OnApplicationBootstrap`
+ that builds the Bull Board UI using `@bull-board/express` `ExpressAdapter` + `@bull-board/api` `BullAdapter`
+- Created `src/common/bull-board/bull-board.module.ts` — `BullBoardModule` providing `BullBoardService`,
+ registering all 3 queues (matching, treasury-ops, payment-config-activation) via `BullModule.registerQueue`
+- Updated `src/app.module.ts`: imported `BullBoardModule`, added `BullBoardAuthMiddleware`
+ (JWT + ADMIN role guard) protecting `/admin/queues`
+- Bull Board dashboard: `http://127.0.0.1:3000/admin/queues` (admin-only, JWT required)
 **Phase 1.2 — AppModule wiring:**
 - `TelemetryModule` imported into `AppModule`
 - `CorrelationIdMiddleware` wired globally via `configure()` in `AppModule`

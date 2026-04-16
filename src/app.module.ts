@@ -1,9 +1,12 @@
 import { BullModule, type BullRootModuleOptions } from '@nestjs/bull';
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Injectable, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullBoardModule } from './common/bull-board/bull-board.module';
+import { BullBoardService } from './common/bull-board/bull-board.service';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import appConfig from './config/app.config';
 import { validateEnvironment } from './config/env.validation';
@@ -35,60 +38,98 @@ import { UsersModule } from './modules/users/users.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { TelemetryModule } from './telemetry';
 
+/**
+ * Express middleware that protects Bull Board at `/admin/queues` with JWT + ADMIN role.
+ * Mounted before BullBoardService's router — rejects non-admin requests with 403.
+ */
+@Injectable()
+class BullBoardAuthMiddleware {
+    constructor(private readonly jwtService: JwtService) { }
+
+    use(req: any, res: any, next: () => void): void {
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            res.status(403).json({ statusCode: 403, message: 'Unauthorized' });
+            return;
+        }
+
+        try {
+            const token = authHeader.slice(7);
+            const payload = this.jwtService.verify(token);
+            if (payload.role !== 'ADMIN') {
+                res.status(403).json({ statusCode: 403, message: 'Forbidden — ADMIN role required' });
+                return;
+            }
+            // Attach user so Bull Board UI can show who is logged in
+            req.user = payload;
+            next();
+        } catch {
+            res.status(403).json({ statusCode: 403, message: 'Invalid or expired token' });
+        }
+    }
+}
+
 @Module({
-  imports: [
-    EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
-    ScheduleModule.forRoot(), // enables @Cron / @Interval decorators
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: nestEnvFilePaths(),
-      validate: validateEnvironment, // Validate environment variables
-      validationOptions: {
-        allowUnknown: true, // Allow unknown env vars (system variables)
-        abortEarly: false, // Show all validation errors at once
-      },
-      load: [appConfig], // Load app config namespace
-    }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: getTypeOrmConfig,
-    }),
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService): BullRootModuleOptions => ({
-        redis: getBullRedisConfig(config),
-      }),
-    }),
-    TelemetryModule,
-    RedisModule,
-    BinanceRestModule,
-    AuthModule,
-    UsersModule,
-    CurrenciesModule,
-    MarketsModule,
-    WalletsModule,
-    OrdersModule,
-    MatchingModule,
-    TradingModule,
-    ExchangeModule,
-    ExchangeRateModule,
-    BlockchainModule,
-    DepositsModule,
-    ManagedWalletsModule,
-    DashboardModule,
-    HealthModule,
-    NotificationsModule,
-    MarketMakerModule,
-    PaymentConfigModule,
-    TreasuryModule,
-    SystemConfigModule,
-    MetadataModule,
-  ],
+    imports: [
+        EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
+        ScheduleModule.forRoot(), // enables @Cron / @Interval decorators
+        ConfigModule.forRoot({
+            isGlobal: true,
+            envFilePath: nestEnvFilePaths(),
+            validate: validateEnvironment, // Validate environment variables
+            validationOptions: {
+                allowUnknown: true, // Allow unknown env vars (system variables)
+                abortEarly: false, // Show all validation errors at once
+            },
+            load: [appConfig], // Load app config namespace
+        }),
+        TypeOrmModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: getTypeOrmConfig,
+        }),
+        BullModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (config: ConfigService): BullRootModuleOptions => ({
+                redis: getBullRedisConfig(config),
+            }),
+        }),
+        TelemetryModule,
+        RedisModule,
+        BullBoardModule, // mounts Bull Board UI at /admin/queues (admin-only)
+        BinanceRestModule,
+        AuthModule,
+        UsersModule,
+        CurrenciesModule,
+        MarketsModule,
+        WalletsModule,
+        OrdersModule,
+        MatchingModule,
+        TradingModule,
+        ExchangeModule,
+        ExchangeRateModule,
+        BlockchainModule,
+        DepositsModule,
+        ManagedWalletsModule,
+        DashboardModule,
+        HealthModule,
+        NotificationsModule,
+        MarketMakerModule,
+        PaymentConfigModule,
+        TreasuryModule,
+        SystemConfigModule,
+        MetadataModule,
+    ],
 })
 export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
-  }
+    configure(consumer: MiddlewareConsumer): void {
+        // Global correlation ID middleware
+        consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+
+        // Bull Board admin auth — protect /admin/queues with JWT + ADMIN role check
+        // BullBoardService mounts the UI at this path during onApplicationBootstrap.
+        // This middleware runs before the BullBoardService router, rejecting non-admin requests.
+        consumer.apply(BullBoardAuthMiddleware).forRoutes(BullBoardService.PATH);
+    }
 }
