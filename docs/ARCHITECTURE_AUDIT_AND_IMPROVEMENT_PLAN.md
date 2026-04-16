@@ -18,12 +18,12 @@
 | `blockchain` | ports (LinkedWallet, OnchainTransaction) | use-cases, queries | persistence | LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY | **Hybrid** — has application layer but many services at module root (onchain-*.service.ts, deposit-fx.service.ts) |
 | `matching` | ports (MatchingRepository, TradeAuditLog) | (none) | persistence | MATCHING_REPOSITORY, TRADE_AUDIT_LOG_REPOSITORY | **Hybrid** — has event store, strategies, visitors but no application/use-cases layer |
 | `currencies` | ports (CurrencyRepository) | use-cases (Create, Update, Delete), queries (GetAll, GetById) | persistence | CURRENCY_REPOSITORY | **Clean Architecture ✓** |
-| `treasury` | ports (4 repos) | (none) | persistence | 4 Symbol tokens | **Hybrid** — ports done, but services at module root |
+| `treasury` | ports (4 repos) | use-cases (15), queries (3) | persistence | 4 Symbol tokens | **Clean Architecture ✓** |
 | `users` | ports (UsersRepository) | use-cases (7), queries (GetUsers) | persistence | USERS_REPOSITORY | **Clean Architecture ✓** |
 | `deposits` | ports (FiatDepositRepository) | use-cases (CreateLink, HandleWebhook, SyncStatus), queries (GetAll, GetPreview) | persistence | FIAT_DEPOSIT_REPOSITORY | **Clean Architecture ✓** |
 | `exchange-rate` | ports (ExchangeRateAuditRepository) | use-cases (Sync, UpdateConfig), queries (GetExchangeRate) | persistence, providers | EXCHANGE_RATE_AUDIT_REPOSITORY | **Clean Architecture ✓** |
 | `system-config` | ports (SystemConfigRepository) | use-cases (UpdateConfig, UpdateConfigsBulk), queries (GetAllConfigs, GetRuntimeSettings) | persistence | SYSTEM_CONFIG_REPOSITORY | **Clean Architecture ✓** |
-| `markets` | ports (MarketRepository) | (none) | persistence | (injection-tokens.ts) | **Hybrid** — has processors, repos still mixed |
+| `markets` | ports (MarketRepository) | use-cases (3), queries (4) | persistence | MARKET_REPOSITORY | **Clean Architecture ✓** |
 | `managed-wallets` | ports (ManagedWalletsDataRepository) | use-cases (7), queries (GetManagedWallets) | (none) | MANAGED_WALLETS_DATA_REPOSITORY | **Clean Architecture ✓** |
 | `notifications` | ports (NotificationRepository) | use-cases (Send, Broadcast, MarkRead, MarkAllRead), queries (GetNotifications) | (none) | (injection-tokens.ts) | **Clean Architecture ✓** |
 | `payment-config` | ports (PaymentConfigRepository) | use-cases (Create, Update, Activate, Deactivate), queries (GetPaymentConfigs) | (none) | PAYMENT_CONFIG_REPOSITORY | **Clean Architecture ✓** |
@@ -36,7 +36,7 @@
 | `price-oracle` | (none) | (none) | (none) | (none) | **Traditional NestJS** — providers |
 | `metadata` | (none) | (none) | (none) | (none) | **Traditional NestJS** — enum builder |
 
-**Summary:** 12/22 modules fully Clean Architecture, 3 hybrid (blockchain, matching, treasury), 6 traditional/infrastructure.
+**Summary:** 14/22 modules fully Clean Architecture, 2 hybrid (blockchain, matching), 6 traditional/infrastructure.
 
 ### 1.2 Domain-Driven Design (DDD)
 
@@ -56,7 +56,7 @@
 | Pattern | Status | Details |
 |---------|--------|---------|
 | **@nestjs/cqrs** | Not installed | No CommandBus, QueryBus, or handler decorators found. |
-| **Manual CQS** | Partial | `orders/application/queries/` and `orders/application/use-cases/` separate reads/writes. `wallets/application/queries/` and `wallets/application/use-cases/` also separated. `blockchain/application/queries/` exists. |
+| **Manual CQS** | Advancing | 14 modules have separated `application/queries/` and `application/use-cases/` layers. Controllers delegate to use-cases/queries. |
 | **Controllers** | Mixed | Controllers don't enforce CQS — single controller methods mix queries and mutations. No read/write endpoint separation. |
 
 **Assessment:** CQS is emerging in application layers of 3 modules (orders, wallets, blockchain) as a convention (queries/ vs use-cases/), but there's no CQRS infrastructure (CommandBus, QueryBus, separate read models).
@@ -116,15 +116,15 @@
 
 | Pattern | Current Score | Target |
 |---------|:------------:|:------:|
-| Clean Architecture | 12/22 full, 3/22 hybrid | All business modules fully layered |
+| Clean Architecture | 14/22 full, 2/22 hybrid | All business modules fully layered |
 | DDD - Aggregates, Value Objects | 0% | Core aggregates defined |
 | DDD - Domain Events & Dispatcher | ~5% (matching-only event store) | Cross-module domain event bus |
 | Async Tasks / Schedulers | 70% | All async work through queues |
 | Worker Pool | 0% | CPU-heavy ops offloaded |
 | Unit of Work | 30% (TransactionContext exists) | Formal UoW pattern |
-| CQS / CQRS | 60% (12 modules now separated) | All modules CQS, optional CQRS for read-heavy |
+| CQS / CQRS | 85% (14 modules now separated) | All modules CQS, optional CQRS for read-heavy |
 | Observability (OpenTelemetry) | 5% (basic logging) | Full OTel traces + metrics + structured logs |
-| SOLID | 75% | Large services decomposed |
+| SOLID | 85% | Large services decomposed |
 
 ---
 
@@ -270,13 +270,13 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
 |--------|--------|-------------|
 | `blockchain` | Medium | Move root-level services (onchain-*.service.ts, deposit-fx.service.ts) into `application/use-cases/` |
 | `matching` | Medium | Create `application/use-cases/` layer; move `matching.service.ts` logic into use-cases |
-| `treasury` | Medium | Create `application/use-cases/` for sweep, fund, rotation operations |
+| `treasury` | Medium | Create `application/use-cases/` for sweep, fund, rotation operations | **DONE ✓** |
 | `currencies` | Low | Create `application/queries/` and `application/use-cases/` from `currencies.service.ts` | **DONE ✓** |
 | `users` | Low | Create `application/use-cases/` from `users.service.ts` | **DONE ✓** |
 | `deposits` | Low | Create `application/use-cases/`, move repo to `infrastructure/persistence/` | **DONE ✓** |
 | `exchange-rate` | Low | Create `application/`, wrap service methods as use-cases | **DONE ✓** |
 | `system-config` | Low | Create `application/` layer | **DONE ✓** |
-| `markets` | Medium | Large service (895 lines) needs decomposition first |
+| `markets` | Medium | Large service (895 lines) needs decomposition first | **DONE ✓** |
 | `managed-wallets` | Low | Create `application/`, move repo to `infrastructure/persistence/` | **DONE ✓** |
 | `notifications` | Low | Already has strategies; add `application/` layer | **DONE ✓** |
 | `payment-config` | Low | Already has processor; add `application/` layer | **DONE ✓** |
@@ -289,27 +289,39 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
 4. Ensure use-cases depend ONLY on ports (Symbol DI tokens)
 5. Service file becomes a thin facade (or is removed)
 6. Update module wiring (`*.module.ts`)
-
-#### 4.2 Decompose Large Services
-**Tasks (SRP violations):**
-- [ ] `markets.service.ts` (895 lines) → Split into:
-  - `CreateMarketPairUseCase`
-  - `UpdateMarketPairUseCase`
-  - `GetTickerQuery`
-  - `GetOhlcvQuery`
-  - `MarketPairValidationService` (domain)
-- [ ] `treasury-main-wallet.service.ts` (748 lines) → Split into:
-  - `RotateMainWalletUseCase`
-  - `CheckMainWalletBalanceUseCase`
-  - `GetMainWalletStatusQuery`
+- [x] `markets.service.ts` (895 lines) → Split into:
+ - `CreateMarketPairUseCase` ✓
+ - `UpdateMarketPairUseCase` ✓
+ - `DeleteMarketPairUseCase` ✓
+ - `GetMarketPairQuery` ✓
+ - `GetMarketTickerQuery` ✓
+ - `GetMarketDepthQuery` ✓
+ - `GetMarketOHLCVQuery` ✓
+- [x] `treasury-main-wallet.service.ts` (748 lines) → Split into:
+ - `ImportMainWalletUseCase` ✓
+ - `ApproveMainWalletUseCase` ✓
+ - `RejectMainWalletUseCase` ✓
+ - `SetDefaultMainWalletUseCase` ✓
+ - `RevealMainWalletPrivateKeyUseCase` ✓
+ - `UpdateMainWalletLabelUseCase` ✓
+ - `RequestMainWalletDeletionUseCase` ✓
+ - `ApproveMainWalletDeletionUseCase` ✓
+ - `RejectMainWalletDeletionUseCase` ✓
+ - `GetMainWalletQuery` ✓
+- [x] `transaction-wallet.service.ts` (705 lines) → Split into:
+  - `CreateTransactionWalletUseCase` ✓
+ - `SendWithdrawalUseCase` ✓
+ - `DeactivateTransactionWalletUseCase` ✓
+ - `DeleteTransactionWalletUseCase` ✓
+ - `SetDefaultUserDepositUseCase` ✓
+ - `UnsetDefaultUserDepositUseCase` ✓
+ - `GetTransactionWalletQuery` ✓
+ - `GetTreasuryOperationQuery` ✓
 - [ ] `onchain-withdrawal.service.ts` (667 lines) → Split into:
-  - `InitiateWithdrawalUseCase`
+ - `InitiateWithdrawalUseCase`
   - `ProcessWithdrawalUseCase`
-  - `CheckWithdrawalStatusQuery`
-- [ ] `managed-wallets.service.ts` (555 lines) → Similar decomposition
-
----
-
+ - `CheckWithdrawalStatusQuery`
+- [x] `managed-wallets.service.ts` (555 lines) → Done in Phase 4.1 ✓
 ### Phase 5: Worker Pool & Async Resilience (Priority: LOW-MEDIUM)
 
 #### 5.1 Worker Pool for CPU-Intensive Tasks
@@ -507,3 +519,27 @@ Phase 6 (Testing)
 **Remaining:** 3 hybrid (blockchain, matching, treasury), 6 traditional/infrastructure (trading, exchange, dashboard, binance-rest, redis, price-oracle, metadata)
 
 **Test coverage:** All 122 tests PASS, TypeScript zero errors, webpack build successful.
+
+### Session 2026-04-17 (continued)
+
+**Phase 4.2 — markets.service.ts decomposition (895 lines → Clean Architecture):**
+- Created `GetMarketPairQuery` (findAll, findOne, findBySymbol, findActive)
+- Created `GetMarketTickerQuery` (getTicker, getTickerBySymbol, getAllTickers, getTickersForBaseSymbols)
+- Created `GetMarketDepthQuery` (getOrderBook, getRecentTrades, getDepthSnapshot variants)
+- Created `GetMarketOHLCVQuery` (getOHLCV)
+- Created `CreateMarketPairUseCase`, `UpdateMarketPairUseCase`, `DeleteMarketPairUseCase`
+- Updated `MarketsController` and `MarketsModule`
+
+**Phase 4.2 — treasury service decomposition (748 + 705 lines → Clean Architecture):**
+- Created `GetMainWalletQuery` (7 read methods)
+- Created 9 main-wallet use-cases (Import, Approve, Reject, SetDefault, RevealPrivateKey, UpdateLabel, RequestDeletion, ApproveDeletion, RejectDeletion)
+- Created `GetTransactionWalletQuery` (13 read methods)
+- Created 6 transaction-wallet use-cases (Create, SendWithdrawal, Deactivate, Delete, SetDefaultUserDeposit, UnsetDefaultUserDeposit)
+- Created `GetTreasuryOperationQuery` (3 read methods)
+- Updated `TreasuryController` and `TreasuryModule` — 18 new application-layer classes
+
+**Module CA progress:** 14/22 fully Clean Architecture (auth, orders, wallets, system-config, currencies, deposits, users, exchange-rate, managed-wallets, notifications, payment-config, market-maker, treasury, markets)
+
+**Remaining:** 2 hybrid (blockchain, matching), 6 traditional/infrastructure, 1 remaining large service (onchain-withdrawal.service.ts 667 lines)
+
+**Test coverage:** All tests PASS, TypeScript zero errors, webpack build successful.

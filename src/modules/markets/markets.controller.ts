@@ -28,8 +28,18 @@ import { RequirePermissions } from '@/common/decorators/require-permissions.deco
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
+import {
+  GetMarketDepthQuery,
+  GetMarketOHLCVQuery,
+  GetMarketPairQuery,
+  GetMarketTickerQuery,
+} from './application/queries';
+import {
+  CreateMarketPairUseCase,
+  DeleteMarketPairUseCase,
+  UpdateMarketPairUseCase,
+} from './application/use-cases';
 import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
-import { MarketsService } from './markets.service';
 import { resolveOhlcvLocale } from './ohlcv-locale.util';
 
 /**
@@ -42,7 +52,15 @@ import { resolveOhlcvLocale } from './ohlcv-locale.util';
 @Controller('markets')
 @UseGuards(JwtAuthGuard) // All routes require authentication
 export class MarketsController {
-  constructor(private readonly marketsService: MarketsService) {}
+  constructor(
+    private readonly getMarketPairQuery: GetMarketPairQuery,
+    private readonly getMarketTickerQuery: GetMarketTickerQuery,
+    private readonly getMarketDepthQuery: GetMarketDepthQuery,
+    private readonly getMarketOHLCVQuery: GetMarketOHLCVQuery,
+    private readonly createMarketPairUseCase: CreateMarketPairUseCase,
+    private readonly updateMarketPairUseCase: UpdateMarketPairUseCase,
+    private readonly deleteMarketPairUseCase: DeleteMarketPairUseCase,
+  ) {}
 
   /**
    * Get all market pairs with pagination, search and filter
@@ -126,19 +144,19 @@ export class MarketsController {
     @Query('sortOrder') sortOrder?: string,
     @Query('fuzzySearch', new ParseBoolPipe({ optional: true })) fuzzySearch: boolean = false,
   ) {
-    return this.marketsService.findAll(
+    return this.getMarketPairQuery.findAll({
       page,
       limit,
       includeInactive,
       includeTickers,
-      search,
-      baseSymbol,
-      quoteSymbol,
-      quoteSymbols,
-      sortBy,
-      sortOrder,
+      search: search ?? null,
+      baseSymbol: baseSymbol ?? null,
+      quoteSymbol: quoteSymbol ?? null,
+      quoteSymbols: quoteSymbols ?? null,
+      sortBy: sortBy ?? null,
+      sortOrder: sortOrder ?? null,
       fuzzySearch,
-    );
+    });
   }
 
   /**
@@ -155,7 +173,7 @@ export class MarketsController {
   @ApiSuccessResponse('Active market pairs retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findActive() {
-    return this.marketsService.findActive();
+    return this.getMarketPairQuery.findActive();
   }
 
   /**
@@ -172,7 +190,7 @@ export class MarketsController {
   @ApiSuccessResponse('All market tickers retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async getAllTickers() {
-    return this.marketsService.getAllTickers();
+    return this.getMarketTickerQuery.getAllTickers();
   }
 
   /**
@@ -191,7 +209,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async findBySymbol(@Param('symbol') symbol: string) {
-    return this.marketsService.findBySymbol(symbol);
+    return this.getMarketPairQuery.findBySymbol(symbol);
   }
 
   /**
@@ -210,7 +228,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async getTickerBySymbol(@Param('symbol') symbol: string) {
-    return this.marketsService.getTickerBySymbol(symbol);
+    return this.getMarketTickerQuery.getTickerBySymbol(symbol);
   }
 
   /**
@@ -233,7 +251,7 @@ export class MarketsController {
     @Param('symbol') symbol: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
   ) {
-    return this.marketsService.getOrderBookBySymbol(symbol, limit);
+    return this.getMarketDepthQuery.getOrderBookBySymbol(symbol, limit);
   }
 
   /**
@@ -256,7 +274,7 @@ export class MarketsController {
     @Param('symbol') symbol: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
   ) {
-    return this.marketsService.getRecentTradesBySymbol(symbol, limit);
+    return this.getMarketDepthQuery.getRecentTradesBySymbol(symbol, limit);
   }
 
   /**
@@ -284,7 +302,7 @@ export class MarketsController {
     @Param('symbol') symbol: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
   ) {
-    return this.marketsService.getDepthSnapshotBySymbol(symbol, limit);
+    return this.getMarketDepthQuery.getDepthSnapshotBySymbol(symbol, limit);
   }
 
   /**
@@ -303,7 +321,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async getTicker(@Param('id') id: string) {
-    return this.marketsService.getTicker(id);
+    return this.getMarketTickerQuery.getTicker(id);
   }
 
   /**
@@ -326,13 +344,13 @@ export class MarketsController {
     @Param('id') id: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
   ) {
-    return this.marketsService.getOrderBook(id, limit);
+    return this.getMarketDepthQuery.getOrderBook(id, limit);
   }
 
   /**
    * Get OHLCV by pair ID
    * GET /markets/:id/ohlcv?limit=100&range=1d
-   * GET /markets/:id/ohlcv?interval=5m          ← new: direct crypto-style interval
+   * GET /markets/:id/ohlcv?interval=5m ← new: direct crypto-style interval
    * range: 1d | 1M | 3M | 1y | 5y (legacy: filter by time window)
    * interval: 1m | 5m | 15m | 1h | 4h | 1d (new: direct interval with preset lookback)
    * IMPORTANT: Must be before @Get(':id') to avoid route conflict
@@ -381,7 +399,13 @@ export class MarketsController {
     @Query('interval') interval?: string,
   ) {
     const resolved = resolveOhlcvLocale(locale, acceptLanguage);
-    return this.marketsService.getOHLCV(id, limit, range, resolved, interval);
+    return this.getMarketOHLCVQuery.getOHLCV({
+      pairId: id,
+      limit,
+      range,
+      locale: resolved,
+      interval,
+    });
   }
 
   /**
@@ -404,7 +428,7 @@ export class MarketsController {
     @Param('id') id: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
   ) {
-    return this.marketsService.getRecentTrades(id, limit);
+    return this.getMarketDepthQuery.getRecentTrades(id, limit);
   }
 
   /**
@@ -433,7 +457,7 @@ export class MarketsController {
     @Param('id') id: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
   ) {
-    return this.marketsService.getDepthSnapshot(id, limit);
+    return this.getMarketDepthQuery.getDepthSnapshot(id, limit);
   }
 
   /**
@@ -452,7 +476,7 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async findOne(@Param('id') id: string) {
-    return this.marketsService.findOne(id);
+    return this.getMarketPairQuery.findOne(id);
   }
 
   /**
@@ -473,7 +497,7 @@ export class MarketsController {
   @ApiConflictResponse('Market pair already exists')
   @ApiUnauthorizedResponse('Unauthorized')
   async create(@Body() createMarketPairDto: CreateMarketPairDto) {
-    return this.marketsService.create(createMarketPairDto);
+    return this.createMarketPairUseCase.execute(createMarketPairDto);
   }
 
   /**
@@ -496,7 +520,7 @@ export class MarketsController {
   @ApiConflictResponse('Market pair already exists')
   @ApiUnauthorizedResponse('Unauthorized')
   async update(@Param('id') id: string, @Body() updateMarketPairDto: UpdateMarketPairDto) {
-    return this.marketsService.update(id, updateMarketPairDto);
+    return this.updateMarketPairUseCase.execute(id, updateMarketPairDto);
   }
 
   /**
@@ -519,6 +543,6 @@ export class MarketsController {
   @ApiNotFoundResponse('Market pair not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async remove(@Param('id') id: string) {
-    await this.marketsService.remove(id);
+    await this.deleteMarketPairUseCase.execute(id);
   }
 }

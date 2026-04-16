@@ -15,6 +15,24 @@ import { Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
+import {
+  ApproveMainWalletDeletionUseCase,
+  ApproveMainWalletUseCase,
+  CreateTransactionWalletUseCase,
+  DeleteTransactionWalletUseCase,
+  GetMainWalletQuery,
+  GetTransactionWalletQuery,
+  GetTreasuryOperationQuery,
+  ImportMainWalletUseCase,
+  RejectMainWalletDeletionUseCase,
+  RejectMainWalletUseCase,
+  RequestMainWalletDeletionUseCase,
+  RevealMainWalletPrivateKeyUseCase,
+  SetDefaultMainWalletUseCase,
+  SetDefaultUserDepositUseCase,
+  UnsetDefaultUserDepositUseCase,
+  UpdateMainWalletLabelUseCase,
+} from './application';
 import type {
   CreateTransactionWalletDto,
   FundWalletDto,
@@ -28,11 +46,7 @@ import type {
   UpdateMainWalletDto,
 } from './dto';
 import { OnchainChainPickerService } from './onchain-chain-picker.service';
-import { TransactionWalletService } from './transaction-wallet.service';
-import {
-  type SupportedTreasuryChain,
-  TreasuryMainWalletService,
-} from './treasury-main-wallet.service';
+import type { SupportedTreasuryChain } from './treasury-main-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
 
 @ApiTags('treasury')
@@ -41,8 +55,22 @@ import { TreasuryOperationsService } from './treasury-operations.service';
 @UseGuards(JwtAuthGuard)
 export class TreasuryController {
   constructor(
-    private readonly transactionWalletService: TransactionWalletService,
-    private readonly treasuryMainWalletService: TreasuryMainWalletService,
+    private readonly getMainWalletQuery: GetMainWalletQuery,
+    private readonly getTransactionWalletQuery: GetTransactionWalletQuery,
+    private readonly getTreasuryOperationQuery: GetTreasuryOperationQuery,
+    private readonly importMainWalletUseCase: ImportMainWalletUseCase,
+    private readonly approveMainWalletUseCase: ApproveMainWalletUseCase,
+    private readonly rejectMainWalletUseCase: RejectMainWalletUseCase,
+    private readonly setDefaultMainWalletUseCase: SetDefaultMainWalletUseCase,
+    private readonly revealMainWalletPrivateKeyUseCase: RevealMainWalletPrivateKeyUseCase,
+    private readonly updateMainWalletLabelUseCase: UpdateMainWalletLabelUseCase,
+    private readonly requestMainWalletDeletionUseCase: RequestMainWalletDeletionUseCase,
+    private readonly approveMainWalletDeletionUseCase: ApproveMainWalletDeletionUseCase,
+    private readonly rejectMainWalletDeletionUseCase: RejectMainWalletDeletionUseCase,
+    private readonly createTransactionWalletUseCase: CreateTransactionWalletUseCase,
+    private readonly deleteTransactionWalletUseCase: DeleteTransactionWalletUseCase,
+    private readonly setDefaultUserDepositUseCase: SetDefaultUserDepositUseCase,
+    private readonly unsetDefaultUserDepositUseCase: UnsetDefaultUserDepositUseCase,
     private readonly treasuryOperationsService: TreasuryOperationsService,
     private readonly twoFaService: TwoFaService,
     private readonly onchainChainPickerService: OnchainChainPickerService,
@@ -71,7 +99,7 @@ export class TreasuryController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'List transaction wallets with optional chain/purpose filters' })
   async listWallets(@Query() query: ListTreasuryWalletsDto) {
-    return this.transactionWalletService.listWallets(query);
+    return this.getTransactionWalletQuery.listWallets(query);
   }
 
   @Post('wallets')
@@ -79,7 +107,7 @@ export class TreasuryController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'Create a new transaction wallet' })
   async createWallet(@Body() dto: CreateTransactionWalletDto) {
-    return this.transactionWalletService.createWallet(dto);
+    return this.createTransactionWalletUseCase.execute(dto);
   }
 
   @Get('wallets/:walletId')
@@ -87,7 +115,7 @@ export class TreasuryController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'Get transaction wallet detail with live on-chain balance' })
   async getWalletById(@Param('walletId') walletId: string) {
-    return this.transactionWalletService.getWalletDetail(walletId);
+    return this.getTransactionWalletQuery.getWalletDetail(walletId);
   }
 
   @Post('wallets/:walletId/sweep')
@@ -128,7 +156,7 @@ export class TreasuryController {
     @Param('walletId') walletId: string,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    await this.transactionWalletService.deleteWallet(walletId, actorUserId);
+    await this.deleteTransactionWalletUseCase.execute(walletId, actorUserId);
     return { ok: true };
   }
 
@@ -141,7 +169,7 @@ export class TreasuryController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER, UserRole.RISK_OFFICER)
   @ApiOperation({ summary: 'List main wallets for a chain (auto-seeded or imported)' })
   async listMainWallets(@Query('chain') chain: string) {
-    return this.treasuryMainWalletService.listByChain(chain as SupportedTreasuryChain);
+    return this.getMainWalletQuery.listByChain(chain as SupportedTreasuryChain);
   }
 
   @Get('main-wallets/pending')
@@ -152,7 +180,7 @@ export class TreasuryController {
       'List main wallets pending Risk approval (Finance/Admin can track imports; only Risk approves/rejects)',
   })
   async listPendingMainWallets() {
-    return this.treasuryMainWalletService.listPendingApproval();
+    return this.getMainWalletQuery.listPendingApproval();
   }
 
   /**
@@ -184,7 +212,7 @@ export class TreasuryController {
       );
     }
 
-    return this.treasuryMainWalletService.importMainWallet(dto, actorUserId, actorRole);
+    return this.importMainWalletUseCase.execute(dto, actorUserId, actorRole);
   }
 
   /**
@@ -201,7 +229,7 @@ export class TreasuryController {
     @Body() _dto: ReviewMainWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryMainWalletService.approveMainWallet(mainWalletId, actorUserId);
+    return this.approveMainWalletUseCase.execute(mainWalletId, actorUserId);
   }
 
   /**
@@ -217,7 +245,7 @@ export class TreasuryController {
     @Body() _dto: ReviewMainWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryMainWalletService.rejectMainWallet(mainWalletId, actorUserId);
+    return this.rejectMainWalletUseCase.execute(mainWalletId, actorUserId);
   }
 
   /**
@@ -233,7 +261,7 @@ export class TreasuryController {
     @Param('mainWalletId') mainWalletId: string,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryMainWalletService.setDefault(mainWalletId, actorUserId);
+    return this.setDefaultMainWalletUseCase.execute(mainWalletId, actorUserId);
   }
 
   /**
@@ -256,7 +284,7 @@ export class TreasuryController {
         'INVALID_MFA_CODE',
       );
     }
-    return this.treasuryMainWalletService.revealPrivateKey(mainWalletId, actorUserId);
+    return this.revealMainWalletPrivateKeyUseCase.execute(mainWalletId, actorUserId);
   }
 
   /**
@@ -272,11 +300,7 @@ export class TreasuryController {
     @Body() dto: UpdateMainWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryMainWalletService.updateMainWalletLabel(
-      mainWalletId,
-      dto.label,
-      actorUserId,
-    );
+    return this.updateMainWalletLabelUseCase.execute(mainWalletId, dto.label, actorUserId);
   }
 
   /**
@@ -294,7 +318,7 @@ export class TreasuryController {
     @Param('mainWalletId') mainWalletId: string,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryMainWalletService.requestMainWalletDeletion(mainWalletId, actorUserId);
+    return this.requestMainWalletDeletionUseCase.execute(mainWalletId, actorUserId);
   }
 
   /**
@@ -310,7 +334,7 @@ export class TreasuryController {
     @Body() _dto: ReviewMainWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    await this.treasuryMainWalletService.approveMainWalletDeletion(mainWalletId, actorUserId);
+    await this.approveMainWalletDeletionUseCase.execute(mainWalletId, actorUserId);
     return { success: true };
   }
 
@@ -327,7 +351,7 @@ export class TreasuryController {
     @Body() _dto: ReviewMainWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryMainWalletService.rejectMainWalletDeletion(mainWalletId, actorUserId);
+    return this.rejectMainWalletDeletionUseCase.execute(mainWalletId, actorUserId);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -340,7 +364,7 @@ export class TreasuryController {
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List treasury operations (SWEEP/FUND) with filters and pagination' })
   async listOperations(@Query() query: ListTreasuryOperationsDto) {
-    return this.treasuryOperationsService.listOperations(query);
+    return this.getTreasuryOperationQuery.listOperations(query);
   }
 
   @Get('operations/:operationId')
@@ -349,7 +373,7 @@ export class TreasuryController {
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Get treasury operation detail' })
   async getOperation(@Param('operationId') operationId: string) {
-    return this.treasuryOperationsService.getOperation(operationId);
+    return this.getTreasuryOperationQuery.getOperation(operationId);
   }
 
   @Get('transactions')
@@ -358,6 +382,6 @@ export class TreasuryController {
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List treasury on-chain transactions (SWEEP/FUND)' })
   async listTransactions(@Query() query: ListTreasuryTransactionsDto) {
-    return this.treasuryOperationsService.listTreasuryTransactions(query);
+    return this.getTreasuryOperationQuery.listTreasuryTransactions(query);
   }
 }

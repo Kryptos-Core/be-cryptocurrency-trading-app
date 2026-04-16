@@ -24,9 +24,9 @@ infrastructure/ # Persistence adapters, external service adapters
 presentation/ # Controllers, DTOs (thường nằm ở root module)
 ```
 
-**Module đã theo Clean Architecture:** `auth`, `orders`, `wallets`, `system-config`, `currencies`, `deposits`, `users`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`
+**Module đã theo Clean Architecture:** `auth`, `orders`, `wallets`, `system-config`, `currencies`, `deposits`, `users`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`, `treasury`, `markets`
 
-**Module hybrid** (chưa tách đầy đủ): `blockchain`, `matching`, `treasury`
+**Module hybrid** (chưa tách đầy đủ): `blockchain`, `matching`
 
 **Module traditional/infrastructure** (chưa migrate): `trading`, `exchange`, `dashboard`, `binance-rest`, `redis`, `price-oracle`, `metadata`
 

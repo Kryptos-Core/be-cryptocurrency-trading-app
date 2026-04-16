@@ -9,6 +9,26 @@ import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
+import {
+  ApproveMainWalletDeletionUseCase,
+  ApproveMainWalletUseCase,
+  CreateTransactionWalletUseCase,
+  DeactivateTransactionWalletUseCase,
+  DeleteTransactionWalletUseCase,
+  GetMainWalletQuery,
+  GetTransactionWalletQuery,
+  GetTreasuryOperationQuery,
+  ImportMainWalletUseCase,
+  RejectMainWalletDeletionUseCase,
+  RejectMainWalletUseCase,
+  RequestMainWalletDeletionUseCase,
+  RevealMainWalletPrivateKeyUseCase,
+  SendWithdrawalUseCase,
+  SetDefaultMainWalletUseCase,
+  SetDefaultUserDepositUseCase,
+  UnsetDefaultUserDepositUseCase,
+  UpdateMainWalletLabelUseCase,
+} from './application';
 import { TREASURY_QUEUE } from './constants';
 import {
   TREASURY_MAIN_WALLET_REPOSITORY,
@@ -62,12 +82,33 @@ import { TreasuryOperationsService } from './treasury-operations.service';
     { provide: TREASURY_MAIN_WALLET_REPOSITORY, useClass: TreasuryMainWalletRepository },
     { provide: TREASURY_OPERATION_REPOSITORY, useClass: TreasuryOperationRepository },
     { provide: TREASURY_ONCHAIN_READ_REPOSITORY, useClass: TreasuryOnchainReadRepository },
+    // Core services (kept for schedulers, processors, and internal use)
     TransactionWalletService,
     TreasuryMainWalletService,
     TreasuryOperationsService,
     TreasuryProcessor,
     MainWalletRotationScheduler,
     OnchainChainPickerService,
+    // Application layer — queries
+    GetMainWalletQuery,
+    GetTransactionWalletQuery,
+    GetTreasuryOperationQuery,
+    // Application layer — use cases
+    ImportMainWalletUseCase,
+    ApproveMainWalletUseCase,
+    RejectMainWalletUseCase,
+    SetDefaultMainWalletUseCase,
+    RevealMainWalletPrivateKeyUseCase,
+    UpdateMainWalletLabelUseCase,
+    RequestMainWalletDeletionUseCase,
+    ApproveMainWalletDeletionUseCase,
+    RejectMainWalletDeletionUseCase,
+    CreateTransactionWalletUseCase,
+    SendWithdrawalUseCase,
+    DeactivateTransactionWalletUseCase,
+    DeleteTransactionWalletUseCase,
+    SetDefaultUserDepositUseCase,
+    UnsetDefaultUserDepositUseCase,
   ],
   exports: [
     TransactionWalletService,
