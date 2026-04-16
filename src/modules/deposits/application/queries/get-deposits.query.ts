@@ -33,6 +33,6 @@ export class GetDepositsQuery {
   }> {
     const { page = 1, limit = 20, ...rest } = params;
     const result = await this.depositsService.getAllDepositsForAdmin({ ...rest, page, limit });
-    return { ...result, page, limit };
+    return { items: result.data, total: result.total, page, limit };
   }
 }

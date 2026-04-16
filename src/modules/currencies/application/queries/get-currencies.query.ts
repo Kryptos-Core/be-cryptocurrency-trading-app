@@ -44,7 +44,7 @@ export class GetCurrenciesQuery {
       isActive !== undefined;
 
     if (hasExtraFilter) {
-      return this.search(params);
+      return this.search({ ...params, page, limit });
     }
 
     const cacheKey = `${CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}`;

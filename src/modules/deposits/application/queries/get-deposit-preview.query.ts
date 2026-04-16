@@ -3,11 +3,8 @@ import { DepositsService } from '../../deposits.service';
 
 export interface DepositCheckoutMeta {
   fiatSymbol: string;
-  quoteCurrencySymbol: string;
-  minDepositAmount: string;
-  maxDepositAmount: string;
-  fiatToQuoteRate: string;
-  fxSpreadBps: string;
+  minAmount: number;
+  maxAmount: number | undefined;
 }
 
 /**
@@ -24,6 +21,6 @@ export class GetDepositPreviewQuery {
   }
 
   async getCheckoutMeta(): Promise<DepositCheckoutMeta> {
-    return this.depositsService.getCheckoutMeta() as Promise<DepositCheckoutMeta>;
+    return this.depositsService.getCheckoutMeta();
   }
 }
