@@ -27,29 +27,33 @@ import { RequirePermissions } from '@/common/decorators/require-permissions.deco
 import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { CurrenciesService } from './currencies.service';
+import { GetCurrenciesQuery, GetCurrencyByIdQuery } from './application/queries';
+import {
+  CreateCurrencyUseCase,
+  DeleteCurrencyUseCase,
+  UpdateCurrencyUseCase,
+} from './application/use-cases';
 import { CreateCurrencyDto, UpdateCurrencyDto } from './dto';
 
 /**
- * Currencies Controller
- * Controller Pattern: Handle HTTP requests
- * Single Responsibility: Only handle HTTP layer
+ * Currencies Controller — Clean Architecture presentation layer.
+ *
+ * Pattern: Thin controller — delegates all business logic to use-cases and queries.
+ * Does NOT call the service directly; service is reserved for cross-module use.
  */
 @ApiTags('currencies')
 @ApiBearerAuth('JWT-auth')
 @Controller('currencies')
-@UseGuards(JwtAuthGuard) // All routes require authentication
+@UseGuards(JwtAuthGuard)
 export class CurrenciesController {
-  constructor(private readonly currenciesService: CurrenciesService) {}
+  constructor(
+    private readonly createCurrency: CreateCurrencyUseCase,
+    private readonly updateCurrency: UpdateCurrencyUseCase,
+    private readonly deleteCurrency: DeleteCurrencyUseCase,
+    private readonly getCurrencies: GetCurrenciesQuery,
+    private readonly getCurrencyById: GetCurrencyByIdQuery,
+  ) {}
 
-  /**
-   * Get all currencies with pagination + optional smart search and filters.
-   * GET /currencies?page=1&limit=10&includeInactive=false&search=BTC&isTradable=true&isActive=true
-   *
-   * When `search`, `isTradable`, or `isActive` are provided the request is
-   * forwarded to the QueryBuilder-based search path (no Redis cache).
-   * Without extra filters the cached stored-procedure path is used.
-   */
   @Get()
   @Public()
   @ApiOperation({
@@ -68,38 +72,21 @@ export class CurrenciesController {
     example: false,
     description: 'Include enriched market ticker fields (may increase response time).',
   })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Text search on symbol or name (case-insensitive, partial match).',
-  })
-  @ApiQuery({
-    name: 'isTradable',
-    required: false,
-    type: Boolean,
-    description: 'Filter by tradable status.',
-  })
-  @ApiQuery({
-    name: 'isActive',
-    required: false,
-    type: Boolean,
-    description: 'Filter by active status.',
-  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'isTradable', required: false, type: Boolean })
+  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
   @ApiSuccessResponse('Currencies retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
-    @Query('includeInactive', new ParseBoolPipe({ optional: true }))
-    includeInactive: boolean = false,
-    @Query('includeMarketData', new ParseBoolPipe({ optional: true }))
-    includeMarketData: boolean = false,
+    @Query('includeInactive', new ParseBoolPipe({ optional: true })) includeInactive = false,
+    @Query('includeMarketData', new ParseBoolPipe({ optional: true })) includeMarketData = false,
     @Query('search') search?: string,
     @Query('isTradable', new ParseBoolPipe({ optional: true })) isTradable?: boolean,
     @Query('isActive', new ParseBoolPipe({ optional: true })) isActive?: boolean,
   ) {
-    return this.currenciesService.findAll(
+    return this.getCurrencies.execute({
       page,
       limit,
       includeInactive,
@@ -107,110 +94,68 @@ export class CurrenciesController {
       search,
       isTradable,
       isActive,
-    );
+    });
   }
 
-  /**
-   * Get all active currencies
-   * GET /currencies/active
-   */
   @Get('active')
   @Public()
-  @ApiOperation({
-    summary: 'Get all active currencies',
-    description: 'Retrieve all active currencies (cached)',
-  })
+  @ApiOperation({ summary: 'Get all active currencies' })
   @ApiSuccessResponse('Active currencies retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findActive() {
-    return this.currenciesService.findActive();
+    return this.getCurrencies.getActive();
   }
 
-  /**
-   * Get all tradable currencies
-   * GET /currencies/tradable
-   */
   @Get('tradable')
   @Public()
-  @ApiOperation({
-    summary: 'Get all tradable currencies',
-    description: 'Retrieve all tradable and active currencies (cached)',
-  })
+  @ApiOperation({ summary: 'Get all tradable currencies' })
   @ApiSuccessResponse('Tradable currencies retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async findTradable() {
-    return this.currenciesService.findTradable();
+    return this.getCurrencies.getTradable();
   }
 
-  /**
-   * Get currency by ID
-   * GET /currencies/:id
-   */
   @Get(':id')
   @Public()
-  @ApiOperation({
-    summary: 'Get currency by ID',
-    description: 'Retrieve a specific currency by its ID',
-  })
-  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiOperation({ summary: 'Get currency by ID' })
+  @ApiParam({ name: 'id', type: String })
   @ApiSuccessResponse('Currency retrieved successfully')
   @ApiNotFoundResponse('Currency not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async findOne(@Param('id') id: string) {
-    return this.currenciesService.findOne(id);
+    return this.getCurrencyById.execute(id);
   }
 
-  /**
-   * Get currency by symbol
-   * GET /currencies/symbol/:symbol
-   */
   @Get('symbol/:symbol')
   @Public()
-  @ApiOperation({
-    summary: 'Get currency by symbol',
-    description: 'Retrieve a specific currency by its symbol (e.g., BTC, ETH)',
-  })
-  @ApiParam({ name: 'symbol', type: String, example: 'BTC' })
+  @ApiOperation({ summary: 'Get currency by symbol' })
+  @ApiParam({ name: 'symbol', type: String })
   @ApiSuccessResponse('Currency retrieved successfully')
   @ApiNotFoundResponse('Currency not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async findBySymbol(@Param('symbol') symbol: string) {
-    return this.currenciesService.findBySymbol(symbol);
+    return this.getCurrencyById.executeBySymbol(symbol);
   }
 
-  /**
-   * Create new currency
-   * POST /currencies
-   */
   @Post()
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN)
-  @ApiOperation({
-    summary: 'Create new currency',
-    description: 'Create a new cryptocurrency entry',
-  })
+  @ApiOperation({ summary: 'Create new currency' })
   @ApiBody({ type: CreateCurrencyDto })
   @RequirePermissions(Permission.CURRENCIES_MANAGE)
   @ApiCreatedResponse('Currency created successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiConflictResponse('Currency symbol already exists')
   @ApiUnauthorizedResponse('Unauthorized')
-  async create(@Body() createCurrencyDto: CreateCurrencyDto) {
-    return this.currenciesService.create(createCurrencyDto);
+  async create(@Body() dto: CreateCurrencyDto) {
+    return this.createCurrency.execute(dto);
   }
 
-  /**
-   * Update currency
-   * PATCH /currencies/:id
-   */
   @Patch(':id')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN)
-  @ApiOperation({
-    summary: 'Update currency',
-    description: 'Update a specific currency by its ID',
-  })
-  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiOperation({ summary: 'Update currency' })
+  @ApiParam({ name: 'id', type: String })
   @ApiBody({ type: UpdateCurrencyDto })
   @RequirePermissions(Permission.CURRENCIES_MANAGE)
   @ApiSuccessResponse('Currency updated successfully')
@@ -218,30 +163,21 @@ export class CurrenciesController {
   @ApiNotFoundResponse('Currency not found')
   @ApiConflictResponse('Currency symbol already exists')
   @ApiUnauthorizedResponse('Unauthorized')
-  async update(@Param('id') id: string, @Body() updateCurrencyDto: UpdateCurrencyDto) {
-    return this.currenciesService.update(id, updateCurrencyDto);
+  async update(@Param('id') id: string, @Body() dto: UpdateCurrencyDto) {
+    return this.updateCurrency.execute(id, dto);
   }
 
-  /**
-   * Delete currency (soft delete)
-   * DELETE /currencies/:id
-   */
   @Delete(':id')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireRoles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({
-    summary: 'Delete currency',
-    description: 'Soft delete a currency by setting is_active to false',
-  })
-  @ApiParam({ name: 'id', type: String, example: '018e9a7b-1234-7abc-8000-000000000002' })
+  @ApiOperation({ summary: 'Soft delete a currency' })
+  @ApiParam({ name: 'id', type: String })
   @RequirePermissions(Permission.CURRENCIES_MANAGE)
-  @ApiSuccessResponse('Currency deleted successfully', {
-    schema: { example: null },
-  })
+  @ApiSuccessResponse('Currency deleted successfully', { schema: { example: null } })
   @ApiNotFoundResponse('Currency not found')
   @ApiUnauthorizedResponse('Unauthorized')
   async remove(@Param('id') id: string) {
-    await this.currenciesService.remove(id);
+    await this.deleteCurrency.execute(id);
   }
 }

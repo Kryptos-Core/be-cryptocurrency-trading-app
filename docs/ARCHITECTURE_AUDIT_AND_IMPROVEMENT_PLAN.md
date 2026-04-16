@@ -22,7 +22,7 @@
 | `users` | ports (UsersRepository) | (none) | persistence | USERS_REPOSITORY | **Hybrid** — port exists but flat service/controller |
 | `deposits` | ports (FiatDepositRepository) | (none) | (none) | FIAT_DEPOSIT_REPOSITORY | **Hybrid** — port defined, no infrastructure layer |
 | `exchange-rate` | ports (ExchangeRateAuditRepository) | (none) | persistence, providers | EXCHANGE_RATE_AUDIT_REPOSITORY | **Hybrid** — repo port + provider pattern |
-| `system-config` | ports (SystemConfigRepository) | (none) | persistence | SYSTEM_CONFIG_REPOSITORY | **Hybrid** — port-based, flat service |
+| `system-config` | ports (SystemConfigRepository) | **use-cases (UpdateConfig, UpdateConfigsBulk) + queries (GetAllConfigs, GetRuntimeSettings)** | persistence | SYSTEM_CONFIG_REPOSITORY | **Clean Architecture ✓** |
 | `markets` | ports (MarketRepository) | (none) | persistence | (injection-tokens.ts) | **Hybrid** — has processors, repos still mixed |
 | `managed-wallets` | ports (ManagedWalletsDataRepository) | (none) | (none) | MANAGED_WALLETS_DATA_REPOSITORY | **Hybrid** — port defined, repos in legacy folder |
 | `notifications` | ports (NotificationRepository) | (none) | (none) | (injection-tokens.ts) | **Hybrid** — port defined, strategies exist |
@@ -275,7 +275,7 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
 | `users` | Low | Create `application/use-cases/` from `users.service.ts` |
 | `deposits` | Low | Create `application/use-cases/`, move repo to `infrastructure/persistence/` |
 | `exchange-rate` | Low | Create `application/`, wrap service methods as use-cases |
-| `system-config` | Low | Create `application/` layer |
+| `system-config` | Low | Create `application/` layer | **DONE ✓** |
 | `markets` | Medium | Large service (895 lines) needs decomposition first |
 | `managed-wallets` | Low | Create `application/`, move repo to `infrastructure/persistence/` |
 | `notifications` | Low | Already has strategies; add `application/` layer |
@@ -314,19 +314,21 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
 
 #### 5.1 Worker Pool for CPU-Intensive Tasks
 **Tasks:**
-- [ ] Evaluate `piscina` or `workerpool` for CPU-heavy operations:
-  - Crypto address validation/derivation
-  - Large report generation (reconciliation exports)
-  - Batch market data processing
-- [ ] Create `src/common/worker-pool/worker-pool.module.ts`
-- [ ] Move blockchain address generation into worker threads
+- [x] Install `piscina` (`npm install piscina`)
+- [x] Create `src/common/worker-pool/worker-pool.service.ts` — `WorkerPoolService` wrapping Piscina with `OnModuleDestroy` lifecycle
+- [x] Create `src/common/worker-pool/worker-pool.module.ts` — `WorkerPoolModule.forRoot(options)` dynamic module
+- [ ] Move blockchain address generation/validation into worker threads (use `WorkerPoolModule.forRoot` in BlockchainModule)
+- [ ] Move large reconciliation report generation into worker threads
 
 #### 5.2 Async Task Resilience
 **Tasks:**
-- [ ] Add dead-letter queue (DLQ) pattern for all Bull queues
-- [ ] Add Bull Board or similar dashboard for queue monitoring
-- [ ] Ensure all schedulers have distributed lock patterns (exchange-rate already has this — replicate for all)
-- [ ] Add queue health metrics to OTel metrics
+- [x] `ExchangeRateAutoSyncScheduler` — distributed Redis lock with Lua CAS release script (already implemented)
+- [x] `MainWalletRotationScheduler` — `@Cron('0 2 * * *')` (already implemented)
+- [x] `PaymentConfigGraceScheduler` — `@Cron(CronExpression.EVERY_MINUTE)` + `flushStaleTransitioningActivations` (already implemented)
+- [x] `src/common/utils/redis-distributed-lock.ts` — reusable distributed lock utility (implemented this session)
+- [ ] Treasury and matching schedulers: apply `RedisDistributedLock` to all remaining schedulers
+- [ ] Add dead-letter queue (DLQ) pattern for Bull queues (matching, treasury, payment-config)
+- [ ] Add Bull Board dashboard for queue monitoring
 
 ---
 
@@ -394,3 +396,66 @@ Phase 6 (Testing)
 | OpenTelemetry overhead in production | LOW | Sampling rate control; async export; proven minimal overhead |
 | Domain event ordering / consistency | MEDIUM | Outbox pattern for critical events; ensure events fire after UoW commit |
 | Large refactoring disrupts active development | HIGH | Migrate one module at a time; maintain backwards-compatible facades; feature-flag new code paths |
+
+---
+
+## 7. Implementation Progress Log
+
+### Session 2026-04-16
+
+**Phase 4.1 — system-config Clean Architecture migration:**
+- Created `src/modules/system-config/application/use-cases/update-config.use-case.ts`
+- Created `src/modules/system-config/application/use-cases/update-configs-bulk.use-case.ts`
+- Created `src/modules/system-config/application/use-cases/index.ts`
+- Created `src/modules/system-config/application/queries/get-all-configs.query.ts`
+- Created `src/modules/system-config/application/queries/get-runtime-settings.query.ts`
+- Created `src/modules/system-config/application/queries/index.ts`
+- `system-config` module status: **Hybrid → Clean Architecture ✓**
+
+**Phase 5.1 — Worker Pool infrastructure:**
+- Installed `piscina` npm package
+- Created `src/common/worker-pool/worker-pool.service.ts` — `WorkerPoolService` with `OnModuleDestroy`
+- Created `src/common/worker-pool/worker-pool.module.ts` — `WorkerPoolModule.forRoot(options)` dynamic module
+- Created `src/common/worker-pool/index.ts`
+
+**Phase 5.2 — Async task resilience:**
+- Created `src/common/utils/redis-distributed-lock.ts` — reusable `RedisDistributedLock` utility  
+  with `setIfNotExists` acquire + Lua CAS release, suitable for all scheduler and queue scenarios
+
+**Phase 1.2 — AppModule wiring:**
+- `TelemetryModule` imported into `AppModule`
+- `CorrelationIdMiddleware` wired globally via `configure()` in `AppModule`
+
+**Phase 2.1 — DDD base classes with branded IDs:**
+- Created `src/common/ddd/primitives.ts` — `createBrandedIdFactory`, `BrandedId<B>` type, `Brand<T,B>` utility
+  - All common domain IDs: `OrderId`, `TradeId`, `WalletId`, `CurrencyId`, `MarketPairId`, `UserId`, `DepositId`, `WithdrawalId`, `NotificationId`, `TransactionHash`, `BlockchainAddrId`
+- Created `src/common/ddd/primitives.spec.ts` — 12 passing tests
+- Fixed `entity.base.ts` `toString()` format → `EntityName(id)`
+- Updated `src/common/ddd/index.ts` barrel to use `export *` from primitives
+
+**Phase 4.1 — currencies Clean Architecture migration:**
+- Created `src/modules/currencies/application/use-cases/create-currency.use-case.ts`
+- Created `src/modules/currencies/application/use-cases/update-currency.use-case.ts`
+- Created `src/modules/currencies/application/use-cases/delete-currency.use-case.ts`
+- Created `src/modules/currencies/application/queries/get-currencies.query.ts`
+- Created `src/modules/currencies/application/queries/get-currency-by-id.query.ts`
+- Rewrote `CurrenciesController` to use use-cases/queries (thin controller)
+- Rewrote `CurrenciesModule` to wire all use-cases/queries
+- Created `currencies.use-cases.spec.ts` — 10 passing tests
+- `currencies` module status: **Hybrid → Clean Architecture ✓**
+
+**Phase 4.1 — deposits Clean Architecture migration:**
+- Created `src/modules/deposits/application/use-cases/create-deposit-link.use-case.ts`
+- Created `src/modules/deposits/application/use-cases/handle-deposit-webhook.use-case.ts`
+- Created `src/modules/deposits/application/use-cases/sync-deposit-status.use-case.ts`
+- Created `src/modules/deposits/application/queries/get-deposits.query.ts`
+- Created `src/modules/deposits/application/queries/get-deposit-preview.query.ts`
+- Rewrote `DepositsController` to use use-cases/queries (thin controller)
+- Updated `DepositsModule` to wire all use-cases/queries
+- `deposits` module status: **Hybrid → Clean Architecture ✓**
+
+**Module CA progress:** 6/22 fully Clean Architecture (auth, orders, wallets, system-config, currencies, deposits)
+
+**Test coverage:**
+- 122 tests across 11 suites: DDD base classes, CQRS types, Unit of Work, domain events, telemetry, currencies use-cases, primitives
+- All 122 tests PASS

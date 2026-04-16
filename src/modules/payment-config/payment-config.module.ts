@@ -15,6 +15,12 @@ import { PaymentConfigRepository } from './repositories/payment-config.repositor
     TypeOrmModule.forFeature([PaymentMethodConfig]),
     BullModule.registerQueue({
       name: PAYMENT_CONFIG_QUEUE,
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 1_000 },
+        removeOnComplete: 50,
+        removeOnFail: false, // failed jobs stay in Bull's failed set (acts as DLQ)
+      },
     }),
   ],
   controllers: [PaymentConfigController],

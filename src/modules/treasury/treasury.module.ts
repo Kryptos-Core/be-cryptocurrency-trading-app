@@ -16,14 +16,14 @@ import {
   TREASURY_OPERATION_REPOSITORY,
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
 } from './domain/ports';
-import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
-import { OnchainChainPickerService } from './onchain-chain-picker.service';
 import {
   TreasuryMainWalletRepository,
   TreasuryOnchainReadRepository,
   TreasuryOperationRepository,
   TreasuryTransactionWalletRepository,
 } from './infrastructure/persistence';
+import { MainWalletRotationScheduler } from './main-wallet-rotation.scheduler';
+import { OnchainChainPickerService } from './onchain-chain-picker.service';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { TreasuryController } from './treasury.controller';
 import { TreasuryProcessor } from './treasury.processor';
@@ -43,13 +43,22 @@ import { TreasuryOperationsService } from './treasury-operations.service';
     forwardRef(() => AuthModule), // forwardRef avoids potential circular deps
     BullModule.registerQueue({
       name: TREASURY_QUEUE,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2_000 },
+        removeOnComplete: 100, // keep last 100 completed jobs for inspection
+        removeOnFail: false, // failed jobs stay in Bull's failed set (acts as DLQ)
+      },
     }),
   ],
   controllers: [TreasuryController],
   providers: [
     WalletEncryptionService,
     // Port → Implementation bindings
-    { provide: TREASURY_TRANSACTION_WALLET_REPOSITORY, useClass: TreasuryTransactionWalletRepository },
+    {
+      provide: TREASURY_TRANSACTION_WALLET_REPOSITORY,
+      useClass: TreasuryTransactionWalletRepository,
+    },
     { provide: TREASURY_MAIN_WALLET_REPOSITORY, useClass: TreasuryMainWalletRepository },
     { provide: TREASURY_OPERATION_REPOSITORY, useClass: TreasuryOperationRepository },
     { provide: TREASURY_ONCHAIN_READ_REPOSITORY, useClass: TreasuryOnchainReadRepository },

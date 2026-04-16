@@ -2,11 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { RedisService } from '@/common/services/redis.service';
+import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import type { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import {
   TREASURY_MAIN_WALLET_EVENTS_CHANNEL,
   TreasuryMainWalletService,
 } from './treasury-main-wallet.service';
+
+const ROTATION_LOCK_KEY = 'treasury:main_wallet_rotation:lock';
+/** 3 h TTL — daily job shouldn't run more than a few minutes, but gives ample safety margin */
+const ROTATION_LOCK_TTL_SECONDS = 10_800;
 
 /**
  * MainWalletRotationScheduler
@@ -26,6 +31,8 @@ import {
  * To enable full automated key rotation in the future:
  *   - Store a pool of pre-approved wallet keys
  *   - Scheduler rotates by setting a pool wallet as the new default
+ *
+ * Distributed lock: prevents duplicate rotation across multiple API instances.
  */
 @Injectable()
 export class MainWalletRotationScheduler {
@@ -49,6 +56,21 @@ export class MainWalletRotationScheduler {
    */
   @Cron('0 2 * * *', { name: 'treasury-main-wallet-rotation', timeZone: 'UTC' })
   async checkAndRotate(): Promise<void> {
+    await withDistributedLock(
+      this.redisService,
+      {
+        lockKey: ROTATION_LOCK_KEY,
+        ttlSeconds: ROTATION_LOCK_TTL_SECONDS,
+        callerName: MainWalletRotationScheduler.name,
+      },
+      () => this.doRotation(),
+      this.logger,
+    ).catch((err: Error) => {
+      this.logger.error(`[RotationScheduler] Unexpected error in checkAndRotate: ${err.message}`);
+    });
+  }
+
+  private async doRotation(): Promise<void> {
     const globalIntervalDays = this.resolveGlobalIntervalDays();
 
     this.logger.log(

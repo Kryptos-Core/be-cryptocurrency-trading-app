@@ -7,16 +7,22 @@ import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { PermissionGuard } from '@/common/guards/permission.guard';
 import { RoleGuard } from '@/common/guards/role.guard';
+import { GetAllConfigsQuery, GetRuntimeSettingsQuery } from './application/queries';
+import { UpdateConfigsBulkUseCase, UpdateConfigUseCase } from './application/use-cases';
 import type { UpdateRuntimeSettingsBulkDto } from './dto/update-runtime-settings-bulk.dto';
 import type { UpdateSystemConfigDto } from './dto/update-system-config.dto';
-import { SystemConfigService } from './system-config.service';
 
 @ApiTags('System Configs')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RoleGuard, PermissionGuard)
 @Controller('system-configs')
 export class SystemConfigController {
-  constructor(private readonly configService: SystemConfigService) {}
+  constructor(
+    private readonly getRuntimeSettings: GetRuntimeSettingsQuery,
+    private readonly getAllConfigs: GetAllConfigsQuery,
+    private readonly updateConfig: UpdateConfigUseCase,
+    private readonly updateConfigsBulk: UpdateConfigsBulkUseCase,
+  ) {}
 
   @Get('runtime')
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
@@ -24,8 +30,8 @@ export class SystemConfigController {
   @ApiOperation({
     summary: 'Runtime platform settings (effective values for admin UI)',
   })
-  async getRuntimeSettings() {
-    return this.configService.getRuntimeSettingsForAdmin();
+  async getRuntimeSettingsHandler() {
+    return this.getRuntimeSettings.execute();
   }
 
   @Patch('runtime')
@@ -36,26 +42,26 @@ export class SystemConfigController {
     @Body() dto: UpdateRuntimeSettingsBulkDto,
     @CurrentUser('userId') userId: string,
   ) {
-    return this.configService.updateConfigsBulk(dto.updates ?? {}, userId);
+    return this.updateConfigsBulk.execute(dto.updates ?? {}, userId);
   }
 
   @Get()
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'List all system config rows (DB)' })
-  async getAllConfigs() {
-    return this.configService.getAllConfigs();
+  async getAllConfigsHandler() {
+    return this.getAllConfigs.execute();
   }
 
   @Patch(':key')
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Update a single config key' })
-  async updateConfig(
+  async updateConfigHandler(
     @Param('key') key: string,
     @Body() dto: UpdateSystemConfigDto,
     @CurrentUser('userId') userId: string,
   ) {
-    return this.configService.updateConfig(key, dto.value, userId);
+    return this.updateConfig.execute(key, dto.value, userId);
   }
 }

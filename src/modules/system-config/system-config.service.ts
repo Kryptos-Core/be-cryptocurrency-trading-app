@@ -384,6 +384,13 @@ export class SystemConfigService implements OnModuleInit {
       .getClient()
       .publish(this.UPDATE_EVENT, JSON.stringify({ key, value: newValue }));
 
+    this.logUpdate(key, userId);
+
+    return updated;
+  }
+
+  /** Structured audit log line — can be called from use-cases too. */
+  logUpdate(key: string, userId?: string): void {
     this.logger.log(
       JSON.stringify({
         event: 'runtime_setting_updated',
@@ -392,8 +399,6 @@ export class SystemConfigService implements OnModuleInit {
         at: new Date().toISOString(),
       }),
     );
-
-    return updated;
   }
 
   async updateConfigsBulk(

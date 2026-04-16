@@ -15,21 +15,37 @@ import type { Request } from 'express';
 import { RequireFinanceAccess, RequirePermissions } from '@/common/decorators';
 import { Permission } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { DepositsService } from './deposits.service';
+import { GetDepositPreviewQuery, GetDepositsQuery } from './application/queries';
+import {
+  CreateDepositLinkUseCase,
+  HandleDepositWebhookUseCase,
+  SyncDepositStatusUseCase,
+} from './application/use-cases';
 import type { CreateFiatDepositDto } from './dto/create-deposit.dto';
 
+/**
+ * DepositsController — Clean Architecture presentation layer.
+ *
+ * Pattern: Thin controller — delegates all business logic to use-cases and queries.
+ */
 @ApiTags('Deposits')
 @Controller('deposits')
 export class DepositsController {
-  constructor(private readonly depositsService: DepositsService) {}
+  constructor(
+    private readonly createDepositLink: CreateDepositLinkUseCase,
+    private readonly handleWebhookUseCase: HandleDepositWebhookUseCase,
+    private readonly syncDepositStatus: SyncDepositStatusUseCase,
+    private readonly getDeposits: GetDepositsQuery,
+    private readonly getDepositPreview: GetDepositPreviewQuery,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new deposit link using PayOS' })
-  async createDepositLink(@Req() req: Request, @Body() dto: CreateFiatDepositDto) {
+  async createDepositLinkEndpoint(@Req() req: Request, @Body() dto: CreateFiatDepositDto) {
     const user = req.user as any;
-    return this.depositsService.createPaymentLink(user.userId, dto.amount);
+    return this.createDepositLink.execute(user.userId, dto.amount);
   }
 
   @Get()
@@ -38,7 +54,7 @@ export class DepositsController {
   @ApiOperation({ summary: 'Get current user deposits' })
   async getMyDeposits(@Req() req: Request) {
     const user = req.user as any;
-    return this.depositsService.getMyDeposits(user.userId);
+    return this.getDeposits.getMyDeposits(user.userId);
   }
 
   @Get('checkout-meta')
@@ -48,7 +64,7 @@ export class DepositsController {
     summary: 'PayOS fiat deposit limits for checkout (min/max from active config)',
   })
   async getCheckoutMeta() {
-    return this.depositsService.getCheckoutMeta();
+    return this.getDepositPreview.getCheckoutMeta();
   }
 
   @Get(':orderCode/sync-status')
@@ -58,12 +74,9 @@ export class DepositsController {
     summary:
       'Sync payment status directly from PayOS (useful for local/dev when webhook is unreachable)',
   })
-  async syncDepositStatus(
-    @Req() req: Request,
-    @Param('orderCode', ParseIntPipe) orderCode: number,
-  ) {
+  async syncStatus(@Req() req: Request, @Param('orderCode', ParseIntPipe) orderCode: number) {
     const user = req.user as any;
-    return this.depositsService.syncPaymentStatusForUser(user.userId, orderCode);
+    return this.syncDepositStatus.execute(user.userId, orderCode);
   }
 
   @Get('admin/all')
@@ -85,14 +98,13 @@ export class DepositsController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
-    return this.depositsService.getAllDepositsForAdmin({ userId, status, page, limit });
+    return this.getDeposits.getAllForAdmin({ userId, status, page, limit });
   }
 
   @Post('payos-webhook')
   @ApiOperation({ summary: 'Receive PayOS payment webhook notification' })
-  async handlePayOSWebhook(@Body() payload: any) {
-    const result = await this.depositsService.handleWebhook(payload);
-    // Respond exact JSON to satisfy PayOS requirements
+  async handlePayOSWebhook(@Body() payload: unknown) {
+    const result = await this.handleWebhookUseCase.execute(payload);
     return {
       error: 0,
       message: 'Ok',
