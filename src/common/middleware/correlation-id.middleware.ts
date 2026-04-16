@@ -1,6 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
 
 export const CORRELATION_ID_HEADER = 'X-Request-ID';
 

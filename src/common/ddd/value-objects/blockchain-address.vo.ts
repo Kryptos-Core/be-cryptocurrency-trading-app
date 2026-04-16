@@ -53,9 +53,7 @@ export class BlockchainAddress extends ValueObject<{ address: string; chain: Sup
 
     const pattern = BlockchainAddress.patternFor(chain);
     if (!pattern.test(trimmed)) {
-      throw new Error(
-        `BlockchainAddress: invalid address "${trimmed}" for chain "${chain}"`,
-      );
+      throw new Error(`BlockchainAddress: invalid address "${trimmed}" for chain "${chain}"`);
     }
 
     return new BlockchainAddress({ address: trimmed, chain });

@@ -39,7 +39,8 @@ export abstract class BaseCommand {
   public readonly correlationId: string;
 
   constructor(correlationId?: string) {
-    this.correlationId = correlationId ?? `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    this.correlationId =
+      correlationId ?? `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   }
 }
 
@@ -77,7 +78,8 @@ export abstract class BaseQuery {
   public readonly correlationId: string;
 
   constructor(correlationId?: string) {
-    this.correlationId = correlationId ?? `qry-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    this.correlationId =
+      correlationId ?? `qry-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   }
 }
 

@@ -132,19 +132,19 @@
 
 ### Phase 1: Foundation — Infrastructure Building Blocks (Priority: HIGH)
 
-#### 1.1 Domain Event Bus & Dispatcher
+#### 1.1 Domain Event Bus & Dispatcher ✅ DONE
 **Goal:** Enable cross-module communication through domain events instead of direct service imports.
 
 **Tasks:**
-- [ ] Create `src/common/domain-events/domain-event.base.ts` — base class with `eventId`, `occurredOn`, `aggregateId`
-- [ ] Create `src/common/domain-events/domain-event-dispatcher.ts` — wraps `EventEmitter2` with typed publish/subscribe
-- [ ] Define initial domain events:
+- [x] Create `src/common/domain-events/domain-event.base.ts` — base class with `eventId`, `occurredOn`, `aggregateId`
+- [x] Create `src/common/domain-events/domain-event-dispatcher.ts` — wraps `EventEmitter2` with typed publish/subscribe
+- [x] Define initial domain events:
   - `OrderCreatedEvent`, `OrderCancelledEvent`, `TradeExecutedEvent`
   - `DepositConfirmedEvent`, `WithdrawalCompletedEvent`
   - `WalletBalanceChangedEvent`
-- [ ] Create `@DomainEventHandler()` decorator for clean handler registration
-- [ ] Migrate `matching/events/EventStore` to also publish to the domain event bus
-- [ ] Replace direct service cross-module calls with event-driven communication where appropriate
+- [x] Create `@DomainEventHandler()` decorator for clean handler registration
+- [ ] Migrate `matching/events/EventStore` to also publish to the domain event bus ← next iteration
+- [ ] Replace direct service cross-module calls with event-driven communication where appropriate ← next iteration
 
 **Files to create:**
 ```
@@ -156,43 +156,21 @@ src/common/domain-events/
   index.ts
 ```
 
-#### 1.2 OpenTelemetry Observability Stack
+#### 1.2 OpenTelemetry Observability Stack ✅ DONE (infrastructure layer)
 **Goal:** Full distributed tracing, metrics, and structured logging.
 
 **Tasks:**
-- [ ] Install OTel packages:
-  ```
-  @opentelemetry/sdk-node
-  @opentelemetry/api
-  @opentelemetry/auto-instrumentations-node
-  @opentelemetry/exporter-trace-otlp-http
-  @opentelemetry/exporter-metrics-otlp-http
-  @opentelemetry/instrumentation-http
-  @opentelemetry/instrumentation-express
-  @opentelemetry/instrumentation-nestjs-core
-  @opentelemetry/resources
-  @opentelemetry/semantic-conventions
-  nestjs-otel
-  ```
-- [ ] Create `src/telemetry/tracing.ts` — OTel SDK bootstrap (loaded before NestJS via `--require`)
-- [ ] Create `src/telemetry/telemetry.module.ts` — NestJS module registering OtelModule
-- [ ] Add custom spans for critical paths:
-  - Order creation → matching → trade execution
-  - Deposit detection → wallet credit
-  - Treasury sweep → fund operations
-- [ ] Replace NestJS Logger with `pino` + `pino-opentelemetry-transport` for structured JSON logs with trace context injection
-- [ ] Add Prometheus metrics endpoint (`/metrics`):
-  - `http_request_duration_seconds` histogram
-  - `matching_queue_depth` gauge
-  - `order_throughput` counter
-  - `wallet_balance_total` gauge (per currency)
-  - `blockchain_rpc_latency_seconds` histogram
-- [ ] Upgrade `HealthModule` to use `@nestjs/terminus`:
-  - DB health indicator (TypeORM)
-  - Redis health indicator
-  - Bull queue health indicator
-  - Blockchain RPC health indicator
-- [ ] Add correlation ID middleware (X-Request-ID) and propagate through logs
+- [x] Install OTel packages: `@opentelemetry/sdk-node`, `@opentelemetry/api`, `@opentelemetry/auto-instrumentations-node`, `@opentelemetry/exporter-trace-otlp-http`, `@opentelemetry/exporter-metrics-otlp-http`, `@opentelemetry/resources`, `@opentelemetry/semantic-conventions`, `prom-client`, `@willsoto/nestjs-prometheus`
+- [x] Create `src/telemetry/tracing.ts` — OTel SDK bootstrap (env-gated, loaded before NestJS via `--require`)
+- [x] Create `src/telemetry/telemetry.module.ts` — NestJS module registering PrometheusModule + MetricsService
+- [x] Create `src/telemetry/metrics.service.ts` — Prometheus metrics: `http_request_duration_seconds`, `matching_queue_depth`, `orders_total`, `trades_total`, `blockchain_rpc_duration_seconds`
+- [x] Upgrade `HealthModule` to use `@nestjs/terminus`: DB (TypeORM) readiness indicator at `GET /health/ready`
+- [x] Add `CorrelationIdMiddleware` (X-Request-ID header propagation)
+- [ ] Wire `TelemetryModule` into `AppModule` ← next step
+- [ ] Wire `CorrelationIdMiddleware` into `AppModule` ← next step
+- [ ] Add custom spans for critical paths (order create→match→trade, deposit→wallet credit) ← Phase 4 refactor
+- [ ] Replace NestJS Logger with pino + structured JSON logs ← future iteration
+- [ ] Add Redis + Bull queue health indicators to HealthModule ← future iteration
 
 **Files to create/modify:**
 ```
@@ -205,23 +183,15 @@ src/common/middleware/
   correlation-id.middleware.ts
 ```
 
-#### 1.3 Unit of Work Pattern
+#### 1.3 Unit of Work Pattern ✅ DONE
 **Goal:** Formalize atomic transaction boundaries for multi-repository operations.
 
 **Tasks:**
-- [ ] Create `src/common/unit-of-work/unit-of-work.ts`:
-  ```typescript
-  export interface IUnitOfWork {
-    start(): Promise<TransactionContext>;
-    commit(ctx: TransactionContext): Promise<void>;
-    rollback(ctx: TransactionContext): Promise<void>;
-    run<T>(fn: (ctx: TransactionContext) => Promise<T>): Promise<T>;
-  }
-  ```
-- [ ] Create `src/common/unit-of-work/typeorm-unit-of-work.ts` — implementation wrapping `DataSource.transaction()`
-- [ ] Define port token: `UNIT_OF_WORK = Symbol('UNIT_OF_WORK')`
-- [ ] Refactor use-cases that manage transactions (wallet operations, order creation, treasury sweeps) to use UoW
-- [ ] Ensure domain events are dispatched AFTER UoW commits (outbox pattern consideration)
+- [x] Create `src/common/unit-of-work/unit-of-work.port.ts` — `IUnitOfWork` interface + `UNIT_OF_WORK` Symbol token
+- [x] Create `src/common/unit-of-work/typeorm-unit-of-work.ts` — TypeORM `DataSource.transaction()` implementation
+- [x] Create `src/common/unit-of-work/unit-of-work.module.ts` — NestJS module
+- [ ] Refactor use-cases that manage transactions (wallet operations, order creation, treasury sweeps) to use UoW ← Phase 4
+- [ ] Ensure domain events are dispatched AFTER UoW commits (outbox pattern consideration) ← Phase 4
 
 **Files to create:**
 ```
@@ -236,23 +206,16 @@ src/common/unit-of-work/
 
 ### Phase 2: DDD Core — Domain Model Enrichment (Priority: HIGH)
 
-#### 2.1 Aggregate Root & Entity Base Classes
+#### 2.1 Aggregate Root & Entity Base Classes ✅ DONE
 **Tasks:**
-- [ ] Create `src/common/ddd/aggregate-root.base.ts`:
-  ```typescript
-  export abstract class AggregateRoot {
-    private _domainEvents: DomainEvent[] = [];
-    protected addDomainEvent(event: DomainEvent): void { ... }
-    public pullDomainEvents(): DomainEvent[] { ... }
-  }
-  ```
-- [ ] Create `src/common/ddd/entity.base.ts` — identity + equality
-- [ ] Create `src/common/ddd/value-object.base.ts` — structural equality
-- [ ] Define key Value Objects:
-  - `Money` (amount: Decimal, currency: string) — replaces raw string amounts
-  - `OrderId`, `TradeId`, `WalletId` — typed IDs
-  - `BlockchainAddress` — validated address VO
-  - `TradingPair` — base/quote currency pair
+- [x] Create `src/common/ddd/aggregate-root.base.ts` — domain event collection + `pullDomainEvents()`
+- [x] Create `src/common/ddd/entity.base.ts` — identity equality (`equals()`, typed `id`, `toString()`)
+- [x] Create `src/common/ddd/value-object.base.ts` — structural deep equality via JSON snapshot
+- [x] Define key Value Objects:
+  - `Money` (amount: Decimal, currency: string) — replaces raw string amounts, arithmetic ops
+  - `TradingPair` — base/quote pair, `fromSymbol()` factory
+  - `BlockchainAddress` — multi-chain validated address VO (EVM, Solana, Tron, TON)
+- [ ] `OrderId`, `TradeId`, `WalletId` — typed branded IDs ← future iteration
 
 **Files to create:**
 ```
@@ -281,27 +244,14 @@ src/common/ddd/value-objects/
 
 ### Phase 3: CQS/CQRS Standardization (Priority: MEDIUM)
 
-#### 3.1 Install and Configure @nestjs/cqrs
+#### 3.1 CQS Base Types ✅ DONE
 **Tasks:**
-- [ ] Install `@nestjs/cqrs`
-- [ ] Create base command/query types:
-  ```
-  src/common/cqrs/
-    base-command.ts
-    base-query.ts
-    index.ts
-  ```
-- [ ] Migrate existing use-cases to `ICommandHandler` pattern:
-  - `CreateOrderUseCase` → `CreateOrderCommandHandler`
-  - `CancelOrderUseCase` → `CancelOrderCommandHandler`
-  - `ApplyTransactionUseCase` → `ApplyTransactionCommandHandler`
-  - `AdminAdjustBalanceUseCase` → `AdminAdjustBalanceCommandHandler`
-- [ ] Migrate existing queries to `IQueryHandler` pattern:
-  - `GetWalletsQuery` → `GetWalletsQueryHandler`
-  - `GetBalanceQuery` → `GetBalanceQueryHandler`
-  - `FindMyOrdersQuery` → `FindMyOrdersQueryHandler`
-- [ ] Controllers dispatch through `CommandBus`/`QueryBus` instead of calling use-cases directly
-- [ ] Connect domain events to `@nestjs/cqrs` EventBus
+- [x] Create `src/common/cqrs/base.types.ts` — `BaseCommand`, `BaseQuery` with `correlationId`, `ICommandHandler<C,R>`, `IQueryHandler<Q,R>` interfaces
+- [x] Create `src/common/cqrs/index.ts` — barrel export
+- [ ] Install `@nestjs/cqrs` if/when full CommandBus/QueryBus is needed ← optional upgrade path
+- [ ] Migrate existing use-cases to explicit `ICommandHandler` / `IQueryHandler` interfaces ← Phase 4 refactor
+- [ ] Controllers dispatch through `CommandBus`/`QueryBus` instead of calling use-cases directly ← Phase 4
+- [ ] Connect domain events to `@nestjs/cqrs` EventBus ← optional (DomainEventDispatcher already does this)
 
 #### 3.2 Read Model Separation (Optional — for high-traffic reads)
 **Tasks:**

@@ -1,5 +1,5 @@
-import { ValueObject } from '../value-object.base';
 import Decimal from 'decimal.js';
+import { ValueObject } from '../value-object.base';
 
 /**
  * Money — Value Object representing an amount in a specific currency.

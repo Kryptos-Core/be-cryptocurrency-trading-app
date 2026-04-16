@@ -1,9 +1,10 @@
 import { BullModule, type BullRootModuleOptions } from '@nestjs/bull';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import appConfig from './config/app.config';
 import { validateEnvironment } from './config/env.validation';
 import { nestEnvFilePaths } from './config/load-env-files';
@@ -32,6 +33,7 @@ import { TradingModule } from './modules/trading/trading.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
 import { UsersModule } from './modules/users/users.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
+import { TelemetryModule } from './telemetry';
 
 @Module({
   imports: [
@@ -59,6 +61,7 @@ import { WalletsModule } from './modules/wallets/wallets.module';
         redis: getBullRedisConfig(config),
       }),
     }),
+    TelemetryModule,
     RedisModule,
     BinanceRestModule,
     AuthModule,
@@ -84,5 +87,8 @@ import { WalletsModule } from './modules/wallets/wallets.module';
     MetadataModule,
   ],
 })
-export class AppModule {}
-
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}
