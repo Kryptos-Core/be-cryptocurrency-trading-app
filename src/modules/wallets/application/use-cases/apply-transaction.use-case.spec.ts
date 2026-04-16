@@ -1,11 +1,11 @@
 import { Test } from '@nestjs/testing';
-import { WalletTransactionAction, WalletReferenceType } from '@/common/enums';
+import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import {
-  WALLET_REPOSITORY,
-  WALLET_LEDGER_REPOSITORY,
-  WALLET_EVENT_PUBLISHER,
   CURRENCY_LOOKUP,
+  WALLET_EVENT_PUBLISHER,
+  WALLET_LEDGER_REPOSITORY,
+  WALLET_REPOSITORY,
 } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 import type { WalletTransactionDto } from '@/modules/wallets/dto/wallet-transaction.dto';
@@ -89,12 +89,15 @@ describe('ApplyTransactionUseCase', () => {
       walletRepo.getOrCreateForUpdate.mockResolvedValue(makeWallet('200', '0'));
       walletRepo.applyBalanceDelta.mockResolvedValue(makeWallet('300', '0'));
 
-      const result = await useCase.execute('uid-1', dto({ action: WalletTransactionAction.CREDIT }));
+      const result = await useCase.execute(
+        'uid-1',
+        dto({ action: WalletTransactionAction.CREDIT }),
+      );
 
       expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith(
         'wid-1',
-        '100',   // +deltaAvailable
-        '0',     // no frozen delta
+        '100', // +deltaAvailable
+        '0', // no frozen delta
         {},
       );
       expect(ledgerRepo.createEntry).toHaveBeenCalledWith(
@@ -104,7 +107,13 @@ describe('ApplyTransactionUseCase', () => {
       expect(eventPublisher.publishBalanceChange).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'uid-1', available: '300', frozen: '0', total: '300' }),
       );
-      expect(result).toEqual({ userId: 'uid-1', currencyId: 'cid-1', available: '300', frozen: '0', total: '300' });
+      expect(result).toEqual({
+        userId: 'uid-1',
+        currencyId: 'cid-1',
+        available: '300',
+        frozen: '0',
+        total: '300',
+      });
     });
   });
 
@@ -169,8 +178,8 @@ describe('ApplyTransactionUseCase', () => {
   describe('TRANSFER', () => {
     it('transfers between two different users and publishes two events', async () => {
       walletRepo.getOrCreateForUpdate
-        .mockResolvedValueOnce(makeWallet('500', '0'))  // first lock (uid-1 < uid-2)
-        .mockResolvedValueOnce(makeWallet('0', '0'));   // second lock
+        .mockResolvedValueOnce(makeWallet('500', '0')) // first lock (uid-1 < uid-2)
+        .mockResolvedValueOnce(makeWallet('0', '0')); // second lock
 
       walletRepo.applyBalanceDelta
         .mockResolvedValueOnce(makeWallet('400', '0')) // source debit
@@ -196,7 +205,10 @@ describe('ApplyTransactionUseCase', () => {
 
     it('throws BadRequestException when source and target are the same user', async () => {
       await expect(
-        useCase.execute('1', dto({ action: WalletTransactionAction.TRANSFER, targetUserId: 1 as any })),
+        useCase.execute(
+          '1',
+          dto({ action: WalletTransactionAction.TRANSFER, targetUserId: 1 as any }),
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
@@ -205,21 +217,21 @@ describe('ApplyTransactionUseCase', () => {
 
   describe('amount validation', () => {
     it('throws BadRequestException for zero amount', async () => {
-      await expect(
-        useCase.execute('uid-1', dto({ amount: '0' })),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(useCase.execute('uid-1', dto({ amount: '0' }))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException for negative amount', async () => {
-      await expect(
-        useCase.execute('uid-1', dto({ amount: '-50' })),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(useCase.execute('uid-1', dto({ amount: '-50' }))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException for non-numeric amount', async () => {
-      await expect(
-        useCase.execute('uid-1', dto({ amount: 'abc' })),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(useCase.execute('uid-1', dto({ amount: 'abc' }))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 
@@ -233,9 +245,7 @@ describe('ApplyTransactionUseCase', () => {
         new Error("Duplicate entry 'x' for key 'uk_ledger_ref'"),
       );
 
-      await expect(
-        useCase.execute('uid-1', dto()),
-      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(useCase.execute('uid-1', dto())).rejects.toBeInstanceOf(ConflictException);
     });
   });
 });

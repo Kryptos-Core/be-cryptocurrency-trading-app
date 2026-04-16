@@ -3,15 +3,14 @@ import { BullModule } from '@nestjs/bull';
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WalletEncryptionService } from '@/common/services';
-import { WorkerPoolModule } from '@/common/worker-pool/worker-pool.module';
 import { RedisModule } from '@/modules/redis/redis.module';
+import { WorkerPoolModule } from '@/common/worker-pool/worker-pool.module';
 
-/** Resolve the crypto-account worker path for both dev (webpack/nest watch) and production (compiled JS). */
-const isDev = process.env.NODE_ENV !== 'production';
-const cryptoWorkerFile = isDev
-  ? path.resolve(process.cwd(), 'src', 'modules', 'treasury', 'workers', 'crypto-account.worker.ts')
-  : path.resolve(__dirname, 'workers', 'crypto-account.worker.js');
-const workerExecArgv = isDev ? ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register'] : [];
+/** Resolve the crypto-account worker path for both dev (ts-node) and production (compiled JS). */
+const isTs = __filename.endsWith('.ts');
+const workerExt = isTs ? '.ts' : '.js';
+const cryptoWorkerFile = path.resolve(__dirname, 'workers', `crypto-account.worker${workerExt}`);
+const workerExecArgv = isTs ? ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register'] : [];
 
 import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
@@ -74,7 +73,7 @@ import { TreasuryOperationsService } from './treasury-operations.service';
       execArgv: workerExecArgv,
       maxThreads: 2, // 2 threads sufficient — wallets created one-at-a-time per request
     }),
-    RedisModule,
+ RedisModule,
     PaymentConfigModule,
     SystemConfigModule,
     forwardRef(() => AuthModule), // forwardRef avoids potential circular deps

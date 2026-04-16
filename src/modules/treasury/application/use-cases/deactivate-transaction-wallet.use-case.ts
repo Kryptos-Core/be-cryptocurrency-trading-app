@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { TransactionWalletService } from '../../transaction-wallet.service';
+import { TransactionWalletService } from '../../transaction-wallet.service';
 
 @Injectable()
 export class DeactivateTransactionWalletUseCase {

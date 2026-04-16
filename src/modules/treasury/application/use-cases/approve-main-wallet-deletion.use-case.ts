@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { TreasuryMainWalletService } from '../../treasury-main-wallet.service';
+import { TreasuryMainWalletService } from '../../treasury-main-wallet.service';
 
 @Injectable()
 export class ApproveMainWalletDeletionUseCase {

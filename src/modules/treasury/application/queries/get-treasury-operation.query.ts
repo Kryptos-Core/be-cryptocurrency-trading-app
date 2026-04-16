@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
 import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from '../../dto';
-import type { TreasuryOperationsService } from '../../treasury-operations.service';
+import { TreasuryOperationsService } from '../../treasury-operations.service';
 
 @Injectable()
 export class GetTreasuryOperationQuery {

@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import type { ListTreasuryWalletsDto } from '../../dto';
-import type {
+import {
   TransactionWalletService,
-  TreasuryOnChainBalances,
-  TreasuryWalletWithBalance,
+  type TreasuryOnChainBalances,
+  type TreasuryWalletWithBalance,
 } from '../../transaction-wallet.service';
 
 @Injectable()

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import type { CreateTransactionWalletDto } from '../../dto';
-import type { TransactionWalletService } from '../../transaction-wallet.service';
+import { TransactionWalletService } from '../../transaction-wallet.service';
 
 @Injectable()
 export class CreateTransactionWalletUseCase {
