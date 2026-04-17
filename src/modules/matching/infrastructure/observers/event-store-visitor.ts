@@ -1,13 +1,5 @@
-/**
- * EventStoreVisitor — Observer/Visitor that bridges MatchingService trade events
- * into the event-sourced EventStore.
- *
- * Registered as an observer via MatchingService.onTradeExecuted().
- * Converts TradeExecutionResult into a TradeExecutedEvent and appends it.
- */
-
 import type { ITradeResultVisitor, TradeExecutionResult } from '../../interfaces';
-import type { EventStore, TradeExecutedEvent } from './event-store';
+import type { EventStore, TradeExecutedEvent } from '../projections/event-store';
 
 export class EventStoreVisitor implements ITradeResultVisitor {
   constructor(private readonly store: EventStore) {}
@@ -28,4 +20,3 @@ export class EventStoreVisitor implements ITradeResultVisitor {
     this.store.append(event);
   }
 }
-

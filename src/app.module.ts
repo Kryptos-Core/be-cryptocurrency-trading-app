@@ -130,6 +130,7 @@ export class AppModule implements NestModule {
         // Bull Board admin auth — protect /admin/queues with JWT + ADMIN role check
         // BullBoardService mounts the UI at this path during onApplicationBootstrap.
         // This middleware runs before the BullBoardService router, rejecting non-admin requests.
-        consumer.apply(BullBoardAuthMiddleware).forRoutes(BullBoardService.PATH);
+        consumer.apply(BullBoardAuthMiddleware).forRoutes('/admin/queues');
     }
 }
+

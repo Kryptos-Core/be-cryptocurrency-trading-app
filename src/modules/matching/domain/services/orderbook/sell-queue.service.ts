@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DEFAULT_SCALE, toBaseUnits } from '../../utils';
+import { DEFAULT_SCALE, toBaseUnits } from '../../../utils';
 import { OrderQueueService } from './order-queue.service';
 
 /**
@@ -14,4 +14,5 @@ export class SellQueueService extends OrderQueueService {
     super('SELL', 'ASC', maxPrice);
   }
 }
+
 

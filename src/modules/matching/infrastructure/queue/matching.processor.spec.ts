@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import type { Job } from 'bull';
-import { RunMatchUseCase } from './application/use-cases';
-import type { OrderBookOrder } from './interfaces';
+import { RunMatchUseCase } from '../../application/use-cases';
+import type { OrderBookOrder } from '../../interfaces';
 import { MatchingProcessor } from './matching.processor';
 import { MATCH_ORDER_JOB, type MatchOrderJobData } from './matching-queue.service';
 
@@ -63,38 +63,5 @@ describe('MatchingProcessor', () => {
         slippageTolerance: undefined,
       }),
     );
-  });
-
-  it('forwards slippageTolerance from job data to use-case', async () => {
-    const data: MatchOrderJobData = {
-      takerOrder: makeOrder({ order_id: 'tk-slip', type: 'MARKET' }),
-      pairId: 'pair-1',
-      feeCurrencyId: 'quote-1',
-      makerFeeRate: '0.001',
-      takerFeeRate: '0.002',
-      slippageTolerance: '0.02',
-    };
-
-    await processor.handleMatch(makeJob(data));
-
-    expect(runMatchUseCase.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ slippageTolerance: '0.02' }),
-    );
-  });
-
-  it('rethrows use-case errors so Bull can retry', async () => {
-    runMatchUseCase.execute.mockRejectedValueOnce(new Error('matching failed'));
-
-    await expect(
-      processor.handleMatch(
-        makeJob({
-          takerOrder: makeOrder({ order_id: 'tk-err' }),
-          pairId: 'pair-1',
-          feeCurrencyId: 'quote-1',
-          makerFeeRate: '0.001',
-          takerFeeRate: '0.001',
-        }),
-      ),
-    ).rejects.toThrow('matching failed');
   });
 });

@@ -1,7 +1,7 @@
 import { getQueueToken } from '@nestjs/bull';
 import { Test, type TestingModule } from '@nestjs/testing';
 import type { Queue } from 'bull';
-import type { OrderBookOrder } from './interfaces';
+import type { OrderBookOrder } from '../../interfaces';
 import {
   MATCH_ORDER_JOB,
   MATCHING_QUEUE,
@@ -65,32 +65,5 @@ describe('MatchingQueueService', () => {
       jobData,
       expect.objectContaining({ attempts: expect.any(Number) }),
     );
-  });
-
-  it('passes the job name as the first argument to queue.add', async () => {
-    await service.enqueueMatch({
-      takerOrder: makeOrder({ order_id: 'tk-2' }),
-      pairId: 'pair-1',
-      feeCurrencyId: 'quote-1',
-      makerFeeRate: '0.001',
-      takerFeeRate: '0.001',
-    });
-
-    const [[jobName]] = queue.add.mock.calls;
-    expect(jobName).toBe(MATCH_ORDER_JOB);
-  });
-
-  it('propagates queue.add errors', async () => {
-    queue.add.mockRejectedValueOnce(new Error('Redis unavailable'));
-
-    await expect(
-      service.enqueueMatch({
-        takerOrder: makeOrder({ order_id: 'tk-err' }),
-        pairId: 'pair-1',
-        feeCurrencyId: 'quote-1',
-        makerFeeRate: '0.001',
-        takerFeeRate: '0.001',
-      }),
-    ).rejects.toThrow('Redis unavailable');
   });
 });

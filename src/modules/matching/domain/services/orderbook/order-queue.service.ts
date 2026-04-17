@@ -1,5 +1,5 @@
-import type { IOrderQueue, OrderBookOrder } from '../../interfaces';
-import { DEFAULT_SCALE, toBaseUnits } from '../../utils';
+import type { IOrderQueue, OrderBookOrder } from '../../../interfaces';
+import { DEFAULT_SCALE, toBaseUnits } from '../../../utils';
 
 type QueueSide = 'BUY' | 'SELL';
 type SortDirection = 'ASC' | 'DESC';
@@ -56,4 +56,5 @@ export class OrderQueueService implements IOrderQueue {
     });
   }
 }
+
 

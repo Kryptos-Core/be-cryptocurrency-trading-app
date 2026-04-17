@@ -13,7 +13,7 @@ import { CurrenciesService } from '@/modules/currencies/currencies.service';
 import {
   type DepthSnapshot,
   OrderBookService,
-} from '@/modules/matching/orderbook/order-book.service';
+} from '@/modules/matching/domain/services/orderbook/order-book.service';
 import { BinanceOHLCVProvider } from '@/modules/price-oracle';
 import { MARKET_REPOSITORY, type MarketRepositoryPort } from './domain/ports';
 import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
@@ -893,3 +893,4 @@ export class MarketsService implements OnModuleInit {
     return seconds;
   }
 }
+

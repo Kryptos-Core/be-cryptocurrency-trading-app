@@ -5,8 +5,8 @@ import type {
   OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
-} from '../../interfaces';
-import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
+} from '../../../interfaces';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../../utils';
 
 /**
  * Price-Time Priority Strategy (Strategy Pattern)
@@ -101,4 +101,5 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
     return results;
   }
 }
+
 

@@ -1,17 +1,6 @@
-/**
- * Order Book Projection — Rebuilds order book state from events.
- *
- * Pure function over the event stream: no side effects, no external dependencies.
- * Supports time-travel: buildAt(pairId, sequence) replays only up to the given
- * sequence number, enabling point-in-time book snapshots.
- *
- * Uses BigInt base units internally for deterministic arithmetic.
- */
-
-import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../utils';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
 import type {
   EventStore,
-  OrderBookEvent,
   OrderPlacedEvent,
   TradeExecutedEvent,
 } from './event-store';
@@ -37,125 +26,76 @@ export interface ProjectedOrderBook {
 export class OrderBookProjection {
   constructor(private readonly store: EventStore) {}
 
-  /**
-   * Replay events up to `upToSequence` (or all events if omitted) and return
-   * the projected order book state.
-   */
-  buildAt(pairId: string, upToSequence?: number): ProjectedOrderBook {
-    const storedEvents = this.store.getStoredEvents(pairId, upToSequence);
-    if (storedEvents.length === 0) {
-      return { pairId, bids: [], asks: [], sequence: 0 };
-    }
+  build(pairId: string): ProjectedOrderBook {
+    return this.buildAt(pairId, this.store.getLastSequence(pairId));
+  }
 
-    // Mutable working state: orderId → { side, price, amountBu, remainingBu, ... }
-    const orders = new Map<
-      string,
-      {
-        orderId: string;
-        userId: string;
-        side: 'BUY' | 'SELL';
-        price: string;
-        amountBu: bigint;
-        remainingBu: bigint;
-        orderType: 'LIMIT' | 'MARKET';
-        timeInForce: string;
-        cancelled: boolean;
+  buildAt(pairId: string, sequence: number): ProjectedOrderBook {
+    const orders = new Map<string, ProjectedOrder>();
+    const events = this.store.getStoredEvents(pairId, sequence);
+
+    for (const wrapper of events) {
+      const event = wrapper.event;
+      switch (event.type) {
+        case 'OrderPlaced':
+          this.applyPlaced(orders, event);
+          break;
+        case 'TradeExecuted':
+          this.applyTrade(orders, event);
+          break;
+        case 'OrderCancelled':
+          orders.delete(event.orderId);
+          break;
       }
-    >();
-
-    let lastSeq = 0;
-
-    for (const { sequence, event } of storedEvents) {
-      lastSeq = sequence;
-      this.applyEvent(orders, event);
     }
 
-    // Build sorted output
-    const bids: ProjectedOrder[] = [];
-    const asks: ProjectedOrder[] = [];
-
-    for (const o of orders.values()) {
-      if (o.cancelled || o.remainingBu <= 0n) continue;
-      const projected: ProjectedOrder = {
-        orderId: o.orderId,
-        userId: o.userId,
-        side: o.side,
-        price: o.price,
-        amount: fromBaseUnits(o.amountBu, DEFAULT_SCALE),
-        remaining: fromBaseUnits(o.remainingBu, DEFAULT_SCALE),
-        orderType: o.orderType,
-        timeInForce: o.timeInForce,
-      };
-      if (o.side === 'BUY') bids.push(projected);
-      else asks.push(projected);
-    }
-
-    // Sort bids price DESC, asks price ASC (BigInt comparison)
-    bids.sort((a, b) => {
-      const pa = toBaseUnits(a.price, DEFAULT_SCALE);
-      const pb = toBaseUnits(b.price, DEFAULT_SCALE);
-      if (pb !== pa) return pb > pa ? 1 : -1;
-      return 0;
-    });
-    asks.sort((a, b) => {
-      const pa = toBaseUnits(a.price, DEFAULT_SCALE);
-      const pb = toBaseUnits(b.price, DEFAULT_SCALE);
-      if (pa !== pb) return pa > pb ? 1 : -1;
-      return 0;
-    });
-
-    return { pairId, bids, asks, sequence: lastSeq };
+    const values = [...orders.values()].filter((o) => o.remaining !== '0');
+    return {
+      pairId,
+      bids: values.filter((o) => o.side === 'BUY').sort((a, b) => this.compareOrders(a, b, 'BUY')),
+      asks: values.filter((o) => o.side === 'SELL').sort((a, b) => this.compareOrders(a, b, 'SELL')),
+      sequence,
+    };
   }
 
-  private applyEvent(orders: Map<string, any>, event: OrderBookEvent): void {
-    switch (event.type) {
-      case 'OrderPlaced':
-        this.applyOrderPlaced(orders, event);
-        break;
-      case 'OrderCancelled':
-        this.applyOrderCancelled(orders, event);
-        break;
-      case 'TradeExecuted':
-        this.applyTradeExecuted(orders, event);
-        break;
-    }
-  }
-
-  private applyOrderPlaced(orders: Map<string, any>, event: OrderPlacedEvent): void {
-    const amountBu = toBaseUnits(event.amount, DEFAULT_SCALE);
+  private applyPlaced(orders: Map<string, ProjectedOrder>, event: OrderPlacedEvent): void {
     orders.set(event.orderId, {
       orderId: event.orderId,
       userId: event.userId,
       side: event.side,
       price: event.price,
-      amountBu,
-      remainingBu: amountBu,
+      amount: event.amount,
+      remaining: event.amount,
       orderType: event.orderType,
       timeInForce: event.timeInForce,
-      cancelled: false,
     });
   }
 
-  private applyOrderCancelled(orders: Map<string, any>, event: { orderId: string }): void {
-    const order = orders.get(event.orderId);
-    if (order) {
-      order.cancelled = true;
+  private applyTrade(orders: Map<string, ProjectedOrder>, event: TradeExecutedEvent): void {
+    const maker = orders.get(event.makerOrderId);
+    if (!maker) return;
+
+    const makerRemaining = this.subtract(maker.remaining, event.amount);
+    if (makerRemaining === '0') {
+      orders.delete(event.makerOrderId);
+      return;
     }
+
+    orders.set(event.makerOrderId, { ...maker, remaining: makerRemaining });
   }
 
-  private applyTradeExecuted(orders: Map<string, any>, event: TradeExecutedEvent): void {
-    const fillBu = toBaseUnits(event.amount, DEFAULT_SCALE);
+  private subtract(left: string, right: string): string {
+    return fromBaseUnits(
+      toBaseUnits(left, DEFAULT_SCALE) - toBaseUnits(right, DEFAULT_SCALE),
+      DEFAULT_SCALE,
+    );
+  }
 
-    const maker = orders.get(event.makerOrderId);
-    if (maker) {
-      maker.remainingBu -= fillBu;
-      if (maker.remainingBu < 0n) maker.remainingBu = 0n;
-    }
-
-    const taker = orders.get(event.takerOrderId);
-    if (taker) {
-      taker.remainingBu -= fillBu;
-      if (taker.remainingBu < 0n) taker.remainingBu = 0n;
-    }
+  private compareOrders(a: ProjectedOrder, b: ProjectedOrder, side: 'BUY' | 'SELL'): number {
+    const pa = toBaseUnits(a.price, DEFAULT_SCALE);
+    const pb = toBaseUnits(b.price, DEFAULT_SCALE);
+    if (pa === pb) return 0;
+    if (side === 'BUY') return pa > pb ? -1 : 1;
+    return pa < pb ? -1 : 1;
   }
 }
