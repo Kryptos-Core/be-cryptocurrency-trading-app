@@ -53,6 +53,7 @@ export interface OnchainTransactionRepositoryPort {
   findByChainAndTxHash(
     chain: string,
     txHash: string,
+    logIndex?: number,
   ): Promise<BlockchainOnchainTransactionRecord | null>;
 
   findByIdAndUserId(

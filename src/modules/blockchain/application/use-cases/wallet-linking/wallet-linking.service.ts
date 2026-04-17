@@ -148,4 +148,9 @@ export class WalletLinkingService {
   async findVerifiedWallet(userId: string, chain: BlockchainNetwork, address: string) {
     return this.linkedWalletRepo.findVerifiedByUserChainAddress(userId, chain, address.trim());
   }
+
+  /** Bất kỳ user nào đã xác minh ví này trên chain (deposit watcher). */
+  async findVerifiedWalletByChainAndAddress(chain: BlockchainNetwork, address: string) {
+    return this.linkedWalletRepo.findVerifiedByChainAndAddress(chain, address.trim());
+  }
 }

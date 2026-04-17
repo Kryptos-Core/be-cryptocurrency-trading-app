@@ -25,9 +25,13 @@ function toEntityManager(ctx: TransactionContext): EntityManager {
 export class OnchainTransactionRepository implements OnchainTransactionRepositoryPort {
   constructor(private readonly dataSource: DataSource) {}
 
-  async findByChainAndTxHash(chain: string, txHash: string): Promise<OnchainTransaction | null> {
+  async findByChainAndTxHash(
+    chain: string,
+    txHash: string,
+    logIndex: number = 0,
+  ): Promise<OnchainTransaction | null> {
     return this.dataSource.getRepository(OnchainTransaction).findOne({
-      where: { chain, tx_hash: txHash },
+      where: { chain, tx_hash: txHash, log_index: logIndex },
     });
   }
 
@@ -212,6 +216,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
               credited_currency_id, credited_amount, conversion_rate
        FROM onchain_transactions
        WHERE user_id = ?
+         AND type NOT IN ('FUND', 'SWEEP')
        ORDER BY created_at DESC
        LIMIT ?`,
       [userId, limit],

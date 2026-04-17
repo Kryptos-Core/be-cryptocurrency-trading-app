@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import { OnchainTxStatus } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import { OnchainTransaction } from '@/modules/blockchain';
@@ -121,6 +122,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
       const opRepo = manager.getRepository(TreasuryOperation);
 
       const txId = uuidv7();
+      const now = new Date();
       await onchainRepo.save({
         tx_id: txId,
         user_id: operation.actor_user_id,
@@ -129,12 +131,14 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
         chain: operation.chain,
         type: operation.type,
         tx_hash: txHash,
+        log_index: 0,
         from_address: fromAddress,
         to_address: toAddress,
         amount,
-        confirmations: 0,
-        status: 'PENDING',
-        confirmed_at: null,
+        /** Broadcast + balance wait already succeeded before this row is written. */
+        confirmations: 1,
+        status: OnchainTxStatus.COMPLETED,
+        confirmed_at: now,
         credited_currency_id: null,
         credited_amount: null,
         conversion_rate: null,

@@ -69,6 +69,20 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     });
   }
 
+  async findVerifiedByChainAndAddress(chain: string, address: string): Promise<LinkedWallet | null> {
+    return this.dataSource
+      .getRepository(LinkedWallet)
+      .createQueryBuilder('w')
+      .where('w.chain = :chain AND w.address = :address AND w.status = :st', {
+        chain,
+        address: address.trim(),
+        st: 'VERIFIED',
+      })
+      .orderBy('w.linked_at', 'ASC')
+      .addOrderBy('w.created_at', 'ASC')
+      .getOne();
+  }
+
   async findByLinkIdAndUserId(linkId: string, userId: string): Promise<LinkedWallet | null> {
     return this.dataSource.getRepository(LinkedWallet).findOne({
       where: { link_id: linkId, user_id: userId },

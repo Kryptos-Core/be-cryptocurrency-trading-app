@@ -1,4 +1,8 @@
 import type { BlockchainNetwork } from '@/common/enums';
+import type {
+  ResolveDepositTransfersContext,
+  ResolvedDepositTransfer,
+} from '@/modules/blockchain/deposit-transfer.types';
 
 /**
  * Số dư on-chain trả về từ blockchain provider
@@ -45,6 +49,15 @@ export interface IBlockchainProvider {
 
   /** Lấy trạng thái giao dịch on-chain */
   getTransactionStatus(txHash: string): Promise<BlockchainTxStatusDto>;
+
+  /**
+   * Inbound deposit legs for this tx hash whose recipient matches [ctx.expectedDepositAddress].
+   * Native + whitelisted tokens (e.g. USDT on Tron); empty if none match.
+   */
+  resolveDepositTransfers(
+    txHash: string,
+    ctx: ResolveDepositTransfersContext,
+  ): Promise<ResolvedDepositTransfer[]>;
 
   /** Kiểm tra address có hợp lệ trên chain này không */
   isValidAddress(address: string): boolean;

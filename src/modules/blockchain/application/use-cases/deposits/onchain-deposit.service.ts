@@ -14,7 +14,11 @@ import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService } from '@/common/services';
 import type { TransactionContext } from '@/common/types/transaction-context';
 import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
-import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import type {
+  DepositSettlementAsset,
+  ResolvedDepositTransfer,
+} from '@/modules/blockchain/deposit-transfer.types';
+import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
 import {
@@ -39,7 +43,7 @@ export class OnchainDepositService {
     private readonly walletLinkingService: WalletLinkingService,
     private readonly depositFxService: DepositFxService,
     private readonly walletsService: WalletsService,
-    private readonly transactionWalletService: TransactionWalletService,
+    private readonly managedWalletsService: ManagedWalletsService,
     private readonly unitOfWork: UnitOfWork,
     private readonly outboxAppender: OutboxAppender,
   ) {}
@@ -62,52 +66,94 @@ export class OnchainDepositService {
     );
   }
 
-  private async assertTronDepositRecipientMatchesConfiguredDefault(
+  /** Redis lock per chain + tx + log index so multiple ERC-20 legs can settle independently. */
+  private depositProcessingLockKey(
     chain: BlockchainNetwork,
-    txRecipient: string,
-  ): Promise<void> {
-    if (chain !== BlockchainNetwork.TRON_MAINNET) return;
-    const tw = await this.transactionWalletService.getDefaultUserDepositWallet('TRON_MAINNET');
-    if (!tw) {
+    txHash: string,
+    logIndex: number,
+  ): string {
+    return `deposit:pending:${chain}:${txHash}:${logIndex}`;
+  }
+
+  private sortDepositLegsByPreference(legs: ResolvedDepositTransfer[]): ResolvedDepositTransfer[] {
+    const rank = (a: ResolvedDepositTransfer) =>
+      a.asset === 'USDT_TRC20' || a.asset === 'USDT_ERC20' ? 0 : 1;
+    return [...legs].sort((a, b) => rank(a) - rank(b));
+  }
+
+  private async requireExpectedDepositAddress(chain: BlockchainNetwork): Promise<string> {
+    const addr = (await this.managedWalletsService.getPublicDepositRecipientAddress(chain))?.trim();
+    if (!addr) {
       throw new BadRequestException(
-        'Chưa có ví nạp mặc định cho mạng này. Nạp on-chain tạm dừng cho đến khi vận hành cấu hình.',
-        'DEPOSIT_DEFAULT_NOT_CONFIGURED',
+        'Chưa cấu hình địa chỉ nạp cho mạng này. Kiểm tra ví nạp mặc định hoặc ví chính (treasury) trên mạng đã chọn.',
+        'DEPOSIT_ADDRESS_NOT_CONFIGURED',
       );
     }
-    if (tw.address !== txRecipient) {
-      throw new BadRequestException(
-        'Giao dịch không gửi đến địa chỉ nạp hiện tại của sàn cho mạng này.',
-        'DEPOSIT_RECIPIENT_MISMATCH',
-      );
+    return addr;
+  }
+
+  private async pickResolvedLegForUser(
+    userId: string,
+    chain: BlockchainNetwork,
+    legs: ResolvedDepositTransfer[],
+  ): Promise<{ resolved: ResolvedDepositTransfer; linkId: string }> {
+    const ordered = this.sortDepositLegsByPreference(legs);
+    for (const leg of ordered) {
+      const linked = await this.walletLinkingService.findVerifiedWallet(userId, chain, leg.from);
+      if (linked) {
+        return { resolved: leg, linkId: linked.link_id };
+      }
     }
+    throw new BadRequestException(
+      `Địa chỉ gửi không phải ví đã liên kết của bạn. Hãy liên kết ví trước.`,
+      'SENDER_NOT_LINKED',
+    );
   }
 
   async previewDepositTx(userId: string, chain: BlockchainNetwork, txHash: string) {
     const provider = this.providerFactory.getProvider(chain);
-    const txStatus = await provider.getTransactionStatus(txHash);
-
-    if (txStatus.status === 'NOT_FOUND') {
+    const expected = await this.requireExpectedDepositAddress(chain);
+    const legs = await provider.resolveDepositTransfers(txHash, { expectedDepositAddress: expected });
+    if (legs.length === 0) {
+      const st = await provider.getTransactionStatus(txHash);
+      if (st.status === 'NOT_FOUND') {
+        throw new BadRequestException(
+          'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash.',
+          'TX_NOT_FOUND',
+        );
+      }
       throw new BadRequestException(
-        'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash.',
-        'TX_NOT_FOUND',
+        'Không tìm thấy khoản chuyển đến địa chỉ nạp của sàn trong giao dịch này.',
+        'DEPOSIT_LEG_NOT_FOUND',
       );
     }
-    if (txStatus.status === 'FAILED') {
+    const ordered = this.sortDepositLegsByPreference(legs);
+    let chosen = ordered[0];
+    for (const leg of ordered) {
+      const lw = await this.walletLinkingService.findVerifiedWallet(userId, chain, leg.from);
+      if (lw) {
+        chosen = leg;
+        break;
+      }
+    }
+    const senderLinked = !!(await this.walletLinkingService.findVerifiedWallet(
+      userId,
+      chain,
+      chosen.from,
+    ));
+    if (chosen.chainStatus === 'FAILED') {
       throw new BadRequestException('Giao dịch on-chain đã thất bại.', 'TX_FAILED');
     }
-
-    const linked = await this.walletLinkingService.findVerifiedWallet(userId, chain, txStatus.from);
-    await this.assertTronDepositRecipientMatchesConfiguredDefault(chain, txStatus.to);
 
     return {
       chain,
       txHash,
-      status: txStatus.status,
-      confirmations: txStatus.confirmations,
-      fromAddress: txStatus.from,
-      toAddress: txStatus.to,
-      onchainAmount: txStatus.value,
-      senderLinked: !!linked,
+      status: chosen.chainStatus,
+      confirmations: chosen.confirmations,
+      fromAddress: chosen.from,
+      toAddress: chosen.to,
+      onchainAmount: chosen.amountHuman,
+      senderLinked,
     };
   }
 
@@ -138,6 +184,7 @@ export class OnchainDepositService {
     userId: string,
     chain: BlockchainNetwork,
     amount: string,
+    settlementAsset: DepositSettlementAsset,
     joinTransaction?: TransactionContext,
   ): Promise<{
     settled: boolean;
@@ -146,7 +193,9 @@ export class OnchainDepositService {
     creditAmount?: string;
     conversionRate?: string;
   }> {
-    const conversion = await this.depositFxService.convertToPlatformCash(chain, amount);
+    const fxAsset =
+      settlementAsset === 'NATIVE' ? 'NATIVE' : settlementAsset === 'USDT_ERC20' ? 'USDT_ERC20' : 'USDT_TRC20';
+    const conversion = await this.depositFxService.convertToPlatformCash(chain, amount, fxAsset);
     const { creditCurrencyId, creditAmount, conversionRate } = conversion;
 
     const refId = this.toLedgerRefId(`${txId}-credit`);
@@ -207,9 +256,63 @@ export class OnchainDepositService {
     };
   }
 
+  /**
+   * Auto-watcher path — same persistence rules as submitDeposit; caller resolves user from linked `from`.
+   */
+  async ingestIncomingDepositForUser(
+    userId: string,
+    resolved: ResolvedDepositTransfer,
+  ): Promise<{ txId: string; status: string; amount: string; chain: string; settled: boolean } | null> {
+    const linked = await this.walletLinkingService.findVerifiedWallet(
+      userId,
+      resolved.chain,
+      resolved.from,
+    );
+    if (!linked) {
+      this.treasuryLog('deposit.ingest.skip_unlinked_sender', {
+        userId,
+        chain: resolved.chain,
+        from: resolved.from,
+        txHash: resolved.txHash,
+      });
+      return null;
+    }
+    const lockKey = this.depositProcessingLockKey(resolved.chain, resolved.txHash, resolved.logIndex);
+    if (await this.cacheService.exists(lockKey)) {
+      return null;
+    }
+    await this.cacheService.set(lockKey, '1', OnchainDepositService.DEPOSIT_LOCK_TTL);
+    try {
+      return await this.persistDepositFromResolved(userId, linked.link_id, resolved, {
+        lockHeld: true,
+      });
+    } finally {
+      await this.cacheService.delete(lockKey);
+    }
+  }
+
   async submitDeposit(userId: string, dto: SubmitDepositDto) {
     const provider = this.providerFactory.getProvider(dto.chain);
-    const lockKey = `deposit:pending:${dto.txHash}`;
+    const expected = await this.requireExpectedDepositAddress(dto.chain);
+    const legs = await provider.resolveDepositTransfers(dto.txHash, {
+      expectedDepositAddress: expected,
+    });
+    if (legs.length === 0) {
+      const st = await provider.getTransactionStatus(dto.txHash);
+      if (st.status === 'NOT_FOUND') {
+        throw new BadRequestException(
+          'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash hoặc chờ tx được confirm.',
+          'TX_NOT_FOUND',
+        );
+      }
+      throw new BadRequestException(
+        'Không tìm thấy khoản chuyển đến địa chỉ nạp của sàn trong giao dịch này.',
+        'DEPOSIT_LEG_NOT_FOUND',
+      );
+    }
+
+    const { resolved, linkId } = await this.pickResolvedLegForUser(userId, dto.chain, legs);
+    const lockKey = this.depositProcessingLockKey(dto.chain, dto.txHash, resolved.logIndex);
     const locked = await this.cacheService.exists(lockKey);
     if (locked) {
       throw new ConflictException(
@@ -220,7 +323,11 @@ export class OnchainDepositService {
     await this.cacheService.set(lockKey, '1', OnchainDepositService.DEPOSIT_LOCK_TTL);
 
     try {
-      const existing = await this.onchainTxRepo.findByChainAndTxHash(dto.chain, dto.txHash);
+      const existing = await this.onchainTxRepo.findByChainAndTxHash(
+        dto.chain,
+        dto.txHash,
+        resolved.logIndex,
+      );
       if (existing) {
         throw new ConflictException(
           'Giao dịch này đã được xử lý trước đó',
@@ -228,46 +335,60 @@ export class OnchainDepositService {
         );
       }
 
-      const txStatus = await provider.getTransactionStatus(dto.txHash);
-      if (txStatus.status === 'NOT_FOUND') {
-        throw new BadRequestException(
-          'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash hoặc chờ tx được confirm.',
-          'TX_NOT_FOUND',
-        );
-      }
-      if (txStatus.status === 'FAILED') {
+      if (resolved.chainStatus === 'FAILED') {
         throw new BadRequestException('Giao dịch on-chain đã thất bại', 'TX_FAILED');
       }
 
-      await this.assertTronDepositRecipientMatchesConfiguredDefault(dto.chain, txStatus.to);
-      const linked = await this.walletLinkingService.findVerifiedWallet(
-        userId,
-        dto.chain,
-        txStatus.from,
+      const onchainAmount = new Decimal(resolved.amountHuman || '0');
+      if (dto.amount?.trim()) {
+        const submittedAmount = new Decimal(dto.amount.trim());
+        const tolerance = new Decimal('0.0001');
+        if (onchainAmount.minus(submittedAmount).abs().greaterThan(tolerance)) {
+          throw new BadRequestException(
+            `Số tiền không khớp. On-chain: ${onchainAmount}, Submit: ${submittedAmount}`,
+            'AMOUNT_MISMATCH',
+          );
+        }
+      }
+
+      return await this.persistDepositFromResolved(userId, linkId, resolved, { lockHeld: true });
+    } finally {
+      await this.cacheService.delete(lockKey);
+    }
+  }
+
+  private async persistDepositFromResolved(
+    userId: string,
+    linkedWalletId: string,
+    resolved: ResolvedDepositTransfer,
+    opts?: { lockHeld?: boolean },
+  ): Promise<{ txId: string; status: string; amount: string; chain: string; settled: boolean }> {
+    const lockKey = this.depositProcessingLockKey(resolved.chain, resolved.txHash, resolved.logIndex);
+    const lockHeld = opts?.lockHeld === true;
+    if (!lockHeld) {
+      await this.cacheService.set(lockKey, '1', OnchainDepositService.DEPOSIT_LOCK_TTL);
+    }
+
+    try {
+      const existing = await this.onchainTxRepo.findByChainAndTxHash(
+        resolved.chain,
+        resolved.txHash,
+        resolved.logIndex,
       );
-      if (!linked) {
-        throw new BadRequestException(
-          `Địa chỉ gửi (${txStatus.from}) không phải ví đã liên kết của bạn. Hãy liên kết ví trước.`,
-          'SENDER_NOT_LINKED',
+      if (existing) {
+        throw new ConflictException(
+          'Giao dịch này đã được xử lý trước đó',
+          'DEPOSIT_ALREADY_PROCESSED',
         );
       }
 
-      const onchainAmount = new Decimal(txStatus.value || '0');
-      const submittedAmount = new Decimal(dto.amount);
-      const tolerance = new Decimal('0.0001');
-      if (onchainAmount.minus(submittedAmount).abs().greaterThan(tolerance)) {
-        throw new BadRequestException(
-          `Số tiền không khớp. On-chain: ${onchainAmount}, Submit: ${submittedAmount}`,
-          'AMOUNT_MISMATCH',
-        );
-      }
-
-      const txId = uuidv7();
+      const onchainAmount = new Decimal(resolved.amountHuman || '0');
       const status =
-        txStatus.status === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
+        resolved.chainStatus === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
 
       let settled = false;
       let creditPayload: Record<string, string> = {};
+      const txId = uuidv7();
 
       await this.unitOfWork.run(async (ctx) => {
         const em = ctx as unknown as EntityManager;
@@ -275,14 +396,15 @@ export class OnchainDepositService {
         await this.onchainTxRepo.createWithinTransaction(ctx, {
           tx_id: txId,
           user_id: userId,
-          linked_wallet_id: linked.link_id,
-          chain: dto.chain,
+          linked_wallet_id: linkedWalletId,
+          chain: resolved.chain,
           type: 'DEPOSIT',
-          tx_hash: dto.txHash,
-          from_address: txStatus.from,
-          to_address: txStatus.to,
+          tx_hash: resolved.txHash,
+          log_index: resolved.logIndex,
+          from_address: resolved.from,
+          to_address: resolved.to,
           amount: onchainAmount.toString() as any,
-          confirmations: txStatus.confirmations,
+          confirmations: resolved.confirmations,
           status: status as any,
           confirmed_at: status === OnchainTxStatus.COMPLETED ? new Date() : undefined,
         });
@@ -291,8 +413,9 @@ export class OnchainDepositService {
           const settlement = await this.settleDepositLedgerIfNeeded(
             txId,
             userId,
-            dto.chain,
+            resolved.chain,
             onchainAmount.toString(),
+            resolved.asset,
             ctx,
           );
           settled = settlement.settled || settlement.alreadySettled;
@@ -309,19 +432,19 @@ export class OnchainDepositService {
           aggregateType: 'OnchainTransaction',
           aggregateId: txId,
           eventType: OutboxIntegrationEventType.OnchainDepositSubmittedV1,
-          dedupeKey: `onchain:deposit:submit:${dto.chain}:${dto.txHash}`,
+          dedupeKey: `onchain:deposit:submit:${resolved.chain}:${resolved.txHash}:${resolved.logIndex}`,
           payload: {
             payloadVersion: 1,
             userId,
             txId,
-            chain: dto.chain,
-            txHash: dto.txHash,
+            chain: resolved.chain,
+            txHash: resolved.txHash,
             status,
             amount: onchainAmount.toString(),
             settled,
-            fromAddress: txStatus.from,
-            toAddress: txStatus.to,
-            confirmations: txStatus.confirmations,
+            fromAddress: resolved.from,
+            toAddress: resolved.to,
+            confirmations: resolved.confirmations,
             createdAt: new Date().toISOString(),
             confirmedAt:
               status === OnchainTxStatus.COMPLETED ? new Date().toISOString() : null,
@@ -333,16 +456,18 @@ export class OnchainDepositService {
       this.treasuryLog('deposit.submit.result', {
         userId,
         txId,
-        chain: dto.chain,
-        txHash: dto.txHash,
+        chain: resolved.chain,
+        txHash: resolved.txHash,
         amount: onchainAmount.toString(),
         status,
         settled,
       });
 
-      return { txId, status, amount: onchainAmount.toString(), chain: dto.chain, settled };
+      return { txId, status, amount: onchainAmount.toString(), chain: resolved.chain, settled };
     } finally {
-      await this.cacheService.delete(lockKey);
+      if (!lockHeld) {
+        await this.cacheService.delete(lockKey);
+      }
     }
   }
 
@@ -357,44 +482,77 @@ export class OnchainDepositService {
       throw new BusinessException('Giao dịch nạp chưa có tx_hash hợp lệ', 'DEPOSIT_TXHASH_MISSING');
     }
 
-    const provider = this.providerFactory.getProvider(tx.chain as BlockchainNetwork);
-    const latest = await provider.getTransactionStatus(String(tx.tx_hash));
+    const chain = tx.chain as BlockchainNetwork;
+    const provider = this.providerFactory.getProvider(chain);
+    const expected = await this.requireExpectedDepositAddress(chain);
+    const legs = await provider.resolveDepositTransfers(String(tx.tx_hash), {
+      expectedDepositAddress: expected,
+    });
+    const storedLog = Number(tx.log_index ?? 0);
+    const leg =
+      legs.find(
+        (l) =>
+          l.logIndex === storedLog &&
+          l.from === tx.from_address &&
+          new Decimal(l.amountHuman).minus(new Decimal(String(tx.amount))).abs().lte('0.0000001'),
+      ) ??
+      legs.find((l) => l.logIndex === storedLog && l.from === tx.from_address) ??
+      legs.find(
+        (l) =>
+          l.from === tx.from_address &&
+          new Decimal(l.amountHuman).minus(new Decimal(String(tx.amount))).abs().lte('0.0000001'),
+      ) ??
+      legs.find((l) => l.from === tx.from_address);
 
-    if (latest.status === 'FAILED') {
+    let latestStatus: ResolvedDepositTransfer['chainStatus'] | 'NOT_FOUND' = 'NOT_FOUND';
+    let confirmations = 0;
+    if (leg) {
+      latestStatus = leg.chainStatus;
+      confirmations = leg.confirmations ?? 0;
+    } else {
+      const legacy = await provider.getTransactionStatus(String(tx.tx_hash));
+      latestStatus = legacy.status;
+      confirmations = legacy.confirmations ?? 0;
+    }
+
+    if (latestStatus === 'FAILED') {
       await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.FAILED, {
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
       });
       this.treasuryAlert('deposit.settle.chain_failed', {
         userId,
         txId,
         txHash: tx.tx_hash,
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
       });
       return {
         txId,
         status: OnchainTxStatus.FAILED,
         settled: false,
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
       };
     }
 
-    if (latest.status !== 'CONFIRMED') {
+    if (latestStatus !== 'CONFIRMED') {
       await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.CONFIRMING, {
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
       });
       this.treasuryLog('deposit.settle.waiting_confirmations', {
         userId,
         txId,
         txHash: tx.tx_hash,
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
       });
       return {
         txId,
         status: OnchainTxStatus.CONFIRMING,
         settled: false,
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
       };
     }
+
+    const settlementAsset: DepositSettlementAsset =
+      leg?.asset === 'USDT_TRC20' || leg?.asset === 'USDT_ERC20' ? leg.asset : 'NATIVE';
 
     let settled = false;
 
@@ -402,15 +560,16 @@ export class OnchainDepositService {
       const em = ctx as unknown as EntityManager;
 
       await this.onchainTxRepo.updateStatusWithinTransaction(ctx, txId, OnchainTxStatus.COMPLETED, {
-        confirmations: latest.confirmations ?? 0,
+        confirmations,
         confirmed_at: new Date(),
       });
 
       const settlement = await this.settleDepositLedgerIfNeeded(
         txId,
         userId,
-        tx.chain as BlockchainNetwork,
+        chain,
         String(tx.amount),
+        settlementAsset,
         ctx,
       );
       settled = settlement.settled || settlement.alreadySettled;
@@ -440,7 +599,7 @@ export class OnchainDepositService {
           amount: String(tx.amount),
           fromAddress: tx.from_address,
           toAddress: tx.to_address,
-          confirmations: latest.confirmations ?? 0,
+          confirmations,
           createdAt:
             tx.created_at instanceof Date ? tx.created_at.toISOString() : String(tx.created_at),
           confirmedAt: new Date().toISOString(),
@@ -453,7 +612,7 @@ export class OnchainDepositService {
       userId,
       txId,
       txHash: tx.tx_hash,
-      confirmations: latest.confirmations ?? 0,
+      confirmations,
       settled,
     });
 
@@ -461,7 +620,7 @@ export class OnchainDepositService {
       txId,
       status: OnchainTxStatus.COMPLETED,
       settled,
-      confirmations: latest.confirmations ?? 0,
+      confirmations,
     };
   }
 }

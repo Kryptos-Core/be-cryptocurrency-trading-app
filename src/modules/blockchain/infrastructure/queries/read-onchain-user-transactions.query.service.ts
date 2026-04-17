@@ -4,7 +4,8 @@ import { DataSource } from 'typeorm';
 import type { OnchainTxRowDto } from '@/modules/blockchain/domain/ports';
 
 /**
- * Merged list: DEPOSIT rows from read_onchain_deposits + non-deposit rows from onchain_transactions.
+ * Merged list: DEPOSIT rows from read_onchain_deposits + user-facing rows from onchain_transactions.
+ * Excludes treasury-only types (FUND/SWEEP) — those belong on treasury admin APIs, not retail history.
  * Used when READ_MODEL_ONCHAIN_DEPOSITS is enabled.
  */
 @Injectable()
@@ -33,7 +34,9 @@ export class ReadOnchainUserTransactionsQueryService {
                 tx.confirmations, tx.created_at, tx.confirmed_at,
                 tx.credited_currency_id, tx.credited_amount, tx.conversion_rate
          FROM onchain_transactions tx
-         WHERE tx.user_id = ? AND tx.type <> 'DEPOSIT'
+         WHERE tx.user_id = ?
+           AND tx.type <> 'DEPOSIT'
+           AND tx.type NOT IN ('FUND', 'SWEEP')
        ) u
        ORDER BY u.created_at DESC
        LIMIT ?`,

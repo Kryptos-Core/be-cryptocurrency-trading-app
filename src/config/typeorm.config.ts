@@ -9,6 +9,7 @@ import { AppSetting } from '../entities/app-setting.entity';
 import { Currency } from '../entities/currency.entity';
 import { CurrencyNetwork } from '../entities/currency-network.entity';
 import { Deposit } from '../entities/deposit.entity';
+import { DepositWatcherCursor } from '../entities/deposit-watcher-cursor.entity';
 import { ExchangeRateAuditLog } from '../entities/exchange-rate-audit-log.entity';
 import { FiatDeposit } from '../entities/fiat-deposit.entity';
 import { IntegrationOutbox } from '../entities/integration-outbox.entity';
@@ -39,6 +40,7 @@ const ALL_ENTITIES = [
   Currency,
   CurrencyNetwork,
   Deposit,
+  DepositWatcherCursor,
   ExchangeRateAuditLog,
   IntegrationOutbox,
   FiatDeposit,

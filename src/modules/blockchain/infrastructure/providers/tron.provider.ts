@@ -3,9 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TronWeb, Trx } from 'tronweb';
 import { BlockchainNetwork } from '@/common/enums';
+import type {
+  ResolveDepositTransfersContext,
+  ResolvedDepositTransfer,
+} from '@/modules/blockchain/deposit-transfer.types';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
+import {
+  isTronTreasuryChain,
+  TRON_USDT_CONTRACT,
+  TRON_USDT_DECIMALS,
+} from '@/modules/treasury/treasury-tron-usdt-contracts';
 import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
@@ -16,6 +25,7 @@ import {
   extractTronFirstContractOwnerBase58,
   extractTronNativeTransferMeta,
 } from '../../utils/tron-native-transfer.util';
+import { extractTronUsdtTrc20TransfersToRecipient } from '../../utils/tron-trc20-deposit.util';
 
 export interface TronProviderBindings {
   network: BlockchainNetwork;
@@ -139,6 +149,76 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     } catch (error) {
       this.logger.error(`Error getting TRON tx: ${txHash}`, error);
       return buildNotFoundTxStatus(txHash, this.bindings.network);
+    }
+  }
+
+  async resolveDepositTransfers(
+    txHash: string,
+    ctx: ResolveDepositTransfersContext,
+  ): Promise<ResolvedDepositTransfer[]> {
+    try {
+      const tx = await this.tronWeb.trx.getTransaction(txHash);
+      if (!tx?.txID) return [];
+      const receipt = await this.tronWeb.trx.getTransactionInfo(txHash);
+      const confirmed = receipt?.blockNumber != null;
+      let chainStatus: ResolvedDepositTransfer['chainStatus'] = 'PENDING';
+      if (confirmed) {
+        const rawResult = receipt?.result as string | undefined;
+        const ok = rawResult == null || String(rawResult).toUpperCase() === 'SUCCESS';
+        chainStatus = ok ? 'CONFIRMED' : 'FAILED';
+      }
+      const confirmations = confirmed ? 1 : 0;
+      const blockNumber = receipt?.blockNumber;
+      const expected = ctx.expectedDepositAddress.trim();
+      const chain = this.bindings.network;
+      const out: ResolvedDepositTransfer[] = [];
+
+      const treasuryChain = this.bindings.treasuryChain;
+      if (isTronTreasuryChain(treasuryChain)) {
+        const usdt = TRON_USDT_CONTRACT[treasuryChain];
+        const legs = extractTronUsdtTrc20TransfersToRecipient(
+          this.tronWeb,
+          tx,
+          usdt,
+          expected,
+          TRON_USDT_DECIMALS,
+        );
+        legs.forEach((leg, i) => {
+          out.push({
+            chain,
+            txHash,
+            logIndex: i + 1,
+            from: leg.from,
+            to: leg.to,
+            amountHuman: leg.amountHuman,
+            asset: 'USDT_TRC20',
+            chainStatus,
+            confirmations,
+            blockNumber,
+          });
+        });
+      }
+
+      const native = extractTronNativeTransferMeta(this.tronWeb, tx);
+      if (native && native.to === expected) {
+        out.push({
+          chain,
+          txHash,
+          logIndex: 0,
+          from: native.from,
+          to: native.to,
+          amountHuman: native.value,
+          asset: 'NATIVE',
+          chainStatus,
+          confirmations,
+          blockNumber,
+        });
+      }
+
+      return out;
+    } catch (error) {
+      this.logger.error(`resolveDepositTransfers TRON ${txHash}`, error);
+      return [];
     }
   }
 

@@ -30,6 +30,15 @@ export interface LinkedWalletRepositoryPort {
     address: string,
   ): Promise<BlockchainLinkedWalletRecord | null>;
 
+  /**
+   * Tìm ví VERIFIED theo chain+address (bất kỳ user) — dùng cho deposit watcher.
+   * Nếu có nhiều row (hiếm), lấy bản ghi đầu theo linked_at.
+   */
+  findVerifiedByChainAndAddress(
+    chain: string,
+    address: string,
+  ): Promise<BlockchainLinkedWalletRecord | null>;
+
   /** Tìm bất kỳ ví nào theo linkId + userId */
   findByLinkIdAndUserId(
     linkId: string,

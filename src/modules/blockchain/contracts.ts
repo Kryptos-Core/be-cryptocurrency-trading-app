@@ -17,6 +17,8 @@ export interface BlockchainOnchainTransactionRecord {
   chain: string;
   type: string;
   tx_hash: string | null;
+  /** EVM log index for multi-leg txs; Tron/native default 0. */
+  log_index?: number;
   from_address: string;
   to_address: string;
   amount: string;

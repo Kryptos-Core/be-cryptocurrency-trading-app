@@ -9,6 +9,7 @@ import type { Express } from 'express';
 import { MATCHING_QUEUE } from '@/modules/matching/infrastructure/queue/matching-queue.service';
 import { PAYMENT_CONFIG_QUEUE } from '@/modules/payment-config/payment-config.service';
 import { TREASURY_QUEUE } from '@/modules/treasury/constants';
+import { DEPOSIT_WATCHER_QUEUE } from '@/modules/blockchain/deposit-watcher/deposit-watcher.constants';
 
 @Injectable()
 export class BullBoardService implements OnApplicationBootstrap {
@@ -22,6 +23,7 @@ export class BullBoardService implements OnApplicationBootstrap {
     @InjectQueue(MATCHING_QUEUE) private readonly matchingQueue: Queue,
     @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: Queue,
     @InjectQueue(PAYMENT_CONFIG_QUEUE) private readonly paymentConfigQueue: Queue,
+    @InjectQueue(DEPOSIT_WATCHER_QUEUE) private readonly depositWatcherQueue: Queue,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -33,6 +35,7 @@ export class BullBoardService implements OnApplicationBootstrap {
         new BullAdapter(this.matchingQueue as any) as any,
         new BullAdapter(this.treasuryQueue as any) as any,
         new BullAdapter(this.paymentConfigQueue as any) as any,
+        new BullAdapter(this.depositWatcherQueue as any) as any,
       ],
       serverAdapter: this.serverAdapter,
     });

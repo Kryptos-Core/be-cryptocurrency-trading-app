@@ -48,14 +48,27 @@ export class DepositFxService {
   /**
    * Chuyển đổi số lượng native coin → platform cash (USDT).
    * Được gọi trong settleDepositLedgerIfNeeded() thay vì credit coin trực tiếp.
+   *
+   * @param settlementAsset Khi `USDT_TRC20` / `USDT_ERC20`, coi [nativeAmount] là số USDT token (human) — credit 1:1 platform cash.
    */
   async convertToPlatformCash(
     chain: BlockchainNetwork,
     nativeAmount: string,
+    settlementAsset: 'NATIVE' | 'USDT_TRC20' | 'USDT_ERC20' = 'NATIVE',
   ): Promise<DepositConversionResult> {
     const cashCurrencySymbol = await this.resolveCashCurrencySymbol();
-    const nativeSymbol = await this.getNativeSymbol(chain);
     const creditCurrencyId = await this.resolveCashCurrencyId(cashCurrencySymbol);
+
+    if (settlementAsset === 'USDT_TRC20' || settlementAsset === 'USDT_ERC20') {
+      return {
+        creditCurrencyId,
+        creditAmount: nativeAmount,
+        conversionRate: '1',
+        originalAmount: nativeAmount,
+      };
+    }
+
+    const nativeSymbol = await this.getNativeSymbol(chain);
 
     // Nếu native coin ĐÃ là cash currency (ví dụ deposit USDT trực tiếp), skip conversion
     if (nativeSymbol.toUpperCase() === cashCurrencySymbol.toUpperCase()) {

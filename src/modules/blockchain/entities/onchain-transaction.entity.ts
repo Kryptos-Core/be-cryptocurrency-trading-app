@@ -17,7 +17,7 @@ import { User } from '@/entities/user.entity';
 import { LinkedWallet } from './linked-wallet.entity';
 
 @Entity('onchain_transactions')
-@Index('uk_onchain_tx_hash', ['chain', 'tx_hash'], { unique: true })
+@Index('uk_onchain_tx_chain_hash_log', ['chain', 'tx_hash', 'log_index'], { unique: true })
 @Index('idx_onchain_tx_user', ['user_id', 'type', 'status'])
 @Index('idx_onchain_tx_created', ['user_id', 'created_at'])
 @Index('idx_onchain_tx_treasury_operation', ['treasury_operation_id'])
@@ -50,6 +50,10 @@ export class OnchainTransaction {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   tx_hash!: string | null;
+
+  /** EVM log index when one tx has multiple token transfers; Tron uses 0 / per-leg index. */
+  @Column({ type: 'int', default: 0 })
+  log_index!: number;
 
   @Column({ type: 'varchar', length: 255 })
   from_address!: string;

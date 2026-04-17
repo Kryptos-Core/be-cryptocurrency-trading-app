@@ -19,6 +19,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BinanceRestModule } from './modules/binance-rest/binance-rest.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
+import { BlockchainDepositWatcherModule } from './modules/blockchain/deposit-watcher/blockchain-deposit-watcher.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DepositsModule } from './modules/deposits/deposits.module';
@@ -115,6 +116,7 @@ class BullBoardAuthMiddleware {
     ExchangeModule,
     ExchangeRateModule,
     BlockchainModule,
+    BlockchainDepositWatcherModule,
     DepositsModule,
     ManagedWalletsModule,
     DashboardModule,

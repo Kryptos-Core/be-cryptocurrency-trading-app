@@ -61,7 +61,6 @@ import { EthereumProvider, SolanaProvider, TronProvider } from './infrastructure
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction]),
@@ -206,6 +205,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     WalletLinkingService,
     OnchainTransferService,
     DepositFxService,
+    OnchainDepositService,
   ],
 })
 export class BlockchainModule {}

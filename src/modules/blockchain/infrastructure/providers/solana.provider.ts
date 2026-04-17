@@ -19,6 +19,10 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
+  ResolveDepositTransfersContext,
+  ResolvedDepositTransfer,
+} from '@/modules/blockchain/deposit-transfer.types';
+import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
   IBlockchainProvider,
@@ -183,6 +187,31 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
       this.logger.error(`Error getting Solana tx: ${txHash}`, error);
       return buildNotFoundTxStatus(txHash, this.bindings.network);
     }
+  }
+
+  async resolveDepositTransfers(
+    txHash: string,
+    ctx: ResolveDepositTransfersContext,
+  ): Promise<ResolvedDepositTransfer[]> {
+    const st = await this.getTransactionStatus(txHash);
+    if (st.status === 'NOT_FOUND') return [];
+    const expected = ctx.expectedDepositAddress.trim();
+    const to = (st.to ?? '').trim();
+    if (!to || to !== expected) return [];
+    return [
+      {
+        chain: this.bindings.network,
+        txHash,
+        logIndex: 0,
+        from: st.from,
+        to: st.to,
+        amountHuman: st.value,
+        asset: 'NATIVE',
+        chainStatus: st.status,
+        confirmations: st.confirmations,
+        blockNumber: st.blockNumber,
+      },
+    ];
   }
 
   isValidAddress(address: string): boolean {

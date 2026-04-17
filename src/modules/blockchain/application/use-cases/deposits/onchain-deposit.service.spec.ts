@@ -10,7 +10,7 @@ import { BadRequestException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
-import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
+import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
 import { DepositFxService } from '../../../domain/services/deposit-fx.service';
@@ -39,6 +39,7 @@ describe('OnchainDepositService', () => {
   };
   const provider = {
     getTransactionStatus: jest.fn(),
+    resolveDepositTransfers: jest.fn(),
   };
   const providerFactory = {
     getProvider: jest.fn().mockReturnValue(provider),
@@ -52,8 +53,8 @@ describe('OnchainDepositService', () => {
   const walletsService = {
     applyTransaction: jest.fn(),
   };
-  const transactionWalletService = {
-    getDefaultUserDepositWallet: jest.fn(),
+  const managedWalletsService = {
+    getPublicDepositRecipientAddress: jest.fn(),
   };
 
   const unitOfWork = {
@@ -66,8 +67,29 @@ describe('OnchainDepositService', () => {
 
   let service: OnchainDepositService;
 
+  const ethResolvedPending = {
+    chain: BlockchainNetwork.ETH_MAINNET,
+    txHash: '0xtx',
+    logIndex: 0,
+    from: '0xsender',
+    to: '0xdeposit',
+    amountHuman: '1.25',
+    asset: 'NATIVE' as const,
+    chainStatus: 'PENDING' as const,
+    confirmations: 2,
+  };
+
+  const ethResolvedConfirmed = {
+    ...ethResolvedPending,
+    txHash: '0xconfirmed',
+    amountHuman: '2.5',
+    chainStatus: 'CONFIRMED' as const,
+    confirmations: 12,
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('0xdeposit');
     unitOfWork.run.mockImplementation(async (fn: (ctx: { query: typeof dataSource.query }) => Promise<unknown>) => {
       const ctx = {
         query: (...args: unknown[]) => (dataSource as any).query(...args),
@@ -84,7 +106,7 @@ describe('OnchainDepositService', () => {
         { provide: WalletLinkingService, useValue: walletLinkingService },
         { provide: DepositFxService, useValue: depositFxService },
         { provide: WalletsService, useValue: walletsService },
-        { provide: TransactionWalletService, useValue: transactionWalletService },
+        { provide: ManagedWalletsService, useValue: managedWalletsService },
         { provide: UnitOfWork, useValue: unitOfWork },
         { provide: OutboxAppender, useValue: outboxAppender },
       ],
@@ -96,13 +118,7 @@ describe('OnchainDepositService', () => {
   it('submitDeposit creates a confirming tx without settling when chain tx is still pending', async () => {
     cacheService.exists.mockResolvedValue(false);
     onchainTxRepo.findByChainAndTxHash.mockResolvedValue(null);
-    provider.getTransactionStatus.mockResolvedValue({
-      status: 'PENDING',
-      confirmations: 2,
-      from: '0xsender',
-      to: '0xdeposit',
-      value: '1.25',
-    });
+    provider.resolveDepositTransfers.mockResolvedValue([ethResolvedPending]);
     walletLinkingService.findVerifiedWallet.mockResolvedValue({ link_id: 'link-1' });
 
     const result = await service.submitDeposit('user-1', {
@@ -111,6 +127,9 @@ describe('OnchainDepositService', () => {
       amount: '1.25',
     } as any);
 
+    expect(provider.resolveDepositTransfers).toHaveBeenCalledWith('0xtx', {
+      expectedDepositAddress: '0xdeposit',
+    });
     expect(onchainTxRepo.createWithinTransaction).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -123,7 +142,9 @@ describe('OnchainDepositService', () => {
     );
     expect(walletsService.applyTransaction).not.toHaveBeenCalled();
     expect(outboxAppender.append).toHaveBeenCalled();
-    expect(cacheService.delete).toHaveBeenCalledWith('deposit:pending:0xtx');
+    expect(cacheService.delete).toHaveBeenCalledWith(
+      `deposit:pending:${BlockchainNetwork.ETH_MAINNET}:0xtx:0`,
+    );
     expect(result).toEqual(
       expect.objectContaining({
         status: OnchainTxStatus.CONFIRMING,
@@ -137,13 +158,7 @@ describe('OnchainDepositService', () => {
   it('submitDeposit settles immediately for confirmed tx and records credit conversion', async () => {
     cacheService.exists.mockResolvedValue(false);
     onchainTxRepo.findByChainAndTxHash.mockResolvedValue(null);
-    provider.getTransactionStatus.mockResolvedValue({
-      status: 'CONFIRMED',
-      confirmations: 12,
-      from: '0xsender',
-      to: '0xdeposit',
-      value: '2.5',
-    });
+    provider.resolveDepositTransfers.mockResolvedValue([ethResolvedConfirmed]);
     walletLinkingService.findVerifiedWallet.mockResolvedValue({ link_id: 'link-2' });
     depositFxService.convertToPlatformCash.mockResolvedValue({
       creditCurrencyId: 'usdt',
@@ -158,6 +173,11 @@ describe('OnchainDepositService', () => {
       amount: '2.5',
     } as any);
 
+    expect(depositFxService.convertToPlatformCash).toHaveBeenCalledWith(
+      BlockchainNetwork.ETH_MAINNET,
+      '2.5',
+      'NATIVE',
+    );
     expect(walletsService.applyTransaction).toHaveBeenCalledWith(
       'user-2',
       expect.objectContaining({
@@ -180,8 +200,11 @@ describe('OnchainDepositService', () => {
   });
 
   it('submitDeposit rejects duplicate processing locks and existing txs', async () => {
-    cacheService.exists.mockResolvedValue(true);
+    const legDup = { ...ethResolvedPending, txHash: '0xdup' };
+    provider.resolveDepositTransfers.mockResolvedValue([legDup]);
+    walletLinkingService.findVerifiedWallet.mockResolvedValue({ link_id: 'link-1' });
 
+    cacheService.exists.mockResolvedValue(true);
     await expect(
       service.submitDeposit('user-1', {
         chain: BlockchainNetwork.ETH_MAINNET,
@@ -190,6 +213,8 @@ describe('OnchainDepositService', () => {
       } as any),
     ).rejects.toBeInstanceOf(ConflictException);
 
+    const legExisting = { ...ethResolvedPending, txHash: '0xdup-existing' };
+    provider.resolveDepositTransfers.mockResolvedValue([legExisting]);
     cacheService.exists.mockResolvedValue(false);
     onchainTxRepo.findByChainAndTxHash.mockResolvedValue({ tx_id: 'existing' });
 
@@ -209,8 +234,13 @@ describe('OnchainDepositService', () => {
       type: 'DEPOSIT',
       chain: BlockchainNetwork.ETH_MAINNET,
       tx_hash: '0xfail',
+      log_index: 0,
       amount: '3',
+      from_address: '0xsender',
+      to_address: '0xdeposit',
     });
+    managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('0xdeposit');
+    provider.resolveDepositTransfers.mockResolvedValue([]);
     provider.getTransactionStatus.mockResolvedValue({
       status: 'FAILED',
       confirmations: 7,
@@ -237,12 +267,24 @@ describe('OnchainDepositService', () => {
       type: 'DEPOSIT',
       chain: BlockchainNetwork.ETH_MAINNET,
       tx_hash: '0xok',
+      log_index: 0,
       amount: '4.2',
+      from_address: '0xsender',
+      to_address: '0xdeposit',
     });
-    provider.getTransactionStatus.mockResolvedValue({
-      status: 'CONFIRMED',
-      confirmations: 21,
-    });
+    provider.resolveDepositTransfers.mockResolvedValue([
+      {
+        chain: BlockchainNetwork.ETH_MAINNET,
+        txHash: '0xok',
+        logIndex: 0,
+        from: '0xsender',
+        to: '0xdeposit',
+        amountHuman: '4.2',
+        asset: 'NATIVE' as const,
+        chainStatus: 'CONFIRMED' as const,
+        confirmations: 21,
+      },
+    ]);
     depositFxService.convertToPlatformCash.mockResolvedValue({
       creditCurrencyId: 'usdt',
       creditAmount: '420',
@@ -279,18 +321,17 @@ describe('OnchainDepositService', () => {
     });
   });
 
-  it('submitDeposit enforces Tron recipient default wallet check', async () => {
+  it('submitDeposit rejects when resolved legs are empty but tx exists', async () => {
     cacheService.exists.mockResolvedValue(false);
     onchainTxRepo.findByChainAndTxHash.mockResolvedValue(null);
+    managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('Tconfigured');
+    provider.resolveDepositTransfers.mockResolvedValue([]);
     provider.getTransactionStatus.mockResolvedValue({
       status: 'PENDING',
       confirmations: 1,
       from: 'Tsender',
-      to: 'Tactual',
+      to: 'Twrong',
       value: '10',
-    });
-    transactionWalletService.getDefaultUserDepositWallet.mockResolvedValue({
-      address: 'Tconfigured',
     });
 
     await expect(
