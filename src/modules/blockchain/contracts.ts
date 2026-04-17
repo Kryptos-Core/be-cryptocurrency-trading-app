@@ -29,6 +29,8 @@ export interface BlockchainOnchainTransactionRecord {
   credit_tx_id?: string | null;
   credited_at?: Date | null;
   treasury_operation_id?: string | null;
+  /** Present for treasury Fund/Sweep rows: mirrors linked `treasury_operations.asset`. */
+  asset?: 'NATIVE' | 'USDT_TRC20' | null;
   created_at: Date;
   updated_at?: Date;
 }

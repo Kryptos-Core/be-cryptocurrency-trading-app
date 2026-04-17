@@ -46,12 +46,6 @@ const MANAGED_TRON_CHAINS = [
 
 type SupportedManagedWalletChain = (typeof MANAGED_TRON_CHAINS)[number];
 
-export type ConfiguredDepositWalletResolution = {
-  address: string;
-  chain: SupportedManagedWalletChain;
-  source: 'transaction_wallet';
-};
-
 type DepositMethodItem = {
   /** API chain code — same universe as GET /treasury/chain-picker-options `onchain_deposit_withdraw`. */
   chain: string;
@@ -268,23 +262,13 @@ export class ManagedWalletsService {
     return { success: true };
   }
 
-  /** User-visible Tron deposit address from transaction_wallets only. */
-  async getConfiguredDepositWallet(
-    chain: string,
-  ): Promise<ConfiguredDepositWalletResolution | null> {
-    if (chain !== BlockchainNetwork.TRON_MAINNET) {
-      return null;
-    }
-    const supportedChain = chain as SupportedManagedWalletChain;
-    const tw = await this.transactionWalletService.getDefaultUserDepositWallet(supportedChain);
-    if (!tw) {
-      return null;
-    }
-    return {
-      address: tw.address,
-      chain: supportedChain,
-      source: 'transaction_wallet',
-    };
+  /**
+   * Public deposit recipient for a chain — **same** string as each row in `GET /deposit/methods`
+   * (`resolveDepositMethodDisplayAddress`). Use for `GET /blockchain/deposit/address` so QR / copy
+   * in the deposit form matches the expandable “Phương thức nạp tiền” card (mainnet vs testnet from ops config).
+   */
+  async getPublicDepositRecipientAddress(chain: string): Promise<string> {
+    return this.resolveDepositMethodDisplayAddress(chain);
   }
 
   async getDepositMethods(): Promise<{

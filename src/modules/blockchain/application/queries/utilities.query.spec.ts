@@ -12,10 +12,9 @@ import {
 
 describe('Blockchain utilities queries', () => {
   const managedWalletsService = {
-    getConfiguredDepositWallet: jest.fn(),
+    getPublicDepositRecipientAddress: jest.fn(),
   };
   const providerFactory = {
-    getProvider: jest.fn(),
     getSupportedNetworks: jest.fn(),
   };
 
@@ -37,11 +36,8 @@ describe('Blockchain utilities queries', () => {
     getSupportedNetworksQuery = moduleRef.get(GetSupportedNetworksQuery);
   });
 
-  it('returns configured Tron default deposit wallet', async () => {
-    managedWalletsService.getConfiguredDepositWallet.mockResolvedValue({
-      address: 'TRON_ADDR',
-      source: 'transaction_wallet_default',
-    });
+  it('returns public deposit recipient (same as deposit methods row)', async () => {
+    managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('TRON_ADDR');
 
     const result = await getDepositAddressQuery.execute(
       new GetDepositAddressRequest(BlockchainNetwork.TRON_MAINNET),
@@ -50,36 +46,36 @@ describe('Blockchain utilities queries', () => {
     expect(result).toEqual({
       chain: BlockchainNetwork.TRON_MAINNET,
       depositAddress: 'TRON_ADDR',
-      source: 'transaction_wallet_default',
+      source: 'deposit_methods_sync',
       note: expect.any(String),
     });
-    expect(providerFactory.getProvider).not.toHaveBeenCalled();
+    expect(managedWalletsService.getPublicDepositRecipientAddress).toHaveBeenCalledWith(
+      BlockchainNetwork.TRON_MAINNET,
+    );
   });
 
   it('rejects when Tron default deposit wallet is missing', async () => {
-    managedWalletsService.getConfiguredDepositWallet.mockResolvedValue(null);
+    managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('');
 
     await expect(
       getDepositAddressQuery.execute(new GetDepositAddressRequest(BlockchainNetwork.TRON_MAINNET)),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('returns hot wallet address for non-Tron chains', async () => {
-    const provider = {
-      getHotWalletAddress: jest.fn().mockResolvedValue('0xhotwallet'),
-    };
-    managedWalletsService.getConfiguredDepositWallet.mockResolvedValue(null);
-    providerFactory.getProvider.mockReturnValue(provider);
+  it('returns treasury-aligned deposit address for non-Tron chains', async () => {
+    managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('0xtreasury');
 
     const result = await getDepositAddressQuery.execute(
       new GetDepositAddressRequest('eth_mainnet'),
     );
 
-    expect(providerFactory.getProvider).toHaveBeenCalledWith(BlockchainNetwork.ETH_MAINNET);
+    expect(managedWalletsService.getPublicDepositRecipientAddress).toHaveBeenCalledWith(
+      BlockchainNetwork.ETH_MAINNET,
+    );
     expect(result).toEqual({
       chain: BlockchainNetwork.ETH_MAINNET,
-      depositAddress: '0xhotwallet',
-      source: 'hot_wallet',
+      depositAddress: '0xtreasury',
+      source: 'deposit_methods_sync',
       note: expect.any(String),
     });
   });

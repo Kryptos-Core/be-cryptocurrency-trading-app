@@ -27,10 +27,7 @@ export class GetDepositAddressQuery
       }
     >
 {
-  constructor(
-    private readonly managedWalletsService: ManagedWalletsService,
-    private readonly providerFactory: BlockchainProviderFactory,
-  ) {}
+  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
 
   async execute(query: GetDepositAddressRequest): Promise<{
     chain: BlockchainNetwork;
@@ -44,31 +41,24 @@ export class GetDepositAddressQuery
     }
 
     const normalizedChain = rawChain.toUpperCase() as BlockchainNetwork;
-    const depositWallet =
-      await this.managedWalletsService.getConfiguredDepositWallet(normalizedChain);
+    const depositAddress =
+      await this.managedWalletsService.getPublicDepositRecipientAddress(normalizedChain);
 
-    if (normalizedChain === BlockchainNetwork.TRON_MAINNET) {
-      if (!depositWallet) {
-        throw new BadRequestException(
-          'Chưa cấu hình ví nạp mặc định cho mạng này. Vui lòng đặt default trong Nạp tiền & ví quản lý.',
-          'DEPOSIT_DEFAULT_NOT_CONFIGURED',
-        );
-      }
-
-      return {
-        chain: normalizedChain,
-        depositAddress: depositWallet.address,
-        source: depositWallet.source,
-        note: 'Đây là địa chỉ ví nhận nạp on-chain do vận hành chỉ định (transaction wallet default).',
-      };
+    if (!depositAddress) {
+      const isTronMainnet = normalizedChain === BlockchainNetwork.TRON_MAINNET;
+      throw new BadRequestException(
+        isTronMainnet
+          ? 'Chưa cấu hình ví nạp mặc định cho mạng này. Vui lòng đặt default trong Nạp tiền & ví quản lý.'
+          : 'Chưa cấu hình địa chỉ nạp cho mạng này. Kiểm tra ví nạp mặc định hoặc ví chính (treasury) trên mạng đã chọn.',
+        isTronMainnet ? 'DEPOSIT_DEFAULT_NOT_CONFIGURED' : 'DEPOSIT_ADDRESS_NOT_CONFIGURED',
+      );
     }
 
-    const provider = this.providerFactory.getProvider(normalizedChain);
     return {
       chain: normalizedChain,
-      depositAddress: await provider.getHotWalletAddress(),
-      source: 'hot_wallet',
-      note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
+      depositAddress,
+      source: 'deposit_methods_sync',
+      note: 'Địa chỉ này khớp với mục “Phương thức nạp tiền của sàn” cho cùng mạng (mainnet/testnet theo cấu hình hệ thống).',
     };
   }
 }

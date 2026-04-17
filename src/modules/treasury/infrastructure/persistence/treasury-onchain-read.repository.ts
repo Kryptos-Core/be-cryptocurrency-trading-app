@@ -1,10 +1,37 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { calcSkip } from '@/common/utils/pagination.util';
+import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import { OnchainTransaction } from '@/modules/blockchain';
 import type { TreasuryOnchainReadRepositoryPort } from '../../domain/ports';
 import type { ListTreasuryTransactionsDto } from '../../dto';
+
+function mapOnchainToTreasuryHistoryRecord(
+  tx: OnchainTransaction,
+  asset: 'NATIVE' | 'USDT_TRC20' | null,
+): BlockchainOnchainTransactionRecord {
+  return {
+    tx_id: tx.tx_id,
+    user_id: tx.user_id,
+    linked_wallet_id: tx.linked_wallet_id,
+    chain: tx.chain,
+    type: tx.type,
+    tx_hash: tx.tx_hash,
+    from_address: tx.from_address,
+    to_address: tx.to_address,
+    amount: tx.amount,
+    confirmations: tx.confirmations,
+    status: tx.status,
+    confirmed_at: tx.confirmed_at,
+    credited_currency_id: tx.credited_currency_id,
+    credited_amount: tx.credited_amount,
+    conversion_rate: tx.conversion_rate,
+    treasury_operation_id: tx.treasury_operation_id,
+    asset,
+    created_at: tx.created_at,
+  };
+}
 
 @Injectable()
 export class TreasuryOnchainReadRepository implements TreasuryOnchainReadRepositoryPort {
@@ -40,7 +67,36 @@ export class TreasuryOnchainReadRepository implements TreasuryOnchainReadReposit
       );
     }
 
-    const [items, total] = await qb.getManyAndCount();
+    const [rows, total] = await qb.getManyAndCount();
+
+    const opIds = [
+      ...new Set(
+        rows
+          .map((t) => t.treasury_operation_id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ];
+
+    const assetByOpId = new Map<string, 'NATIVE' | 'USDT_TRC20'>();
+    if (opIds.length > 0) {
+      const ops = await this.dataSource.getRepository(TreasuryOperation).find({
+        where: { operation_id: In(opIds) },
+        select: ['operation_id', 'asset'],
+      });
+      for (const op of ops) {
+        assetByOpId.set(op.operation_id, op.asset);
+      }
+    }
+
+    const items = rows.map((tx) =>
+      mapOnchainToTreasuryHistoryRecord(
+        tx,
+        tx.treasury_operation_id
+          ? (assetByOpId.get(tx.treasury_operation_id) ?? 'NATIVE')
+          : null,
+      ),
+    );
+
     return { items, total, page, limit };
   }
 }
