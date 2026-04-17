@@ -29,7 +29,13 @@ Sau đó điền thông tin và chạy ứng dụng (đảm bảo `NODE_ENV` kh�
 | DB_PASSWORD | Mật khẩu MySQL |
 | DB_NAME | Tên cơ sở dữ liệu |
 | JWT_SECRET | Mã bí mật JWT |
-| REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB | Kết nối Redis (cache, lock khớp lệnh, pub/sub) — xem [REDIS_USAGE.md](REDIS_USAGE.md) |
+| REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB | Kết nối Redis (cache, lock khớp lệnh, pub/sub, lock relay outbox) — xem [REDIS_USAGE.md](REDIS_USAGE.md) |
+
+### Read model / CQRS (markets pilot)
+
+| Biến | Mô tả |
+|---|---|
+| READ_MARKETS_FROM_PROJECTION | (Tùy chọn) `true` / `1` / `yes`: một số API list cặp thị trường đọc từ bảng **`read_market_pairs`** thay vì nguồn ghi, khi filter đơn giản (không ticker kèm list, không search/sort phức tạp — xem `GetMarketPairQuery`). Mặc định tắt. **Chỉ bật sau khi** migration outbox/read đã chạy và job relay outbox đã đồng bộ projection; nếu không, dữ liệu list có thể thiếu hoặc cũ. Chi tiết: [ARCHITECTURE.md](ARCHITECTURE.md). |
 
 ### Giao dịch và Sàn giao dịch (Trading và Exchange)
 

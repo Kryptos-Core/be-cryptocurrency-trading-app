@@ -6,6 +6,10 @@ Các file dưới đây mô tả **cấu hình, API và pattern kỹ thuật** �
 
 | Tài liệu | Nội dung |
 |----------|----------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Outbox, UoW, CQRS bus, read projection pilot, ranh giới module |
+| [bounded-contexts.md](bounded-contexts.md) | Bounded contexts và ACL |
+| [ubiquitous-language.md](ubiquitous-language.md) | Thuật ngữ domain / tích hợp |
+| [worker-pool-inventory.md](worker-pool-inventory.md) | Worker pool (Piscina), Bull, scale-out |
 | [ENV_CONFIG_USAGE.md](ENV_CONFIG_USAGE.md) | Biến môi trường, on-chain, PayOS, … |
 | [REDIS_USAGE.md](REDIS_USAGE.md) | Redis, queue, lock |
 | [WALLETCONNECT.md](WALLETCONNECT.md) | WalletConnect / Reown |
@@ -24,12 +28,14 @@ Các file dưới đây mô tả **cấu hình, API và pattern kỹ thuật** �
 | [onboarding/ai-assisted-dev.md](onboarding/ai-assisted-dev.md) | AI-assisted workflow: stop-prompt-gate, quality gates |
 | [onboarding/ecc-commands-quick-ref.md](onboarding/ecc-commands-quick-ref.md) | Lệnh slash `/ecc:*` và use-case map |
 
-## Clean Architecture
+## Clean Architecture và tích hợp
 
-Module `auth` và `orders` sử dụng **Clean Architecture** đầy đủ:
+Module **`auth`** và **`orders`** dùng **Clean Architecture** đầy đủ (`domain/` → `application/` → `infrastructure/` → controllers). Các module khác đang theo **hybrid** (`BaseRepository` + dần dần `application/queries` cho surface đọc mỏng).
 
-```
-domain/ (ports) → application/ (use-cases) → infrastructure/ (persistence) → presentation (controllers)
-```
+Bổ sung toàn cục:
 
-Chi tiết: [DATA_ACCESS_PATTERNS.md](DATA_ACCESS_PATTERNS.md).
+- **`@nestjs/cqrs`** — `ApplicationBusModule` / bus ứng dụng.
+- **Transactional outbox** + relay Bull — đồng bộ sự kiện và read model (pilot markets).
+- **`npm run lint:boundaries`** — kiểm tra import xuyên module (có allowlist tạm).
+
+Tổng hợp luồng: [ARCHITECTURE.md](ARCHITECTURE.md). Pattern data access: [DATA_ACCESS_PATTERNS.md](DATA_ACCESS_PATTERNS.md).

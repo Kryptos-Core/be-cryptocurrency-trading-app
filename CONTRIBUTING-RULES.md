@@ -17,7 +17,9 @@
 
 ### Module Structure
 
-**Clean Architecture** (auth, orders — full layered):
+**Full Clean Architecture** (áp dụng cho `auth`, `orders` — template dưới đây). Luồng tích hợp / outbox / read model toàn repo: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+Cấu trúc thư mục tham chiếu:
 ```
 src/modules/feature-name/
 ├── domain/
@@ -53,12 +55,15 @@ src/modules/feature-name/
  └── feature.controller.spec.ts
 ```
 
-**Hybrid pattern** (wallets, users, markets, currencies, deposits, blockchain, treasury, matching):
+**Hybrid pattern** (hầu hết bounded context còn lại — ví dụ wallets, users, markets, matching, …):
 ```
 src/modules/feature-name/
 ├── domain/
-│ └── ports/ # Repository port interfaces
+│ └── ports/ # Repository port interfaces (khi module đã tách port)
 │ └── *.port.ts
+├── application/        # tùy module — có thể chỉ có queries đọc mỏng
+│ └── queries/
+│ └── *.query.ts
 ├── dto/
 │ └── *.dto.ts
 ├── infrastructure/
@@ -70,6 +75,8 @@ src/modules/feature-name/
 └── __tests__/
  └── *.spec.ts
 ```
+
+Ghi chép outbox / transaction chung: [docs/DATA_ACCESS_PATTERNS.md](./docs/DATA_ACCESS_PATTERNS.md).
 
 ### Naming
 

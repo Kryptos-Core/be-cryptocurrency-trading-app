@@ -92,6 +92,7 @@ Production: `npm run build` rồi `npm run start:prod`.
 | Script | Ý nghĩa |
 |--------|----------|
 | `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
+| `npm run lint:boundaries` | Kiểm tra import xuyên module (theo script + allowlist) |
 | `npm run test` | Jest unit + integration tests |
 | `npm run test:cov` | Jest với coverage report |
 
@@ -101,9 +102,11 @@ Production: `npm run build` rồi `npm run start:prod`.
 
 Module `auth` và `orders` sử dụng **Clean Architecture**: `domain/` (ports) → `application/` (use-cases, queries) → `infrastructure/` (persistence adapters, providers) → presentation (`orders.controller.ts`, `auth.controller.ts`).
 
-Các module khác (`wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`) dùng hybrid pattern với `BaseRepository`.
+Các module khác (`wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`, …) dùng **hybrid** với `BaseRepository`; một số module đang có thêm lớp **`application/queries`** cho API đọc mỏng.
 
-Chi tiết: [docs/DATA_ACCESS_PATTERNS.md](docs/DATA_ACCESS_PATTERNS.md).
+**Toàn cục:** transactional **outbox** (`integration_outbox`) + relay **Bull**, **`UnitOfWork`**, **`@nestjs/cqrs`** (application bus), read model pilot **`read_market_pairs`** và biến **`READ_MARKETS_FROM_PROJECTION`**. Ranh giới module: `npm run lint:boundaries`.
+
+Chi tiết: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_ACCESS_PATTERNS.md](docs/DATA_ACCESS_PATTERNS.md).
 
 Seed dùng `src/seed/data/users.json` nếu có; không thì dùng `users.json.example` (copy thành `users.json` và đổi mật khẩu ngoài môi trường dev). Có thể trỏ `SEED_USERS_JSON` sang file khác.
 

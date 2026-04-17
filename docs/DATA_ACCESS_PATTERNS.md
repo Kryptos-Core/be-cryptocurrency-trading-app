@@ -44,7 +44,7 @@ async createEntry(entry: LedgerEntryInput, ctx?: TransactionContext): Promise<Wa
 
 ## Ma trận hybrid: SP | ORM | QueryBuilder | Raw
 
-Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ SP ghi + QB đọc admin) phải có **lý do trong PR** hoặc **ADR** — xem [DATA_ACCESS_HYBRID_STRATEGY_PLAN.md](./DATA_ACCESS_HYBRID_STRATEGY_PLAN.md).
+Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ SP ghi + QB đọc admin) phải có **lý do trong PR** hoặc **ADR** — xem [ARCHITECTURE.md](./ARCHITECTURE.md) (tổng quan kiến trúc + outbox/read model).
 
 | Loại thao tác | Stored procedure | ORM (`find` / `save`) | QueryBuilder | Raw (ngoài `CALL`) |
 |---------------|------------------|------------------------|--------------|---------------------|
@@ -113,7 +113,23 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 ---
 
+## Unit of Work + transactional outbox (ghi nhất quán)
+
+Một số luồng ghi (pilot: **markets**) cần **cùng một transaction** cho: cập nhật entity nghiệp vụ + hàng **`integration_outbox`**.
+
+- **`UnitOfWork.run(callback)`** — cung cấp `EntityManager` / context cho callback; domain vẫn dùng `TransactionContext` opaque, infrastructure map sang manager.
+- **Repository**: thêm method dạng `*WithinTransaction(..., manager)` khi cần tái sử dụng query trên connection đang mở transaction (tránh hai connection).
+- **Outbox**: append payload + type sự kiện tích hợp trong transaction; relay (Bull) đọc và gọi handler (projector cập nhật `read_*`).
+
+Chi tiết luồng và flag đọc projection: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## Đọc từ read model (CQRS read side)
+
+- Bảng ví dụ: **`read_market_pairs`** — đồng bộ từ integration event sau outbox, không thay thế entity ghi `market_pairs` trong mọi API.
+- Query handler ứng dụng (`GetMarketPairQuery`) có thể chọn nguồn đọc theo **feature flag** env; khi bật, chỉ các filter đơn giản mới dùng projection (xem code handler).
+
 ## Liên kết
 
 - [BASE_REPOSITORY_USAGE.md](./BASE_REPOSITORY_USAGE.md) — method list của `BaseRepository`.
 - [REDIS_USAGE.md](./REDIS_USAGE.md) — cache / lock (không thay thế repository, bổ sung cho performance).
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — outbox, bus, projection pilot, ranh giới module.

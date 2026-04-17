@@ -8,3 +8,6 @@
 | Ledger entry | Immutable wallet balance movement |
 | Outbox row | Durable integration event waiting for relay |
 | Projection | Read-optimized row derived from integration events |
+| Integration event | Payload published after outbox relay; handlers có thể cập nhật read model |
+| Unit of Work (UoW) | Khối transaction ứng dụng bọc nhiều thao tác persistence + outbox append |
+| Application bus | `@nestjs/cqrs` — điều phối command/query handler trong Nest |

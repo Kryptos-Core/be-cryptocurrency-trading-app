@@ -13,4 +13,4 @@
 | Notifications | `notifications` | user notifications | repository port |
 | Adapters | `binance-rest`, `price-oracle`, `redis` | external I/O only | **no domain** — infrastructure |
 
-**ACL rule:** No `modules/A` importing `modules/B/application/**/*.ts` services. Prefer ports, DTOs, or integration events from outbox relay.
+**ACL rule:** Tránh `modules/A` import trực tiếp `modules/B/application/**/*.ts` (service/use-case). Ưu tiên **port**, **DTO**, hoặc **integration event** (relay từ bảng `integration_outbox`). Kiểm tra cục bộ: `npm run lint:boundaries` (xem [ARCHITECTURE.md](ARCHITECTURE.md)).

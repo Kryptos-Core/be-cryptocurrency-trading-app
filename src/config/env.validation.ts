@@ -570,6 +570,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'REDIS_PASSWORD',
     'REDIS_DB',
     'MATCHING_BOOK_FULL_REFRESH',
+    'READ_MARKETS_FROM_PROJECTION',
     'JWT_SECRET',
     'JWT_EXPIRATION',
     'JWT_REFRESH_SECRET',

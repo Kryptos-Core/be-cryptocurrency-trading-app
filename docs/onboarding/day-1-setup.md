@@ -32,6 +32,9 @@ npm install
 # Chạy migrations
 npm run migration:run
 
+# (Tùy chọn) Kiểm tra ranh giới import giữa các module — CI / trước PR lớn
+npm run lint:boundaries
+
 # Seed data (optional, dev only)
 npm run db:seed
 
@@ -78,6 +81,10 @@ src/
 │ ├── users/ # Hybrid
 │ └── ...
 ├── common/
+│ ├── application-bus/ # @nestjs/cqrs — ApplicationBusModule
+│ ├── outbox/ # transactional outbox + Bull relay
+│ ├── unit-of-work/ # UnitOfWork — transaction bọc ghi + outbox
+│ ├── read-model/ # projector / handler read side (pilot)
 │ ├── repositories/ # BaseRepository
 │ ├── services/ # RedisService, CloudinaryService, MailService, …
 │ ├── types/ # TransactionContext (opaque interface)
@@ -87,20 +94,22 @@ src/
 └── entities/ # Shared database entities (typed relations ✓)
 ```
 
-### Clean Architecture — 2 module đầu tiên
+### Clean Architecture — module tham chiếu
 
 - **auth**: `domain/ports/`, `application/use-cases/`, `infrastructure/providers/` (JwtTokenIssuerAdapter)
-- **orders**: `domain/ports/`, `application/use-cases/`, `infrastructure/persistence/` (OrderRepositoryImpl)
+- **orders**: `domain/ports/`, `application/use-cases/`, `application/queries/`, `infrastructure/persistence/` (OrderRepositoryImpl); có aggregate pilot trong `domain/aggregates/`
+- **markets**: ghi có thể đi qua **UoW + outbox**; đọc list có thể dùng **read projection** khi bật `READ_MARKETS_FROM_PROJECTION` — xem [ARCHITECTURE.md](../ARCHITECTURE.md)
 
 **Port Pattern:** Domain định nghĩa interface (ví dụ `TokenIssuerPort`). Infrastructure cung cấp implementation (`JwtTokenIssuerAdapter`). Use-case inject qua Symbol token (`TOKEN_ISSUER`). Không bao giờ import implementation trực tiếp vào domain.
 
-**TransactionContext:** Domain dùng `TransactionContext` thay vì `EntityManager`. Infrastructure cast về `EntityManager` qua `toEntityManager()`. Xem: [docs/DATA_ACCESS_PATTERNS.md](../DATA_ACCESS_PATTERNS.md).
+**TransactionContext:** Domain dùng `TransactionContext` thay vì `EntityManager`. Infrastructure cast về `EntityManager` qua `toEntityManager()`. Xem: [docs/DATA_ACCESS_PATTERNS.md](../DATA_ACCESS_PATTERNS.md), [docs/ARCHITECTURE.md](../ARCHITECTURE.md) (UoW + outbox).
 
 ## 6. Module quan trọng cần đọc đầu tiên
 
 Trước khi code, đọc:
 - [VIBE_CODE.md](../../VIBE_CODE.md) — quy trình AI coding của team
 - [README.md](../../README.md) — full setup + module docs
+- [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — outbox, bus, read model pilot
 - `.cursor/rules/nestjs-sensitive-zones.md` — modules cực nhạy cảm
 
 ## 7. Task đầu tiên

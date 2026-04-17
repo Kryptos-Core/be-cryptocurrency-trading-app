@@ -24,11 +24,11 @@ infrastructure/ # Persistence adapters, external service adapters
 presentation/ # Controllers, DTOs (thường nằm ở root module)
 ```
 
-**Module đã theo Clean Architecture:** `auth`, `orders`, `wallets`, `system-config`, `currencies`, `deposits`, `users`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`, `treasury`, `markets`
+**Clean Architecture đầy đủ (domain + application + infrastructure):** `auth`, `orders`.
 
-**Module hybrid** (chưa tách đầy đủ): `blockchain`, `matching`
+**Hybrid** (ports/repository + thường có `BaseRepository` / SP; một số đã có `application/queries` mỏng cho surface đọc): `wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`, `system-config`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`, … và các adapter **`trading`**, **`exchange`**, **`dashboard`**, **`binance-rest`**, **`price-oracle`**, **`metadata`** (logic tập trung service + query handlers đọc, không có domain nặng).
 
-**Module traditional/infrastructure** (chưa migrate): `trading`, `exchange`, `dashboard`, `binance-rest`, `redis`, `price-oracle`, `metadata`
+**Toàn cục:** `src/common/outbox/` (transactional outbox + Bull relay `outbox-relay`), `src/common/unit-of-work/`, `src/common/application-bus/` (`@nestjs/cqrs`), read model pilot `read_market_pairs`, env `READ_MARKETS_FROM_PROJECTION`. Tóm tắt: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md). Kiểm tra import xuyên module: `npm run lint:boundaries`.
 
 ---
 
@@ -83,6 +83,7 @@ function toEntityManager(ctx: TransactionContext): EntityManager {
 npm run docker:infra:up
 npm install
 npm run migration:run
+# npm run lint:boundaries  # tùy chọn — trước PR lớn
 npm run db:seed
 npm run start:dev
 ```

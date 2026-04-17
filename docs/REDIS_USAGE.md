@@ -1,6 +1,6 @@
 # Cách sử dụng Redis - Dự án hiện tại
 
-Redis dùng cho **cache**, **pub/sub**, **distributed lock** (ví dụ khớp lệnh theo cặp), và các tác vụ realtime/queue phụ thuộc cấu hình module. Chi tiết triển khai: xem code `RedisService` và module `matching`.
+Redis dùng cho **cache**, **pub/sub**, **distributed lock** (khớp lệnh theo cặp, relay outbox), và các tác vụ realtime/queue phụ thuộc cấu hình module. Chi tiết triển khai: xem `RedisService`, module `matching`, và `OutboxRelayService`.
 
 ## Biến môi trường
 
@@ -47,3 +47,5 @@ Tài liệu liên quan: [README.md](../README.md) (hạ tầng), module **matchi
   - Chi tiết: `matching/circuit-breaker.service.ts`.
 
 - **Idempotency key đặt lệnh:** prefix `order:idempotency:{userId}:{key}` — TTL 24h; lưu snapshot JSON của Order để tránh tạo lệnh trùng. Chi tiết: `orders/orders.service.ts`.
+
+- **Outbox relay — distributed lock:** key cố định `outbox:relay:lock` — tránh nhiều instance flush relay trùng lúc; TTL ngắn theo implementation trong `src/common/outbox/outbox-relay.service.ts`. Luồng tổng thể: [ARCHITECTURE.md](ARCHITECTURE.md).
