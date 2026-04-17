@@ -48,4 +48,4 @@ Tài liệu liên quan: [README.md](../README.md) (hạ tầng), module **matchi
 
 - **Idempotency key đặt lệnh:** prefix `order:idempotency:{userId}:{key}` — TTL 24h; lưu snapshot JSON của Order để tránh tạo lệnh trùng. Chi tiết: `orders/orders.service.ts`.
 
-- **Outbox relay — distributed lock:** key cố định `outbox:relay:lock` — tránh nhiều instance flush relay trùng lúc; TTL ngắn theo implementation trong `src/common/outbox/outbox-relay.service.ts`. Luồng tổng thể: [ARCHITECTURE.md](ARCHITECTURE.md).
+- **Outbox relay — distributed lock:** `outbox:relay:lock` — một instance drain hiệu quả; TTL trong `outbox-relay.service.ts`. Semantics relay: [ARCHITECTURE_FULL_ROLLOUT.md](ARCHITECTURE_FULL_ROLLOUT.md).

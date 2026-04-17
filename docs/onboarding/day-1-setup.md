@@ -82,9 +82,9 @@ src/
 │ └── ...
 ├── common/
 │ ├── application-bus/ # @nestjs/cqrs — ApplicationBusModule
-│ ├── outbox/ # transactional outbox + Bull relay
+│ ├── outbox/ # outbox + Bull relay → OutboxIntegrationSyncService (sync read model)
 │ ├── unit-of-work/ # UnitOfWork — transaction bọc ghi + outbox
-│ ├── read-model/ # projector / handler read side (pilot)
+│ ├── read-model/ # applier read model (markets, on-chain deposits)
 │ ├── repositories/ # BaseRepository
 │ ├── services/ # RedisService, CloudinaryService, MailService, …
 │ ├── types/ # TransactionContext (opaque interface)
@@ -98,7 +98,7 @@ src/
 
 - **auth**: `domain/ports/`, `application/use-cases/`, `infrastructure/providers/` (JwtTokenIssuerAdapter)
 - **orders**: `domain/ports/`, `application/use-cases/`, `application/queries/`, `infrastructure/persistence/` (OrderRepositoryImpl); có aggregate pilot trong `domain/aggregates/`
-- **markets**: ghi có thể đi qua **UoW + outbox**; đọc list có thể dùng **read projection** khi bật `READ_MARKETS_FROM_PROJECTION` — xem [ARCHITECTURE.md](../ARCHITECTURE.md)
+- **markets**: UoW + outbox; đọc list có thể từ **`read_market_pairs`** (`READ_MARKETS_FROM_PROJECTION`). **blockchain** (deposit): **`read_onchain_deposits`** (`READ_MODEL_ONCHAIN_DEPOSITS`) — [ARCHITECTURE.md](../ARCHITECTURE.md), [ARCHITECTURE_FULL_ROLLOUT.md](../ARCHITECTURE_FULL_ROLLOUT.md)
 
 **Port Pattern:** Domain định nghĩa interface (ví dụ `TokenIssuerPort`). Infrastructure cung cấp implementation (`JwtTokenIssuerAdapter`). Use-case inject qua Symbol token (`TOKEN_ISSUER`). Không bao giờ import implementation trực tiếp vào domain.
 
@@ -109,7 +109,8 @@ src/
 Trước khi code, đọc:
 - [VIBE_CODE.md](../../VIBE_CODE.md) — quy trình AI coding của team
 - [README.md](../../README.md) — full setup + module docs
-- [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — outbox, bus, read model pilot
+- [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — outbox relay, bus, read model
+- [docs/ARCHITECTURE_FULL_ROLLOUT.md](../ARCHITECTURE_FULL_ROLLOUT.md) — relay semantics, on-chain read model
 - `.cursor/rules/nestjs-sensitive-zones.md` — modules cực nhạy cảm
 
 ## 7. Task đầu tiên

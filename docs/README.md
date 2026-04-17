@@ -6,7 +6,8 @@ Các file dưới đây mô tả **cấu hình, API và pattern kỹ thuật** �
 
 | Tài liệu | Nội dung |
 |----------|----------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Outbox, UoW, CQRS bus, read projection pilot, ranh giới module |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Outbox relay, UoW, CQRS bus, read model, ranh giới module |
+| [ARCHITECTURE_FULL_ROLLOUT.md](ARCHITECTURE_FULL_ROLLOUT.md) | Relay (`published_at`, skip_locked), on-chain read model, notification idempotent |
 | [bounded-contexts.md](bounded-contexts.md) | Bounded contexts và ACL |
 | [ubiquitous-language.md](ubiquitous-language.md) | Thuật ngữ domain / tích hợp |
 | [worker-pool-inventory.md](worker-pool-inventory.md) | Worker pool (Piscina), Bull, scale-out |
@@ -30,12 +31,4 @@ Các file dưới đây mô tả **cấu hình, API và pattern kỹ thuật** �
 
 ## Clean Architecture và tích hợp
 
-Module **`auth`** và **`orders`** dùng **Clean Architecture** đầy đủ (`domain/` → `application/` → `infrastructure/` → controllers). Các module khác đang theo **hybrid** (`BaseRepository` + dần dần `application/queries` cho surface đọc mỏng).
-
-Bổ sung toàn cục:
-
-- **`@nestjs/cqrs`** — `ApplicationBusModule` / bus ứng dụng.
-- **Transactional outbox** + relay Bull — đồng bộ sự kiện và read model (pilot markets).
-- **`npm run lint:boundaries`** — kiểm tra import xuyên module (có allowlist tạm).
-
-Tổng hợp luồng: [ARCHITECTURE.md](ARCHITECTURE.md). Pattern data access: [DATA_ACCESS_PATTERNS.md](DATA_ACCESS_PATTERNS.md).
+Module **`auth`** và **`orders`** dùng Clean Architecture đầy đủ; module khác **hybrid** (`BaseRepository` + `application/queries` dần dần). Outbox + Bull relay đồng bộ read model (markets, on-chain deposits) — [ARCHITECTURE.md](ARCHITECTURE.md), [ARCHITECTURE_FULL_ROLLOUT.md](ARCHITECTURE_FULL_ROLLOUT.md). `npm run lint:boundaries` — import xuyên module. Data access: [DATA_ACCESS_PATTERNS.md](DATA_ACCESS_PATTERNS.md).

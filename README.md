@@ -10,7 +10,7 @@ API backend cho nền tảng giao dịch tiền mã hóa (**NestJS**). Base path
 - Liên kết ví & WalletConnect  
 - Kho bạc (treasury), thông báo push (Firebase), realtime WebSocket  
 
-Chi tiết luồng nghiệp vụ, Redis, migration đặc biệt, v.v. nằm trong thư mục [`docs/`](docs/).
+Kiến trúc (outbox relay, read model): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/ARCHITECTURE_FULL_ROLLOUT.md`](docs/ARCHITECTURE_FULL_ROLLOUT.md). Còn lại: [`docs/`](docs/).
 
 ## Yêu cầu
 
@@ -74,8 +74,6 @@ Lệnh **truncate toàn bộ bảng** (kể cả bảng migration) — ứng d�
 3. Khởi động API (`npm run start:dev`). Backend có bootstrap đồng bộ catalog Binance khi DB trống; nếu **vẫn không thấy cặp** (rate limit, mạng), người có quyền **`exchange:sync`** gọi đồng bộ thủ công qua API hoặc từ app (Cài đặt / màn Thị trường khi danh sách trống).
 
 4. Tab Markets trên client chỉ hiển thị dữ liệu sau khi catalog đã có ít nhất một cặp active.
-| `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
-| `npm run test` | Jest |
 
 Production: `npm run build` rồi `npm run start:prod`.
 

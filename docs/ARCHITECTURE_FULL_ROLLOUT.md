@@ -1,6 +1,6 @@
 # Full architecture rollout
 
-This document tracks the **Definition of Done** for bringing every bounded context to the same technical bar: Clean Architecture, DDD aggregates where invariants exist, transactional outbox for cross-context effects, CQRS command/query surfaces, `UnitOfWork` for writes, OpenTelemetry enrichment, and worker pools for CPU-heavy work.
+Checklist và ghi chép **cross-cutting**: UoW, transactional outbox + relay, read model, worker pool — bổ sung cho [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Platform building blocks
 
@@ -20,41 +20,40 @@ This document tracks the **Definition of Done** for bringing every bounded conte
 
 Orders must not import `modules/matching/application/**`. Use [`ORDER_MATCHING_GATEWAY`](../src/modules/orders/domain/ports/order-matching-gateway.port.ts) implemented by [`OrderMatchingGatewayAdapter`](../src/modules/matching/infrastructure/adapters/order-matching-gateway.adapter.ts).
 
-## Module order (largest first)
+## Module dependency direction
 
-See the approved plan in Cursor (Full-stack module hardening): `blockchain` → `matching` → `treasury` → … → small adapters.
+Ưu tiên hướng phụ thuộng **domain nặng → adapter nhẹ**; kiểm tra bằng `npm run lint:boundaries` (allowlist trong script nếu cần).
 
 ## Decimal / base-unit helpers
 
-Shared integer decimal helpers live in [`src/common/utils/base-units.ts`](../src/common/utils/base-units.ts) (used by matching, orders, and any new module).
+[`src/common/utils/base-units.ts`](../src/common/utils/base-units.ts) — dùng chung matching, orders, module mới.
 
 ## Blockchain — on-chain deposits (UoW + outbox)
 
-`submitDeposit` and the confirming branch of `settleDepositByTxId` persist the on-chain row, optional wallet credit, and an integration outbox row in **one** `UnitOfWork.run` transaction. Wallet credits reuse the same transaction via `WalletsService.applyTransaction(userId, dto, joinTransaction)`.
+`submitDeposit` và nhánh xác nhận của `settleDepositByTxId` ghi on-chain row, credit ví (nếu có), và một dòng **`integration_outbox`** trong **một** `UnitOfWork.run`. Credit ví: `WalletsService.applyTransaction(..., joinTransaction)`.
 
 | Outbox `event_type` | When |
 |---------------------|------|
-| `OnchainDeposit.Submitted@v1` | After each successful `submitDeposit` (payload includes `settled` when the chain tx was already confirmed). |
-| `OnchainDeposit.Settled@v1` | After `settleDepositByTxId` completes on-chain confirmation and ledger settlement. |
+| `OnchainDeposit.Submitted@v1` | Sau `submitDeposit` thành công (payload có `settled` nếu tx chain đã confirmed). |
+| `OnchainDeposit.Settled@v1` | Sau `settleDepositByTxId` hoàn tất xác nhận chain + ledger. |
 
-Catalog entries: [`integration-event-catalog.ts`](../src/common/integration-events/integration-event-catalog.ts).
+Catalog: [`integration-event-catalog.ts`](../src/common/integration-events/integration-event-catalog.ts).
 
-### Outbox relay semantics
+### Outbox relay
 
-The relay ([`OutboxRelayService`](../src/common/outbox/outbox-relay.service.ts)) drains `integration_outbox` without using the CQRS `EventBus` for delivery. For each pass it runs up to 50 iterations; **each iteration locks and processes at most one row** in its own database transaction.
+[`OutboxRelayService`](../src/common/outbox/outbox-relay.service.ts) đọc `integration_outbox` và gọi [`OutboxIntegrationSyncService.dispatchRow`](../src/common/outbox/outbox-integration-sync.service.ts) — **không** dùng CQRS `EventBus` cho đường giao này. Mỗi lần lặp (tối đa 50): **một transaction / tối đa một dòng** (`take(1)`), lock **`pessimistic_write` + `skip_locked`**, `event_type` trong allow-list ([`outbox-relay-supported-event-types.ts`](../src/common/outbox/outbox-relay-supported-event-types.ts)).
 
-- **Selection**: `published_at IS NULL`, `event_type` in the supported allow-list ([`outbox-relay-supported-event-types.ts`](../src/common/outbox/outbox-relay-supported-event-types.ts)), ordered by `occurred_at`, with **`pessimistic_write` + `skip_locked`** so a long-held lock on one row does not head-of-line block other workers.
-- **`published_at`**: set only after [`OutboxIntegrationSyncService.dispatchRow`](../src/common/outbox/outbox-integration-sync.service.ts) completes without throwing — that runs the **read-model upsert** and **idempotent notification** writes on the **same `EntityManager`** as the outbox row update. If dispatch throws, the transaction rolls back and the row stays unpublished for retry.
-- **Partial batch / failure**: If one row’s transaction fails after earlier rows in the same `flushOnce` already committed, those earlier rows remain published; the relay **stops further iterations** in that pass (the next scheduled flush retries). This matches per-row commits rather than one large transaction for the whole batch.
+- **`published_at`**: chỉ set sau khi `dispatchRow` hoàn tất không throw (read model + notification trên **cùng `EntityManager`** với cập nhật outbox). Lỗi → rollback → row vẫn unpublished.
+- **Lỗi giữa batch**: các dòng đã commit vẫn published; cùng một `flushOnce` **dừng** lặp tiếp; lần flush sau retry.
 
-### On-chain deposit read model (`read_onchain_deposits`)
+### Read model `read_onchain_deposits`
 
-Projection is applied inside relay dispatch (not a separate async handler). The table is keyed by **`tx_id`** (internal id from the write path). **`OnchainDeposit.Submitted@v1`** establishes or refreshes the baseline row; **`OnchainDeposit.Settled@v1`** merges settlement fields. Optional **`UNIQUE (chain, tx_hash)`** is enforced when the migration defines it.
+PK **`tx_id`**. `Submitted@v1` tạo/cập nhật baseline; `Settled@v1` merge settlement. Migration hiện **không** có `UNIQUE (chain, tx_hash)` — chỉ thêm khi invariant nghiệp vụ thật sự cần.
 
-### Query path flag
+### Query flag
 
-When **`READ_MODEL_ONCHAIN_DEPOSITS=true`**, user-facing deposit listings merge **`read_onchain_deposits`** with non-deposit rows still read from `onchain_transactions` ([`ReadOnchainUserTransactionsQueryService`](../src/modules/blockchain/infrastructure/queries/read-onchain-user-transactions.query.service.ts)). When the flag is unset/false, queries use the legacy SQL only.
+**`READ_MODEL_ONCHAIN_DEPOSITS=true`**: listing deposit user merge `read_onchain_deposits` + các type khác từ `onchain_transactions` ([`ReadOnchainUserTransactionsQueryService`](../src/modules/blockchain/infrastructure/queries/read-onchain-user-transactions.query.service.ts)). Tắt flag → SQL legacy.
 
-### Notifications idempotency
+### Notifications
 
-For on-chain deposit outbox events, **`notification_id` is the outbox row `id`** (deterministic, one notification per outbox row). Inserts use the caller’s transaction manager and treat **duplicate primary key** as success so concurrent workers cannot double-insert the same id.
+**`notification_id` = `id` dòng outbox**. Insert idempotent (duplicate PK coi là OK) trong cùng transaction dispatch.

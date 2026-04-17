@@ -115,21 +115,22 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 ## Unit of Work + transactional outbox (ghi nhất quán)
 
-Một số luồng ghi (pilot: **markets**) cần **cùng một transaction** cho: cập nhật entity nghiệp vụ + hàng **`integration_outbox`**.
+Luồng ghi (**markets**, **on-chain deposits**, …) có thể dùng **cùng một transaction** cho: entity nghiệp vụ + append **`integration_outbox`**.
 
-- **`UnitOfWork.run(callback)`** — cung cấp `EntityManager` / context cho callback; domain vẫn dùng `TransactionContext` opaque, infrastructure map sang manager.
-- **Repository**: thêm method dạng `*WithinTransaction(..., manager)` khi cần tái sử dụng query trên connection đang mở transaction (tránh hai connection).
-- **Outbox**: append payload + type sự kiện tích hợp trong transaction; relay (Bull) đọc và gọi handler (projector cập nhật `read_*`).
+- **`UnitOfWork.run(callback)`** — `EntityManager` / context cho callback; domain dùng `TransactionContext`, infrastructure map sang manager.
+- **Repository**: method `*WithinTransaction(..., manager)` khi cần cùng connection đang mở transaction.
+- **Relay**: Bull gọi `OutboxRelayService.flushOnce` → **`OutboxIntegrationSyncService.dispatchRow`** cập nhật `read_*` + notification (đồng bộ, per-row transaction); xem [ARCHITECTURE_FULL_ROLLOUT.md](./ARCHITECTURE_FULL_ROLLOUT.md).
 
-Chi tiết luồng và flag đọc projection: [ARCHITECTURE.md](./ARCHITECTURE.md).
+Chi tiết + flag env: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Đọc từ read model (CQRS read side)
 
-- Bảng ví dụ: **`read_market_pairs`** — đồng bộ từ integration event sau outbox, không thay thế entity ghi `market_pairs` trong mọi API.
-- Query handler ứng dụng (`GetMarketPairQuery`) có thể chọn nguồn đọc theo **feature flag** env; khi bật, chỉ các filter đơn giản mới dùng projection (xem code handler).
+- **`read_market_pairs`** — flag `READ_MARKETS_FROM_PROJECTION`; `GetMarketPairQuery` chỉ dùng projection khi filter đơn giản.
+- **`read_onchain_deposits`** — flag `READ_MODEL_ONCHAIN_DEPOSITS`; listing deposit merge với nguồn ghi cho các loại không phải deposit.
 
 ## Liên kết
 
 - [BASE_REPOSITORY_USAGE.md](./BASE_REPOSITORY_USAGE.md) — method list của `BaseRepository`.
 - [REDIS_USAGE.md](./REDIS_USAGE.md) — cache / lock (không thay thế repository, bổ sung cho performance).
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — outbox, bus, projection pilot, ranh giới module.
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — outbox relay, bus, read model, ranh giới module.
+- [ARCHITECTURE_FULL_ROLLOUT.md](./ARCHITECTURE_FULL_ROLLOUT.md) — relay + on-chain read model.

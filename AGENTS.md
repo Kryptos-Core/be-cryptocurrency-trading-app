@@ -10,7 +10,8 @@ Mở **đúng thư mục gốc repo NestJS này** làm folder workspace (cùng c
 - [CONTRIBUTING-RULES.md](./CONTRIBUTING-RULES.md) — Conventions + PR process
 - [docs/security-zones.md](./docs/security-zones.md) — **ĐỌC TRƯỚC KHI SỬA** sensitive modules
 - [docs/onboarding/](./docs/onboarding/) — Onboarding guides (day-1, ai-dev, ecc-ref)
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Outbox, UoW, CQRS bus, read projection pilot, ranh giới module
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Outbox relay, UoW, CQRS bus, read model, ranh giới module
+- [docs/ARCHITECTURE_FULL_ROLLOUT.md](./docs/ARCHITECTURE_FULL_ROLLOUT.md) — `published_at`, skip_locked, on-chain deposits read path
 - [README.md](./README.md) — Full setup + module docs
 
 ## Stack

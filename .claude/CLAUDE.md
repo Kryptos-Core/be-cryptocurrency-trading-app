@@ -28,7 +28,7 @@ presentation/ # Controllers, DTOs (thường nằm ở root module)
 
 **Hybrid** (ports/repository + thường có `BaseRepository` / SP; một số đã có `application/queries` mỏng cho surface đọc): `wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`, `system-config`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`, … và các adapter **`trading`**, **`exchange`**, **`dashboard`**, **`binance-rest`**, **`price-oracle`**, **`metadata`** (logic tập trung service + query handlers đọc, không có domain nặng).
 
-**Toàn cục:** `src/common/outbox/` (transactional outbox + Bull relay `outbox-relay`), `src/common/unit-of-work/`, `src/common/application-bus/` (`@nestjs/cqrs`), read model pilot `read_market_pairs`, env `READ_MARKETS_FROM_PROJECTION`. Tóm tắt: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md). Kiểm tra import xuyên module: `npm run lint:boundaries`.
+**Toàn cục:** `src/common/outbox/` (outbox + Bull `outbox-relay` → `OutboxRelayService` / `OutboxIntegrationSyncService`), `src/common/unit-of-work/`, `src/common/application-bus/` (`@nestjs/cqrs`), read model `read_market_pairs` / `read_onchain_deposits`, env `READ_MARKETS_FROM_PROJECTION`, `READ_MODEL_ONCHAIN_DEPOSITS`. [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md), [docs/ARCHITECTURE_FULL_ROLLOUT.md](../docs/ARCHITECTURE_FULL_ROLLOUT.md). `npm run lint:boundaries`.
 
 ---
 

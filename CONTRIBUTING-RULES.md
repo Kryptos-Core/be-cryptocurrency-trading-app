@@ -17,7 +17,7 @@
 
 ### Module Structure
 
-**Full Clean Architecture** (áp dụng cho `auth`, `orders` — template dưới đây). Luồng tích hợp / outbox / read model toàn repo: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+**Full Clean Architecture** (áp dụng cho `auth`, `orders` — template dưới đây). Outbox relay + read model: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/ARCHITECTURE_FULL_ROLLOUT.md](./docs/ARCHITECTURE_FULL_ROLLOUT.md).
 
 Cấu trúc thư mục tham chiếu:
 ```
