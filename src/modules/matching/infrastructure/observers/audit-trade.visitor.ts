@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   TRADE_AUDIT_LOG_REPOSITORY,
   type TradeAuditLogRepositoryPort,
-} from '../domain/ports';
-import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
+} from '../../domain/ports';
+import type { ITradeResultVisitor, TradeExecutionResult } from '../../interfaces';
 
 /**
  * Visitor Pattern: Audit log visitor for trade execution results.
@@ -39,3 +39,4 @@ export class AuditTradeVisitor implements ITradeResultVisitor {
     }
   }
 }
+

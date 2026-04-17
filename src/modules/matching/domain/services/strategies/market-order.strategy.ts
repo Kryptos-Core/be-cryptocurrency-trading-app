@@ -5,8 +5,8 @@ import type {
   OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
-} from '../interfaces';
-import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../utils';
+} from '../../interfaces';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
 
 const SCALE_MULTIPLIER = 10n ** BigInt(DEFAULT_SCALE);
 
@@ -123,3 +123,4 @@ export class MarketOrderStrategy implements IMatchingStrategy {
     return results;
   }
 }
+

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseQuery, type IQueryHandler } from '@/common/cqrs';
-import { OnchainTransferQueryService } from '../../onchain-transfer-query.service';
+import { OnchainTransferQueryService } from '../services/queries/onchain-transfer-query.service';
 
 export class GetTransactionsRequest extends BaseQuery {
   constructor(
@@ -14,7 +14,11 @@ export class GetTransactionsRequest extends BaseQuery {
 
 @Injectable()
 export class GetTransactionsQuery
-  implements IQueryHandler<GetTransactionsRequest, Awaited<ReturnType<OnchainTransferQueryService['getTransactions']>>>
+  implements
+    IQueryHandler<
+      GetTransactionsRequest,
+      Awaited<ReturnType<OnchainTransferQueryService['getTransactions']>>
+    >
 {
   constructor(private readonly queryService: OnchainTransferQueryService) {}
 

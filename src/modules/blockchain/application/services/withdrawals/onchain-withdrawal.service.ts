@@ -24,7 +24,7 @@ import {
   type OnchainTransactionRepositoryPort,
 } from './domain/ports';
 import type { RequestWithdrawalDto } from './dto';
-import { WalletLinkingService } from './wallet-linking.service';
+import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 
 @Injectable()
 export class OnchainWithdrawalService {
@@ -665,3 +665,4 @@ export class OnchainWithdrawalService {
     };
   }
 }
+

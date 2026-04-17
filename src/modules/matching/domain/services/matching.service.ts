@@ -2,46 +2,35 @@ import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
-import { CircuitBreakerService } from './circuit-breaker.service';
-import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from './domain/ports';
-import { MatchingLockContentionError } from './errors/matching-lock-contention.error';
+import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from '../ports';
+import { MatchingLockContentionError } from '../../errors/matching-lock-contention.error';
 import type {
   MatchingContext,
   MatchingReconcileResult,
   OrderBookOrder,
   TradeExecutionResult,
   TradeExecutor,
-} from './interfaces';
+} from '../../interfaces';
+import { AuditTradeVisitor, MetricsTradeVisitor } from '../../infrastructure/observers';
+import { marketOrderCanFullyFillRemaining } from '../../utils/market-fok-fill.util';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
+import { CircuitBreakerService } from './circuit-breaker.service';
 import { OrderBookService } from './orderbook';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
-import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from './utils';
-import { marketOrderCanFullyFillRemaining } from './utils/market-fok-fill.util';
-import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
 
 const LOCK_PREFIX = 'matching:lock:';
 const LOCK_TTL_MS = 10000;
-/** Retry NX lock to reduce skipped matches under brief contention. */
 const LOCK_RETRY_ATTEMPTS = 15;
 const LOCK_RETRY_DELAY_MS = 20;
-/** Safety cap for admin reconcile loops (each round may run N match attempts). */
 const RECONCILE_MAX_ROUNDS = 400;
 
-/**
- * Default circuit-breaker config: halt when price moves ≥5% within a 60-second window.
- * Halt lasts 300 seconds (5 min) — admin can clear early via CircuitBreakerService.resumeTrading().
- */
 const DEFAULT_CIRCUIT_BREAKER_CONFIG = {
   thresholdPct: '0.05',
   windowSec: 60,
   haltDurationSec: 300,
 } as const;
 
-/**
- * Lua script: atomically delete lock key only if its value matches the caller's value.
- * Returns 1 if deleted, 0 if key doesn't exist or value mismatch.
- * Prevents a process from deleting a lock acquired by another process after TTL expiry.
- */
 const RELEASE_LOCK_LUA = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])
@@ -50,11 +39,6 @@ else
 end
 `;
 
-/**
- * Matching Engine Service
- * Orchestrates order matching (price-time priority), trade execution (atomic DB), lock (Redis), observer (trade events).
- * Visitor Pattern: AuditTradeVisitor + MetricsTradeVisitor registered on init as trade observers.
- */
 @Injectable()
 export class MatchingService implements OnModuleInit {
   private readonly logger = new Logger(MatchingService.name);
@@ -78,9 +62,6 @@ export class MatchingService implements OnModuleInit {
     this.onTradeExecuted((t) => this.metricsVisitor.visit(t));
   }
 
-  /**
-   * Run matching for one taker order. Lock Pattern: Redis lock per pair.
-   */
   async runMatch(params: {
     takerOrder: OrderBookOrder;
     pairId: string;
@@ -92,7 +73,6 @@ export class MatchingService implements OnModuleInit {
     const { takerOrder, pairId, feeCurrencyId, makerFeeRate, takerFeeRate, slippageTolerance } =
       params;
 
-    // Validate fee rates early to avoid silent errors in BigInt arithmetic.
     try {
       toBaseUnits(makerFeeRate, DEFAULT_SCALE);
       toBaseUnits(takerFeeRate, DEFAULT_SCALE);
@@ -104,7 +84,6 @@ export class MatchingService implements OnModuleInit {
     const lockValue = randomBytes(16).toString('hex');
     const client = this.redisService.getClient();
 
-    // Circuit breaker: halt trading for this pair when extreme price move detected.
     if (await this.circuitBreaker.isHalted(pairId)) {
       this.logger.warn(`Matching halted by circuit breaker for pair ${pairId}`);
       return [];
@@ -141,7 +120,6 @@ export class MatchingService implements OnModuleInit {
           this.logger.log(
             `FOK order ${takerOrder.order_id} cannot be fully filled now; skip execution`,
           );
-          // Cancel the order in DB so it does not remain as OPEN indefinitely.
           try {
             await this.matchingRepository.cancelIocRemainder(
               takerOrder.order_id,
@@ -166,7 +144,6 @@ export class MatchingService implements OnModuleInit {
       };
 
       const executeTrade: TradeExecutor = async (makerOrder, fillAmount, price) => {
-        // Fee = fillAmount * price * feeRate (all in base units, divide by SCALE^2 for correct decimal)
         const SCALE = 10n ** BigInt(DEFAULT_SCALE);
         const fillBu = toBaseUnits(fillAmount, DEFAULT_SCALE);
         const priceBu = toBaseUnits(price, DEFAULT_SCALE);
@@ -207,7 +184,6 @@ export class MatchingService implements OnModuleInit {
           created_at: new Date(),
         };
         this.notifyTradeExecuted(execResult);
-        // Record price for circuit breaker monitoring (fire-and-forget; never throws into matching flow).
         this.circuitBreaker
           .recordPriceAndCheck(pairId, price, DEFAULT_CIRCUIT_BREAKER_CONFIG)
           .catch((e) =>
@@ -248,7 +224,6 @@ export class MatchingService implements OnModuleInit {
         });
       }
 
-      // IOC: cancel any unfilled remainder in the DB.
       if (tif === 'IOC' && takerRemainingBu > 0n) {
         try {
           await this.matchingRepository.cancelIocRemainder(takerOrder.order_id, takerOrder.user_id);
@@ -273,7 +248,6 @@ export class MatchingService implements OnModuleInit {
   private async canFullyFillOrder(params: {
     pairId: string;
     takerOrder: OrderBookOrder;
-    /** When set on MARKET FOK, must match MarketOrderStrategy slippage rules. */
     fokSlippageTolerance?: string;
   }): Promise<boolean> {
     const { pairId, takerOrder, fokSlippageTolerance } = params;
@@ -293,10 +267,7 @@ export class MatchingService implements OnModuleInit {
 
     for (const maker of makers) {
       if (remainingBu <= 0n) break;
-
-      // Self-Trade Prevention: exclude makers owned by the same user (mirrors matching strategy).
       if (maker.user_id && takerOrder.user_id && maker.user_id === takerOrder.user_id) continue;
-
       if (!maker.remaining) continue;
       let makerRemainingBu: bigint;
       try {
@@ -329,11 +300,6 @@ export class MatchingService implements OnModuleInit {
     return remainingBu <= 0n;
   }
 
-  /**
-   * Seed order book from DB on first match for a pair; subsequent matches use the in-memory
-   * book incrementally (add/remove updates keep it consistent with DB state).
-   * Taker is excluded from the book so it only acts as context, not a resting duplicate.
-   */
   private matchingBookFullRefreshEnabled(): boolean {
     const v = (
       this.configService.get<string>('MATCHING_BOOK_FULL_REFRESH') ??
@@ -351,7 +317,6 @@ export class MatchingService implements OnModuleInit {
   ): Promise<void> {
     const fullRefresh = this.matchingBookFullRefreshEnabled();
     if (!fullRefresh && this.orderBookService.isLoaded(pairId)) {
-      // Incremental path: book is already seeded; just ensure the taker is not in it as a resting order.
       this.orderBookService.removeOrder(pairId, takerOrderId, 'BUY');
       this.orderBookService.removeOrder(pairId, takerOrderId, 'SELL');
       return;
@@ -366,16 +331,10 @@ export class MatchingService implements OnModuleInit {
     this.orderBookService.markLoaded(pairId);
   }
 
-  /** Remove a cancelled/filled order from the in-memory book (keeps book aligned with DB). */
   removeOrderFromBook(pairId: string, orderId: string, side: 'BUY' | 'SELL'): boolean {
     return this.orderBookService.removeOrder(pairId, orderId, side);
   }
 
-  /**
-   * Admin / operations: manually drive matching for every OPEN/PARTIAL order on a pair until
-   * no more trades execute (or safety cap). Use when book/DB drifted or matches were skipped.
-   * Each iteration calls [runMatch] for one taker (oldest first among candidates that round).
-   */
   async reconcileOpenOrdersForPair(params: {
     pairId: string;
     feeCurrencyId: string;
@@ -457,7 +416,6 @@ export class MatchingService implements OnModuleInit {
     };
   }
 
-  /** Observer Pattern: subscribe to trade executed. */
   onTradeExecuted(callback: (trade: TradeExecutionResult) => void): void {
     this.observers.push(callback);
   }

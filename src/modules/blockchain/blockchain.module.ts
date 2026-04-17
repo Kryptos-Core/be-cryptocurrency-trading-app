@@ -39,6 +39,10 @@ import {
   UnlinkWalletUseCase,
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
+import { OnchainDepositService } from './application/services/deposits/onchain-deposit.service';
+import { OnchainTransferQueryService } from './application/services/queries/onchain-transfer-query.service';
+import { WalletLinkingService } from './application/services/wallet-linking/wallet-linking.service';
+import { OnchainWithdrawalService } from './application/services/withdrawals/onchain-withdrawal.service';
 import { BlockchainController } from './blockchain.controller';
 import {
   BC_SOLANA_DEVNET,
@@ -49,23 +53,16 @@ import {
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DepositFxService } from './deposit-fx.service';
+import { DepositFxService } from './domain/services/deposit-fx.service';
 import { LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
 import { LinkedWalletRepository, OnchainTransactionRepository } from './infrastructure/persistence';
-import { OnchainDepositService } from './onchain-deposit.service';
-import { OnchainTransferQueryService } from './onchain-transfer-query.service';
-import { OnchainWithdrawalService } from './onchain-withdrawal.service';
-import { EthereumProvider } from './providers/ethereum.provider';
-import { SolanaProvider } from './providers/solana.provider';
-import { TronProvider } from './providers/tron.provider';
+import { EthereumProvider } from './infrastructure/providers/ethereum.provider';
+import { SolanaProvider } from './infrastructure/providers/solana.provider';
+import { TronProvider } from './infrastructure/providers/tron.provider';
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
-import { WalletLinkingService } from './wallet-linking.service';
 
-/**
- * Blockchain Module — Tron / Solana / EVM (mainnet + sandbox chains).
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction]),
@@ -169,12 +166,10 @@ import { WalletLinkingService } from './wallet-linking.service';
       inject: [ConfigService, TreasuryMainWalletService, SystemConfigService],
     },
     BlockchainProviderFactory,
-
     LinkedWalletRepository,
     OnchainTransactionRepository,
     { provide: LINKED_WALLET_REPOSITORY, useExisting: LinkedWalletRepository },
     { provide: ONCHAIN_TRANSACTION_REPOSITORY, useExisting: OnchainTransactionRepository },
-
     DepositFxService,
     WalletLinkingService,
     OnchainDepositService,
@@ -183,7 +178,6 @@ import { WalletLinkingService } from './wallet-linking.service';
     OnchainTransferService,
     WalletConnectSessionManager,
     WalletConnectService,
-
     RequestLinkWalletUseCase,
     VerifyLinkWalletUseCase,
     UnlinkWalletUseCase,
@@ -194,7 +188,6 @@ import { WalletLinkingService } from './wallet-linking.service';
     ApproveWithdrawalUseCase,
     RejectWithdrawalUseCase,
     ProcessPendingWithdrawalsUseCase,
-
     GetLinkedWalletsQuery,
     GetLinkedWalletBalanceQuery,
     GetDepositAddressQuery,
@@ -207,10 +200,9 @@ import { WalletLinkingService } from './wallet-linking.service';
   ],
   exports: [
     BlockchainProviderFactory,
-    DepositFxService,
     WalletLinkingService,
-    WalletConnectService,
     OnchainTransferService,
+    DepositFxService,
   ],
 })
 export class BlockchainModule {}

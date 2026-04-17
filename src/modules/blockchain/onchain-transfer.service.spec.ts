@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { BlockchainNetwork, OnchainTxStatus } from '@/common/enums';
-import { OnchainDepositService } from './onchain-deposit.service';
+import { OnchainDepositService } from './application/services/deposits/onchain-deposit.service';
 import { OnchainTransferService } from './onchain-transfer.service';
-import { OnchainTransferQueryService } from './onchain-transfer-query.service';
-import { OnchainWithdrawalService } from './onchain-withdrawal.service';
+import { OnchainTransferQueryService } from './application/services/queries/onchain-transfer-query.service';
+import { OnchainWithdrawalService } from './application/services/withdrawals/onchain-withdrawal.service';
 
 describe('OnchainTransferService', () => {
   let service: OnchainTransferService;
@@ -186,3 +186,4 @@ describe('OnchainTransferService', () => {
     expect(result).toEqual({ pendingCount: 0, pendingTotalByChain: {} });
   });
 });
+

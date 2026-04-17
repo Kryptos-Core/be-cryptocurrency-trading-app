@@ -13,13 +13,13 @@ import { CacheService } from '@/common/services';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DepositFxService } from './deposit-fx.service';
+import { DepositFxService } from '../../../domain/services/deposit-fx.service';
 import {
   ONCHAIN_TRANSACTION_REPOSITORY,
   type OnchainTransactionRepositoryPort,
 } from './domain/ports';
 import type { SubmitDepositDto } from './dto';
-import { WalletLinkingService } from './wallet-linking.service';
+import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 
 @Injectable()
 export class OnchainDepositService {
@@ -433,3 +433,4 @@ export class OnchainDepositService {
     };
   }
 }
+

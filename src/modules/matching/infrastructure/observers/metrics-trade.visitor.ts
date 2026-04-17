@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
+import type { ITradeResultVisitor, TradeExecutionResult } from '../../interfaces';
 
 /**
  * Visitor Pattern: Metrics aggregation visitor for trade execution results.
@@ -26,3 +26,4 @@ export class MetricsTradeVisitor implements ITradeResultVisitor {
     };
   }
 }
+

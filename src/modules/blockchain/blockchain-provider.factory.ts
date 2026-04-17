@@ -10,9 +10,9 @@ import {
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
 import type { IBlockchainProvider } from './interfaces';
-import { EthereumProvider } from './providers/ethereum.provider';
-import { SolanaProvider } from './providers/solana.provider';
-import { TronProvider } from './providers/tron.provider';
+import { EthereumProvider } from './infrastructure/providers/ethereum.provider';
+import { SolanaProvider } from './infrastructure/providers/solana.provider';
+import { TronProvider } from './infrastructure/providers/tron.provider';
 
 @Injectable()
 export class BlockchainProviderFactory {
@@ -58,3 +58,4 @@ export class BlockchainProviderFactory {
     return Array.from(this.providerMap.keys());
   }
 }
+

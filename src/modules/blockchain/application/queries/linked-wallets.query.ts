@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseQuery, type IQueryHandler } from '@/common/cqrs';
-import { WalletLinkingService } from '../../wallet-linking.service';
+import { WalletLinkingService } from '../services/wallet-linking/wallet-linking.service';
 
 export class GetLinkedWalletsRequest extends BaseQuery {
   constructor(
@@ -54,7 +54,11 @@ export class GetLinkedWalletBalanceRequest extends BaseQuery {
 
 @Injectable()
 export class GetLinkedWalletBalanceQuery
-  implements IQueryHandler<GetLinkedWalletBalanceRequest, Awaited<ReturnType<WalletLinkingService['getLinkedWalletBalance']>>>
+  implements
+    IQueryHandler<
+      GetLinkedWalletBalanceRequest,
+      Awaited<ReturnType<WalletLinkingService['getLinkedWalletBalance']>>
+    >
 {
   constructor(private readonly walletLinkingService: WalletLinkingService) {}
 

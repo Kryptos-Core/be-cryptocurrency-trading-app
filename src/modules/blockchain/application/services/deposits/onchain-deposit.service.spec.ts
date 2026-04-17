@@ -6,10 +6,10 @@ import { CacheService } from '@/common/services';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DepositFxService } from './deposit-fx.service';
+import { DepositFxService } from '../../../domain/services/deposit-fx.service';
 import { ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
-import { OnchainDepositService } from './onchain-deposit.service';
-import { WalletLinkingService } from './wallet-linking.service';
+import { OnchainDepositService } from './application/services/deposits/onchain-deposit.service';
+import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 
 describe('OnchainDepositService', () => {
   const onchainTxRepo = {
@@ -263,3 +263,4 @@ describe('OnchainDepositService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+

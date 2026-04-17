@@ -6,7 +6,7 @@
  * Converts TradeExecutionResult into a TradeExecutedEvent and appends it.
  */
 
-import type { ITradeResultVisitor, TradeExecutionResult } from '../interfaces';
+import type { ITradeResultVisitor, TradeExecutionResult } from '../../interfaces';
 import type { EventStore, TradeExecutedEvent } from './event-store';
 
 export class EventStoreVisitor implements ITradeResultVisitor {
@@ -28,3 +28,4 @@ export class EventStoreVisitor implements ITradeResultVisitor {
     this.store.append(event);
   }
 }
+

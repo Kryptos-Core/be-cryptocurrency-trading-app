@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { OrderBookOrder } from '../interfaces';
-import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../utils';
+import type { OrderBookOrder } from '../../interfaces';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
 import { BuyQueueService } from './buy-queue.service';
 import { SellQueueService } from './sell-queue.service';
 
@@ -172,3 +172,4 @@ export class OrderBookService {
     return levels;
   }
 }
+
