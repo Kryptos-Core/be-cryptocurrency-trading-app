@@ -33,7 +33,12 @@ import {
   type TreasuryOnchainReadRepositoryPort,
   type TreasuryOperationRepositoryPort,
 } from './domain/ports';
-import type { FundWalletDto, ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from './dto';
+import type {
+  FundWalletDto,
+  ListTreasuryOperationsDto,
+  ListTreasuryTransactionsDto,
+  SweepWalletDto,
+} from './dto';
 import { TransactionWalletService } from './transaction-wallet.service';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
 import {
@@ -68,11 +73,19 @@ export class TreasuryOperationsService {
   async enqueueSweep(
     walletId: string,
     actorUserId: string,
-    mainWalletId?: string,
+    dto: SweepWalletDto,
   ): Promise<{ operationId: string; status: string }> {
     const wallet = await this.transactionWalletService.getWalletById(walletId);
     if (!wallet.is_active) {
       throw new BadRequestException('Transaction wallet is inactive', 'TREASURY_WALLET_INACTIVE');
+    }
+
+    const asset = dto.asset ?? 'NATIVE';
+    if (asset === 'USDT_TRC20' && !TreasuryOperationsService.isTronChain(wallet.chain)) {
+      throw new BadRequestException(
+        'USDT sweep is only supported on Tron networks',
+        'TREASURY_USDT_CHAIN_UNSUPPORTED',
+      );
     }
 
     const operation = await this.createOperation({
@@ -81,12 +94,13 @@ export class TreasuryOperationsService {
       fromWalletId: wallet.wallet_id,
       toWalletId: null,
       amount: '0',
+      asset,
       actorUserId,
     });
 
     await this.treasuryQueue.add(
       TREASURY_SWEEP_JOB,
-      { operationId: operation.operation_id, mainWalletId } satisfies TreasuryJobData,
+      { operationId: operation.operation_id, mainWalletId: dto.mainWalletId } satisfies TreasuryJobData,
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5_000 },
@@ -107,7 +121,19 @@ export class TreasuryOperationsService {
       throw new BadRequestException('Transaction wallet is inactive', 'TREASURY_WALLET_INACTIVE');
     }
 
-    const amount = this.normalizePositiveAmount(dto.amount);
+    const asset = dto.asset ?? 'NATIVE';
+    if (asset === 'USDT_TRC20' && !TreasuryOperationsService.isTronChain(wallet.chain)) {
+      throw new BadRequestException(
+        'USDT funding is only supported on Tron networks',
+        'TREASURY_USDT_CHAIN_UNSUPPORTED',
+      );
+    }
+
+    const rawAmount = this.normalizePositiveAmount(dto.amount);
+    const amount =
+      asset === 'USDT_TRC20'
+        ? new Decimal(rawAmount).toDecimalPlaces(6, Decimal.ROUND_DOWN).toFixed()
+        : rawAmount;
 
     const operation = await this.createOperation({
       type: 'FUND',
@@ -115,6 +141,7 @@ export class TreasuryOperationsService {
       fromWalletId: null,
       toWalletId: wallet.wallet_id,
       amount,
+      asset,
       actorUserId,
     });
 
@@ -149,12 +176,36 @@ export class TreasuryOperationsService {
         data.mainWalletId,
       );
 
-      const result = await this.sendSweepFromWallet(wallet, mainAddress);
-      if (TreasuryOperationsService.isTronChain(wallet.chain)) {
-        await this.transactionWalletService.waitForTronBalanceReflectSweep(
+      const asset = operation.asset ?? 'NATIVE';
+      let usdtBeforeSweep: string | null = null;
+      if (TreasuryOperationsService.isTronChain(wallet.chain) && asset === 'USDT_TRC20') {
+        usdtBeforeSweep = await this.transactionWalletService.getTronUsdtHumanBalanceOnChain(
           wallet.chain,
           wallet.address,
         );
+      }
+
+      const result = await this.sendSweepFromWallet(wallet, mainAddress, asset);
+      if (TreasuryOperationsService.isTronChain(wallet.chain)) {
+        if (asset === 'USDT_TRC20' && usdtBeforeSweep != null) {
+          const swept = await this.transactionWalletService.waitForTronUsdtBalanceReflectSweep(
+            wallet.chain,
+            wallet.address,
+            usdtBeforeSweep,
+          );
+          if (!swept) {
+            await this.transactionWalletService.invalidateBalanceCache(wallet.chain, wallet.address);
+            throw new BusinessException(
+              'USDT sweep did not reduce on-chain balance in time. Check TRX for fees/energy and TronGrid.',
+              'TREASURY_SWEEP_USDT_BALANCE_NOT_UPDATED',
+            );
+          }
+        } else if (asset === 'NATIVE') {
+          await this.transactionWalletService.waitForTronBalanceReflectSweep(
+            wallet.chain,
+            wallet.address,
+          );
+        }
       }
       await this.finalizeSuccess(
         operation,
@@ -188,23 +239,48 @@ export class TreasuryOperationsService {
       const wallet = await this.transactionWalletService.getWalletById(operation.to_wallet_id!);
       const amount = this.normalizePositiveAmount(operation.amount);
       const mainAddress = await this.transactionWalletService.getMainWalletAddress(wallet.chain);
+      const asset = operation.asset ?? 'NATIVE';
 
       let tronPreFundSun: number | null = null;
+      let tronPreUsdtHuman: string | null = null;
       if (TreasuryOperationsService.isTronChain(wallet.chain)) {
-        tronPreFundSun = await this.transactionWalletService.getTronNativeBalanceSun(
-          wallet.chain,
-          wallet.address,
-        );
+        if (asset === 'USDT_TRC20') {
+          tronPreUsdtHuman = await this.transactionWalletService.getTronUsdtHumanBalanceOnChain(
+            wallet.chain,
+            wallet.address,
+          );
+        } else {
+          tronPreFundSun = await this.transactionWalletService.getTronNativeBalanceSun(
+            wallet.chain,
+            wallet.address,
+          );
+        }
       }
 
-      const txHash = await this.sendFundFromMain(wallet.chain, wallet.address, amount);
-
-      if (tronPreFundSun !== null && TreasuryOperationsService.isTronChain(wallet.chain)) {
-        await this.transactionWalletService.waitForTronBalanceReflectFund(
+      let txHash: string;
+      if (asset === 'USDT_TRC20' && TreasuryOperationsService.isTronChain(wallet.chain)) {
+        txHash = await this.sendFundUsdtFromMain(wallet.chain, wallet.address, amount);
+        const funded = await this.transactionWalletService.waitForTronUsdtBalanceReflectFund(
           wallet.chain,
           wallet.address,
-          tronPreFundSun,
+          tronPreUsdtHuman ?? '0',
         );
+        if (!funded) {
+          await this.transactionWalletService.invalidateBalanceCache(wallet.chain, wallet.address);
+          throw new BusinessException(
+            'USDT funding did not increase destination balance in time. Ensure the main wallet has enough USDT and TRX (bandwidth/energy), then retry.',
+            'TREASURY_FUND_USDT_BALANCE_NOT_UPDATED',
+          );
+        }
+      } else {
+        txHash = await this.sendFundFromMain(wallet.chain, wallet.address, amount);
+        if (tronPreFundSun !== null && TreasuryOperationsService.isTronChain(wallet.chain)) {
+          await this.transactionWalletService.waitForTronBalanceReflectFund(
+            wallet.chain,
+            wallet.address,
+            tronPreFundSun,
+          );
+        }
       }
 
       await this.finalizeSuccess(operation, mainAddress, wallet.address, txHash, amount);
@@ -267,6 +343,7 @@ export class TreasuryOperationsService {
     toWalletId: string | null;
     amount: string;
     actorUserId: string;
+    asset?: 'NATIVE' | 'USDT_TRC20';
   }): Promise<TreasuryOperationRecord> {
     return this.treasuryOperationRepository.createPendingOperation(params);
   }
@@ -327,10 +404,27 @@ export class TreasuryOperationsService {
     await this.transactionWalletService.invalidateAllTreasuryBalanceCaches();
   }
 
+  private async sendFundUsdtFromMain(
+    chain: 'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA',
+    toAddress: string,
+    amount: string,
+  ): Promise<string> {
+    const pk = await this.transactionWalletService.resolveMainWalletPrivateKey(chain);
+    return this.transactionWalletService.transferTronUsdtFromPrivateKey(chain, pk, toAddress, amount);
+  }
+
   private async sendSweepFromWallet(
     wallet: TransactionWalletRecord,
     mainAddress: string,
+    asset: 'NATIVE' | 'USDT_TRC20' = 'NATIVE',
   ): Promise<{ txHash: string; amount: string }> {
+    if (asset === 'USDT_TRC20') {
+      if (!TreasuryOperationsService.isTronChain(wallet.chain)) {
+        throw new BusinessException('USDT sweep requires a Tron chain', 'TREASURY_USDT_CHAIN');
+      }
+      return this.transactionWalletService.sweepAllTronUsdtFromWallet(wallet, mainAddress);
+    }
+
     const privateKey = this.transactionWalletService.decryptWalletPrivateKey(wallet);
 
     const evmSweepDef = getEvmDefinitionByTreasuryChain(wallet.chain);

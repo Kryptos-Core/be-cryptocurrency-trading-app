@@ -43,17 +43,17 @@ import {
   type TronDepositUiChain,
 } from './infrastructure/persistence/treasury-transaction-wallet.repository';
 import { jsonRpcProviderForTreasuryEvmChain } from './treasury-evm-json-rpc.helper';
+import {
+  TRON_USDT_CONTRACT,
+  TRON_USDT_DECIMALS,
+  type TronTreasuryNetwork,
+} from './treasury-tron-usdt-contracts';
 
 const LIST_CACHE_TTL_SECONDS = 60;
 /** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
 const BALANCE_CACHE_TTL_SECONDS = 12;
 
 type SupportedTreasuryChain = BlockchainChainDbValue;
-
-/** Official USDT (TRC-20) on Tron mainnet (6 decimals). */
-const TRON_USDT_CONTRACT: Record<'TRON_MAINNET', string> = {
-  TRON_MAINNET: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-};
 
 const TRC20_BALANCE_OF_ABI = [
   {
@@ -65,7 +65,20 @@ const TRC20_BALANCE_OF_ABI = [
   },
 ] as const;
 
-const TRON_USDT_DECIMALS = 6;
+const TRC20_TRANSFER_ABI = [
+  {
+    constant: false,
+    /** Required by TronWeb `_send` (uses `stateMutability.toLowerCase()`). */
+    stateMutability: 'nonpayable' as const,
+    inputs: [
+      { name: '_to', type: 'address' },
+      { name: '_value', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', type: 'bool' }],
+    type: 'function',
+  },
+] as const;
 
 export interface TreasuryOnChainBalances {
   balance: string;
@@ -245,6 +258,138 @@ export class TransactionWalletService {
     );
   }
 
+  /**
+   * Poll on-chain USDT (TRC-20) until it increases (no cache), for post–USDT-fund UI freshness.
+   * @returns true if balance increased before timeout
+   */
+  async waitForTronUsdtBalanceReflectFund(
+    chain: TronTreasuryNetwork,
+    address: string,
+    usdtHumanBefore: string,
+  ): Promise<boolean> {
+    const before = new Decimal(usdtHumanBefore);
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      const human = new Decimal(await this.getTronUsdtHumanBalanceOnChain(chain, address));
+      if (human.gt(before)) {
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 1_500));
+    }
+    this.logger.warn(
+      `Treasury TRON USDT fund: USDT balance for ${address} did not increase above ${usdtHumanBefore} after 90s`,
+    );
+    return false;
+  }
+
+  /**
+   * Poll on-chain USDT until it drops after a sweep (no cache).
+   * @returns true if balance decreased before timeout
+   */
+  async waitForTronUsdtBalanceReflectSweep(
+    chain: TronTreasuryNetwork,
+    address: string,
+    usdtHumanBeforeSweep: string,
+  ): Promise<boolean> {
+    const before = new Decimal(usdtHumanBeforeSweep);
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      const human = new Decimal(await this.getTronUsdtHumanBalanceOnChain(chain, address));
+      if (human.lt(before)) {
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 1_500));
+    }
+    this.logger.warn(
+      `Treasury TRON USDT sweep: USDT balance for ${address} did not drop below pre-sweep ${usdtHumanBeforeSweep} after 90s`,
+    );
+    return false;
+  }
+
+  /**
+   * Send TRC-20 USDT from a private key wallet to a recipient (Tron networks only).
+   */
+  async transferTronUsdtFromPrivateKey(
+    chain: TronTreasuryNetwork,
+    privateKey: string,
+    toBase58: string,
+    amountHuman: string,
+  ): Promise<string> {
+    const tw = await this.buildTronWebWithPrivateKey(chain, privateKey);
+    if (!tw.isAddress(toBase58)) {
+      throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
+    }
+    const valueInt = new Decimal(amountHuman)
+      .mul(new Decimal(10).pow(TRON_USDT_DECIMALS))
+      .floor();
+    if (valueInt.lte(0)) {
+      throw new BadRequestException('USDT amount must be greater than zero', 'TREASURY_INVALID_AMOUNT');
+    }
+    const contractAddress = TRON_USDT_CONTRACT[chain];
+    const contract = tw.contract(TRC20_TRANSFER_ABI as unknown as never[], contractAddress);
+    const fromAddr = tw.address.fromPrivateKey(privateKey);
+    if (!fromAddr) {
+      throw new BusinessException('Invalid Tron private key for USDT transfer', 'TRON_USDT_SEND_INVALID_KEY');
+    }
+    const raw = await contract.transfer(toBase58, valueInt.toFixed(0)).send({
+      feeLimit: 150_000_000,
+      callValue: 0,
+      from: fromAddr,
+      /** Wait for solidity result so we do not mark COMPLETED on a tx that reverts (e.g. no TRX for energy). */
+      shouldPollResponse: true,
+      /** With shouldPollResponse, TronWeb returns decoded output unless keepTxID is set. */
+      keepTxID: true,
+      pollTimes: 40,
+    });
+    const txid = TransactionWalletService.parseTronContractSendTxId(raw);
+    if (!txid) {
+      throw new BusinessException('Failed to resolve TRON USDT transfer tx id', 'TRON_USDT_SEND_FAILED');
+    }
+    return txid;
+  }
+
+  /** Normalize TronWeb `method.send()` return value (string txID, [txID, decoded], or legacy object). */
+  private static parseTronContractSendTxId(raw: unknown): string | null {
+    if (typeof raw === 'string' && raw.length >= 16) {
+      return raw;
+    }
+    if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string' && (raw[0] as string).length >= 16) {
+      return raw[0] as string;
+    }
+    if (raw && typeof raw === 'object') {
+      const o = raw as { txid?: unknown; transaction?: { txID?: unknown } };
+      if (typeof o.txid === 'string' && o.txid.length >= 16) {
+        return o.txid;
+      }
+      const nested = o.transaction?.txID;
+      if (typeof nested === 'string' && nested.length >= 16) {
+        return nested;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Sweep all TRC-20 USDT from a treasury transaction wallet to the main address.
+   */
+  async sweepAllTronUsdtFromWallet(
+    wallet: TransactionWalletRecord,
+    toMainBase58: string,
+  ): Promise<{ txHash: string; amount: string }> {
+    const chain = this.assertSupportedChain(wallet.chain);
+    if (chain !== 'TRON_MAINNET' && chain !== 'TRON_NILE' && chain !== 'TRON_SHASTA') {
+      throw new BadRequestException('USDT sweep is only supported on Tron networks', 'TREASURY_USDT_CHAIN');
+    }
+    const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
+    const human = await this.getTronUsdtHumanBalanceOnChain(chain, wallet.address);
+    const amount = new Decimal(human);
+    if (amount.lte(0)) {
+      throw new BusinessException('No USDT balance to sweep', 'TREASURY_SWEEP_USDT_ZERO');
+    }
+    const txHash = await this.transferTronUsdtFromPrivateKey(chain, pk, toMainBase58, human);
+    return { txHash, amount: human };
+  }
+
   async getWalletById(walletId: string): Promise<TransactionWalletRecord> {
     const wallet = await this.treasuryTransactionWalletRecordRepository.findByWalletId(walletId);
 
@@ -298,16 +443,12 @@ export class TransactionWalletService {
       const tronWeb = await this.buildTronReadOnlyClient(chain);
       const sun = await tronWeb.trx.getBalance(address);
       let usdtTrc20Balance: string | undefined;
-      if (chain === 'TRON_MAINNET') {
-        try {
-          usdtTrc20Balance = await this.readTronUsdtBalance(tronWeb, chain, address);
-        } catch (err) {
-          this.logger.warn(
-            `USDT TRC-20 balance skipped for ${address} on ${chain}: ${(err as Error).message}`,
-          );
-          usdtTrc20Balance = '0';
-        }
-      } else {
+      try {
+        usdtTrc20Balance = await this.readTronUsdtBalance(tronWeb, chain, address);
+      } catch (err) {
+        this.logger.warn(
+          `USDT TRC-20 balance skipped for ${address} on ${chain}: ${(err as Error).message}`,
+        );
         usdtTrc20Balance = '0';
       }
       return {
@@ -322,9 +463,15 @@ export class TransactionWalletService {
     });
   }
 
+  /** Direct on-chain USDT (TRC-20) human balance — not Redis-cached. */
+  async getTronUsdtHumanBalanceOnChain(chain: TronTreasuryNetwork, ownerBase58: string): Promise<string> {
+    const tronWeb = await this.buildTronReadOnlyClient(chain);
+    return this.readTronUsdtBalance(tronWeb, chain, ownerBase58);
+  }
+
   private async readTronUsdtBalance(
     tronWeb: TronWeb,
-    chain: 'TRON_MAINNET',
+    chain: TronTreasuryNetwork,
     ownerBase58: string,
   ): Promise<string> {
     const contractAddress = TRON_USDT_CONTRACT[chain];

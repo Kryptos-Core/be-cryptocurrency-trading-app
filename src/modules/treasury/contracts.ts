@@ -42,6 +42,8 @@ export interface TreasuryMainWalletRecord {
   updated_at: Date;
 }
 
+export type TreasuryOperationAsset = 'NATIVE' | 'USDT_TRC20';
+
 export interface TreasuryOperationRecord {
   operation_id: string;
   type: 'SWEEP' | 'FUND';
@@ -49,6 +51,7 @@ export interface TreasuryOperationRecord {
   from_wallet_id: string | null;
   to_wallet_id: string | null;
   amount: string;
+  asset: TreasuryOperationAsset;
   tx_hash: string | null;
   onchain_tx_id: string | null;
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';

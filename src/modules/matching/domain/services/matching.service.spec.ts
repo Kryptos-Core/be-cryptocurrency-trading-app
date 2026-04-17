@@ -49,8 +49,6 @@ describe('MatchingService', () => {
       providers: [
         MatchingService,
         OrderBookService,
-        BuyQueueService,
-        SellQueueService,
         PriceTimePriorityStrategy,
         MarketOrderStrategy,
         { provide: MATCHING_REPOSITORY, useValue: matchingRepository },

@@ -46,6 +46,10 @@ export class TreasuryOperation {
   @Column({ ...DECIMAL_36_18_DEFAULT_ZERO_STRING_COLUMN })
   amount!: string;
 
+  /** NATIVE = chain native coin (TRX, ETH, SOL); USDT_TRC20 = TRC-20 USDT (Tron networks only). */
+  @Column({ type: 'varchar', length: 24, default: 'NATIVE' })
+  asset!: 'NATIVE' | 'USDT_TRC20';
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   tx_hash!: string | null;
 

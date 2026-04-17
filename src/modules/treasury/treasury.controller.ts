@@ -128,7 +128,7 @@ export class TreasuryController {
     @Body() dto: SweepWalletDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryOperationsService.enqueueSweep(walletId, actorUserId, dto.mainWalletId);
+    return this.treasuryOperationsService.enqueueSweep(walletId, actorUserId, dto);
   }
 
   @Post('wallets/:walletId/fund')

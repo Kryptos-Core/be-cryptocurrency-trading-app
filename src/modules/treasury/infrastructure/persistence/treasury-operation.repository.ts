@@ -20,6 +20,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
     fromWalletId: string | null;
     toWalletId: string | null;
     amount: string;
+    asset?: 'NATIVE' | 'USDT_TRC20';
     actorUserId: string;
   }): Promise<TreasuryOperation> {
     const repo = this.dataSource.getRepository(TreasuryOperation);
@@ -30,6 +31,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
       from_wallet_id: params.fromWalletId,
       to_wallet_id: params.toWalletId,
       amount: params.amount,
+      asset: params.asset ?? 'NATIVE',
       tx_hash: null,
       onchain_tx_id: null,
       status: 'PENDING',

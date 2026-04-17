@@ -27,9 +27,9 @@ describe('EventStoreVisitor', () => {
 
     visitor.visit(trade);
 
-    const events = store.readAll();
-    expect(events).toHaveLength(1);
-    const event = events[0] as TradeExecutedEvent;
+    const stored = store.getStoredEvents('pair-1');
+    expect(stored).toHaveLength(1);
+    const event = stored[0].event as TradeExecutedEvent;
     expect(event.type).toBe('TradeExecuted');
     expect(event.tradeId).toBe('t1');
   });

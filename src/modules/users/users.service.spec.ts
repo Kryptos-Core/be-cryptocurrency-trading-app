@@ -5,18 +5,17 @@ import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import type { UserRecord } from '@/modules/users';
 import { WalletsService } from '@/modules/wallets/wallets.service';
-import { USERS_REPOSITORY } from './domain/ports';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 import type {
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
   UpdateMyProfileBasicDto,
 } from './dto';
-import { UserRecordsRepository } from './infrastructure/persistence';
-import { UserRecordsService } from './users.service';
+import { UsersService } from './users.service';
 
-describe('UserRecordsService', () => {
-  let service: UserRecordsService;
-  let usersRepository: jest.Mocked<UserRecordsRepository>;
+describe('UsersService', () => {
+  let service: UsersService;
+  let usersRepository: jest.Mocked<UsersRepositoryPort>;
   let cloudinaryService: jest.Mocked<CloudinaryService>;
   let twoFaService: jest.Mocked<TwoFaService>;
 
@@ -57,8 +56,7 @@ describe('UserRecordsService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UserRecordsService,
-        { provide: UserRecordsRepository, useValue: mockRepo },
+        UsersService,
         { provide: USERS_REPOSITORY, useValue: mockRepo },
         { provide: CloudinaryService, useValue: mockCloudinary },
         { provide: TwoFaService, useValue: mockTwoFa },
@@ -67,8 +65,8 @@ describe('UserRecordsService', () => {
       ],
     }).compile();
 
-    service = module.get(UserRecordsService);
-    usersRepository = module.get(UserRecordsRepository);
+    service = module.get(UsersService);
+    usersRepository = module.get(USERS_REPOSITORY);
     cloudinaryService = module.get(CloudinaryService);
     twoFaService = module.get(TwoFaService);
 
