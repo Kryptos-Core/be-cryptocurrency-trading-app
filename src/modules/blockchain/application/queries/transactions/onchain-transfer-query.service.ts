@@ -11,7 +11,7 @@ import {
   type AdminWithdrawalFilters,
   ONCHAIN_TRANSACTION_REPOSITORY,
   type OnchainTransactionRepositoryPort,
-} from './domain/ports';
+} from '../../../domain/ports';
 
 @Injectable()
 export class OnchainTransferQueryService {
@@ -23,30 +23,20 @@ export class OnchainTransferQueryService {
     private readonly systemConfigService: SystemConfigService,
   ) {}
 
-  /**
-   * Lấy lịch sử giao dịch on-chain của user
-   */
   async getTransactions(userId: string, limit: number = 50) {
     return this.onchainTxRepo.listByUser(userId, limit);
   }
 
-  /**
-   * Lấy chi tiết 1 giao dịch
-   */
   async getTransactionById(userId: string, txId: string) {
     const tx = await this.onchainTxRepo.getByIdAndUser(userId, txId);
-    if (!tx) {
-      throw new BadRequestException('Giao dịch không tìm thấy', 'TX_NOT_FOUND');
-    }
+    if (!tx) throw new BadRequestException('Giao dịch không tìm thấy', 'TX_NOT_FOUND');
     return tx;
   }
 
-  /** Filters for admin withdrawal list */
   async getAdminWithdrawals(filters: AdminWithdrawalFilters) {
     return this.onchainTxRepo.listAdminWithdrawals(filters);
   }
 
-  /** Single withdrawal detail with user info and wallet balance */
   async getAdminWithdrawalById(txId: string) {
     const detail = await this.onchainTxRepo.getAdminWithdrawalDetail(txId);
     if (!detail) {
@@ -55,7 +45,6 @@ export class OnchainTransferQueryService {
     return detail;
   }
 
-  /** Stats for pending withdrawals */
   async getAdminWithdrawalStats() {
     return this.onchainTxRepo.getWithdrawalStats();
   }
@@ -85,7 +74,6 @@ export class OnchainTransferQueryService {
     return base;
   }
 
-  /** Resolve currencyId từ native symbol của chain */
   async resolveWithdrawalCurrencyId(chain: BlockchainNetwork): Promise<string> {
     const symbol = await this.getChainAssetSymbol(chain);
     const currency = await this.currencyRepository.findBySymbol(symbol);

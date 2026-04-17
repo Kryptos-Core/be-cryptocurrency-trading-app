@@ -10,12 +10,12 @@ import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
   IBlockchainProvider,
-} from '../interfaces';
-import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
+} from '../../interfaces';
+import { buildNotFoundTxStatus } from '../../utils/build-not-found-tx.util';
 import {
   extractTronFirstContractOwnerBase58,
   extractTronNativeTransferMeta,
-} from '../utils/tron-native-transfer.util';
+} from '../../utils/tron-native-transfer.util';
 
 export interface TronProviderBindings {
   network: BlockchainNetwork;
@@ -163,3 +163,4 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     return tw.defaultAddress.base58;
   }
 }
+

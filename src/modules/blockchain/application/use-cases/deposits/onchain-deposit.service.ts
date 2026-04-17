@@ -12,21 +12,19 @@ import { BadRequestException, BusinessException, ConflictException } from '@/com
 import { CacheService } from '@/common/services';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
 import { DepositFxService } from '../../../domain/services/deposit-fx.service';
 import {
   ONCHAIN_TRANSACTION_REPOSITORY,
   type OnchainTransactionRepositoryPort,
-} from './domain/ports';
-import type { SubmitDepositDto } from './dto';
+} from '../../../domain/ports';
+import type { SubmitDepositDto } from '../../../dto';
 import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 
 @Injectable()
 export class OnchainDepositService {
   private readonly logger = new Logger(OnchainDepositService.name);
-
-  /** TTL lock deposit (giây) */
-  private static readonly DEPOSIT_LOCK_TTL = 600; // 10 phút
+  private static readonly DEPOSIT_LOCK_TTL = 600;
 
   constructor(
     @Inject(ONCHAIN_TRANSACTION_REPOSITORY)
@@ -41,39 +39,20 @@ export class OnchainDepositService {
   ) {}
 
   private treasuryLog(event: string, fields: Record<string, unknown>): void {
-    this.logger.log(
-      JSON.stringify({
-        domain: 'treasury',
-        event,
-        at: new Date().toISOString(),
-        ...fields,
-      }),
-    );
+    this.logger.log(JSON.stringify({ domain: 'treasury', event, at: new Date().toISOString(), ...fields }));
   }
 
   private treasuryAlert(event: string, fields: Record<string, unknown>): void {
     this.logger.warn(
-      JSON.stringify({
-        domain: 'treasury',
-        severity: 'alert',
-        event,
-        at: new Date().toISOString(),
-        ...fields,
-      }),
+      JSON.stringify({ domain: 'treasury', severity: 'alert', event, at: new Date().toISOString(), ...fields }),
     );
   }
 
-  /**
-   * Tron mainnet: chỉ chấp nhận nạp vào transaction wallet đang là default user deposit.
-   * Không có default -> từ chối; có default nhưng tx.to khác -> từ chối.
-   */
   private async assertTronDepositRecipientMatchesConfiguredDefault(
     chain: BlockchainNetwork,
     txRecipient: string,
   ): Promise<void> {
-    if (chain !== BlockchainNetwork.TRON_MAINNET) {
-      return;
-    }
+    if (chain !== BlockchainNetwork.TRON_MAINNET) return;
     const tw = await this.transactionWalletService.getDefaultUserDepositWallet('TRON_MAINNET');
     if (!tw) {
       throw new BadRequestException(
@@ -89,40 +68,18 @@ export class OnchainDepositService {
     }
   }
 
-  /**
-   * Preview giao dịch nạp tiền theo txHash để FE tự điền amount
-   * Không tạo bản ghi giao dịch, chỉ đọc trạng thái on-chain.
-   */
-  async previewDepositTx(
-    userId: string,
-    chain: BlockchainNetwork,
-    txHash: string,
-  ): Promise<{
-    chain: string;
-    txHash: string;
-    status: string;
-    confirmations: number;
-    fromAddress: string;
-    toAddress: string;
-    onchainAmount: string;
-    senderLinked: boolean;
-  }> {
+  async previewDepositTx(userId: string, chain: BlockchainNetwork, txHash: string) {
     const provider = this.providerFactory.getProvider(chain);
     const txStatus = await provider.getTransactionStatus(txHash);
 
     if (txStatus.status === 'NOT_FOUND') {
-      throw new BadRequestException(
-        'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash.',
-        'TX_NOT_FOUND',
-      );
+      throw new BadRequestException('Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash.', 'TX_NOT_FOUND');
     }
-
     if (txStatus.status === 'FAILED') {
       throw new BadRequestException('Giao dịch on-chain đã thất bại.', 'TX_FAILED');
     }
 
     const linked = await this.walletLinkingService.findVerifiedWallet(userId, chain, txStatus.from);
-
     await this.assertTronDepositRecipientMatchesConfiguredDefault(chain, txStatus.to);
 
     return {
@@ -139,9 +96,7 @@ export class OnchainDepositService {
 
   private toLedgerRefId(seed: string): number {
     const compact = seed.replace(/[^a-fA-F0-9]/g, '').slice(0, 12);
-    if (compact.length === 0) {
-      return Date.now();
-    }
+    if (compact.length === 0) return Date.now();
     return parseInt(compact, 16);
   }
 
@@ -152,12 +107,8 @@ export class OnchainDepositService {
     refId: number,
     direction: 'CREDIT' | 'DEBIT',
   ): Promise<boolean> {
-    // TODO: migrate to WalletLedgerRepositoryPort when wallets domain is fully wired
     const rows = await this.dataSource.query(
-      `SELECT ledger_id
-       FROM wallet_ledger
-       WHERE user_id = ? AND currency_id = ? AND ref_type = ? AND ref_id = ? AND direction = ?
-       LIMIT 1`,
+      `SELECT ledger_id FROM wallet_ledger WHERE user_id = ? AND currency_id = ? AND ref_type = ? AND ref_id = ? AND direction = ? LIMIT 1`,
       [userId, currencyId, refType, String(refId), direction],
     );
     return Array.isArray(rows) && rows.length > 0;
@@ -169,7 +120,6 @@ export class OnchainDepositService {
     chain: BlockchainNetwork,
     amount: string,
   ): Promise<{ settled: boolean; alreadySettled: boolean }> {
-    // Quy đổi native coin -> platform cash currency (USDT)
     const conversion = await this.depositFxService.convertToPlatformCash(chain, amount);
     const { creditCurrencyId, creditAmount, conversionRate } = conversion;
 
@@ -181,9 +131,7 @@ export class OnchainDepositService {
       refId,
       'CREDIT',
     );
-    if (existed) {
-      return { settled: false, alreadySettled: true };
-    }
+    if (existed) return { settled: false, alreadySettled: true };
 
     try {
       await this.walletsService.applyTransaction(userId, {
@@ -200,7 +148,6 @@ export class OnchainDepositService {
       throw error;
     }
 
-    // Lưu thông tin quy đổi vào onchain_transactions để audit/hiển thị FE
     await this.onchainTxRepo.updateCreditConversion(
       txId,
       String(creditCurrencyId),
@@ -211,78 +158,44 @@ export class OnchainDepositService {
     return { settled: true, alreadySettled: false };
   }
 
-  /**
-   * Nạp tiền thủ công - user submit txHash đã gửi on-chain
-   */
-  async submitDeposit(
-    userId: string,
-    dto: SubmitDepositDto,
-  ): Promise<{
-    txId: string;
-    status: string;
-    amount: string;
-    chain: string;
-    settled?: boolean;
-  }> {
+  async submitDeposit(userId: string, dto: SubmitDepositDto) {
     const provider = this.providerFactory.getProvider(dto.chain);
-
-    // Lock chống double-submit
     const lockKey = `deposit:pending:${dto.txHash}`;
     const locked = await this.cacheService.exists(lockKey);
     if (locked) {
-      throw new ConflictException(
-        'Giao dịch này đang được xử lý. Vui lòng chờ.',
-        'DEPOSIT_PROCESSING',
-      );
+      throw new ConflictException('Giao dịch này đang được xử lý. Vui lòng chờ.', 'DEPOSIT_PROCESSING');
     }
     await this.cacheService.set(lockKey, '1', OnchainDepositService.DEPOSIT_LOCK_TTL);
 
     try {
-      // Kiểm tra txHash đã tồn tại chưa (idempotent)
       const existing = await this.onchainTxRepo.findByChainAndTxHash(dto.chain, dto.txHash);
       if (existing) {
-        throw new ConflictException(
-          'Giao dịch này đã được xử lý trước đó',
-          'DEPOSIT_ALREADY_PROCESSED',
-        );
+        throw new ConflictException('Giao dịch này đã được xử lý trước đó', 'DEPOSIT_ALREADY_PROCESSED');
       }
 
-      // Verify on-chain
       const txStatus = await provider.getTransactionStatus(dto.txHash);
-
       if (txStatus.status === 'NOT_FOUND') {
         throw new BadRequestException(
           'Không tìm thấy giao dịch on-chain. Kiểm tra lại txHash hoặc chờ tx được confirm.',
           'TX_NOT_FOUND',
         );
       }
-
       if (txStatus.status === 'FAILED') {
         throw new BadRequestException('Giao dịch on-chain đã thất bại', 'TX_FAILED');
       }
 
       await this.assertTronDepositRecipientMatchesConfiguredDefault(dto.chain, txStatus.to);
-
-      // Verify sender = ví đã liên kết của user
-      const senderAddress = txStatus.from;
-      const linked = await this.walletLinkingService.findVerifiedWallet(
-        userId,
-        dto.chain,
-        senderAddress,
-      );
-
+      const linked = await this.walletLinkingService.findVerifiedWallet(userId, dto.chain, txStatus.from);
       if (!linked) {
         throw new BadRequestException(
-          `Địa chỉ gửi (${senderAddress}) không phải ví đã liên kết của bạn. Hãy liên kết ví trước.`,
+          `Địa chỉ gửi (${txStatus.from}) không phải ví đã liên kết của bạn. Hãy liên kết ví trước.`,
           'SENDER_NOT_LINKED',
         );
       }
 
-      // Verify amount khớp (cho phép sai số nhỏ do gas)
       const onchainAmount = new Decimal(txStatus.value || '0');
       const submittedAmount = new Decimal(dto.amount);
       const tolerance = new Decimal('0.0001');
-
       if (onchainAmount.minus(submittedAmount).abs().greaterThan(tolerance)) {
         throw new BadRequestException(
           `Số tiền không khớp. On-chain: ${onchainAmount}, Submit: ${submittedAmount}`,
@@ -290,10 +203,8 @@ export class OnchainDepositService {
         );
       }
 
-      // Tạo bản ghi giao dịch
       const txId = uuidv7();
-      const status =
-        txStatus.status === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
+      const status = txStatus.status === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
 
       await this.onchainTxRepo.create({
         tx_id: txId,
@@ -312,18 +223,9 @@ export class OnchainDepositService {
 
       let settled = false;
       if (status === OnchainTxStatus.COMPLETED) {
-        const settlement = await this.settleDepositLedgerIfNeeded(
-          txId,
-          userId,
-          dto.chain,
-          onchainAmount.toString(),
-        );
+        const settlement = await this.settleDepositLedgerIfNeeded(txId, userId, dto.chain, onchainAmount.toString());
         settled = settlement.settled || settlement.alreadySettled;
       }
-
-      this.logger.log(
-        `[Deposit] userId=${userId}, chain=${dto.chain}, amount=${onchainAmount}, txHash=${dto.txHash}, status=${status}`,
-      );
 
       this.treasuryLog('deposit.submit.result', {
         userId,
@@ -335,33 +237,19 @@ export class OnchainDepositService {
         settled,
       });
 
-      return {
-        txId,
-        status,
-        amount: onchainAmount.toString(),
-        chain: dto.chain,
-        settled,
-      };
+      return { txId, status, amount: onchainAmount.toString(), chain: dto.chain, settled };
     } finally {
-      // Xoá lock sau khi xử lý xong
       await this.cacheService.delete(lockKey);
     }
   }
 
-  async settleDepositByTxId(
-    userId: string,
-    txId: string,
-  ): Promise<{ txId: string; status: string; settled: boolean; confirmations: number }> {
-    this.treasuryLog('deposit.settle.requested', {
-      userId,
-      txId,
-    });
+  async settleDepositByTxId(userId: string, txId: string) {
+    this.treasuryLog('deposit.settle.requested', { userId, txId });
 
     const tx = await this.onchainTxRepo.findByIdAndUserId(txId, userId);
     if (!tx || tx.type !== 'DEPOSIT') {
       throw new BadRequestException('Giao dịch nạp tiền không tồn tại', 'DEPOSIT_NOT_FOUND');
     }
-
     if (!tx.tx_hash) {
       throw new BusinessException('Giao dịch nạp chưa có tx_hash hợp lệ', 'DEPOSIT_TXHASH_MISSING');
     }
@@ -379,12 +267,7 @@ export class OnchainDepositService {
         txHash: tx.tx_hash,
         confirmations: latest.confirmations ?? 0,
       });
-      return {
-        txId,
-        status: OnchainTxStatus.FAILED,
-        settled: false,
-        confirmations: latest.confirmations ?? 0,
-      };
+      return { txId, status: OnchainTxStatus.FAILED, settled: false, confirmations: latest.confirmations ?? 0 };
     }
 
     if (latest.status !== 'CONFIRMED') {
@@ -397,12 +280,7 @@ export class OnchainDepositService {
         txHash: tx.tx_hash,
         confirmations: latest.confirmations ?? 0,
       });
-      return {
-        txId,
-        status: OnchainTxStatus.CONFIRMING,
-        settled: false,
-        confirmations: latest.confirmations ?? 0,
-      };
+      return { txId, status: OnchainTxStatus.CONFIRMING, settled: false, confirmations: latest.confirmations ?? 0 };
     }
 
     await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.COMPLETED, {
@@ -433,4 +311,3 @@ export class OnchainDepositService {
     };
   }
 }
-

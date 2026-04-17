@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseCommand, type ICommandHandler } from '@/common/cqrs';
-import type { ManualWithdrawalActionDto, RequestWithdrawalDto } from '../../dto';
-import { OnchainWithdrawalService } from '../services/withdrawals/onchain-withdrawal.service';
+import type { RequestWithdrawalDto } from '../../dto';
+import { OnchainWithdrawalService } from './withdrawals/onchain-withdrawal.service';
 
 export class RequestWithdrawalCommand extends BaseCommand {
   constructor(
@@ -15,7 +15,11 @@ export class RequestWithdrawalCommand extends BaseCommand {
 
 @Injectable()
 export class RequestWithdrawalUseCase
-  implements ICommandHandler<RequestWithdrawalCommand, Awaited<ReturnType<OnchainWithdrawalService['requestWithdrawal']>>>
+  implements
+    ICommandHandler<
+      RequestWithdrawalCommand,
+      Awaited<ReturnType<OnchainWithdrawalService['requestWithdrawal']>>
+    >
 {
   constructor(private readonly withdrawalService: OnchainWithdrawalService) {}
 
@@ -36,7 +40,11 @@ export class ApproveWithdrawalCommand extends BaseCommand {
 
 @Injectable()
 export class ApproveWithdrawalUseCase
-  implements ICommandHandler<ApproveWithdrawalCommand, Awaited<ReturnType<OnchainWithdrawalService['approveManualWithdrawal']>>>
+  implements
+    ICommandHandler<
+      ApproveWithdrawalCommand,
+      Awaited<ReturnType<OnchainWithdrawalService['approveManualWithdrawal']>>
+    >
 {
   constructor(private readonly withdrawalService: OnchainWithdrawalService) {}
 
@@ -58,7 +66,11 @@ export class RejectWithdrawalCommand extends BaseCommand {
 
 @Injectable()
 export class RejectWithdrawalUseCase
-  implements ICommandHandler<RejectWithdrawalCommand, Awaited<ReturnType<OnchainWithdrawalService['rejectManualWithdrawal']>>>
+  implements
+    ICommandHandler<
+      RejectWithdrawalCommand,
+      Awaited<ReturnType<OnchainWithdrawalService['rejectManualWithdrawal']>>
+    >
 {
   constructor(private readonly withdrawalService: OnchainWithdrawalService) {}
 
@@ -83,7 +95,11 @@ export class ProcessPendingWithdrawalsCommand extends BaseCommand {
 
 @Injectable()
 export class ProcessPendingWithdrawalsUseCase
-  implements ICommandHandler<ProcessPendingWithdrawalsCommand, Awaited<ReturnType<OnchainWithdrawalService['processPendingManualWithdrawals']>>>
+  implements
+    ICommandHandler<
+      ProcessPendingWithdrawalsCommand,
+      Awaited<ReturnType<OnchainWithdrawalService['processPendingManualWithdrawals']>>
+    >
 {
   constructor(private readonly withdrawalService: OnchainWithdrawalService) {}
 

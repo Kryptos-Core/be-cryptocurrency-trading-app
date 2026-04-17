@@ -3,8 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EVM_CHAIN_DEFINITIONS } from '@/common/constants/evm-chain-definitions';
 import { BlockchainNetwork } from '@/common/enums';
-import { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
-import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import { LinkedWallet, OnchainTransaction } from '@/modules/blockchain';
 import { OnchainTransferService } from '@/modules/blockchain/onchain-transfer.service';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
@@ -39,10 +38,10 @@ import {
   UnlinkWalletUseCase,
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
-import { OnchainDepositService } from './application/services/deposits/onchain-deposit.service';
-import { OnchainTransferQueryService } from './application/services/queries/onchain-transfer-query.service';
-import { WalletLinkingService } from './application/services/wallet-linking/wallet-linking.service';
-import { OnchainWithdrawalService } from './application/services/withdrawals/onchain-withdrawal.service';
+import { OnchainTransferQueryService } from './application/queries/transactions/onchain-transfer-query.service';
+import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
+import { WalletLinkingService } from './application/use-cases/wallet-linking/wallet-linking.service';
+import { OnchainWithdrawalService } from './application/use-cases/withdrawals/onchain-withdrawal.service';
 import { BlockchainController } from './blockchain.controller';
 import {
   BC_SOLANA_DEVNET,
@@ -53,12 +52,10 @@ import {
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DepositFxService } from './domain/services/deposit-fx.service';
+import { DepositFxService } from './domain/services';
 import { LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
 import { LinkedWalletRepository, OnchainTransactionRepository } from './infrastructure/persistence';
-import { EthereumProvider } from './infrastructure/providers/ethereum.provider';
-import { SolanaProvider } from './infrastructure/providers/solana.provider';
-import { TronProvider } from './infrastructure/providers/tron.provider';
+import { EthereumProvider, SolanaProvider, TronProvider } from './infrastructure/providers';
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
 import { WalletConnectService } from './wallet-connect/wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-session-manager.service';
@@ -200,6 +197,8 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
   ],
   exports: [
     BlockchainProviderFactory,
+    LINKED_WALLET_REPOSITORY,
+    ONCHAIN_TRANSACTION_REPOSITORY,
     WalletLinkingService,
     OnchainTransferService,
     DepositFxService,

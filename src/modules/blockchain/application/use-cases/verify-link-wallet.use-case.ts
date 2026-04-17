@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseCommand, type ICommandHandler } from '@/common/cqrs';
 import type { VerifyLinkDto } from '../../dto';
-import { WalletLinkingService } from '../services/wallet-linking/wallet-linking.service';
+import { WalletLinkingService } from './wallet-linking/wallet-linking.service';
 
 export class VerifyLinkWalletCommand extends BaseCommand {
   constructor(
@@ -15,13 +15,17 @@ export class VerifyLinkWalletCommand extends BaseCommand {
 
 @Injectable()
 export class VerifyLinkWalletUseCase
-  implements ICommandHandler<VerifyLinkWalletCommand, { linkId: string; address: string; chain: string }>
+  implements
+    ICommandHandler<
+      VerifyLinkWalletCommand,
+      { linkId: string; address: string; chain: string; status: string }
+    >
 {
   constructor(private readonly walletLinkingService: WalletLinkingService) {}
 
   async execute(
     command: VerifyLinkWalletCommand,
-  ): Promise<{ linkId: string; address: string; chain: string }> {
+  ): Promise<{ linkId: string; address: string; chain: string; status: string }> {
     return this.walletLinkingService.verifyLink(command.userId, command.dto);
   }
 }

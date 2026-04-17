@@ -22,8 +22,8 @@ import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
   IBlockchainProvider,
-} from '../interfaces';
-import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
+} from '../../interfaces';
+import { buildNotFoundTxStatus } from '../../utils/build-not-found-tx.util';
 
 export interface SolanaProviderBindings {
   network: BlockchainNetwork;
@@ -217,3 +217,4 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
     return hotWallet.publicKey.toBase58();
   }
 }
+

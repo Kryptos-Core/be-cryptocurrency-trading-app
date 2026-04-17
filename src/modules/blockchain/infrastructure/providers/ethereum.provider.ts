@@ -11,8 +11,8 @@ import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,
   IBlockchainProvider,
-} from '../interfaces';
-import { buildNotFoundTxStatus } from '../utils/build-not-found-tx.util';
+} from '../../interfaces';
+import { buildNotFoundTxStatus } from '../../utils/build-not-found-tx.util';
 
 /**
  * EVM provider — one Nest instance per chain (JsonRpcProvider + fixed chainId).
@@ -189,3 +189,4 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     return wallet.address;
   }
 }
+

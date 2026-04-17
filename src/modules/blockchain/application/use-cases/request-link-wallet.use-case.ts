@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseCommand, type ICommandHandler } from '@/common/cqrs';
 import type { RequestLinkDto } from '../../dto';
-import { WalletLinkingService } from '../services/wallet-linking/wallet-linking.service';
+import { WalletLinkingService } from './wallet-linking/wallet-linking.service';
 
 export class RequestLinkWalletCommand extends BaseCommand {
   constructor(

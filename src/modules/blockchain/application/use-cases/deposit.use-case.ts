@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseCommand, BaseQuery, type ICommandHandler, type IQueryHandler } from '@/common/cqrs';
 import type { BlockchainNetwork } from '@/common/enums';
 import type { SubmitDepositDto } from '../../dto';
-import { OnchainDepositService } from '../services/deposits/onchain-deposit.service';
+import { OnchainDepositService } from './deposits/onchain-deposit.service';
 
 export class SubmitDepositCommand extends BaseCommand {
   constructor(

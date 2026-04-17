@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseQuery, type IQueryHandler } from '@/common/cqrs';
-import { WalletLinkingService } from '../services/wallet-linking/wallet-linking.service';
+import { WalletLinkingService } from '../use-cases/wallet-linking/wallet-linking.service';
 
 export class GetLinkedWalletsRequest extends BaseQuery {
   constructor(

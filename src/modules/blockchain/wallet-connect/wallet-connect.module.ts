@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BlockchainProviderFactory } from '../blockchain-provider.factory';
-import { WalletLinkingService } from '../application/services/wallet-linking/wallet-linking.service';
+import { WalletLinkingService } from '../application/use-cases/wallet-linking/wallet-linking.service';
 import { WalletConnectController } from './wallet-connect.controller';
 import { WalletConnectService } from './wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect-session-manager.service';
@@ -8,10 +8,10 @@ import { WalletConnectSessionManager } from './wallet-connect-session-manager.se
 /**
  * WalletConnectModule
  *
- * Cung cấp WalletConnectService cho BlockchainModule.
- * Imports WalletLinkingService để tái dụng verify logic.
+ * Cung cap WalletConnectService cho BlockchainModule.
+ * Imports WalletLinkingService de tai dung verify logic.
  *
- * Pattern: Feature Module với single responsibility
+ * Pattern: Feature Module voi single responsibility
  */
 @Module({
   controllers: [WalletConnectController],
@@ -24,4 +24,3 @@ import { WalletConnectSessionManager } from './wallet-connect-session-manager.se
   exports: [WalletConnectService],
 })
 export class WalletConnectModule {}
-

@@ -1,20 +1,5 @@
-// ─── Linked Wallets ──────────────────────────────────────────────────────
-export {
-  GetLinkedWalletBalanceQuery,
-  GetLinkedWalletBalanceRequest,
-  GetLinkedWalletsQuery,
-  GetLinkedWalletsRequest,
-} from './linked-wallets.query';
-
-// ─── Utilities ───────────────────────────────────────────────────────────
-export {
-  GetDepositAddressQuery,
-  GetDepositAddressRequest,
-  GetSupportedNetworksQuery,
-  GetSupportedNetworksRequest,
-} from './utilities.query';
-
-// ─── Transactions ────────────────────────────────────────────────────────
+export { GetLinkedWalletBalanceQuery, GetLinkedWalletBalanceRequest, GetLinkedWalletsQuery, GetLinkedWalletsRequest } from './linked-wallets.query';
+export { GetDepositAddressQuery, GetDepositAddressRequest, GetSupportedNetworksQuery, GetSupportedNetworksRequest } from './utilities.query';
 export {
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalByIdRequest,

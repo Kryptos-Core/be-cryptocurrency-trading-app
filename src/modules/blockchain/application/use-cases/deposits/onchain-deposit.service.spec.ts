@@ -8,7 +8,7 @@ import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { DepositFxService } from '../../../domain/services/deposit-fx.service';
 import { ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
-import { OnchainDepositService } from './application/services/deposits/onchain-deposit.service';
+import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
 import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 
 describe('OnchainDepositService', () => {
@@ -263,4 +263,5 @@ describe('OnchainDepositService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
 
