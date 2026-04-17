@@ -1,4 +1,4 @@
-import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import type { ListTreasuryTransactionsDto } from '../../dto';
 
 /**
@@ -6,9 +6,11 @@ import type { ListTreasuryTransactionsDto } from '../../dto';
  */
 export interface TreasuryOnchainReadRepositoryPort {
   listFundSweepTransactions(filter: ListTreasuryTransactionsDto): Promise<{
-    items: OnchainTransaction[];
+    items: BlockchainOnchainTransactionRecord[];
     total: number;
     page: number;
     limit: number;
   }>;
 }
+
+

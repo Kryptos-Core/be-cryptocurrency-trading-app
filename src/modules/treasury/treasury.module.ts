@@ -13,7 +13,7 @@ const cryptoWorkerFile = isDev
   : path.resolve(__dirname, 'workers', 'crypto-account.worker.js');
 const workerExecArgv = isDev ? ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register'] : [];
 
-import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain';
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
@@ -136,3 +136,4 @@ import { TreasuryOperationsService } from './treasury-operations.service';
   ],
 })
 export class TreasuryModule {}
+

@@ -3,7 +3,7 @@ import { uuidv7 } from 'uuidv7';
 import { type BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
-import type { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
+import type { BlockchainLinkedWalletRecord } from '@/modules/blockchain/contracts';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
 import { LINKED_WALLET_REPOSITORY, type LinkedWalletRepositoryPort } from '../../../domain/ports';
@@ -111,7 +111,7 @@ export class WalletLinkingService {
     return result;
   }
 
-  async getLinkedWallet(linkId: string, userId: string): Promise<LinkedWallet> {
+  async getLinkedWallet(linkId: string, userId: string): Promise<BlockchainLinkedWalletRecord> {
     const link = await this.linkedWalletRepo.findByLinkIdAndUserId(linkId, userId);
     if (!link) {
       throw new BadRequestException('Vi lien ket khong tim thay.', 'LINK_NOT_FOUND');
@@ -138,3 +138,5 @@ export class WalletLinkingService {
     return this.linkedWalletRepo.findVerifiedByUserChainAddress(userId, chain, address.trim());
   }
 }
+
+

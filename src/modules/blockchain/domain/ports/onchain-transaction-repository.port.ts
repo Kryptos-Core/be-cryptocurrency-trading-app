@@ -1,4 +1,4 @@
-import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain/contracts';
 
 /** DTO dùng trong read-model của user (getTransactions, getTransactionById) */
 export interface OnchainTxRowDto {
@@ -49,30 +49,30 @@ export interface AdminWithdrawalFilters {
  * Domain-level abstraction for on-chain transaction persistence.
  */
 export interface OnchainTransactionRepositoryPort {
-  findByChainAndTxHash(chain: string, txHash: string): Promise<OnchainTransaction | null>;
+  findByChainAndTxHash(chain: string, txHash: string): Promise<BlockchainOnchainTransactionRecord | null>;
 
-  findByIdAndUserId(txId: string, userId: string): Promise<OnchainTransaction | null>;
+  findByIdAndUserId(txId: string, userId: string): Promise<BlockchainOnchainTransactionRecord | null>;
 
   findByUserPaginated(
     userId: string,
     filters: { type?: string; chain?: string; status?: string },
     limit: number,
     offset: number,
-  ): Promise<{ items: OnchainTransaction[]; total: number }>;
+  ): Promise<{ items: BlockchainOnchainTransactionRecord[]; total: number }>;
 
-  create(data: Partial<OnchainTransaction>): Promise<OnchainTransaction>;
+  create(data: Partial<BlockchainOnchainTransactionRecord>): Promise<BlockchainOnchainTransactionRecord>;
 
   updateStatus(txId: string, status: string, extra?: Record<string, any>): Promise<void>;
 
   updateWithTxHash(txId: string, txHash: string, status: string): Promise<void>;
 
-  findPendingWithdrawals(limit: number): Promise<OnchainTransaction[]>;
+  findPendingWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
   /** Cập nhật thông tin credit sau khi ví được nạp thành công. */
   updateCreditInfo(txId: string, creditTxId: string, creditedAt: Date): Promise<void>;
 
   /** Tìm transaction theo txId (không cần userId — dùng cho internal/admin flow). */
-  findById(txId: string): Promise<OnchainTransaction | null>;
+  findById(txId: string): Promise<BlockchainOnchainTransactionRecord | null>;
 
   /** Cập nhật thông tin quy đổi (credited_currency_id, credited_amount, conversion_rate). */
   updateCreditConversion(
@@ -92,7 +92,7 @@ export interface OnchainTransactionRepositoryPort {
   ): Promise<void>;
 
   /** Tìm pending withdrawal chưa có txHash (manual review queue). */
-  findPendingManualWithdrawals(limit: number): Promise<OnchainTransaction[]>;
+  findPendingManualWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
   // ─── Read-model queries (cho OnchainTransferQueryService) ─────────────
 
@@ -118,3 +118,9 @@ export interface OnchainTransactionRepositoryPort {
 }
 
 export const ONCHAIN_TRANSACTION_REPOSITORY = Symbol('ONCHAIN_TRANSACTION_REPOSITORY');
+
+
+
+
+
+

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from '../../dto';
 import { TreasuryOperationsService } from '../../treasury-operations.service';
@@ -22,7 +22,7 @@ export class GetTreasuryOperationQuery {
   }
 
   async listTreasuryTransactions(filter: ListTreasuryTransactionsDto): Promise<{
-    items: OnchainTransaction[];
+    items: BlockchainOnchainTransactionRecord[];
     total: number;
     page: number;
     limit: number;
@@ -30,3 +30,5 @@ export class GetTreasuryOperationQuery {
     return this.service.listTreasuryTransactions(filter);
   }
 }
+
+

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
+import { LinkedWallet } from '@/modules/blockchain';
 import type { LinkedWalletRepositoryPort } from '@/modules/blockchain/domain/ports';
 
 /**
@@ -125,3 +125,4 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     return result?.affectedRows ?? result?.[0]?.affectedRows ?? 0;
   }
 }
+

@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WalletEncryptionService } from '@/common/services';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
-import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import {
@@ -59,3 +59,4 @@ import { ManagedWalletsDataRepository } from './repositories/managed-wallets-dat
   exports: [ManagedWalletsService],
 })
 export class ManagedWalletsModule {}
+

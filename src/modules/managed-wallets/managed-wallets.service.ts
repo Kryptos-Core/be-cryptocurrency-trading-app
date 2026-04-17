@@ -15,7 +15,7 @@ import {
   NotFoundException,
 } from '@/common/exceptions';
 import { WalletEncryptionService } from '@/common/services';
-import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
@@ -138,7 +138,7 @@ export class ManagedWalletsService {
     walletId: string,
     role: UserRole,
     limit: number = 50,
-  ): Promise<OnchainTransaction[]> {
+  ): Promise<BlockchainOnchainTransactionRecord[]> {
     const wallet = await this.requireTransactionWalletForActor(userId, walletId, role);
     const { chain, address } = wallet;
 
@@ -553,3 +553,5 @@ export class ManagedWalletsService {
     return chain as SupportedManagedWalletChain;
   }
 }
+
+

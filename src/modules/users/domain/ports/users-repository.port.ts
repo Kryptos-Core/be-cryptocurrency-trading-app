@@ -1,5 +1,5 @@
 import type { UserRole } from '@/common/enums';
-import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import type { User } from '@/entities/user.entity';
 
 /**
@@ -33,7 +33,7 @@ export interface UsersRepositoryPort {
     userId: string,
     skip: number,
     limit: number,
-  ): Promise<{ items: OnchainTransaction[]; total: number }>;
+  ): Promise<{ items: BlockchainOnchainTransactionRecord[]; total: number }>;
 
   /** Create new user with optional profile fields */
   createUser(
@@ -101,3 +101,5 @@ export interface UsersRepositoryPort {
   /** Save / clear FCM device token for push notifications */
   saveFcmToken(userId: string, fcmToken: string | null): Promise<void>;
 }
+
+

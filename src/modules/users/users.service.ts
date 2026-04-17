@@ -4,7 +4,7 @@ import { CloudinaryService } from '@/common/services';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import type { User } from '@/entities/user.entity';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
@@ -66,7 +66,7 @@ export class UsersService {
     userId: string,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{ items: OnchainTransaction[]; total: number; page: number; limit: number }> {
+  ): Promise<{ items: BlockchainOnchainTransactionRecord[]; total: number; page: number; limit: number }> {
     await this.findOne(userId);
     const skip = calcSkip(page, limit);
     const { items, total } = await this.usersRepository.findOnchainTransactionsByUser(
@@ -356,3 +356,5 @@ export class UsersService {
     await this.usersRepository.saveFcmToken(userId, fcmToken);
   }
 }
+
+
