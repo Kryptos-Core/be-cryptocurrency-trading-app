@@ -1,8 +1,8 @@
 import type { DeepPartial } from 'typeorm';
 import type {
-  TreasuryMainWallet,
   TreasuryMainWalletChain,
-} from '@/entities/treasury-main-wallet.entity';
+  TreasuryMainWalletRecord,
+} from '@/modules/treasury/contracts';
 
 /**
  * Port: Treasury main wallet repository abstraction.
@@ -10,16 +10,16 @@ import type {
  */
 export interface TreasuryMainWalletRepositoryPort {
   countAll(): Promise<number>;
-  findByChainForList(chain: TreasuryMainWalletChain): Promise<TreasuryMainWallet[]>;
-  findPendingApprovalList(): Promise<TreasuryMainWallet[]>;
-  findByMainWalletId(mainWalletId: string): Promise<TreasuryMainWallet | null>;
+  findByChainForList(chain: TreasuryMainWalletChain): Promise<TreasuryMainWalletRecord[]>;
+  findPendingApprovalList(): Promise<TreasuryMainWalletRecord[]>;
+  findByMainWalletId(mainWalletId: string): Promise<TreasuryMainWalletRecord | null>;
   findByChainAndAddress(
     chain: TreasuryMainWalletChain,
     address: string,
-  ): Promise<TreasuryMainWallet | null>;
-  findActiveDefaultOnChain(chain: TreasuryMainWalletChain): Promise<TreasuryMainWallet | null>;
-  saveWallet(wallet: DeepPartial<TreasuryMainWallet>): Promise<TreasuryMainWallet>;
-  saveNew(partial: DeepPartial<TreasuryMainWallet>): Promise<TreasuryMainWallet>;
+  ): Promise<TreasuryMainWalletRecord | null>;
+  findActiveDefaultOnChain(chain: TreasuryMainWalletChain): Promise<TreasuryMainWalletRecord | null>;
+  saveWallet(wallet: DeepPartial<TreasuryMainWalletRecord>): Promise<TreasuryMainWalletRecord>;
+  saveNew(partial: DeepPartial<TreasuryMainWalletRecord>): Promise<TreasuryMainWalletRecord>;
   clearDefaultAndSetMainWallet(chain: TreasuryMainWalletChain, mainWalletId: string): Promise<void>;
   updateLabel(mainWalletId: string, label: string | null): Promise<void>;
   countActiveOthersOnChainExcluding(
@@ -28,5 +28,5 @@ export interface TreasuryMainWalletRepositoryPort {
   ): Promise<number>;
   deleteByMainWalletId(mainWalletId: string): Promise<void>;
   updateLastRotatedAt(mainWalletId: string, at: Date): Promise<void>;
-  findAllActiveDefaults(): Promise<TreasuryMainWallet[]>;
+  findAllActiveDefaults(): Promise<TreasuryMainWalletRecord[]>;
 }

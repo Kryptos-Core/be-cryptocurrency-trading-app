@@ -1,6 +1,6 @@
 import type { UserRole } from '@/common/enums';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users/contracts';
 
 /**
  * Users Repository Port — domain contract for user persistence.
@@ -8,18 +8,18 @@ import type { User } from '@/entities/user.entity';
  */
 export interface UsersRepositoryPort {
   /** Find user by ID (UUID string) */
-  findById(userId: string): Promise<User | null>;
+  findById(userId: string): Promise<UserRecord | null>;
 
   /** Find user by email (used for login) */
-  findByEmail(email: string): Promise<User | null>;
+  findByEmail(email: string): Promise<UserRecord | null>;
 
   /** Get all users with pagination (legacy, no filters) */
-  findAll(page?: number, limit?: number): Promise<{ users: User[]; total: number }>;
+  findAll(page?: number, limit?: number): Promise<{ users: UserRecord[]; total: number }>;
 
   /** Get users with search/filter/sort */
   findAllWithFilters(
     filters: any,
-  ): Promise<{ users: User[]; total: number; page: number; limit: number }>;
+  ): Promise<{ users: UserRecord[]; total: number; page: number; limit: number }>;
 
   /** Find all security change requests for a specific user (all statuses, paginated) */
   findSecurityChangesByUserId(
@@ -42,10 +42,10 @@ export interface UsersRepositoryPort {
     firstName?: string | null,
     lastName?: string | null,
     role?: UserRole,
-  ): Promise<User>;
+  ): Promise<UserRecord>;
 
   /** Create new trader user (legacy path) */
-  create(email: string, passwordHash: string): Promise<User>;
+  create(email: string, passwordHash: string): Promise<UserRecord>;
 
   /** Update user */
   update(
@@ -101,5 +101,11 @@ export interface UsersRepositoryPort {
   /** Save / clear FCM device token for push notifications */
   saveFcmToken(userId: string, fcmToken: string | null): Promise<void>;
 }
+
+
+
+
+
+
 
 

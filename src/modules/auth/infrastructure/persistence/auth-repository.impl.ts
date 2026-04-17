@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-result.util';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import type { AuthRepositoryPort } from '@/modules/auth/domain/ports';
 
 /**
@@ -13,12 +13,12 @@ import type { AuthRepositoryPort } from '@/modules/auth/domain/ports';
 export class AuthRepositoryImpl implements AuthRepositoryPort {
   constructor(private readonly dataSource: DataSource) {}
 
-  async findByLinkedWallet(chain: string, address: string): Promise<User | null> {
+  async findByLinkedWallet(chain: string, address: string): Promise<UserRecord | null> {
     const result = await this.dataSource.query(
       `CALL ${USER_STORE_PROCEDURE.FIND_BY_LINKED_WALLET}(?, ?)`,
       [chain, address],
     );
-    return spFirstRow<User>(result);
+    return spFirstRow<UserRecord>(result);
   }
 
   async createWalletOnlyUser(
@@ -27,7 +27,7 @@ export class AuthRepositoryImpl implements AuthRepositoryPort {
     passwordHash: string,
     chain: string,
     address: string,
-  ): Promise<User> {
+  ): Promise<UserRecord> {
     await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE_WALLET_ONLY}(?, ?, ?, ?, ?)`, [
       userId,
       email,
@@ -38,7 +38,7 @@ export class AuthRepositoryImpl implements AuthRepositoryPort {
     const userResult = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
       userId,
     ]);
-    const createdUser = spFirstRow<User>(userResult);
+    const createdUser = spFirstRow<UserRecord>(userResult);
     if (!createdUser) {
       throw new Error(`Created wallet-only user ${userId} was not found`);
     }
@@ -60,3 +60,4 @@ export class AuthRepositoryImpl implements AuthRepositoryPort {
     return Number(spFirstValue<number>(result, 'affected') ?? 0);
   }
 }
+

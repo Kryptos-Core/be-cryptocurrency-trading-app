@@ -1,6 +1,5 @@
 import type { QueryDeepPartialEntity } from 'typeorm';
-import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
-import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
+import type { TreasuryMainWalletChain, TreasuryOperationRecord } from '@/modules/treasury/contracts';
 import type { ListTreasuryOperationsDto } from '../../dto';
 
 /**
@@ -14,28 +13,35 @@ export interface TreasuryOperationRepositoryPort {
     toWalletId: string | null;
     amount: string;
     actorUserId: string;
-  }): Promise<TreasuryOperation>;
+  }): Promise<TreasuryOperationRecord>;
 
-  findByOperationIdWithWallets(operationId: string): Promise<TreasuryOperation | null>;
-  findByOperationId(operationId: string): Promise<TreasuryOperation | null>;
+  findByOperationIdWithWallets(operationId: string): Promise<TreasuryOperationRecord | null>;
+  findByOperationId(operationId: string): Promise<TreasuryOperationRecord | null>;
   countNonTerminalForWallet(walletId: string): Promise<number>;
   updateByOperationId(
     operationId: string,
-    partial: QueryDeepPartialEntity<TreasuryOperation>,
+    partial: QueryDeepPartialEntity<TreasuryOperationRecord>,
   ): Promise<void>;
 
   listWithFilters(filter: ListTreasuryOperationsDto): Promise<{
-    items: TreasuryOperation[];
+    items: TreasuryOperationRecord[];
     total: number;
     page: number;
     limit: number;
   }>;
 
   finalizeSuccessWithOnchainTx(params: {
-    operation: TreasuryOperation;
+    operation: TreasuryOperationRecord;
     fromAddress: string;
     toAddress: string;
     txHash: string;
     amount: string;
   }): Promise<void>;
 }
+
+
+
+
+
+
+

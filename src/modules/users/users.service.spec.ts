@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { WalletsService } from '@/modules/wallets/wallets.service';
@@ -11,16 +11,16 @@ import type {
   ReviewSecurityChangeDto,
   UpdateMyProfileBasicDto,
 } from './dto';
-import { UsersRepository } from './infrastructure/persistence';
-import { UsersService } from './users.service';
+import { UserRecordsRepository } from './infrastructure/persistence';
+import { UserRecordsService } from './users.service';
 
-describe('UsersService', () => {
-  let service: UsersService;
-  let usersRepository: jest.Mocked<UsersRepository>;
+describe('UserRecordsService', () => {
+  let service: UserRecordsService;
+  let usersRepository: jest.Mocked<UserRecordsRepository>;
   let cloudinaryService: jest.Mocked<CloudinaryService>;
   let twoFaService: jest.Mocked<TwoFaService>;
 
-  const mockUser: User = {
+  const mockUserRecord: UserRecord = {
     user_id: 'user-1',
     email: 'u@test.com',
     password_hash: 'hash',
@@ -32,7 +32,7 @@ describe('UsersService', () => {
     avatar_public_id: null,
     two_fa_enabled: 1,
     created_at: new Date(),
-  } as User;
+  } as UserRecord;
 
   beforeEach(async () => {
     const mockRepo = {
@@ -57,8 +57,8 @@ describe('UsersService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UsersService,
-        { provide: UsersRepository, useValue: mockRepo },
+        UserRecordsService,
+        { provide: UserRecordsRepository, useValue: mockRepo },
         { provide: USERS_REPOSITORY, useValue: mockRepo },
         { provide: CloudinaryService, useValue: mockCloudinary },
         { provide: TwoFaService, useValue: mockTwoFa },
@@ -67,12 +67,12 @@ describe('UsersService', () => {
       ],
     }).compile();
 
-    service = module.get(UsersService);
-    usersRepository = module.get(UsersRepository);
+    service = module.get(UserRecordsService);
+    usersRepository = module.get(UserRecordsRepository);
     cloudinaryService = module.get(CloudinaryService);
     twoFaService = module.get(TwoFaService);
 
-    (usersRepository.findById as jest.Mock).mockResolvedValue(mockUser);
+    (usersRepository.findById as jest.Mock).mockResolvedValue(mockUserRecord);
   });
 
   describe('updateProfileBasic', () => {
@@ -81,7 +81,7 @@ describe('UsersService', () => {
       const dto: UpdateMyProfileBasicDto = { firstName: 'Jane', lastName: 'Smith' };
       const result = await service.updateProfileBasic('user-1', dto);
       expect(usersRepository.updateProfileBasic).toHaveBeenCalledWith('user-1', 'Jane', 'Smith');
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(mockUserRecord);
     });
   });
 
@@ -107,7 +107,7 @@ describe('UsersService', () => {
 
     it('should reject EMAIL_CHANGE for wallet placeholder email (use contact-email OTP flow)', async () => {
       (usersRepository.findById as jest.Mock).mockResolvedValueOnce({
-        ...mockUser,
+        ...mockUserRecord,
         email: 'abcd1234@eth_sepolia.wallet',
         two_fa_enabled: 0,
       });
@@ -157,7 +157,7 @@ describe('UsersService', () => {
 
     it('should reject if 2FA not enabled', async () => {
       (usersRepository.findById as jest.Mock).mockResolvedValueOnce({
-        ...mockUser,
+        ...mockUserRecord,
         two_fa_enabled: 0,
       });
       const dto: RequestSecurityChangeDto = {
@@ -228,7 +228,7 @@ describe('UsersService', () => {
       const result = await service.uploadAvatar('user-1', buffer);
       expect(cloudinaryService.upload).toHaveBeenCalledWith(buffer, expect.any(String));
       expect(usersRepository.updateAvatar).toHaveBeenCalled();
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(mockUserRecord);
     });
 
     it('should throw when Cloudinary is not configured', async () => {
@@ -239,3 +239,6 @@ describe('UsersService', () => {
     });
   });
 });
+
+
+

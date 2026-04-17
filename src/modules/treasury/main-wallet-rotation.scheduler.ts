@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
-import type { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
+import type { TreasuryMainWalletRecord } from '@/modules/treasury';
 import {
   TREASURY_MAIN_WALLET_EVENTS_CHANNEL,
   TreasuryMainWalletService,
@@ -77,7 +77,7 @@ export class MainWalletRotationScheduler {
       `[RotationScheduler] Running rotation check (globalIntervalDays=${globalIntervalDays})`,
     );
 
-    let dueMallets: TreasuryMainWallet[];
+    let dueMallets: TreasuryMainWalletRecord[];
     try {
       dueMallets =
         await this.treasuryMainWalletService.getWalletsDueForRotation(globalIntervalDays);
@@ -138,3 +138,6 @@ export class MainWalletRotationScheduler {
     return this.DEFAULT_ROTATION_DAYS;
   }
 }
+
+
+

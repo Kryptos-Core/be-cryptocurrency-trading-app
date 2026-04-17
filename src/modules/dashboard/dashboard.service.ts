@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services';
-import type { MarketPair } from '@/entities/market-pair.entity';
+import type { MarketPairRecord } from '@/modules/markets';
 import { MarketsService } from '@/modules/markets/markets.service';
 import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
 import type {
@@ -121,7 +121,7 @@ export class DashboardService {
    * Prioritises stablecoin-quoted pairs (USDT → USDC → FDUSD → BUSD) as they carry
    * the most trading volume; falls back to all active pairs when fewer than needed.
    */
-  private selectCandidates(pairs: MarketPair[]): MarketPair[] {
+  private selectCandidates(pairs: MarketPairRecord[]): MarketPairRecord[] {
     const stablePairs = pairs.filter((p) =>
       STABLE_QUOTE_SUFFIXES.some((suffix) => p.symbol.endsWith(suffix)),
     );
@@ -197,3 +197,6 @@ export class DashboardService {
     );
   }
 }
+
+
+

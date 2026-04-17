@@ -1,4 +1,4 @@
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 
 /**
  * Auth Repository Port — domain contract for authentication persistence.
@@ -6,7 +6,7 @@ import type { User } from '@/entities/user.entity';
  */
 export interface AuthRepositoryPort {
   /** Find user by linked wallet (chain + address) */
-  findByLinkedWallet(chain: string, address: string): Promise<User | null>;
+  findByLinkedWallet(chain: string, address: string): Promise<UserRecord | null>;
 
   /** Create wallet-only user and link wallet in one transaction */
   createWalletOnlyUser(
@@ -15,7 +15,7 @@ export interface AuthRepositoryPort {
     passwordHash: string,
     chain: string,
     address: string,
-  ): Promise<User>;
+  ): Promise<UserRecord>;
 
   /** Update user password (direct change, no approval) */
   updatePassword(userId: string, passwordHash: string): Promise<void>;
@@ -23,3 +23,6 @@ export interface AuthRepositoryPort {
   /** Enable/disable 2FA for user */
   setTwoFaEnabled(userId: string, enabled: boolean): Promise<number>;
 }
+
+
+

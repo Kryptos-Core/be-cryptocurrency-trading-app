@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import type { MarketPair } from '@/entities/market-pair.entity';
+import type { MarketPairRecord } from '@/modules/markets';
 import type { MarketTickerDto } from '../../dto';
 import { MarketsService } from '../../markets.service';
 
 /**
- * GetMarketPairQuery — read-only query for market pair data.
+ * GetMarketPairQuery - read-only query for market pair data.
  * Delegates to MarketsService; use this from controllers instead of calling the service directly.
  */
 @Injectable()
@@ -24,7 +24,7 @@ export class GetMarketPairQuery {
     sortOrder?: string | null;
     fuzzySearch?: boolean;
   }): Promise<{
-    pairs: MarketPair[];
+    pairs: MarketPairRecord[];
     total: number;
     page: number;
     limit: number;
@@ -45,15 +45,15 @@ export class GetMarketPairQuery {
     );
   }
 
-  async findOne(pairId: string): Promise<MarketPair> {
+  async findOne(pairId: string): Promise<MarketPairRecord> {
     return this.marketsService.findOne(pairId);
   }
 
-  async findBySymbol(symbol: string): Promise<MarketPair> {
+  async findBySymbol(symbol: string): Promise<MarketPairRecord> {
     return this.marketsService.findBySymbol(symbol);
   }
 
-  async findActive(): Promise<MarketPair[]> {
+  async findActive(): Promise<MarketPairRecord[]> {
     return this.marketsService.findActive();
   }
 }

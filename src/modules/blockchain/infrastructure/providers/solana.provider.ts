@@ -13,7 +13,7 @@ import {
 import bs58 from 'bs58';
 import * as nacl from 'tweetnacl';
 import { BlockchainNetwork } from '@/common/enums';
-import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
+import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
@@ -217,4 +217,5 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
     return hotWallet.publicKey.toBase58();
   }
 }
+
 

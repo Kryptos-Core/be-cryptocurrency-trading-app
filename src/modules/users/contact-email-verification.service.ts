@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 
 /**
@@ -85,7 +85,7 @@ export class ContactEmailVerificationService {
     return { expiresIn: this.otpTtlSeconds };
   }
 
-  async verifyAndUpdateEmail(userId: string, newEmailRaw: string, otpCode: string): Promise<User> {
+  async verifyAndUpdateEmail(userId: string, newEmailRaw: string, otpCode: string): Promise<UserRecord> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
@@ -130,3 +130,5 @@ export class ContactEmailVerificationService {
     return updated;
   }
 }
+
+

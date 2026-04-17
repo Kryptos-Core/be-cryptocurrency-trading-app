@@ -27,7 +27,7 @@ import {
 } from '@/common/exceptions';
 import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
 import { WorkerPoolService } from '@/common/worker-pool/worker-pool.service';
-import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { TransactionWalletRecord } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   TREASURY_MAIN_WALLET_REPOSITORY,
@@ -75,7 +75,7 @@ export interface TreasuryOnChainBalances {
 }
 
 export interface TreasuryWalletWithBalance
-  extends Omit<TransactionWallet, 'encrypted_private_key'> {
+  extends Omit<TransactionWalletRecord, 'encrypted_private_key'> {
   balance: string;
   symbol: string;
   usdtTrc20Balance?: string;
@@ -87,7 +87,7 @@ export class TransactionWalletService {
 
   constructor(
     @Inject(TREASURY_TRANSACTION_WALLET_REPOSITORY)
-    private readonly treasuryTransactionWalletRepository: TreasuryTransactionWalletRepositoryPort,
+    private readonly treasuryTransactionWalletRecordRepository: TreasuryTransactionWalletRepositoryPort,
     @Inject(TREASURY_OPERATION_REPOSITORY)
     private readonly treasuryOperationRepository: TreasuryOperationRepositoryPort,
     @Inject(TREASURY_MAIN_WALLET_REPOSITORY)
@@ -100,12 +100,12 @@ export class TransactionWalletService {
     private readonly workerPool: WorkerPoolService,
   ) { }
 
-  async createWallet(dto: CreateTransactionWalletDto): Promise<TransactionWallet> {
+  async createWallet(dto: CreateTransactionWalletDto): Promise<TransactionWalletRecord> {
     const chain = this.assertSupportedChain(dto.chain);
     const account = await this.generateAccount(chain);
 
     try {
-      const created = await this.treasuryTransactionWalletRepository.createAndSave({
+      const created = await this.treasuryTransactionWalletRecordRepository.createAndSave({
         wallet_id: uuidv7(),
         chain,
         address: account.address,
@@ -140,11 +140,11 @@ export class TransactionWalletService {
     const wallets = await this.cacheService.getOrSet(
       cacheKey,
       async () => {
-        const where: FindOptionsWhere<TransactionWallet> = {};
+        const where: FindOptionsWhere<TransactionWalletRecord> = {};
         if (filter.chain) where.chain = filter.chain;
         if (filter.purpose) where.purpose = filter.purpose;
 
-        return this.treasuryTransactionWalletRepository.findManyOrdered(where);
+        return this.treasuryTransactionWalletRecordRepository.findManyOrdered(where);
       },
       LIST_CACHE_TTL_SECONDS,
     );
@@ -245,8 +245,8 @@ export class TransactionWalletService {
     );
   }
 
-  async getWalletById(walletId: string): Promise<TransactionWallet> {
-    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
+  async getWalletById(walletId: string): Promise<TransactionWalletRecord> {
+    const wallet = await this.treasuryTransactionWalletRecordRepository.findByWalletId(walletId);
 
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
@@ -257,7 +257,7 @@ export class TransactionWalletService {
 
   async getWalletDetail(
     walletId: string,
-  ): Promise<TransactionWallet & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
+  ): Promise<TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
     const wallet = await this.getWalletById(walletId);
     const b = await this.getBalanceByAddress(wallet.chain, wallet.address);
 
@@ -377,25 +377,25 @@ export class TransactionWalletService {
     return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
   }
 
-  decryptWalletPrivateKey(wallet: TransactionWallet): string {
+  decryptWalletPrivateKey(wallet: TransactionWalletRecord): string {
     return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
   }
 
   /**
    * Wallets that may receive user deposits (shown on deposit config UI): Tron mainnet, DEPOSIT or BOTH.
    */
-  async listWalletsForDepositConfiguration(): Promise<TransactionWallet[]> {
-    return this.treasuryTransactionWalletRepository.findForDepositConfiguration();
+  async listWalletsForDepositConfiguration(): Promise<TransactionWalletRecord[]> {
+    return this.treasuryTransactionWalletRecordRepository.findForDepositConfiguration();
   }
 
   async getDefaultUserDepositWallet(
     chain: BlockchainChainDbValue,
-  ): Promise<TransactionWallet | null> {
-    return this.treasuryTransactionWalletRepository.findDefaultUserDepositWallet(chain);
+  ): Promise<TransactionWalletRecord | null> {
+    return this.treasuryTransactionWalletRecordRepository.findDefaultUserDepositWallet(chain);
   }
 
-  async setDefaultUserDeposit(walletId: string): Promise<TransactionWallet> {
-    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
+  async setDefaultUserDeposit(walletId: string): Promise<TransactionWalletRecord> {
+    const wallet = await this.treasuryTransactionWalletRecordRepository.findByWalletId(walletId);
 
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
@@ -417,7 +417,7 @@ export class TransactionWalletService {
     }
 
     const updated =
-      await this.treasuryTransactionWalletRepository.setDefaultUserDepositInTransaction(wallet);
+      await this.treasuryTransactionWalletRecordRepository.setDefaultUserDepositInTransaction(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
     return updated;
   }
@@ -426,8 +426,8 @@ export class TransactionWalletService {
    * Clears the user-facing default deposit flag for this wallet. Chain may temporarily
    * have no default until another wallet is set (deposit UI falls back to main hot wallet).
    */
-  async unsetDefaultUserDeposit(walletId: string): Promise<TransactionWallet> {
-    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
+  async unsetDefaultUserDeposit(walletId: string): Promise<TransactionWalletRecord> {
+    const wallet = await this.treasuryTransactionWalletRecordRepository.findByWalletId(walletId);
 
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
@@ -450,13 +450,13 @@ export class TransactionWalletService {
 
     wallet.is_default_user_deposit = false;
     wallet.default_set_at = null;
-    const saved = await this.treasuryTransactionWalletRepository.save(wallet);
+    const saved = await this.treasuryTransactionWalletRecordRepository.save(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
     return saved;
   }
 
   async deactivateWallet(walletId: string): Promise<void> {
-    const wallet = await this.treasuryTransactionWalletRepository.findByWalletId(walletId);
+    const wallet = await this.treasuryTransactionWalletRecordRepository.findByWalletId(walletId);
     if (!wallet) {
       throw new NotFoundException('Transaction wallet', walletId);
     }
@@ -467,7 +467,7 @@ export class TransactionWalletService {
       );
     }
     wallet.is_active = false;
-    await this.treasuryTransactionWalletRepository.save(wallet);
+    await this.treasuryTransactionWalletRecordRepository.save(wallet);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
   }
 
@@ -505,7 +505,7 @@ export class TransactionWalletService {
         'TX_WALLET_USDT_NON_ZERO',
       );
     }
-    await this.treasuryTransactionWalletRepository.deleteByWalletId(walletId);
+    await this.treasuryTransactionWalletRecordRepository.deleteByWalletId(walletId);
     await this.invalidateBalanceCache(wallet.chain, wallet.address);
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
     this.logger.log(
@@ -537,11 +537,11 @@ export class TransactionWalletService {
    * Prefers purpose WITHDRAWAL over BOTH; then newest by created_at.
    * Returns null for chains without transaction_wallets (e.g. Solana) or when none configured.
    */
-  async getWithdrawalSourceWallet(chain: string): Promise<TransactionWallet | null> {
+  async getWithdrawalSourceWallet(chain: string): Promise<TransactionWalletRecord | null> {
     if (!this.isTreasuryChain(chain)) {
       return null;
     }
-    const wallets = await this.treasuryTransactionWalletRepository.findActiveWithdrawalCandidates(
+    const wallets = await this.treasuryTransactionWalletRecordRepository.findActiveWithdrawalCandidates(
       chain as SupportedTreasuryChain,
     );
     if (!wallets.length) {
@@ -562,7 +562,7 @@ export class TransactionWalletService {
    * Send native coin (TRX / ETH) from a transaction wallet to a user destination.
    */
   async sendWithdrawalNativeTransfer(
-    wallet: TransactionWallet,
+    wallet: TransactionWalletRecord,
     toAddress: string,
     amount: string,
   ): Promise<string> {
@@ -706,3 +706,6 @@ export class TransactionWalletService {
     }
   }
 }
+
+
+

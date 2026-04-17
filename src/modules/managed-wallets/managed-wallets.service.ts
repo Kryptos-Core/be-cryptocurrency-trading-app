@@ -16,7 +16,7 @@ import {
 } from '@/common/exceptions';
 import { WalletEncryptionService } from '@/common/services';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { TransactionWalletRecord } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
@@ -366,7 +366,7 @@ export class ManagedWalletsService {
     _userId: string,
     walletId: string,
     role: UserRole,
-  ): Promise<TransactionWallet> {
+  ): Promise<TransactionWalletRecord> {
     if (
       role !== UserRole.ADMIN &&
       role !== UserRole.RISK_OFFICER &&
@@ -381,7 +381,7 @@ export class ManagedWalletsService {
     return wallet;
   }
 
-  private mapTransactionWallet(wallet: TransactionWallet): ManagedWalletResponseDto {
+  private mapTransactionWallet(wallet: TransactionWalletRecord): ManagedWalletResponseDto {
     return {
       walletId: wallet.wallet_id,
       userId: '',
@@ -553,5 +553,8 @@ export class ManagedWalletsService {
     return chain as SupportedManagedWalletChain;
   }
 }
+
+
+
 
 

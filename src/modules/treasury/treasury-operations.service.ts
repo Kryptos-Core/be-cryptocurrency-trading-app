@@ -19,8 +19,7 @@ import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-de
 import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
 import { RedisService } from '@/common/services';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
-import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
+import type { TransactionWalletRecord, TreasuryOperationRecord } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   TREASURY_EVENTS_CHANNEL,
@@ -42,7 +41,7 @@ import {
   TreasuryMainWalletService,
 } from './treasury-main-wallet.service';
 
-type TreasuryOperationType = 'SWEEP' | 'FUND';
+type TreasuryOperationRecordType = 'SWEEP' | 'FUND';
 
 interface TreasuryJobData {
   operationId: string;
@@ -233,7 +232,7 @@ export class TreasuryOperationsService {
   }
 
   async listOperations(filter: ListTreasuryOperationsDto): Promise<{
-    items: TreasuryOperation[];
+    items: TreasuryOperationRecord[];
     total: number;
     page: number;
     limit: number;
@@ -241,7 +240,7 @@ export class TreasuryOperationsService {
     return this.treasuryOperationRepository.listWithFilters(filter);
   }
 
-  async getOperation(operationId: string): Promise<TreasuryOperation> {
+  async getOperation(operationId: string): Promise<TreasuryOperationRecord> {
     const operation =
       await this.treasuryOperationRepository.findByOperationIdWithWallets(operationId);
 
@@ -262,20 +261,20 @@ export class TreasuryOperationsService {
   }
 
   private async createOperation(params: {
-    type: TreasuryOperationType;
+    type: TreasuryOperationRecordType;
     chain: SupportedTreasuryChain;
     fromWalletId: string | null;
     toWalletId: string | null;
     amount: string;
     actorUserId: string;
-  }): Promise<TreasuryOperation> {
+  }): Promise<TreasuryOperationRecord> {
     return this.treasuryOperationRepository.createPendingOperation(params);
   }
 
   private async getOperationForProcessing(
     operationId: string,
-    expectedType: TreasuryOperationType,
-  ): Promise<TreasuryOperation> {
+    expectedType: TreasuryOperationRecordType,
+  ): Promise<TreasuryOperationRecord> {
     const operation = await this.treasuryOperationRepository.findByOperationId(operationId);
 
     if (!operation) {
@@ -307,7 +306,7 @@ export class TreasuryOperationsService {
   }
 
   private async finalizeSuccess(
-    operation: TreasuryOperation,
+    operation: TreasuryOperationRecord,
     fromAddress: string,
     toAddress: string,
     txHash: string,
@@ -329,7 +328,7 @@ export class TreasuryOperationsService {
   }
 
   private async sendSweepFromWallet(
-    wallet: TransactionWallet,
+    wallet: TransactionWalletRecord,
     mainAddress: string,
   ): Promise<{ txHash: string; amount: string }> {
     const privateKey = this.transactionWalletService.decryptWalletPrivateKey(wallet);
@@ -557,5 +556,10 @@ export class TreasuryOperationsService {
     }
   }
 }
+
+
+
+
+
 
 

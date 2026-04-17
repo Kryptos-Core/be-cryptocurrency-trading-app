@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
-import type { MarketPair } from '@/entities/market-pair.entity';
+import type { MarketPairRecord } from '@/modules/markets';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
 import {
   type DepthSnapshot,
@@ -78,7 +78,7 @@ export class MarketsService implements OnModuleInit {
     sortOrder?: string | null,
     fuzzySearch: boolean = false,
   ): Promise<{
-    pairs: MarketPair[];
+    pairs: MarketPairRecord[];
     total: number;
     page: number;
     limit: number;
@@ -174,7 +174,7 @@ export class MarketsService implements OnModuleInit {
    * Find market pair by ID
    * Cache-Aside Pattern: Cache individual pair
    */
-  async findOne(pairId: string): Promise<MarketPair> {
+  async findOne(pairId: string): Promise<MarketPairRecord> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}id:${pairId}`;
 
     const pair = await this.cacheService.getOrSet(
@@ -185,7 +185,7 @@ export class MarketsService implements OnModuleInit {
           relations: ['base_currency', 'quote_currency'],
         });
         if (!found) {
-          throw new NotFoundException('MarketPair', pairId);
+          throw new NotFoundException('MarketPairRecord', pairId);
         }
         return found;
       },
@@ -199,7 +199,7 @@ export class MarketsService implements OnModuleInit {
    * Find market pair by symbol
    * Cache-Aside Pattern: Cache by symbol
    */
-  async findBySymbol(symbol: string): Promise<MarketPair> {
+  async findBySymbol(symbol: string): Promise<MarketPairRecord> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}symbol:${symbol.toUpperCase()}`;
 
     const pair = await this.cacheService.getOrSet(
@@ -207,7 +207,7 @@ export class MarketsService implements OnModuleInit {
       async () => {
         const found = await this.marketRepository.findBySymbol(symbol);
         if (!found) {
-          throw new NotFoundException('MarketPair', symbol);
+          throw new NotFoundException('MarketPairRecord', symbol);
         }
         return found;
       },
@@ -222,7 +222,7 @@ export class MarketsService implements OnModuleInit {
    * Cache-Aside Pattern: Cache active list.
    * If cache returned empty [], invalidate and re-fetch once (avoid stale empty after sync).
    */
-  async findActive(): Promise<MarketPair[]> {
+  async findActive(): Promise<MarketPairRecord[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}active`;
 
     const cached = await this.cacheService.getOrSet(
@@ -248,10 +248,10 @@ export class MarketsService implements OnModuleInit {
    * Create new market pair
    * Business Logic: Validate currencies, generate symbol, check conflicts
    */
-  async create(createMarketPairDto: CreateMarketPairDto): Promise<MarketPair> {
+  async create(createMarketPairRecordDto: CreateMarketPairDto): Promise<MarketPairRecord> {
     // Validate base currency exists and is tradable
     const baseCurrency = await this.currenciesService.findOne(
-      String(createMarketPairDto.baseCurrencyId),
+      String(createMarketPairRecordDto.baseCurrencyId),
     );
     if (!baseCurrency.is_tradable || !baseCurrency.is_active) {
       throw new BadRequestException(
@@ -261,7 +261,7 @@ export class MarketsService implements OnModuleInit {
 
     // Validate quote currency exists and is tradable
     const quoteCurrency = await this.currenciesService.findOne(
-      String(createMarketPairDto.quoteCurrencyId),
+      String(createMarketPairRecordDto.quoteCurrencyId),
     );
     if (!quoteCurrency.is_tradable || !quoteCurrency.is_active) {
       throw new BadRequestException(
@@ -270,14 +270,14 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Check if base and quote are the same
-    if (createMarketPairDto.baseCurrencyId === createMarketPairDto.quoteCurrencyId) {
+    if (createMarketPairRecordDto.baseCurrencyId === createMarketPairRecordDto.quoteCurrencyId) {
       throw new BadRequestException('Base and quote currencies cannot be the same');
     }
 
     // Check if pair already exists
     const pairExists = await this.marketRepository.pairExists(
-      String(createMarketPairDto.baseCurrencyId),
-      String(createMarketPairDto.quoteCurrencyId),
+      String(createMarketPairRecordDto.baseCurrencyId),
+      String(createMarketPairRecordDto.quoteCurrencyId),
     );
     if (pairExists) {
       throw new ConflictException(
@@ -287,7 +287,7 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Generate symbol if not provided
-    const symbol = createMarketPairDto.symbol || `${baseCurrency.symbol}/${quoteCurrency.symbol}`;
+    const symbol = createMarketPairRecordDto.symbol || `${baseCurrency.symbol}/${quoteCurrency.symbol}`;
 
     // Check if symbol already exists
     const symbolExists = await this.marketRepository.symbolExists(symbol);
@@ -300,15 +300,15 @@ export class MarketsService implements OnModuleInit {
 
     // Create market pair
     const pair = await this.marketRepository.create({
-      base_currency_id: String(createMarketPairDto.baseCurrencyId),
-      quote_currency_id: String(createMarketPairDto.quoteCurrencyId),
+      base_currency_id: String(createMarketPairRecordDto.baseCurrencyId),
+      quote_currency_id: String(createMarketPairRecordDto.quoteCurrencyId),
       symbol: symbol.toUpperCase(),
-      price_scale: createMarketPairDto.priceScale ?? 2,
-      amount_scale: createMarketPairDto.amountScale ?? 6,
-      min_order_amount: createMarketPairDto.minOrderAmount ?? '0.0001',
-      maker_fee_rate: (createMarketPairDto.makerFeeRate ?? 0.001).toString(),
-      taker_fee_rate: (createMarketPairDto.takerFeeRate ?? 0.001).toString(),
-      is_active: createMarketPairDto.isActive ?? true,
+      price_scale: createMarketPairRecordDto.priceScale ?? 2,
+      amount_scale: createMarketPairRecordDto.amountScale ?? 6,
+      min_order_amount: createMarketPairRecordDto.minOrderAmount ?? '0.0001',
+      maker_fee_rate: (createMarketPairRecordDto.makerFeeRate ?? 0.001).toString(),
+      taker_fee_rate: (createMarketPairRecordDto.takerFeeRate ?? 0.001).toString(),
+      is_active: createMarketPairRecordDto.isActive ?? true,
     });
 
     // Invalidate cache
@@ -323,14 +323,14 @@ export class MarketsService implements OnModuleInit {
    * Update market pair
    * Business Logic: Validate updates, check conflicts
    */
-  async update(pairId: string, updateMarketPairDto: UpdateMarketPairDto): Promise<MarketPair> {
+  async update(pairId: string, updateMarketPairRecordDto: UpdateMarketPairDto): Promise<MarketPairRecord> {
     // Verify pair exists
     const pair = await this.findOne(pairId);
 
     // Validate base currency if being updated
-    if (updateMarketPairDto.baseCurrencyId) {
+    if (updateMarketPairRecordDto.baseCurrencyId) {
       const baseCurrency = await this.currenciesService.findOne(
-        String(updateMarketPairDto.baseCurrencyId),
+        String(updateMarketPairRecordDto.baseCurrencyId),
       );
       if (!baseCurrency.is_tradable || !baseCurrency.is_active) {
         throw new BadRequestException(
@@ -340,9 +340,9 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Validate quote currency if being updated
-    if (updateMarketPairDto.quoteCurrencyId) {
+    if (updateMarketPairRecordDto.quoteCurrencyId) {
       const quoteCurrency = await this.currenciesService.findOne(
-        String(updateMarketPairDto.quoteCurrencyId),
+        String(updateMarketPairRecordDto.quoteCurrencyId),
       );
       if (!quoteCurrency.is_tradable || !quoteCurrency.is_active) {
         throw new BadRequestException(
@@ -353,12 +353,12 @@ export class MarketsService implements OnModuleInit {
 
     // Check if new pair combination conflicts
     const newBaseId =
-      updateMarketPairDto.baseCurrencyId != null
-        ? String(updateMarketPairDto.baseCurrencyId)
+      updateMarketPairRecordDto.baseCurrencyId != null
+        ? String(updateMarketPairRecordDto.baseCurrencyId)
         : pair.base_currency_id;
     const newQuoteId =
-      updateMarketPairDto.quoteCurrencyId != null
-        ? String(updateMarketPairDto.quoteCurrencyId)
+      updateMarketPairRecordDto.quoteCurrencyId != null
+        ? String(updateMarketPairRecordDto.quoteCurrencyId)
         : pair.quote_currency_id;
 
     if (newBaseId === newQuoteId) {
@@ -376,38 +376,38 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Check if new symbol conflicts
-    if (updateMarketPairDto.symbol && updateMarketPairDto.symbol !== pair.symbol) {
+    if (updateMarketPairRecordDto.symbol && updateMarketPairRecordDto.symbol !== pair.symbol) {
       const symbolExists = await this.marketRepository.symbolExists(
-        updateMarketPairDto.symbol,
+        updateMarketPairRecordDto.symbol,
         pairId,
       );
       if (symbolExists) {
         throw new ConflictException(
-          `Market pair symbol ${updateMarketPairDto.symbol} already exists`,
+          `Market pair symbol ${updateMarketPairRecordDto.symbol} already exists`,
           'MARKET_PAIR_SYMBOL_EXISTS',
         );
       }
     }
 
     // Update pair
-    const updateData: Partial<MarketPair> = {};
-    if (updateMarketPairDto.baseCurrencyId !== undefined)
-      updateData.base_currency_id = String(updateMarketPairDto.baseCurrencyId);
-    if (updateMarketPairDto.quoteCurrencyId !== undefined)
-      updateData.quote_currency_id = String(updateMarketPairDto.quoteCurrencyId);
-    if (updateMarketPairDto.symbol !== undefined) updateData.symbol = updateMarketPairDto.symbol;
-    if (updateMarketPairDto.priceScale !== undefined)
-      updateData.price_scale = updateMarketPairDto.priceScale;
-    if (updateMarketPairDto.amountScale !== undefined)
-      updateData.amount_scale = updateMarketPairDto.amountScale;
-    if (updateMarketPairDto.minOrderAmount !== undefined)
-      updateData.min_order_amount = updateMarketPairDto.minOrderAmount;
-    if (updateMarketPairDto.makerFeeRate !== undefined)
-      updateData.maker_fee_rate = updateMarketPairDto.makerFeeRate.toString();
-    if (updateMarketPairDto.takerFeeRate !== undefined)
-      updateData.taker_fee_rate = updateMarketPairDto.takerFeeRate.toString();
-    if (updateMarketPairDto.isActive !== undefined)
-      updateData.is_active = updateMarketPairDto.isActive;
+    const updateData: Partial<MarketPairRecord> = {};
+    if (updateMarketPairRecordDto.baseCurrencyId !== undefined)
+      updateData.base_currency_id = String(updateMarketPairRecordDto.baseCurrencyId);
+    if (updateMarketPairRecordDto.quoteCurrencyId !== undefined)
+      updateData.quote_currency_id = String(updateMarketPairRecordDto.quoteCurrencyId);
+    if (updateMarketPairRecordDto.symbol !== undefined) updateData.symbol = updateMarketPairRecordDto.symbol;
+    if (updateMarketPairRecordDto.priceScale !== undefined)
+      updateData.price_scale = updateMarketPairRecordDto.priceScale;
+    if (updateMarketPairRecordDto.amountScale !== undefined)
+      updateData.amount_scale = updateMarketPairRecordDto.amountScale;
+    if (updateMarketPairRecordDto.minOrderAmount !== undefined)
+      updateData.min_order_amount = updateMarketPairRecordDto.minOrderAmount;
+    if (updateMarketPairRecordDto.makerFeeRate !== undefined)
+      updateData.maker_fee_rate = updateMarketPairRecordDto.makerFeeRate.toString();
+    if (updateMarketPairRecordDto.takerFeeRate !== undefined)
+      updateData.taker_fee_rate = updateMarketPairRecordDto.takerFeeRate.toString();
+    if (updateMarketPairRecordDto.isActive !== undefined)
+      updateData.is_active = updateMarketPairRecordDto.isActive;
 
     const updated = await this.marketRepository.update(pairId, updateData);
 
@@ -538,7 +538,7 @@ export class MarketsService implements OnModuleInit {
     return last;
   }
 
-  private buildTickerResponse(pair: MarketPair, tickerData: IMarketTickerData): MarketTickerDto {
+  private buildTickerResponse(pair: MarketPairRecord, tickerData: IMarketTickerData): MarketTickerDto {
     return {
       symbol: pair.symbol,
       pairId: pair.pair_id,
@@ -562,7 +562,7 @@ export class MarketsService implements OnModuleInit {
    * Get ticker data for given pairs. Uses DB first; for pairs with no/zero price,
    * applies OHLCV fallback (Price Oracle) in batches to match single-ticker API behaviour.
    */
-  private async getTickersForPairs(pairs: MarketPair[]): Promise<MarketTickerDto[]> {
+  private async getTickersForPairs(pairs: MarketPairRecord[]): Promise<MarketTickerDto[]> {
     if (pairs.length === 0) return [];
     const tickerDataList = await Promise.all(
       pairs.map((pair) => this.marketRepository.getTicker(pair.pair_id)),
@@ -570,7 +570,7 @@ export class MarketsService implements OnModuleInit {
     const finalTickerData: IMarketTickerData[] = pairs.map(
       (_, i) => tickerDataList[i] ?? this.emptyTickerData(),
     );
-    const needFallback: { pair: MarketPair; data: IMarketTickerData; index: number }[] = [];
+    const needFallback: { pair: MarketPairRecord; data: IMarketTickerData; index: number }[] = [];
     finalTickerData.forEach((data, i) => {
       if (!data?.lastPrice || this.parsePrice(data.lastPrice) <= 0) {
         needFallback.push({ pair: pairs[i], data, index: i });
@@ -637,7 +637,7 @@ export class MarketsService implements OnModuleInit {
     if (normalizedSymbols.size === 0) return [];
 
     const activePairs = await this.findActive();
-    const selectedByBase = new Map<string, MarketPair>();
+    const selectedByBase = new Map<string, MarketPairRecord>();
 
     for (const pair of activePairs) {
       const base = this.extractBaseSymbol(pair.symbol);
@@ -893,4 +893,8 @@ export class MarketsService implements OnModuleInit {
     return seconds;
   }
 }
+
+
+
+
 

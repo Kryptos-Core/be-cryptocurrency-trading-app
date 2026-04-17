@@ -7,7 +7,7 @@ import type { BlockchainNetwork, Permission } from '@/common/enums';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
@@ -15,7 +15,7 @@ import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/doma
 /** Response for wallet auth (login or register) */
 export interface WalletAuthResult {
   accessToken: string;
-  user: Partial<User>;
+  user: Partial<UserRecord>;
   isNewUser: boolean;
 }
 
@@ -191,7 +191,7 @@ export class WalletAuthService {
     return `${short}@${chainSlug}.wallet`;
   }
 
-  private buildAccessToken(user: User): string {
+  private buildAccessToken(user: UserRecord): string {
     const role = normalizeUserRole(user.role as string);
     const permissions = getPermissionsForRole(role) as Permission[];
     const identityVerified = user.identity_verified === 1;
@@ -210,8 +210,11 @@ export class WalletAuthService {
     return this.jwtService.sign(payload);
   }
 
-  private sanitizeUser(user: User): Partial<User> {
+  private sanitizeUser(user: UserRecord): Partial<UserRecord> {
     const { password_hash, two_fa_secret, ...sanitized } = user;
     return sanitized;
   }
 }
+
+
+

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UnauthorizedException } from '@/common/exceptions';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
 import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
 import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
@@ -21,19 +21,19 @@ export class AuthService {
     private readonly usersRepository: UsersRepositoryPort,
   ) {}
 
-  register(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
+  register(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<UserRecord> }> {
     return this.registerUserUseCase.execute(registerDto);
   }
 
-  login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
+  login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<UserRecord> }> {
     return this.loginWithPasswordUseCase.execute(loginDto);
   }
 
-  async getProfile(_userId: string): Promise<Partial<User>> {
+  async getProfile(_userId: string): Promise<Partial<UserRecord>> {
     throw new UnauthorizedException('User profile endpoint should be called from users service');
   }
 
-  async getUserById(userId: string): Promise<User> {
+  async getUserById(userId: string): Promise<UserRecord> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -45,3 +45,6 @@ export class AuthService {
     return this.changePasswordUseCase.execute(userId, dto);
   }
 }
+
+
+

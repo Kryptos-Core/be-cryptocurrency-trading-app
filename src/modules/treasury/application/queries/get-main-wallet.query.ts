@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { TreasuryMainWallet } from '@/entities/treasury-main-wallet.entity';
+import type { TreasuryMainWalletRecord } from '@/modules/treasury';
 import {
   type SupportedTreasuryChain,
   TreasuryMainWalletService,
@@ -17,7 +17,7 @@ export class GetMainWalletQuery {
     return this.service.listPendingApproval();
   }
 
-  async getById(mainWalletId: string): Promise<TreasuryMainWallet> {
+  async getById(mainWalletId: string): Promise<TreasuryMainWalletRecord> {
     return this.service.getById(mainWalletId);
   }
 
@@ -36,7 +36,10 @@ export class GetMainWalletQuery {
     return this.service.resolveMainWalletPrivateKey(chain);
   }
 
-  async getWalletsDueForRotation(globalIntervalDays: number): Promise<TreasuryMainWallet[]> {
+  async getWalletsDueForRotation(globalIntervalDays: number): Promise<TreasuryMainWalletRecord[]> {
     return this.service.getWalletsDueForRotation(globalIntervalDays);
   }
 }
+
+
+

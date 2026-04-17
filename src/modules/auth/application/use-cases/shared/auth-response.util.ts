@@ -1,9 +1,9 @@
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
 import type { Permission } from '@/common/enums';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 
-export function buildAuthAccessTokenPayload(user: User) {
+export function buildAuthAccessTokenPayload(user: UserRecord) {
   const role = normalizeUserRole(user.role as string);
   const permissions = getPermissionsForRole(role) as Permission[];
 
@@ -18,7 +18,10 @@ export function buildAuthAccessTokenPayload(user: User) {
   };
 }
 
-export function sanitizeAuthUser(user: User): Partial<User> {
+export function sanitizeAuthUser(user: UserRecord): Partial<UserRecord> {
   const { password_hash, two_fa_secret, ...sanitized } = user;
   return sanitized;
 }
+
+
+

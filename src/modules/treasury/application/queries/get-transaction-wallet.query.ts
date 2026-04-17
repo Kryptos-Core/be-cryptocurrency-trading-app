@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
-import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { TransactionWalletRecord } from '@/modules/treasury';
 import type { ListTreasuryWalletsDto } from '../../dto';
 import {
   TransactionWalletService,
@@ -23,13 +23,13 @@ export class GetTransactionWalletQuery {
     return this.service.getBalanceCached(chain as any, address);
   }
 
-  async getWalletById(walletId: string): Promise<TransactionWallet> {
+  async getWalletById(walletId: string): Promise<TransactionWalletRecord> {
     return this.service.getWalletById(walletId);
   }
 
   async getWalletDetail(
     walletId: string,
-  ): Promise<TransactionWallet & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
+  ): Promise<TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
     return this.service.getWalletDetail(walletId);
   }
 
@@ -48,17 +48,17 @@ export class GetTransactionWalletQuery {
     return this.service.resolveMainWalletPrivateKey(chain as any);
   }
 
-  async listWalletsForDepositConfiguration(): Promise<TransactionWallet[]> {
+  async listWalletsForDepositConfiguration(): Promise<TransactionWalletRecord[]> {
     return this.service.listWalletsForDepositConfiguration();
   }
 
   async getDefaultUserDepositWallet(
     chain: BlockchainChainDbValue,
-  ): Promise<TransactionWallet | null> {
+  ): Promise<TransactionWalletRecord | null> {
     return this.service.getDefaultUserDepositWallet(chain as any);
   }
 
-  async getWithdrawalSourceWallet(chain: string): Promise<TransactionWallet | null> {
+  async getWithdrawalSourceWallet(chain: string): Promise<TransactionWalletRecord | null> {
     return this.service.getWithdrawalSourceWallet(chain);
   }
 
@@ -85,3 +85,9 @@ export class GetTransactionWalletQuery {
     return this.service.getTronNativeBalanceSun(chain, address);
   }
 }
+
+
+
+
+
+

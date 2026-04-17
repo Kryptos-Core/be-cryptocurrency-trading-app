@@ -19,10 +19,10 @@ import {
 import { WalletEncryptionService } from '@/common/services';
 import { RedisService } from '@/common/services/redis.service';
 import type {
-  TreasuryMainWallet,
   TreasuryMainWalletChain,
+  TreasuryMainWalletRecord,
   TreasuryMainWalletStatus,
-} from '@/entities/treasury-main-wallet.entity';
+} from '@/modules/treasury';
 import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import {
@@ -41,7 +41,6 @@ export interface MainWalletDto {
   label: string | null;
   balance: string;
   symbol: string;
-  /** TRON: USDT (TRC-20) human balance; null when not applicable or unknown */
   usdtTrc20Balance: string | null;
   isDefault: boolean;
   status: TreasuryMainWalletStatus;
@@ -55,7 +54,6 @@ export interface MainWalletDto {
   createdAt: string;
 }
 
-/** Redis Pub/Sub channel for main wallet lifecycle events */
 export const TREASURY_MAIN_WALLET_EVENTS_CHANNEL = 'treasury:main_wallet_events';
 
 @Injectable()
@@ -75,10 +73,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     await this.seedFromPaymentConfigIfEmpty();
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Read API
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
   async listByChain(chain: SupportedTreasuryChain): Promise<MainWalletDto[]> {
     const wallets = await this.mainWalletRepository.findByChainForList(chain);
 
@@ -94,7 +88,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return Promise.all(wallets.map((w) => this.toDto(w)));
   }
 
-  async getById(mainWalletId: string): Promise<TreasuryMainWallet> {
+  async getById(mainWalletId: string): Promise<TreasuryMainWalletRecord> {
     const wallet = await this.mainWalletRepository.findByMainWalletId(mainWalletId);
     if (!wallet) {
       throw new NotFoundException('Treasury main wallet', mainWalletId);
@@ -102,11 +96,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return wallet;
   }
 
-  decryptPrivateKey(wallet: TreasuryMainWallet): string {
+  decryptPrivateKey(wallet: TreasuryMainWalletRecord): string {
     return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
   }
 
-  /** Public address only — no throw when no default ACTIVE wallet (e.g. deposit methods list). */
   async getDefaultActiveMainWalletAddressOrNull(chain: string): Promise<string | null> {
     if (!BLOCKCHAIN_CHAIN_DB_VALUES.includes(chain as BlockchainChainDbValue)) {
       return null;
@@ -138,10 +131,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     );
   }
 
-  /**
-   * Resolve the private key for the active default main wallet on a given chain.
-   * Used by sweep/fund operations. No .env fallback — DB is the single source of truth.
-   */
   async resolveMainWalletPrivateKey(chain: SupportedTreasuryChain): Promise<string> {
     const wallet = await this.mainWalletRepository.findActiveDefaultOnChain(chain);
 
@@ -156,16 +145,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Write API — Import / Approve / Reject / SetDefault / Delete
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  /**
-   * Import a main wallet from private key.
-   * MFA code is verified by the controller BEFORE calling this method.
-   * Finance Manager and Admin: ACTIVE immediately (self-approved, same default rules as Risk approve).
-   * Other roles (if ever allowed): PENDING_APPROVAL.
-   */
   async importMainWallet(
     dto: ImportMainWalletDto,
     createdByUserId: string,
@@ -175,7 +154,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     const address = this.deriveAddress(chain, dto.privateKey.trim());
     const encrypted = this.walletEncryptionService.encrypt(dto.privateKey.trim());
 
-    // Check for duplicate address on this chain
     const existing = await this.mainWalletRepository.findByChainAndAddress(chain, address);
     if (existing) {
       throw new ConflictException(
@@ -249,10 +227,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.toDto(created);
   }
 
-  /**
-   * Risk Officer approves a pending main wallet.
-   * If no active default exists for this chain → auto-set as default.
-   */
   async approveMainWallet(mainWalletId: string, approverUserId: string): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
 
@@ -263,7 +237,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
       );
     }
 
-    // Auto-set default if no active default exists for this chain
     const hasActiveDefault = await this.mainWalletRepository.findActiveDefaultOnChain(wallet.chain);
 
     wallet.status = 'ACTIVE';
@@ -288,9 +261,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.toDto(updated);
   }
 
-  /**
-   * Risk Officer rejects a pending main wallet.
-   */
   async rejectMainWallet(mainWalletId: string, rejectorUserId: string): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
 
@@ -317,9 +287,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.toDto(updated);
   }
 
-  /**
-   * Set a specific ACTIVE main wallet as the default for its chain.
-   */
   async setDefault(mainWalletId: string, actorUserId: string): Promise<MainWalletDto> {
     const wallet = await this.getById(mainWalletId);
 
@@ -347,9 +314,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.toDto(updated!);
   }
 
-  /**
-   * Returns decrypted private key — caller must enforce MFA (controller).
-   */
   async revealPrivateKey(
     mainWalletId: string,
     actorUserId: string,
@@ -376,10 +340,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return await this.toDto(updated);
   }
 
-  /**
-   * Finance/Admin requests deletion — wallet becomes PENDING_DELETION until Risk approves.
-   * Same default rule as hard delete: cannot request removal of default while other ACTIVE wallets exist.
-   */
   async requestMainWalletDeletion(
     mainWalletId: string,
     actorUserId: string,
@@ -421,9 +381,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.toDto(updated);
   }
 
-  /**
-   * Risk Officer: approve pending deletion — row removed from DB.
-   */
   async approveMainWalletDeletion(mainWalletId: string, approverUserId: string): Promise<void> {
     const wallet = await this.getById(mainWalletId);
     if (wallet.status !== 'PENDING_DELETION') {
@@ -435,9 +392,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     await this.executeHardDeleteMainWallet(mainWalletId, approverUserId, wallet);
   }
 
-  /**
-   * Risk Officer: reject deletion request — wallet back to ACTIVE.
-   */
   async rejectMainWalletDeletion(
     mainWalletId: string,
     rejectorUserId: string,
@@ -465,13 +419,10 @@ export class TreasuryMainWalletService implements OnModuleInit {
     return this.toDto(updated);
   }
 
-  /**
-   * Permanently delete a main wallet row (after Risk approval). Validates default rule.
-   */
   private async executeHardDeleteMainWallet(
     mainWalletId: string,
     actorUserId: string,
-    wallet: TreasuryMainWallet,
+    wallet: TreasuryMainWalletRecord,
   ): Promise<void> {
     if (wallet.is_default) {
       const othersCount = await this.mainWalletRepository.countActiveOthersOnChainExcluding(
@@ -498,39 +449,23 @@ export class TreasuryMainWalletService implements OnModuleInit {
     });
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Auto-rotation support (called by scheduler)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  /**
-   * Mark a wallet as rotated (update last_rotated_at).
-   * Called after rotation sweep completes.
-   */
   async markRotated(mainWalletId: string): Promise<void> {
     await this.mainWalletRepository.updateLastRotatedAt(mainWalletId, new Date());
   }
 
-  /**
-   * Get all ACTIVE default wallets that are due for rotation based on their
-   * `rotation_interval_days` (or the globalIntervalDays fallback).
-   */
-  async getWalletsDueForRotation(globalIntervalDays: number): Promise<TreasuryMainWallet[]> {
+  async getWalletsDueForRotation(globalIntervalDays: number): Promise<TreasuryMainWalletRecord[]> {
     const allDefaults = await this.mainWalletRepository.findAllActiveDefaults();
 
     const now = new Date();
     return allDefaults.filter((w) => {
       const interval = w.rotation_interval_days ?? globalIntervalDays;
-      if (!w.last_rotated_at) return true; // Never rotated → due
+      if (!w.last_rotated_at) return true;
       const daysSince = (now.getTime() - w.last_rotated_at.getTime()) / (1000 * 60 * 60 * 24);
       return daysSince >= interval;
     });
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Private helpers
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  private async toDto(w: TreasuryMainWallet): Promise<MainWalletDto> {
+  private async toDto(w: TreasuryMainWalletRecord): Promise<MainWalletDto> {
     let balance = '0';
     let symbol = '';
     let usdtTrc20Balance: string | null = null;
@@ -543,7 +478,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       symbol = result.symbol;
       usdtTrc20Balance = result.usdtTrc20Balance ?? null;
     } catch {
-      // Balance fetch is best-effort — Solana devnet may be unavailable
+      // best-effort
     }
     return {
       mainWalletId: w.main_wallet_id,
@@ -569,7 +504,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
   private async getSyntheticFromPaymentConfig(
     chain: SupportedTreasuryChain,
   ): Promise<MainWalletDto[]> {
-    // Synthetic read-only fallback during first boot (before seed completes)
     try {
       const config = await this.getPaymentConfigForChain(chain);
       if (!config?.hotWalletPrivateKey) return [];
@@ -611,10 +545,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
   }
 
-  /**
-   * One-time seed at startup: if treasury_main_wallets is empty,
-   * import from PaymentConfig (backward compatible with existing deployments).
-   */
   private async seedFromPaymentConfigIfEmpty(): Promise<void> {
     const count = await this.mainWalletRepository.countAll();
     if (count > 0) return;
@@ -641,7 +571,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
           encrypted_private_key: encrypted,
           label: `${chain} (migrated from PaymentConfig)`,
           is_default: true,
-          // Seeded records bypass approval workflow — treated as ACTIVE
           status: 'ACTIVE' as TreasuryMainWalletStatus,
           created_by: null,
           approved_by: null,
@@ -676,9 +605,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
     ) as Promise<BlockchainGatewayConfig | null>;
   }
 
-  /**
-   * Derive blockchain address from private key — supports ETH, TRON, Solana.
-   */
   private deriveAddress(chain: SupportedTreasuryChain, privateKey: string): string {
     const throwInvalid = (hint: string): never => {
       throw new BadRequestException(
@@ -705,7 +631,6 @@ export class TreasuryMainWalletService implements OnModuleInit {
         throwInvalid('Use a valid Solana secret key (Base58-encoded byte array).');
       }
     }
-    // TRON — hex private key; Base58 strings starting with T are addresses, not keys
     let pk = privateKey.trim();
     if (pk.startsWith('0x') || pk.startsWith('0X')) {
       pk = pk.slice(2);
@@ -746,3 +671,4 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
   }
 }
+

@@ -5,7 +5,7 @@ import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 import { WalletsService } from '@/modules/wallets/wallets.service';
@@ -47,7 +47,7 @@ export class UsersService {
    */
   async findAll(
     filters: UserFilterDto,
-  ): Promise<{ users: User[]; total: number; page: number; limit: number }> {
+  ): Promise<{ users: UserRecord[]; total: number; page: number; limit: number }> {
     return this.usersRepository.findAllWithFilters(filters);
   }
 
@@ -96,7 +96,7 @@ export class UsersService {
   /**
    * Find user by ID (UUID string)
    */
-  async findOne(userId: string): Promise<User> {
+  async findOne(userId: string): Promise<UserRecord> {
     const user = await this.usersRepository.findById(userId);
 
     if (!user) {
@@ -109,14 +109,14 @@ export class UsersService {
   /**
    * Find user by email (used in auth)
    */
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<UserRecord | null> {
     return this.usersRepository.findByEmail(email);
   }
 
   /**
    * Create new user
    */
-  async create(email: string, passwordHash: string): Promise<User> {
+  async create(email: string, passwordHash: string): Promise<UserRecord> {
     // Check if email already exists
     const existingUser = await this.usersRepository.findByEmail(email);
     if (existingUser) {
@@ -129,7 +129,7 @@ export class UsersService {
   /**
    * Update user
    */
-  async update(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(userId: string, updateUserDto: UpdateUserDto): Promise<UserRecord> {
     // Verify user exists
     const user = await this.findOne(userId);
 
@@ -179,7 +179,7 @@ export class UsersService {
   /**
    * Update current user profile basic (first_name, last_name) — no approval needed
    */
-  async updateProfileBasic(userId: string, dto: UpdateMyProfileBasicDto): Promise<User> {
+  async updateProfileBasic(userId: string, dto: UpdateMyProfileBasicDto): Promise<UserRecord> {
     await this.findOne(userId);
     const affected = await this.usersRepository.updateProfileBasic(
       userId,
@@ -319,7 +319,7 @@ export class UsersService {
     userId: string,
     avatarUrl: string | null,
     avatarPublicId: string | null,
-  ): Promise<User> {
+  ): Promise<UserRecord> {
     await this.findOne(userId);
     await this.usersRepository.updateAvatar(userId, avatarUrl, avatarPublicId);
     return this.findOne(userId);
@@ -328,7 +328,7 @@ export class UsersService {
   /**
    * Upload avatar image to Cloudinary and update user record. Deletes previous avatar if any.
    */
-  async uploadAvatar(userId: string, buffer: Buffer): Promise<User> {
+  async uploadAvatar(userId: string, buffer: Buffer): Promise<UserRecord> {
     const user = await this.findOne(userId);
 
     if (!this.cloudinaryService.isConfigured()) {
@@ -356,5 +356,9 @@ export class UsersService {
     await this.usersRepository.saveFcmToken(userId, fcmToken);
   }
 }
+
+
+
+
 
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConflictException } from '@/common/exceptions';
 import { formatName } from '@/common/utils/name.util';
-import type { User } from '@/entities/user.entity';
+import type { UserRecord } from '@/modules/users';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { TokenIssuerPort } from '@/modules/auth/application/ports/token-issuer.port';
@@ -23,7 +23,7 @@ export class RegisterUserUseCase {
     private readonly passwordHasher: PasswordHasherPort,
   ) {}
 
-  async execute(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
+  async execute(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<UserRecord> }> {
     const { email, password, firstName, lastName } = registerDto;
 
     const emailExists = await this.usersRepository.emailExists(email);
@@ -50,3 +50,5 @@ export class RegisterUserUseCase {
     };
   }
 }
+
+

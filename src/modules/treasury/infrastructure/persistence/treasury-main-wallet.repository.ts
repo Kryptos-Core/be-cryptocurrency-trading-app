@@ -7,7 +7,7 @@ import {
 import type { TreasuryMainWalletRepositoryPort } from '../../domain/ports';
 
 /**
- * Persistence for treasury main wallets — keeps TypeORM usage out of TreasuryMainWalletService.
+ * Persistence for treasury main wallets - keeps TypeORM usage out of TreasuryMainWalletService.
  * Implements TreasuryMainWalletRepositoryPort for DIP compliance.
  */
 @Injectable()

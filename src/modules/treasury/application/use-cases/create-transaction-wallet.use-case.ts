@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
+import type { TransactionWalletRecord } from '@/modules/treasury';
 import type { CreateTransactionWalletDto } from '../../dto';
 import { TransactionWalletService } from '../../transaction-wallet.service';
 
@@ -7,7 +7,10 @@ import { TransactionWalletService } from '../../transaction-wallet.service';
 export class CreateTransactionWalletUseCase {
   constructor(private readonly service: TransactionWalletService) {}
 
-  async execute(dto: CreateTransactionWalletDto): Promise<TransactionWallet> {
+  async execute(dto: CreateTransactionWalletDto): Promise<TransactionWalletRecord> {
     return this.service.createWallet(dto);
   }
 }
+
+
+
