@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
-import {
-  RemoveOrderFromBookCommand,
-  RemoveOrderFromBookUseCase,
-} from '@/modules/matching/application/use-cases';
 import { CancelOrderCommand } from '@/modules/orders/commands/cancel-order.command';
-import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
+import {
+  ORDER_MATCHING_GATEWAY,
+  ORDER_REPOSITORY,
+  type OrderMatchingGatewayPort,
+  type OrderRepositoryPort,
+} from '@/modules/orders/domain/ports';
 import { canCancelOrder } from '@/modules/orders/states';
 
 @Injectable()
@@ -13,7 +14,8 @@ export class CancelOrderUseCase {
   constructor(
     @Inject(ORDER_REPOSITORY)
     private readonly orderRepository: OrderRepositoryPort,
-    private readonly removeOrderFromBookUseCase: RemoveOrderFromBookUseCase,
+    @Inject(ORDER_MATCHING_GATEWAY)
+    private readonly orderMatchingGateway: OrderMatchingGatewayPort,
   ) {}
 
   async execute(command: CancelOrderCommand) {
@@ -42,9 +44,7 @@ export class CancelOrderUseCase {
 
     if (order.side === 'BUY' || order.side === 'SELL') {
       try {
-        await this.removeOrderFromBookUseCase.execute(
-          new RemoveOrderFromBookCommand(order.pair_id, orderId, order.side),
-        );
+        await this.orderMatchingGateway.removeOrderFromBook(order.pair_id, orderId, order.side);
       } catch (_) {}
     }
 

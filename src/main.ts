@@ -3,7 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters';
-import { LoggingInterceptor, ResponseInterceptor } from './common/interceptors';
+import {
+  LoggingInterceptor,
+  ResponseInterceptor,
+  TelemetryContextInterceptor,
+} from './common/interceptors';
 import { setupSwagger } from './config/swagger.config';
 
 const logger = new Logger('Bootstrap');
@@ -72,7 +76,11 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   // Global Interceptors
-  app.useGlobalInterceptors(new LoggingInterceptor(), new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    new TelemetryContextInterceptor(),
+    new LoggingInterceptor(),
+    new ResponseInterceptor(),
+  );
 
   // Setup Swagger Documentation
   if (process.env.NODE_ENV !== 'production') {

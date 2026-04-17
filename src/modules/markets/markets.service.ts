@@ -9,6 +9,7 @@ import {
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService } from '@/common/services';
+import { runInSpan } from '@/common/telemetry';
 import { getEntityManagerFromTransactionContext } from '@/common/typeorm/entity-manager-from-context';
 import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
 import { MarketPair } from '@/entities/market-pair.entity';
@@ -181,24 +182,30 @@ export class MarketsService implements OnModuleInit {
    * Cache-Aside Pattern: Cache individual pair
    */
   async findOne(pairId: string): Promise<MarketPairRecord> {
-    const cacheKey = `${this.CACHE_KEY_PREFIX}id:${pairId}`;
-
-    const pair = await this.cacheService.getOrSet(
-      cacheKey,
+    return runInSpan(
+      'Markets.findOne',
       async () => {
-        const found = await this.marketRepository.findOne({
-          where: { pair_id: pairId },
-          relations: ['base_currency', 'quote_currency'],
-        });
-        if (!found) {
-          throw new NotFoundException('MarketPairRecord', pairId);
-        }
-        return found;
-      },
-      this.CACHE_TTL,
-    );
+        const cacheKey = `${this.CACHE_KEY_PREFIX}id:${pairId}`;
 
-    return pair;
+        const pair = await this.cacheService.getOrSet(
+          cacheKey,
+          async () => {
+            const found = await this.marketRepository.findOne({
+              where: { pair_id: pairId },
+              relations: ['base_currency', 'quote_currency'],
+            });
+            if (!found) {
+              throw new NotFoundException('MarketPairRecord', pairId);
+            }
+            return found;
+          },
+          this.CACHE_TTL,
+        );
+
+        return pair;
+      },
+      { module: 'markets', pairId },
+    );
   }
 
   /**

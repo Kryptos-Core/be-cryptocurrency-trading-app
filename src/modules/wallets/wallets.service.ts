@@ -19,6 +19,7 @@ import type {
 import type { WalletBalanceDto } from './dto/wallet-balance.dto';
 import type { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
 import type { WalletListItemDto } from './dto/wallet-list-item.dto';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { WalletTransactionDto } from './dto/wallet-transaction.dto';
 
 /**
@@ -70,8 +71,12 @@ export class WalletsService {
 
   // ─── Commands / Use Cases ────────────────────────────────
 
-  applyTransaction(userId: string, dto: WalletTransactionDto): Promise<WalletBalanceDto> {
-    return this.applyTransactionUseCase.execute(userId, dto);
+  applyTransaction(
+    userId: string,
+    dto: WalletTransactionDto,
+    joinTransaction?: TransactionContext,
+  ): Promise<WalletBalanceDto> {
+    return this.applyTransactionUseCase.execute(userId, dto, joinTransaction);
   }
 
   adminAdjustBalance(

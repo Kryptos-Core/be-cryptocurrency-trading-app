@@ -30,14 +30,12 @@ export function toBaseUnits(decimalString: string, scale: number): bigint {
     fracPart = absolute.slice(dotIndex + 1);
   }
 
-  // Pad or truncate fractional part to exactly `scale` digits
   if (fracPart.length > scale) {
     fracPart = fracPart.slice(0, scale);
   } else {
     fracPart = fracPart.padEnd(scale, '0');
   }
 
-  // Handle empty integer part (e.g. ".5")
   if (intPart === '' || intPart === '0'.repeat(intPart.length)) {
     intPart = '0';
   }

@@ -9,6 +9,7 @@ import {
 } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 import type { WalletTransactionDto } from '@/modules/wallets/dto/wallet-transaction.dto';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { ApplyTransactionUseCase } from './apply-transaction.use-case';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -114,6 +115,22 @@ describe('ApplyTransactionUseCase', () => {
         frozen: '0',
         total: '300',
       });
+    });
+
+    it('runs in provided join transaction without starting walletRepo.transaction', async () => {
+      walletRepo.getOrCreateForUpdate.mockResolvedValue(makeWallet('200', '0'));
+      walletRepo.applyBalanceDelta.mockResolvedValue(makeWallet('300', '0'));
+      const joinCtx = { joined: true } as unknown as TransactionContext;
+
+      await useCase.execute('uid-1', dto({ action: WalletTransactionAction.CREDIT }), joinCtx);
+
+      expect(walletRepo.transaction).not.toHaveBeenCalled();
+      expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith(
+        'wid-1',
+        '100',
+        '0',
+        joinCtx,
+      );
     });
   });
 

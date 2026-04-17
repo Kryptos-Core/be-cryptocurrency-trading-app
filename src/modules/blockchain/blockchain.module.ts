@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EVM_CHAIN_DEFINITIONS } from '@/common/constants/evm-chain-definitions';
+import { OutboxModule } from '@/common/outbox/outbox.module';
 import { BlockchainNetwork } from '@/common/enums';
 import { LinkedWallet, OnchainTransaction } from '@/modules/blockchain';
 import { OnchainTransferService } from '@/modules/blockchain/onchain-transfer.service';
@@ -63,6 +64,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
 @Module({
   imports: [
     TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction]),
+    OutboxModule,
     WalletsModule,
     CurrenciesModule,
     ManagedWalletsModule,

@@ -1,6 +1,7 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
+import { runInSpan } from '@/common/telemetry';
 import { RunMatchCommand, RunMatchUseCase } from '../../application/use-cases';
 import { MATCH_ORDER_JOB, MATCHING_QUEUE, type MatchOrderJobData } from './matching-queue.service';
 
@@ -17,15 +18,20 @@ export class MatchingProcessor {
     this.logger.debug(
       `Processing match job ${job.id} - order=${takerOrder.order_id} pair=${pairId}`,
     );
-    await this.runMatchUseCase.execute(
-      new RunMatchCommand(
-        takerOrder,
-        pairId,
-        feeCurrencyId,
-        makerFeeRate,
-        takerFeeRate,
-        slippageTolerance,
-      ),
+    await runInSpan(
+      'MatchingProcessor.handleMatch',
+      async () =>
+        this.runMatchUseCase.execute(
+          new RunMatchCommand(
+            takerOrder,
+            pairId,
+            feeCurrencyId,
+            makerFeeRate,
+            takerFeeRate,
+            slippageTolerance,
+          ),
+        ),
+      { module: 'matching', pairId, orderId: takerOrder.order_id },
     );
   }
 }

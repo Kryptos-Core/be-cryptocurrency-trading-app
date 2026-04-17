@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services';
+import { runInSpan } from '@/common/telemetry';
 import type { MarketPairRecord } from '@/modules/markets';
 import { MarketsService } from '@/modules/markets/markets.service';
 import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
@@ -45,6 +46,14 @@ export class DashboardService {
   ) {}
 
   async getDashboardSummary(userId: string | null): Promise<DashboardResponseDto> {
+    return runInSpan(
+      'Dashboard.getDashboardSummary',
+      async () => this.getDashboardSummaryImpl(userId),
+      { module: 'dashboard', hasUser: Boolean(userId) },
+    );
+  }
+
+  private async getDashboardSummaryImpl(userId: string | null): Promise<DashboardResponseDto> {
     const [activePairs, wallets] = await Promise.all([
       this.marketsService.findActive(),
       userId

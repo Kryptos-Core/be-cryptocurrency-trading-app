@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import {
   CURRENCY_LOOKUP,
   type CurrencyLookupPort,
@@ -31,7 +32,11 @@ export class ApplyTransactionUseCase {
     private readonly balanceCalc: BalanceCalculationService,
   ) {}
 
-  async execute(userId: string, dto: WalletTransactionDto): Promise<WalletBalanceDto> {
+  async execute(
+    userId: string,
+    dto: WalletTransactionDto,
+    joinTransaction?: TransactionContext,
+  ): Promise<WalletBalanceDto> {
     let amount: Decimal;
     try {
       amount = this.balanceCalc.parsePositiveAmount(dto.amount);
@@ -45,7 +50,7 @@ export class ApplyTransactionUseCase {
     const currencyId = String(dto.currencyId);
 
     try {
-      const result = await this.walletRepo.transaction(async (manager) => {
+      const runCore = async (manager: TransactionContext) => {
         switch (dto.action) {
           case WalletTransactionAction.CREDIT:
             return this.credit(userId, dto, amount, manager);
@@ -60,7 +65,11 @@ export class ApplyTransactionUseCase {
           default:
             throw new BadRequestException('Invalid wallet action', 'INVALID_ACTION');
         }
-      });
+      };
+
+      const result = joinTransaction
+        ? await runCore(joinTransaction)
+        : await this.walletRepo.transaction(runCore);
 
       const symbol = await this.currencyLookup.getSymbol(currencyId);
       await this.eventPublisher.publishBalanceChange({

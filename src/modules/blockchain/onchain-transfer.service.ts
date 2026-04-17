@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BlockchainNetwork } from '@/common/enums';
+import { runInSpan } from '@/common/telemetry';
 import { OnchainTransferQueryService } from './application/queries/transactions/onchain-transfer-query.service';
 import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
 import { OnchainWithdrawalService } from './application/use-cases/withdrawals/onchain-withdrawal.service';
@@ -26,6 +27,10 @@ export class OnchainTransferService {
   }
 
   async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {
-    return this.withdrawalService.requestWithdrawal(userId, dto);
+    return runInSpan(
+      'Blockchain.requestWithdrawal',
+      () => this.withdrawalService.requestWithdrawal(userId, dto),
+      { module: 'blockchain', userId },
+    );
   }
 }

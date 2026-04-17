@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   BlockchainNetwork,
@@ -9,7 +9,11 @@ import {
   WalletTransactionAction,
 } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService } from '@/common/services';
+import type { TransactionContext } from '@/common/types/transaction-context';
+import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
@@ -36,6 +40,8 @@ export class OnchainDepositService {
     private readonly depositFxService: DepositFxService,
     private readonly walletsService: WalletsService,
     private readonly transactionWalletService: TransactionWalletService,
+    private readonly unitOfWork: UnitOfWork,
+    private readonly outboxAppender: OutboxAppender,
   ) {}
 
   private treasuryLog(event: string, fields: Record<string, unknown>): void {
@@ -117,8 +123,10 @@ export class OnchainDepositService {
     refType: WalletReferenceType,
     refId: number,
     direction: 'CREDIT' | 'DEBIT',
+    joinTransaction?: TransactionContext,
   ): Promise<boolean> {
-    const rows = await this.dataSource.query(
+    const runner = joinTransaction ? (joinTransaction as unknown as EntityManager) : this.dataSource;
+    const rows = await runner.query(
       `SELECT ledger_id FROM wallet_ledger WHERE user_id = ? AND currency_id = ? AND ref_type = ? AND ref_id = ? AND direction = ? LIMIT 1`,
       [userId, currencyId, refType, String(refId), direction],
     );
@@ -130,6 +138,7 @@ export class OnchainDepositService {
     userId: string,
     chain: BlockchainNetwork,
     amount: string,
+    joinTransaction?: TransactionContext,
   ): Promise<{ settled: boolean; alreadySettled: boolean }> {
     const conversion = await this.depositFxService.convertToPlatformCash(chain, amount);
     const { creditCurrencyId, creditAmount, conversionRate } = conversion;
@@ -141,17 +150,22 @@ export class OnchainDepositService {
       WalletReferenceType.EXTERNAL_DEPOSIT,
       refId,
       'CREDIT',
+      joinTransaction,
     );
     if (existed) return { settled: false, alreadySettled: true };
 
     try {
-      await this.walletsService.applyTransaction(userId, {
-        currencyId: creditCurrencyId,
-        action: WalletTransactionAction.CREDIT,
-        amount: creditAmount,
-        refType: WalletReferenceType.EXTERNAL_DEPOSIT,
-        refId,
-      });
+      await this.walletsService.applyTransaction(
+        userId,
+        {
+          currencyId: creditCurrencyId,
+          action: WalletTransactionAction.CREDIT,
+          amount: creditAmount,
+          refType: WalletReferenceType.EXTERNAL_DEPOSIT,
+          refId,
+        },
+        joinTransaction,
+      );
     } catch (error: any) {
       if (error?.code === 'DUPLICATE_LEDGER_ENTRY') {
         return { settled: false, alreadySettled: true };
@@ -159,12 +173,22 @@ export class OnchainDepositService {
       throw error;
     }
 
-    await this.onchainTxRepo.updateCreditConversion(
-      txId,
-      String(creditCurrencyId),
-      creditAmount,
-      conversionRate,
-    );
+    if (joinTransaction) {
+      await this.onchainTxRepo.updateCreditConversionWithinTransaction(
+        joinTransaction,
+        txId,
+        String(creditCurrencyId),
+        creditAmount,
+        conversionRate,
+      );
+    } else {
+      await this.onchainTxRepo.updateCreditConversion(
+        txId,
+        String(creditCurrencyId),
+        creditAmount,
+        conversionRate,
+      );
+    }
 
     return { settled: true, alreadySettled: false };
   }
@@ -228,31 +252,54 @@ export class OnchainDepositService {
       const status =
         txStatus.status === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
 
-      await this.onchainTxRepo.create({
-        tx_id: txId,
-        user_id: userId,
-        linked_wallet_id: linked.link_id,
-        chain: dto.chain,
-        type: 'DEPOSIT',
-        tx_hash: dto.txHash,
-        from_address: txStatus.from,
-        to_address: txStatus.to,
-        amount: onchainAmount.toString() as any,
-        confirmations: txStatus.confirmations,
-        status: status as any,
-        confirmed_at: status === OnchainTxStatus.COMPLETED ? new Date() : undefined,
-      });
-
       let settled = false;
-      if (status === OnchainTxStatus.COMPLETED) {
-        const settlement = await this.settleDepositLedgerIfNeeded(
-          txId,
-          userId,
-          dto.chain,
-          onchainAmount.toString(),
-        );
-        settled = settlement.settled || settlement.alreadySettled;
-      }
+
+      await this.unitOfWork.run(async (ctx) => {
+        const em = ctx as unknown as EntityManager;
+
+        await this.onchainTxRepo.createWithinTransaction(ctx, {
+          tx_id: txId,
+          user_id: userId,
+          linked_wallet_id: linked.link_id,
+          chain: dto.chain,
+          type: 'DEPOSIT',
+          tx_hash: dto.txHash,
+          from_address: txStatus.from,
+          to_address: txStatus.to,
+          amount: onchainAmount.toString() as any,
+          confirmations: txStatus.confirmations,
+          status: status as any,
+          confirmed_at: status === OnchainTxStatus.COMPLETED ? new Date() : undefined,
+        });
+
+        if (status === OnchainTxStatus.COMPLETED) {
+          const settlement = await this.settleDepositLedgerIfNeeded(
+            txId,
+            userId,
+            dto.chain,
+            onchainAmount.toString(),
+            ctx,
+          );
+          settled = settlement.settled || settlement.alreadySettled;
+        }
+
+        await this.outboxAppender.append(em, {
+          aggregateType: 'OnchainTransaction',
+          aggregateId: txId,
+          eventType: OutboxIntegrationEventType.OnchainDepositSubmittedV1,
+          dedupeKey: `onchain:deposit:submit:${dto.chain}:${dto.txHash}`,
+          payload: {
+            payloadVersion: 1,
+            userId,
+            txId,
+            chain: dto.chain,
+            txHash: dto.txHash,
+            status,
+            amount: onchainAmount.toString(),
+            settled,
+          },
+        });
+      });
 
       this.treasuryLog('deposit.submit.result', {
         userId,
@@ -320,30 +367,53 @@ export class OnchainDepositService {
       };
     }
 
-    await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.COMPLETED, {
-      confirmations: latest.confirmations ?? 0,
-      confirmed_at: new Date(),
-    });
+    let settled = false;
 
-    const settlement = await this.settleDepositLedgerIfNeeded(
-      txId,
-      userId,
-      tx.chain as BlockchainNetwork,
-      String(tx.amount),
-    );
+    await this.unitOfWork.run(async (ctx) => {
+      const em = ctx as unknown as EntityManager;
+
+      await this.onchainTxRepo.updateStatusWithinTransaction(ctx, txId, OnchainTxStatus.COMPLETED, {
+        confirmations: latest.confirmations ?? 0,
+        confirmed_at: new Date(),
+      });
+
+      const settlement = await this.settleDepositLedgerIfNeeded(
+        txId,
+        userId,
+        tx.chain as BlockchainNetwork,
+        String(tx.amount),
+        ctx,
+      );
+      settled = settlement.settled || settlement.alreadySettled;
+
+      await this.outboxAppender.append(em, {
+        aggregateType: 'OnchainTransaction',
+        aggregateId: txId,
+        eventType: OutboxIntegrationEventType.OnchainDepositSettledV1,
+        dedupeKey: `onchain:deposit:settle:${txId}`,
+        payload: {
+          payloadVersion: 1,
+          userId,
+          txId,
+          chain: tx.chain,
+          txHash: tx.tx_hash,
+          settled,
+        },
+      });
+    });
 
     this.treasuryLog('deposit.settle.result', {
       userId,
       txId,
       txHash: tx.tx_hash,
       confirmations: latest.confirmations ?? 0,
-      settled: settlement.settled || settlement.alreadySettled,
+      settled,
     });
 
     return {
       txId,
       status: OnchainTxStatus.COMPLETED,
-      settled: settlement.settled || settlement.alreadySettled,
+      settled,
       confirmations: latest.confirmations ?? 0,
     };
   }

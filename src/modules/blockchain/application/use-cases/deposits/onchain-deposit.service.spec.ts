@@ -8,21 +8,26 @@ import {
 } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
+import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
 import { DepositFxService } from '../../../domain/services/deposit-fx.service';
+import { ONCHAIN_TRANSACTION_REPOSITORY } from '../../../domain/ports';
 import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
-import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
+import { OnchainDepositService } from './onchain-deposit.service';
 
 describe('OnchainDepositService', () => {
   const onchainTxRepo = {
     findByChainAndTxHash: jest.fn(),
     create: jest.fn(),
+    createWithinTransaction: jest.fn(),
     updateCreditConversion: jest.fn(),
+    updateCreditConversionWithinTransaction: jest.fn(),
     findByIdAndUserId: jest.fn(),
     updateStatus: jest.fn(),
+    updateStatusWithinTransaction: jest.fn(),
   };
   const dataSource = {
     query: jest.fn(),
@@ -51,10 +56,24 @@ describe('OnchainDepositService', () => {
     getDefaultUserDepositWallet: jest.fn(),
   };
 
+  const unitOfWork = {
+    run: jest.fn(),
+  };
+
+  const outboxAppender = {
+    append: jest.fn().mockResolvedValue(undefined),
+  };
+
   let service: OnchainDepositService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    unitOfWork.run.mockImplementation(async (fn: (ctx: { query: typeof dataSource.query }) => Promise<unknown>) => {
+      const ctx = {
+        query: (...args: unknown[]) => (dataSource as any).query(...args),
+      };
+      return fn(ctx as any);
+    });
     const moduleRef = await Test.createTestingModule({
       providers: [
         OnchainDepositService,
@@ -66,6 +85,8 @@ describe('OnchainDepositService', () => {
         { provide: DepositFxService, useValue: depositFxService },
         { provide: WalletsService, useValue: walletsService },
         { provide: TransactionWalletService, useValue: transactionWalletService },
+        { provide: UnitOfWork, useValue: unitOfWork },
+        { provide: OutboxAppender, useValue: outboxAppender },
       ],
     }).compile();
 
@@ -90,7 +111,8 @@ describe('OnchainDepositService', () => {
       amount: '1.25',
     } as any);
 
-    expect(onchainTxRepo.create).toHaveBeenCalledWith(
+    expect(onchainTxRepo.createWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         user_id: 'user-1',
         linked_wallet_id: 'link-1',
@@ -100,6 +122,7 @@ describe('OnchainDepositService', () => {
       }),
     );
     expect(walletsService.applyTransaction).not.toHaveBeenCalled();
+    expect(outboxAppender.append).toHaveBeenCalled();
     expect(cacheService.delete).toHaveBeenCalledWith('deposit:pending:0xtx');
     expect(result).toEqual(
       expect.objectContaining({
@@ -143,8 +166,10 @@ describe('OnchainDepositService', () => {
         amount: '250',
         refType: WalletReferenceType.EXTERNAL_DEPOSIT,
       }),
+      expect.anything(),
     );
-    expect(onchainTxRepo.updateCreditConversion).toHaveBeenCalledWith(
+    expect(onchainTxRepo.updateCreditConversionWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
       expect.any(String),
       'usdt',
       '250',
@@ -227,7 +252,8 @@ describe('OnchainDepositService', () => {
 
     const result = await service.settleDepositByTxId('user-9', 'tx-ok');
 
-    expect(onchainTxRepo.updateStatus).toHaveBeenCalledWith(
+    expect(onchainTxRepo.updateStatusWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
       'tx-ok',
       OnchainTxStatus.COMPLETED,
       expect.objectContaining({ confirmations: 21, confirmed_at: expect.any(Date) }),
@@ -235,13 +261,16 @@ describe('OnchainDepositService', () => {
     expect(walletsService.applyTransaction).toHaveBeenCalledWith(
       'user-9',
       expect.objectContaining({ currencyId: 'usdt', amount: '420' }),
+      expect.anything(),
     );
-    expect(onchainTxRepo.updateCreditConversion).toHaveBeenCalledWith(
+    expect(onchainTxRepo.updateCreditConversionWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
       'tx-ok',
       'usdt',
       '420',
       '100',
     );
+    expect(outboxAppender.append).toHaveBeenCalled();
     expect(result).toEqual({
       txId: 'tx-ok',
       status: OnchainTxStatus.COMPLETED,

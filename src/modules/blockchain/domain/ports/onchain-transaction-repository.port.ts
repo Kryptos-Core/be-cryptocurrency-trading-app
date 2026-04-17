@@ -1,3 +1,4 @@
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain/contracts';
 
 /** DTO dùng trong read-model của user (getTransactions, getTransactionById) */
@@ -70,7 +71,20 @@ export interface OnchainTransactionRepositoryPort {
     data: Partial<BlockchainOnchainTransactionRecord>,
   ): Promise<BlockchainOnchainTransactionRecord>;
 
+  /** Insert onchain row inside an existing DB transaction (same connection as outbox / wallet). */
+  createWithinTransaction(
+    ctx: TransactionContext,
+    data: Partial<BlockchainOnchainTransactionRecord>,
+  ): Promise<BlockchainOnchainTransactionRecord>;
+
   updateStatus(txId: string, status: string, extra?: Record<string, any>): Promise<void>;
+
+  updateStatusWithinTransaction(
+    ctx: TransactionContext,
+    txId: string,
+    status: string,
+    extra?: Record<string, any>,
+  ): Promise<void>;
 
   updateWithTxHash(txId: string, txHash: string, status: string): Promise<void>;
 
@@ -84,6 +98,14 @@ export interface OnchainTransactionRepositoryPort {
 
   /** Cập nhật thông tin quy đổi (credited_currency_id, credited_amount, conversion_rate). */
   updateCreditConversion(
+    txId: string,
+    creditCurrencyId: string,
+    creditAmount: string,
+    conversionRate: string,
+  ): Promise<void>;
+
+  updateCreditConversionWithinTransaction(
+    ctx: TransactionContext,
     txId: string,
     creditCurrencyId: string,
     creditAmount: string,

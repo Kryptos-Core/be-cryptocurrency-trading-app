@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BusinessException, UnauthorizedException } from '@/common/exceptions';
+import { runInSpan } from '@/common/telemetry';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { TokenIssuerPort } from '@/modules/auth/application/ports/token-issuer.port';
@@ -23,6 +24,16 @@ export class LoginWithPasswordUseCase {
   ) {}
 
   async execute(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<UserRecord> }> {
+    return runInSpan(
+      'Auth.LoginWithPassword',
+      async () => this.executeImpl(loginDto),
+      { module: 'auth' },
+    );
+  }
+
+  private async executeImpl(
+    loginDto: LoginDto,
+  ): Promise<{ accessToken: string; user: Partial<UserRecord> }> {
     const { email, password } = loginDto;
 
     const user = await this.usersRepository.findByEmail(email);

@@ -13,6 +13,7 @@
     "lint": "biome lint ./src ./scripts",
     "lint:fix": "biome check --write ./src ./scripts",
     "lint:boundaries": "node scripts/check-module-boundaries.mjs",
+    "lint:uow": "node scripts/check-uow-policy.mjs",
     "check": "biome check ./src ./scripts",
     "check:fix": "biome check --write ./src ./scripts",
     "start": "cross-env NODE_ENV=development nest start",

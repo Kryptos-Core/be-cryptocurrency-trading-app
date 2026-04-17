@@ -1,4 +1,4 @@
-import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '@/modules/matching/utils';
+import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '@/common/utils/base-units';
 
 /**
  * Max quote to freeze for MARKET BUY: amount * bestAsk * (1 + slippage).

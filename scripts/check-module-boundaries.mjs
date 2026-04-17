@@ -31,6 +31,7 @@ function walk(dir) {
     if (name.isDirectory()) walk(full);
     else if (name.isFile() && (name.name.endsWith('.ts') || name.name.endsWith('.tsx'))) {
       const rel = path.relative(srcRoot, full).replaceAll('\\', '/');
+      if (rel.endsWith('.integration.spec.ts')) continue;
       const fromCtx = rel.split('/')[0];
       const text = fs.readFileSync(full, 'utf8');
       const re = /from ['"]@\/modules\/([^/'"]+)\/application\//g;

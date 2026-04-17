@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { OnchainTransaction } from '@/modules/blockchain';
 import type {
@@ -10,6 +11,10 @@ import type {
   OnchainTransactionRepositoryPort,
   OnchainTxRowDto,
 } from '@/modules/blockchain/domain/ports';
+
+function toEntityManager(ctx: TransactionContext): EntityManager {
+  return ctx as unknown as EntityManager;
+}
 
 /**
  * Infrastructure: Onchain Transaction Repository (TypeORM + raw SQL)
@@ -60,6 +65,15 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     return repo.save(entity);
   }
 
+  async createWithinTransaction(
+    ctx: TransactionContext,
+    data: Partial<OnchainTransaction>,
+  ): Promise<OnchainTransaction> {
+    const repo = toEntityManager(ctx).getRepository(OnchainTransaction);
+    const entity = repo.create({ tx_id: uuidv7(), ...data });
+    return repo.save(entity);
+  }
+
   async updateStatus(txId: string, status: string, extra?: Record<string, any>): Promise<void> {
     const update: Record<string, any> = {
       status: status as OnchainTransaction['status'],
@@ -75,6 +89,28 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     }
 
     await this.dataSource.getRepository(OnchainTransaction).update({ tx_id: txId }, update);
+  }
+
+  async updateStatusWithinTransaction(
+    ctx: TransactionContext,
+    txId: string,
+    status: string,
+    extra?: Record<string, any>,
+  ): Promise<void> {
+    const update: Record<string, any> = {
+      status: status as OnchainTransaction['status'],
+    };
+
+    if (extra) {
+      if (extra.confirmations !== undefined) update.confirmations = extra.confirmations;
+      if (extra.confirmed_at !== undefined) update.confirmed_at = extra.confirmed_at;
+      if (extra.credited_currency_id !== undefined)
+        update.credited_currency_id = extra.credited_currency_id;
+      if (extra.credited_amount !== undefined) update.credited_amount = extra.credited_amount;
+      if (extra.conversion_rate !== undefined) update.conversion_rate = extra.conversion_rate;
+    }
+
+    await toEntityManager(ctx).getRepository(OnchainTransaction).update({ tx_id: txId }, update);
   }
 
   async updateWithTxHash(txId: string, txHash: string, status: string): Promise<void> {
@@ -117,6 +153,21 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     conversionRate: string,
   ): Promise<void> {
     await this.dataSource.query(
+      `UPDATE onchain_transactions
+       SET credited_currency_id = ?, credited_amount = ?, conversion_rate = ?
+       WHERE tx_id = ?`,
+      [creditCurrencyId, creditAmount, conversionRate, txId],
+    );
+  }
+
+  async updateCreditConversionWithinTransaction(
+    ctx: TransactionContext,
+    txId: string,
+    creditCurrencyId: string,
+    creditAmount: string,
+    conversionRate: string,
+  ): Promise<void> {
+    await toEntityManager(ctx).query(
       `UPDATE onchain_transactions
        SET credited_currency_id = ?, credited_amount = ?, conversion_rate = ?
        WHERE tx_id = ?`,

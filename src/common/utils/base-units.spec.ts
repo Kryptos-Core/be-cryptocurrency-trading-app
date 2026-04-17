@@ -34,7 +34,6 @@ describe('toBaseUnits', () => {
   });
 
   it('truncates excess decimals beyond scale', () => {
-    // 19 decimal digits → truncate to 18
     expect(toBaseUnits('1.1234567890123456789', SCALE_18)).toBe(1_123456789012345678n);
   });
 
@@ -116,8 +115,6 @@ describe('comparePriceBigInt', () => {
   });
 
   it('distinguishes values where parseFloat fails (> 2^53)', () => {
-    // parseFloat('9007199254740992.5') === parseFloat('9007199254740992.6')
-    // BigInt must distinguish them
     expect(comparePriceBigInt('9007199254740992.5', '9007199254740992.6', SCALE_18)).toBeLessThan(
       0,
     );

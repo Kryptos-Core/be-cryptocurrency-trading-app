@@ -18,9 +18,11 @@ import {
   PriceTimePriorityStrategy,
   SellQueueService,
 } from './domain/services';
+import { OrderMatchingGatewayAdapter } from './infrastructure/adapters';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './infrastructure/observers';
 import { MatchingRepository, TradeAuditLogRepository } from './infrastructure/persistence';
 import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infrastructure/queue';
+import { ORDER_MATCHING_GATEWAY } from '@/modules/orders/domain/ports/order-matching-gateway.port';
 
 @Module({
   imports: [
@@ -44,9 +46,15 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
     RunMatchUseCase,
     RemoveOrderFromBookUseCase,
     ReconcileOpenOrdersForPairUseCase,
+    OrderMatchingGatewayAdapter,
+    {
+      provide: ORDER_MATCHING_GATEWAY,
+      useExisting: OrderMatchingGatewayAdapter,
+    },
     MatchingProcessor,
   ],
   exports: [
+    ORDER_MATCHING_GATEWAY,
     EnqueueMatchUseCase,
     RunMatchUseCase,
     RemoveOrderFromBookUseCase,

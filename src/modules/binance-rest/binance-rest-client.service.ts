@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { runInSpan } from '@/common/telemetry';
 
 export interface BinanceRestRawResponse {
   ok: boolean;
@@ -29,11 +30,17 @@ export class BinanceRestClient {
     params?: Record<string, string | number | boolean | undefined>,
     options?: BinanceRequestOptions,
   ): Promise<T> {
-    const response = await this.requestRaw('GET', endpoint, params, options);
-    if (!response.ok) {
-      throw new Error(`Binance API error: ${response.status} ${response.body}`);
-    }
-    return JSON.parse(response.body || '{}') as T;
+    return runInSpan(
+      'BinanceRest.getPublicJson',
+      async () => {
+        const response = await this.requestRaw('GET', endpoint, params, options);
+        if (!response.ok) {
+          throw new Error(`Binance API error: ${response.status} ${response.body}`);
+        }
+        return JSON.parse(response.body || '{}') as T;
+      },
+      { module: 'binance-rest', endpoint },
+    );
   }
 
   async getPublicText(

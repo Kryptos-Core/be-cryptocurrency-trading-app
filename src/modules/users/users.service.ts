@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
+import { runInSpan } from '@/common/telemetry';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
@@ -102,13 +103,19 @@ export class UsersService {
    * Find user by ID (UUID string)
    */
   async findOne(userId: string): Promise<UserRecord> {
-    const user = await this.usersRepository.findById(userId);
+    return runInSpan(
+      'Users.findOne',
+      async () => {
+        const user = await this.usersRepository.findById(userId);
 
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
+        if (!user) {
+          throw new NotFoundException('User', userId);
+        }
 
-    return user;
+        return user;
+      },
+      { module: 'users', userId },
+    );
   }
 
   /**

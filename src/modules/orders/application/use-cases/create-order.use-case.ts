@@ -3,10 +3,15 @@ import { BusinessException, ForbiddenException, NotFoundException } from '@/comm
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
-import { EnqueueMatchCommand, EnqueueMatchUseCase } from '@/modules/matching/application/use-cases';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderCommand } from '@/modules/orders/commands/create-order.command';
-import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
+import {
+  ORDER_MATCHING_GATEWAY,
+  ORDER_REPOSITORY,
+  type OrderBookOrderSnapshot,
+  type OrderMatchingGatewayPort,
+  type OrderRepositoryPort,
+} from '@/modules/orders/domain/ports';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
 
@@ -22,7 +27,8 @@ export class CreateOrderUseCase {
     private readonly orderRepository: OrderRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly validationService: OrderValidationService,
-    private readonly enqueueMatchUseCase: EnqueueMatchUseCase,
+    @Inject(ORDER_MATCHING_GATEWAY)
+    private readonly orderMatchingGateway: OrderMatchingGatewayPort,
     private readonly prepareCreateOrderContextService: PrepareCreateOrderContextService,
     private readonly orderReservePolicy: OrderReservePolicy,
   ) {}
@@ -114,16 +120,14 @@ export class CreateOrderUseCase {
     }
 
     try {
-      await this.enqueueMatchUseCase.execute(
-        new EnqueueMatchCommand(
-          this.orderToOrderBookOrder(order),
-          order.pair_id,
-          feeCurrencyId,
-          makerFeeRate ?? '0.001',
-          takerFeeRate ?? '0.001',
-          order.type === 'MARKET' ? (order.slippage_tolerance ?? undefined) : undefined,
-        ),
-      );
+      await this.orderMatchingGateway.enqueueMatch({
+        takerOrder: this.orderToOrderBookOrder(order),
+        pairId: order.pair_id,
+        feeCurrencyId,
+        makerFeeRate: makerFeeRate ?? '0.001',
+        takerFeeRate: takerFeeRate ?? '0.001',
+        slippageTolerance: order.type === 'MARKET' ? (order.slippage_tolerance ?? undefined) : undefined,
+      });
     } catch (error) {
       this.logger.warn(
         `Matching enqueue failed after order create ${order.order_id}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
@@ -185,7 +189,7 @@ export class CreateOrderUseCase {
     return order;
   }
 
-  private orderToOrderBookOrder(o: Order) {
+  private orderToOrderBookOrder(o: Order): OrderBookOrderSnapshot {
     const filled = parseFloat(o.filled_amount ?? '0');
     const amount = parseFloat(o.amount ?? '0');
     return {

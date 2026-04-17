@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
 import { RedisService } from '@/common/services/redis.service';
+import { runInSpan } from '@/common/telemetry';
 import { ExchangeRateAuditLog } from '@/entities/exchange-rate-audit-log.entity';
 import { DepositsService } from '@/modules/deposits/deposits.service';
 import {
@@ -62,11 +63,17 @@ export class ExchangeRateService {
   ) {}
 
   async getMarketPrices(query: MarketPricesDto) {
-    const symbols = query.symbols
-      ?.split(',')
-      .map((symbol) => symbol.trim().toUpperCase())
-      .filter(Boolean);
-    return this.coinGeckoProvider.getMarketPrices(symbols);
+    return runInSpan(
+      'ExchangeRate.getMarketPrices',
+      async () => {
+        const symbols = query.symbols
+          ?.split(',')
+          .map((symbol) => symbol.trim().toUpperCase())
+          .filter(Boolean);
+        return this.coinGeckoProvider.getMarketPrices(symbols);
+      },
+      { module: 'exchange-rate' },
+    );
   }
 
   async getDepositPreview(dto: RatePreviewDto) {

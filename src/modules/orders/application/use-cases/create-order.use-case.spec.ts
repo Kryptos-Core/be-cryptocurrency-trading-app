@@ -1,10 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { BusinessException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
-import { EnqueueMatchUseCase } from '@/modules/matching/application/use-cases';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
-import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
+import { ORDER_MATCHING_GATEWAY, ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
 
@@ -22,8 +21,8 @@ describe('CreateOrderUseCase', () => {
   const validationStrategy = {
     validate: jest.fn(),
   };
-  const enqueueMatchUseCase = {
-    execute: jest.fn(),
+  const orderMatchingGateway = {
+    enqueueMatch: jest.fn(),
   };
   const prepareCreateOrderContextService = {
     execute: jest.fn(),
@@ -42,7 +41,7 @@ describe('CreateOrderUseCase', () => {
         { provide: ORDER_REPOSITORY, useValue: orderRepository },
         { provide: CacheService, useValue: cacheService },
         { provide: OrderValidationService, useValue: validationStrategy },
-        { provide: EnqueueMatchUseCase, useValue: enqueueMatchUseCase },
+        { provide: ORDER_MATCHING_GATEWAY, useValue: orderMatchingGateway },
         {
           provide: PrepareCreateOrderContextService,
           useValue: prepareCreateOrderContextService,
@@ -119,7 +118,7 @@ describe('CreateOrderUseCase', () => {
     );
     expect(validationStrategy.validate).toHaveBeenCalledWith({ amount: '1' });
     expect(orderRepository.createOrderViaProcedure).toHaveBeenCalled();
-    expect(enqueueMatchUseCase.execute).toHaveBeenCalledWith(
+    expect(orderMatchingGateway.enqueueMatch).toHaveBeenCalledWith(
       expect.objectContaining({
         pairId: 'p1',
         feeCurrencyId: 'quote',
@@ -178,7 +177,7 @@ describe('CreateOrderUseCase', () => {
       },
     } as any);
 
-    expect(enqueueMatchUseCase.execute).not.toHaveBeenCalled();
+    expect(orderMatchingGateway.enqueueMatch).not.toHaveBeenCalled();
   });
 
   it('throws when procedure reports failure', async () => {

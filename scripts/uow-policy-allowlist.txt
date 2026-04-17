@@ -1,0 +1,5 @@
+# Paths relative to src/ — approved this.dataSource.transaction( callers
+common/unit-of-work/
+common/outbox/outbox-relay.service.ts
+common/repositories/base.repository.ts
+modules/treasury/infrastructure/persistence/
