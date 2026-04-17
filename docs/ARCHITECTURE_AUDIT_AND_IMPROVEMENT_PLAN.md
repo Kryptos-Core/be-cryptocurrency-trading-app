@@ -542,6 +542,10 @@ Phase 6 (Testing)
 
 ### Session 2026-04-17 (continued)
 
+**Phase 6 - additional sensitive-flow coverage:**
+- Added `src/modules/orders/orders-matching.integration.spec.ts` covering `CreateOrderUseCase -> EnqueueMatchUseCase -> MatchingQueueService` wiring with real matching application providers and overridden external dependencies
+- Added `src/modules/blockchain/onchain-deposit.service.spec.ts` covering `submitDeposit` confirming/completed paths, duplicate guards, Tron default recipient enforcement, and `settleDepositByTxId` failed/confirmed transitions
+- Verified targeted Phase 6 suites and full Nest build after test additions
 **Phase 4 / 6 - matching boundary hardening + tests:**
 - Added `EnqueueMatchUseCase` so `orders` no longer depends on `MatchingQueueService` directly
 - Updated `CreateOrderUseCase` to dispatch matching through application use-cases only
@@ -589,5 +593,6 @@ Phase 6 (Testing)
 **Module CA progress:** 14/22 fully Clean Architecture (auth, orders, wallets, system-config, currencies, deposits, users, exchange-rate, managed-wallets, notifications, payment-config, market-maker, treasury, markets)
 
 **Remaining:** matching engine internals remain service-centric by design, but public module boundary now goes through application use-cases; Phase 6 still needs broader integration coverage for critical flows.
+
 
 
