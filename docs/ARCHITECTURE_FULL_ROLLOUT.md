@@ -1,4 +1,4 @@
-# Full architecture rollout (personal project)
+# Full architecture rollout
 
 This document tracks the **Definition of Done** for bringing every bounded context to the same technical bar: Clean Architecture, DDD aggregates where invariants exist, transactional outbox for cross-context effects, CQRS command/query surfaces, `UnitOfWork` for writes, OpenTelemetry enrichment, and worker pools for CPU-heavy work.
 
@@ -38,3 +38,23 @@ Shared integer decimal helpers live in [`src/common/utils/base-units.ts`](../src
 | `OnchainDeposit.Settled@v1` | After `settleDepositByTxId` completes on-chain confirmation and ledger settlement. |
 
 Catalog entries: [`integration-event-catalog.ts`](../src/common/integration-events/integration-event-catalog.ts).
+
+### Outbox relay semantics
+
+The relay ([`OutboxRelayService`](../src/common/outbox/outbox-relay.service.ts)) drains `integration_outbox` without using the CQRS `EventBus` for delivery. For each pass it runs up to 50 iterations; **each iteration locks and processes at most one row** in its own database transaction.
+
+- **Selection**: `published_at IS NULL`, `event_type` in the supported allow-list ([`outbox-relay-supported-event-types.ts`](../src/common/outbox/outbox-relay-supported-event-types.ts)), ordered by `occurred_at`, with **`pessimistic_write` + `skip_locked`** so a long-held lock on one row does not head-of-line block other workers.
+- **`published_at`**: set only after [`OutboxIntegrationSyncService.dispatchRow`](../src/common/outbox/outbox-integration-sync.service.ts) completes without throwing — that runs the **read-model upsert** and **idempotent notification** writes on the **same `EntityManager`** as the outbox row update. If dispatch throws, the transaction rolls back and the row stays unpublished for retry.
+- **Partial batch / failure**: If one row’s transaction fails after earlier rows in the same `flushOnce` already committed, those earlier rows remain published; the relay **stops further iterations** in that pass (the next scheduled flush retries). This matches per-row commits rather than one large transaction for the whole batch.
+
+### On-chain deposit read model (`read_onchain_deposits`)
+
+Projection is applied inside relay dispatch (not a separate async handler). The table is keyed by **`tx_id`** (internal id from the write path). **`OnchainDeposit.Submitted@v1`** establishes or refreshes the baseline row; **`OnchainDeposit.Settled@v1`** merges settlement fields. Optional **`UNIQUE (chain, tx_hash)`** is enforced when the migration defines it.
+
+### Query path flag
+
+When **`READ_MODEL_ONCHAIN_DEPOSITS=true`**, user-facing deposit listings merge **`read_onchain_deposits`** with non-deposit rows still read from `onchain_transactions` ([`ReadOnchainUserTransactionsQueryService`](../src/modules/blockchain/infrastructure/queries/read-onchain-user-transactions.query.service.ts)). When the flag is unset/false, queries use the legacy SQL only.
+
+### Notifications idempotency
+
+For on-chain deposit outbox events, **`notification_id` is the outbox row `id`** (deterministic, one notification per outbox row). Inserts use the caller’s transaction manager and treat **duplicate primary key** as success so concurrent workers cannot double-insert the same id.

@@ -13,6 +13,7 @@ import { NOTIFICATION_REPOSITORY } from './domain/ports';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
+import { OnchainDepositOutboxNotificationService } from './onchain-deposit-outbox-notification.service';
 import { NotificationRepository } from './repositories/notification.repository';
 import {
   InAppNotificationStrategy,
@@ -50,7 +51,8 @@ import {
     MarkNotificationReadUseCase,
     MarkAllNotificationsReadUseCase,
     SendNotificationUseCase,
+    OnchainDepositOutboxNotificationService,
   ],
-  exports: [NotificationsService],
+  exports: [NotificationsService, OnchainDepositOutboxNotificationService],
 })
 export class NotificationsModule {}

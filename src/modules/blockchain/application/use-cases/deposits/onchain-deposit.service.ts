@@ -139,7 +139,13 @@ export class OnchainDepositService {
     chain: BlockchainNetwork,
     amount: string,
     joinTransaction?: TransactionContext,
-  ): Promise<{ settled: boolean; alreadySettled: boolean }> {
+  ): Promise<{
+    settled: boolean;
+    alreadySettled: boolean;
+    creditCurrencyId?: string;
+    creditAmount?: string;
+    conversionRate?: string;
+  }> {
     const conversion = await this.depositFxService.convertToPlatformCash(chain, amount);
     const { creditCurrencyId, creditAmount, conversionRate } = conversion;
 
@@ -152,7 +158,9 @@ export class OnchainDepositService {
       'CREDIT',
       joinTransaction,
     );
-    if (existed) return { settled: false, alreadySettled: true };
+    if (existed) {
+      return { settled: false, alreadySettled: true };
+    }
 
     try {
       await this.walletsService.applyTransaction(
@@ -190,7 +198,13 @@ export class OnchainDepositService {
       );
     }
 
-    return { settled: true, alreadySettled: false };
+    return {
+      settled: true,
+      alreadySettled: false,
+      creditCurrencyId: String(creditCurrencyId),
+      creditAmount,
+      conversionRate,
+    };
   }
 
   async submitDeposit(userId: string, dto: SubmitDepositDto) {
@@ -253,6 +267,7 @@ export class OnchainDepositService {
         txStatus.status === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
 
       let settled = false;
+      let creditPayload: Record<string, string> = {};
 
       await this.unitOfWork.run(async (ctx) => {
         const em = ctx as unknown as EntityManager;
@@ -281,6 +296,13 @@ export class OnchainDepositService {
             ctx,
           );
           settled = settlement.settled || settlement.alreadySettled;
+          if (settlement.settled && settlement.creditCurrencyId) {
+            creditPayload = {
+              creditedCurrencyId: settlement.creditCurrencyId,
+              creditedAmount: settlement.creditAmount ?? '',
+              conversionRate: settlement.conversionRate ?? '',
+            };
+          }
         }
 
         await this.outboxAppender.append(em, {
@@ -297,6 +319,13 @@ export class OnchainDepositService {
             status,
             amount: onchainAmount.toString(),
             settled,
+            fromAddress: txStatus.from,
+            toAddress: txStatus.to,
+            confirmations: txStatus.confirmations,
+            createdAt: new Date().toISOString(),
+            confirmedAt:
+              status === OnchainTxStatus.COMPLETED ? new Date().toISOString() : null,
+            ...creditPayload,
           },
         });
       });
@@ -386,6 +415,15 @@ export class OnchainDepositService {
       );
       settled = settlement.settled || settlement.alreadySettled;
 
+      let settleCredit: Record<string, string> = {};
+      if (settlement.settled && settlement.creditCurrencyId) {
+        settleCredit = {
+          creditedCurrencyId: settlement.creditCurrencyId,
+          creditedAmount: settlement.creditAmount ?? '',
+          conversionRate: settlement.conversionRate ?? '',
+        };
+      }
+
       await this.outboxAppender.append(em, {
         aggregateType: 'OnchainTransaction',
         aggregateId: txId,
@@ -398,6 +436,15 @@ export class OnchainDepositService {
           chain: tx.chain,
           txHash: tx.tx_hash,
           settled,
+          status: OnchainTxStatus.COMPLETED,
+          amount: String(tx.amount),
+          fromAddress: tx.from_address,
+          toAddress: tx.to_address,
+          confirmations: latest.confirmations ?? 0,
+          createdAt:
+            tx.created_at instanceof Date ? tx.created_at.toISOString() : String(tx.created_at),
+          confirmedAt: new Date().toISOString(),
+          ...settleCredit,
         },
       });
     });

@@ -71,6 +71,13 @@ export class EnvironmentVariables {
   @IsOptional()
   READ_MARKETS_FROM_PROJECTION?: string;
 
+  /**
+   * When true/1/yes/on: user on-chain transaction list merges DEPOSIT rows from read_onchain_deposits with other types from onchain_transactions.
+   */
+  @IsString()
+  @IsOptional()
+  READ_MODEL_ONCHAIN_DEPOSITS?: string;
+
   @IsString()
   @IsOptional()
   MM_DEFAULT_SPREAD_BPS?: string;

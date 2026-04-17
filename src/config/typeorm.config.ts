@@ -19,6 +19,7 @@ import { Notification } from '../entities/notification.entity';
 import { Order } from '../entities/order.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
 import { ReadMarketPair } from '../entities/read-market-pair.entity';
+import { ReadOnchainDeposit } from '../entities/read-onchain-deposit.entity';
 import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
 import { TransactionWallet } from '../entities/transaction-wallet.entity';
@@ -46,6 +47,7 @@ const ALL_ENTITIES = [
   MarketMakerConfig,
   MarketPair,
   ReadMarketPair,
+  ReadOnchainDeposit,
   OnchainTransaction,
   Order,
   Trade,

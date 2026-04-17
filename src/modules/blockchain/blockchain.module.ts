@@ -55,6 +55,7 @@ import {
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
 import { DepositFxService } from './domain/services';
+import { ReadOnchainUserTransactionsQueryService } from './infrastructure/queries/read-onchain-user-transactions.query.service';
 import { LinkedWalletRepository, OnchainTransactionRepository } from './infrastructure/persistence';
 import { EthereumProvider, SolanaProvider, TronProvider } from './infrastructure/providers';
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';
@@ -167,6 +168,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     BlockchainProviderFactory,
     LinkedWalletRepository,
     OnchainTransactionRepository,
+    ReadOnchainUserTransactionsQueryService,
     { provide: LINKED_WALLET_REPOSITORY, useExisting: LinkedWalletRepository },
     { provide: ONCHAIN_TRANSACTION_REPOSITORY, useExisting: OnchainTransactionRepository },
     DepositFxService,

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { NOTIFICATION_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { Notification } from '@/entities/notification.entity';
@@ -120,5 +120,55 @@ export class NotificationRepository extends BaseRepository<Notification> {
          VALUES (UUID(), ?, ?)`,
       [params.targetUserId, params.notificationId],
     );
+  }
+
+  /**
+   * Same as createForUser but uses the caller's EntityManager (same DB transaction as outbox relay).
+   * Idempotent: duplicate PRIMARY KEY on notifications.notification_id is ignored (MySQL errno 1062).
+   */
+  async createForUserWithManagerIdempotent(
+    em: EntityManager,
+    params: {
+      notificationId: string;
+      title: string;
+      body: string;
+      type: string;
+      createdBy: string;
+      targetUserId: string;
+      data: Record<string, unknown> | null;
+    },
+  ): Promise<void> {
+    try {
+      await em.query(
+        `INSERT INTO notifications (notification_id, title, body, type, created_by, data)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          params.notificationId,
+          params.title,
+          params.body,
+          params.type,
+          params.createdBy,
+          params.data ? JSON.stringify(params.data) : null,
+        ],
+      );
+    } catch (e: any) {
+      if (e?.errno === 1062 || e?.code === 'ER_DUP_ENTRY') {
+        return;
+      }
+      throw e;
+    }
+
+    try {
+      await em.query(
+        `INSERT INTO user_notifications (id, user_id, notification_id)
+         VALUES (UUID(), ?, ?)`,
+        [params.targetUserId, params.notificationId],
+      );
+    } catch (e: any) {
+      if (e?.errno === 1062 || e?.code === 'ER_DUP_ENTRY') {
+        return;
+      }
+      throw e;
+    }
   }
 }

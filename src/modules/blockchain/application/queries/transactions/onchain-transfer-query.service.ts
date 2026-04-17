@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { nativeSymbolForChain } from '@/common/constants/chain-registry';
 import { BlockchainNetwork } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
@@ -12,6 +13,7 @@ import {
   ONCHAIN_TRANSACTION_REPOSITORY,
   type OnchainTransactionRepositoryPort,
 } from '../../../domain/ports';
+import { ReadOnchainUserTransactionsQueryService } from '../../../infrastructure/queries/read-onchain-user-transactions.query.service';
 
 @Injectable()
 export class OnchainTransferQueryService {
@@ -21,9 +23,14 @@ export class OnchainTransferQueryService {
     @Inject(CURRENCY_REPOSITORY)
     private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly systemConfigService: SystemConfigService,
+    private readonly config: ConfigService,
+    private readonly readOnchainMerged: ReadOnchainUserTransactionsQueryService,
   ) {}
 
   async getTransactions(userId: string, limit: number = 50) {
+    if (this.readOnchainMerged.useReadModel()) {
+      return this.readOnchainMerged.listMergedForUser(userId, limit);
+    }
     return this.onchainTxRepo.listByUser(userId, limit);
   }
 
