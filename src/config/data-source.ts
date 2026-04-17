@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { DataSource } from 'typeorm';
+import { typeormEntityGlobPaths } from './typeorm-entity-glob-paths';
 import { loadEnvFilesForCli } from './load-env-files';
 
 loadEnvFilesForCli();
@@ -26,7 +27,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: [path.join(__dirname, '../entities/*.entity{.ts,.js}')],
+  entities: typeormEntityGlobPaths(__dirname),
   migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
   synchronize: false, // Always false for migrations
   logging: true,
