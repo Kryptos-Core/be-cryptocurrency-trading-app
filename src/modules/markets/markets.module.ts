@@ -25,7 +25,7 @@ import { MarketRepository } from './repositories';
 @Module({
   imports: [
     TypeOrmModule.forFeature([MarketPair, ReadMarketPair]),
-    OutboxModule,
+    forwardRef(() => OutboxModule),
     forwardRef(() => CurrenciesModule),
     PriceOracleModule,
     forwardRef(() => MatchingModule),
