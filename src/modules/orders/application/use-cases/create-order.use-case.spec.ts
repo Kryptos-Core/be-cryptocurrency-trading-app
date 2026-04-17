@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { BusinessException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
-import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
+import { EnqueueMatchUseCase } from '@/modules/matching/application/use-cases';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
@@ -22,8 +22,8 @@ describe('CreateOrderUseCase', () => {
   const validationStrategy = {
     validate: jest.fn(),
   };
-  const matchingQueueService = {
-    enqueueMatch: jest.fn(),
+  const enqueueMatchUseCase = {
+    execute: jest.fn(),
   };
   const prepareCreateOrderContextService = {
     execute: jest.fn(),
@@ -42,7 +42,7 @@ describe('CreateOrderUseCase', () => {
         { provide: ORDER_REPOSITORY, useValue: orderRepository },
         { provide: CacheService, useValue: cacheService },
         { provide: OrderValidationService, useValue: validationStrategy },
-        { provide: MatchingQueueService, useValue: matchingQueueService },
+        { provide: EnqueueMatchUseCase, useValue: enqueueMatchUseCase },
         {
           provide: PrepareCreateOrderContextService,
           useValue: prepareCreateOrderContextService,
@@ -119,8 +119,66 @@ describe('CreateOrderUseCase', () => {
     );
     expect(validationStrategy.validate).toHaveBeenCalledWith({ amount: '1' });
     expect(orderRepository.createOrderViaProcedure).toHaveBeenCalled();
-    expect(matchingQueueService.enqueueMatch).toHaveBeenCalled();
+    expect(enqueueMatchUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pairId: 'p1',
+        feeCurrencyId: 'quote',
+        makerFeeRate: '0.001',
+        takerFeeRate: '0.002',
+      }),
+    );
     expect(result.order_id).toBe('o1');
+  });
+
+  it('does not enqueue matching when created order is already filled', async () => {
+    cacheService.get.mockResolvedValue(null);
+    orderRepository.findByUserIdempotency.mockResolvedValue(null);
+    prepareCreateOrderContextService.execute.mockResolvedValue({
+      pair: {
+        quote_currency_id: 'quote',
+        maker_fee_rate: '0.001',
+        taker_fee_rate: '0.002',
+      },
+      availableQuote: '1000',
+      availableBase: '10',
+    });
+    orderReservePolicy.prepare.mockReturnValue({
+      validationContext: { amount: '1' },
+      slippageTolerance: null,
+      marketBuyReservedQuote: null,
+    });
+    orderRepository.createOrderViaProcedure.mockResolvedValue({
+      order_id: 'o-filled',
+      error_code: null,
+      error_message: null,
+    });
+    orderRepository.findById.mockResolvedValue({
+      order_id: 'o-filled',
+      user_id: 'u1',
+      pair_id: 'p1',
+      side: 'BUY',
+      type: 'LIMIT',
+      amount: '1',
+      filled_amount: '1',
+      status: 'FILLED',
+      price: '100',
+      time_in_force: 'GTC',
+      created_at: new Date(),
+    });
+
+    await useCase.execute({
+      userId: 'u1',
+      dto: {
+        pairId: 'p1',
+        side: 'BUY',
+        type: 'LIMIT',
+        price: '100',
+        amount: '1',
+        idempotencyKey: 'filled-key',
+      },
+    } as any);
+
+    expect(enqueueMatchUseCase.execute).not.toHaveBeenCalled();
   });
 
   it('throws when procedure reports failure', async () => {

@@ -1,7 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { BaseCommand, type ICommandHandler } from '@/common/cqrs';
 import type { MatchOrderJobData } from '../../matching-queue.service';
+import { MatchingQueueService } from '../../matching-queue.service';
 import { MatchingService } from '../../matching.service';
+
+export class EnqueueMatchCommand extends BaseCommand implements MatchOrderJobData {
+  constructor(
+    public readonly takerOrder: MatchOrderJobData['takerOrder'],
+    public readonly pairId: string,
+    public readonly feeCurrencyId: string,
+    public readonly makerFeeRate: string,
+    public readonly takerFeeRate: string,
+    public readonly slippageTolerance?: string,
+    correlationId?: string,
+  ) {
+    super(correlationId);
+  }
+}
+
+@Injectable()
+export class EnqueueMatchUseCase implements ICommandHandler<EnqueueMatchCommand, void> {
+  constructor(private readonly matchingQueueService: MatchingQueueService) {}
+
+  async execute(command: EnqueueMatchCommand): Promise<void> {
+    await this.matchingQueueService.enqueueMatch({
+      takerOrder: command.takerOrder,
+      pairId: command.pairId,
+      feeCurrencyId: command.feeCurrencyId,
+      makerFeeRate: command.makerFeeRate,
+      takerFeeRate: command.takerFeeRate,
+      slippageTolerance: command.slippageTolerance,
+    });
+  }
+}
 
 export class RunMatchCommand extends BaseCommand implements MatchOrderJobData {
   constructor(

@@ -542,6 +542,11 @@ Phase 6 (Testing)
 
 ### Session 2026-04-17 (continued)
 
+**Phase 4 / 6 - matching boundary hardening + tests:**
+- Added `EnqueueMatchUseCase` so `orders` no longer depends on `MatchingQueueService` directly
+- Updated `CreateOrderUseCase` to dispatch matching through application use-cases only
+- Reduced `MatchingModule` exports to application-facing use-cases and removed public export of `MatchingService` / `MatchingQueueService`
+- Added focused tests for matching enqueue adapter and create-order enqueue behavior, including the no-enqueue path for already-filled orders
 **Phase 3 / 4 - CQRS closure for blockchain + matching integration:**
 - lockchain controller no longer resolves deposit address or supported networks directly; added GetDepositAddressQuery and GetSupportedNetworksQuery`r
 - Updated BlockchainModule wiring so every controller read path now flows through pplication/queries/`r
@@ -583,5 +588,6 @@ Phase 6 (Testing)
 
 **Module CA progress:** 14/22 fully Clean Architecture (auth, orders, wallets, system-config, currencies, deposits, users, exchange-rate, managed-wallets, notifications, payment-config, market-maker, treasury, markets)
 
-**Remaining:** 1 hybrid (`matching` engine internals still service-centric but now wrapped by application use-cases), 6 traditional/infrastructure, pending checklist items in CQRS standardization and Phase 6 tests.
+**Remaining:** matching engine internals remain service-centric by design, but public module boundary now goes through application use-cases; Phase 6 still needs broader integration coverage for critical flows.
+
 

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
 import {
+  EnqueueMatchUseCase,
   ReconcileOpenOrdersForPairUseCase,
   RemoveOrderFromBookUseCase,
   RunMatchUseCase,
@@ -24,11 +25,7 @@ import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
  * Matching Module
  * Core engine: order matching (price-time priority), trade execution, order book, lock, observer.
  * Visitor Pattern: AuditTradeVisitor and MetricsTradeVisitor registered as trade observers.
- * Queue Pattern: MatchingQueueService enqueues MATCH_ORDER_JOB; MatchingProcessor consumes.
- *
- * Port bindings:
- *  MATCHING_REPOSITORY        → MatchingRepository
- *  TRADE_AUDIT_LOG_REPOSITORY → TradeAuditLogRepository
+ * Queue Pattern: EnqueueMatchUseCase enqueues MATCH_ORDER_JOB; MatchingProcessor consumes.
  */
 @Module({
   imports: [
@@ -47,18 +44,18 @@ import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
     MetricsTradeVisitor,
     CircuitBreakerService,
     MatchingService,
+    MatchingQueueService,
+    EnqueueMatchUseCase,
     RunMatchUseCase,
     RemoveOrderFromBookUseCase,
     ReconcileOpenOrdersForPairUseCase,
-    MatchingQueueService,
     MatchingProcessor,
   ],
   exports: [
-    MatchingService,
+    EnqueueMatchUseCase,
     RunMatchUseCase,
     RemoveOrderFromBookUseCase,
     ReconcileOpenOrdersForPairUseCase,
-    MatchingQueueService,
     MetricsTradeVisitor,
     CircuitBreakerService,
     OrderBookService,

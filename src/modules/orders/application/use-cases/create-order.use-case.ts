@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
+import { EnqueueMatchCommand, EnqueueMatchUseCase } from '@/modules/matching/application/use-cases';
 import { Order } from '@/entities/order.entity';
-import { MatchingQueueService } from '@/modules/matching/matching-queue.service';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderCommand } from '@/modules/orders/commands/create-order.command';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
@@ -22,7 +22,7 @@ export class CreateOrderUseCase {
     private readonly orderRepository: OrderRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly validationService: OrderValidationService,
-    private readonly matchingQueueService: MatchingQueueService,
+    private readonly enqueueMatchUseCase: EnqueueMatchUseCase,
     private readonly prepareCreateOrderContextService: PrepareCreateOrderContextService,
     private readonly orderReservePolicy: OrderReservePolicy,
   ) {}
@@ -89,13 +89,13 @@ export class CreateOrderUseCase {
     }
 
     await this.enqueueMatching(
-      order!,
+      order,
       pair.quote_currency_id,
       pair.maker_fee_rate,
       pair.taker_fee_rate,
     );
-    await this.cacheService.set(cacheKey, this.orderToPlain(order!), IDEMPOTENCY_TTL_SEC);
-    return order!;
+    await this.cacheService.set(cacheKey, this.orderToPlain(order), IDEMPOTENCY_TTL_SEC);
+    return order;
   }
 
   private async enqueueMatching(
@@ -114,16 +114,16 @@ export class CreateOrderUseCase {
     }
 
     try {
-      await this.matchingQueueService.enqueueMatch({
-        takerOrder: this.orderToOrderBookOrder(order),
-        pairId: order.pair_id,
-        feeCurrencyId,
-        makerFeeRate: makerFeeRate ?? '0.001',
-        takerFeeRate: takerFeeRate ?? '0.001',
-        ...(order.type === 'MARKET' && order.slippage_tolerance
-          ? { slippageTolerance: order.slippage_tolerance }
-          : {}),
-      });
+      await this.enqueueMatchUseCase.execute(
+        new EnqueueMatchCommand(
+          this.orderToOrderBookOrder(order),
+          order.pair_id,
+          feeCurrencyId,
+          makerFeeRate ?? '0.001',
+          takerFeeRate ?? '0.001',
+          order.type === 'MARKET' ? (order.slippage_tolerance ?? undefined) : undefined,
+        ),
+      );
     } catch (error) {
       this.logger.warn(
         `Matching enqueue failed after order create ${order.order_id}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,

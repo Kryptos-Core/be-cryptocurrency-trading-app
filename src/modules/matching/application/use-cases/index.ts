@@ -1,4 +1,6 @@
 export {
+  EnqueueMatchCommand,
+  EnqueueMatchUseCase,
   ReconcileOpenOrdersForPairCommand,
   ReconcileOpenOrdersForPairUseCase,
   RemoveOrderFromBookCommand,
