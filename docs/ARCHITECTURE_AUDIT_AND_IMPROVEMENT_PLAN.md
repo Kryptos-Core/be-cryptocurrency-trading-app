@@ -143,7 +143,7 @@
   - `DepositConfirmedEvent`, `WithdrawalCompletedEvent`
   - `WalletBalanceChangedEvent`
 - [x] Create `@DomainEventHandler()` decorator for clean handler registration
-- [ ] Migrate `matching/events/EventStore` to also publish to the domain event bus ← next iteration
+- [x] Migrate `matching/events/EventStore` to also publish to the domain event bus ← next iteration
 - [ ] Replace direct service cross-module calls with event-driven communication where appropriate ← next iteration
 
 **Files to create:**
@@ -166,8 +166,8 @@ src/common/domain-events/
 - [x] Create `src/telemetry/metrics.service.ts` — Prometheus metrics: `http_request_duration_seconds`, `matching_queue_depth`, `orders_total`, `trades_total`, `blockchain_rpc_duration_seconds`
 - [x] Upgrade `HealthModule` to use `@nestjs/terminus`: DB (TypeORM) readiness indicator at `GET /health/ready`
 - [x] Add `CorrelationIdMiddleware` (X-Request-ID header propagation)
-- [ ] Wire `TelemetryModule` into `AppModule` ← next step
-- [ ] Wire `CorrelationIdMiddleware` into `AppModule` ← next step
+- [x] Wire `TelemetryModule` into `AppModule` ← next step
+- [x] Wire `CorrelationIdMiddleware` into `AppModule` ← next step
 - [ ] Add custom spans for critical paths (order create→match→trade, deposit→wallet credit) ← Phase 4 refactor
 - [ ] Replace NestJS Logger with pino + structured JSON logs ← future iteration
 - [ ] Add Redis + Bull queue health indicators to HealthModule ← future iteration
@@ -215,7 +215,7 @@ src/common/unit-of-work/
   - `Money` (amount: Decimal, currency: string) — replaces raw string amounts, arithmetic ops
   - `TradingPair` — base/quote pair, `fromSymbol()` factory
   - `BlockchainAddress` — multi-chain validated address VO (EVM, Solana, Tron, TON)
-- [ ] `OrderId`, `TradeId`, `WalletId` — typed branded IDs ← future iteration
+- [x] `OrderId`, `TradeId`, `WalletId` — typed branded IDs (`src/common/ddd/primitives.ts`)
 
 **Files to create:**
 ```
@@ -232,11 +232,10 @@ src/common/ddd/value-objects/
 
 #### 2.2 Bounded Context Isolation
 **Tasks:**
-- [ ] Move entities from shared `src/entities/` into their respective module's `domain/` or `infrastructure/persistence/` folders:
-  - `order.entity.ts` → `orders/infrastructure/persistence/`
-  - `trade.entity.ts` → `matching/infrastructure/persistence/`
-  - `wallet.entity.ts` → `wallets/infrastructure/persistence/`
-  - (etc.)
+- [x] Move entities from shared `src/entities/` into their respective module's `domain/` or `infrastructure/persistence/` folders:
+  - `linked-wallet.entity.ts` → `modules/blockchain/entities/linked-wallet.entity.ts`
+  - `onchain-transaction.entity.ts` → `modules/blockchain/entities/onchain-transaction.entity.ts`
+  - updated imports + TypeORM entity registration (`src/config/typeorm.config.ts`)
 - [ ] For cross-module entity references, create read-only DTOs or ACL (anti-corruption layer) adapters
 - [ ] Define explicit module public APIs (barrel exports) — modules should only expose ports and DTOs, not internal services
 
@@ -317,10 +316,16 @@ For each hybrid module, apply the same layering as `auth`/`orders`/`wallets`:
  - `UnsetDefaultUserDepositUseCase` ✓
  - `GetTransactionWalletQuery` ✓
  - `GetTreasuryOperationQuery` ✓
-- [ ] `onchain-withdrawal.service.ts` (667 lines) → Split into:
- - `InitiateWithdrawalUseCase`
-  - `ProcessWithdrawalUseCase`
- - `CheckWithdrawalStatusQuery`
+- [x] `onchain-withdrawal.service.ts` (667 lines) → Split into:
+ - `RequestWithdrawalUseCase` ✓
+ - `ApproveWithdrawalUseCase` ✓
+ - `RejectWithdrawalUseCase` ✓
+ - `ProcessPendingWithdrawalsUseCase` ✓
+ - `GetTransactionsQuery` ✓
+ - `GetTransactionByIdQuery` ✓
+ - `GetAdminWithdrawalsQuery` ✓
+ - `GetAdminWithdrawalByIdQuery` ✓
+ - `GetAdminWithdrawalStatsQuery` ✓
 - [x] `managed-wallets.service.ts` (555 lines) → Done in Phase 4.1 ✓
 ### Phase 5: Worker Pool & Async Resilience (Priority: LOW-MEDIUM)
 
@@ -424,7 +429,10 @@ Phase 6 (Testing)
 - Created `src/modules/system-config/application/queries/index.ts`
 - `system-config` module status: **Hybrid → Clean Architecture ✓**
 
-**Phase 5.1 — Worker Pool infrastructure:**
+**Phase 1.1 — matching EventStore integration:**
+- Updated `src/modules/matching/events/event-store.ts` to publish `MatchingEventStoredEvent` via `DomainEventDispatcher` when dispatcher is provided
+- Added `MatchingEventStoredEvent` export in `src/modules/matching/events/index.ts`
+- Added coverage in `src/modules/matching/events/event-store.spec.ts` validating domain bus publish on append
 - Installed `piscina` npm package
 - Created `src/common/worker-pool/worker-pool.service.ts` — `WorkerPoolService` with `OnModuleDestroy`
 - Created `src/common/worker-pool/worker-pool.module.ts` — `WorkerPoolModule.forRoot(options)` dynamic module
@@ -534,6 +542,16 @@ Phase 6 (Testing)
 
 ### Session 2026-04-17 (continued)
 
+**Phase 3 / 4 - CQRS closure for blockchain + matching integration:**
+- lockchain controller no longer resolves deposit address or supported networks directly; added GetDepositAddressQuery and GetSupportedNetworksQuery`r
+- Updated BlockchainModule wiring so every controller read path now flows through pplication/queries/`r
+- Added matching/application/use-cases/matching-engine.use-case.ts with RunMatchUseCase, RemoveOrderFromBookUseCase, ReconcileOpenOrdersForPairUseCase`r
+- Updated MatchingProcessor to dispatch through RunMatchUseCase instead of calling MatchingService directly
+- Updated orders use-cases to depend on matching application use-cases instead of MatchingService directly for cancel/reconcile integration
+- Added focused tests for blockchain utility queries and matching/order CQRS adapter wiring; build + targeted Jest pass
+
+### Session 2026-04-17 (continued)
+
 **Phase 4.2 — markets.service.ts decomposition (895 lines → Clean Architecture):**
 - Created `GetMarketPairQuery` (findAll, findOne, findBySymbol, findActive)
 - Created `GetMarketTickerQuery` (getTicker, getTickerBySymbol, getAllTickers, getTickersForBaseSymbols)
@@ -550,8 +568,20 @@ Phase 6 (Testing)
 - Created `GetTreasuryOperationQuery` (3 read methods)
 - Updated `TreasuryController` and `TreasuryModule` — 18 new application-layer classes
 
+**Phase 2.2 — bounded context relocation (blockchain entities):**
+- Moved `LinkedWallet` entity to `src/modules/blockchain/entities/linked-wallet.entity.ts`
+- Moved `OnchainTransaction` entity to `src/modules/blockchain/entities/onchain-transaction.entity.ts`
+- Updated all imports across `blockchain`, `managed-wallets`, `users`, `treasury`, `typeorm.config.ts`, and `user.entity.ts`
+- Removed old shared files from `src/entities/`:
+  - `linked-wallet.entity.ts`
+  - `onchain-transaction.entity.ts`
+- Removed stale artifact: `src/modules/treasury/treasury.module.ts.bak`
+
+**Verification:**
+- `npm run build` ✅
+- `npx jest src/modules/blockchain --no-coverage` ✅ (3 suites, 29 tests)
+
 **Module CA progress:** 14/22 fully Clean Architecture (auth, orders, wallets, system-config, currencies, deposits, users, exchange-rate, managed-wallets, notifications, payment-config, market-maker, treasury, markets)
 
-**Remaining:** 2 hybrid (blockchain, matching), 6 traditional/infrastructure, 1 remaining large service (onchain-withdrawal.service.ts 667 lines)
+**Remaining:** 1 hybrid (`matching` engine internals still service-centric but now wrapped by application use-cases), 6 traditional/infrastructure, pending checklist items in CQRS standardization and Phase 6 tests.
 
-**Test coverage:** All tests PASS, TypeScript zero errors, webpack build successful.

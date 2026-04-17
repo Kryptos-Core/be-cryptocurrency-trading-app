@@ -23,29 +23,48 @@ import {
 import { BlockchainNetwork, Permission } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import {
   GetAdminWithdrawalByIdQuery,
+  GetAdminWithdrawalByIdRequest,
   GetAdminWithdrawalStatsQuery,
+  GetAdminWithdrawalStatsRequest,
   GetAdminWithdrawalsQuery,
+  GetAdminWithdrawalsRequest,
+  GetDepositAddressQuery,
+  GetDepositAddressRequest,
   GetLinkedWalletBalanceQuery,
+  GetLinkedWalletBalanceRequest,
   GetLinkedWalletsQuery,
+  GetLinkedWalletsRequest,
+  GetSupportedNetworksQuery,
+  GetSupportedNetworksRequest,
   GetTransactionByIdQuery,
+  GetTransactionByIdRequest,
   GetTransactionsQuery,
+  GetTransactionsRequest,
 } from './application/queries';
 import {
+  ApproveWithdrawalCommand,
   ApproveWithdrawalUseCase,
+  PreviewDepositQuery,
   PreviewDepositUseCase,
+  ProcessPendingWithdrawalsCommand,
   ProcessPendingWithdrawalsUseCase,
+  RejectWithdrawalCommand,
   RejectWithdrawalUseCase,
+  RequestLinkWalletCommand,
   RequestLinkWalletUseCase,
+  RequestWithdrawalCommand,
   RequestWithdrawalUseCase,
+  SettleDepositCommand,
   SettleDepositUseCase,
+  SubmitDepositCommand,
   SubmitDepositUseCase,
+  UnlinkWalletCommand,
   UnlinkWalletUseCase,
+  VerifyLinkWalletCommand,
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import type {
   ManualWithdrawalActionDto,
   RequestLinkDto,
@@ -64,7 +83,6 @@ import type {
 @UseGuards(JwtAuthGuard)
 export class BlockchainController {
   constructor(
-    // ─── Use Cases ─────────────────────────────────────────────────────
     private readonly requestLinkWallet: RequestLinkWalletUseCase,
     private readonly verifyLinkWallet: VerifyLinkWalletUseCase,
     private readonly unlinkWalletUc: UnlinkWalletUseCase,
@@ -75,25 +93,17 @@ export class BlockchainController {
     private readonly approveWithdrawal: ApproveWithdrawalUseCase,
     private readonly rejectWithdrawal: RejectWithdrawalUseCase,
     private readonly processPendingWithdrawals: ProcessPendingWithdrawalsUseCase,
-    // ─── Queries ───────────────────────────────────────────────────────
     private readonly getLinkedWalletsQuery: GetLinkedWalletsQuery,
     private readonly getLinkedWalletBalanceQuery: GetLinkedWalletBalanceQuery,
+    private readonly getDepositAddressQuery: GetDepositAddressQuery,
     private readonly getTransactionsQuery: GetTransactionsQuery,
     private readonly getTransactionByIdQuery: GetTransactionByIdQuery,
     private readonly getAdminWithdrawalsQuery: GetAdminWithdrawalsQuery,
     private readonly getAdminWithdrawalByIdQuery: GetAdminWithdrawalByIdQuery,
     private readonly getAdminWithdrawalStatsQuery: GetAdminWithdrawalStatsQuery,
-    // ─── Infrastructure ────────────────────────────────────────────────
-    private readonly providerFactory: BlockchainProviderFactory,
-    private readonly managedWalletsService: ManagedWalletsService,
+    private readonly getSupportedNetworksQuery: GetSupportedNetworksQuery,
   ) {}
 
-  // ============ WALLET LINKING ============
-
-  /**
-   * Bước 1: Yêu cầu liên kết ví — tạo nonce challenge
-   * POST /blockchain/wallets/request-link
-   */
   @Post('wallets/request-link')
   @ApiOperation({
     summary: 'Yêu cầu liên kết ví',
@@ -104,13 +114,9 @@ export class BlockchainController {
   @ApiBadRequestResponse('Địa chỉ ví không hợp lệ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async requestLink(@CurrentUser('userId') userId: string, @Body() dto: RequestLinkDto) {
-    return this.requestLinkWallet.execute(userId, dto);
+    return this.requestLinkWallet.execute(new RequestLinkWalletCommand(userId, dto));
   }
 
-  /**
-   * Bước 2: Xác minh chữ ký & tạo liên kết
-   * POST /blockchain/wallets/verify-link
-   */
   @Post('wallets/verify-link')
   @ApiOperation({
     summary: 'Xác minh liên kết ví',
@@ -120,13 +126,9 @@ export class BlockchainController {
   @ApiBadRequestResponse('Chữ ký không hợp lệ hoặc nonce hết hạn')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async verifyLink(@CurrentUser('userId') userId: string, @Body() dto: VerifyLinkDto) {
-    return this.verifyLinkWallet.execute(userId, dto);
+    return this.verifyLinkWallet.execute(new VerifyLinkWalletCommand(userId, dto));
   }
 
-  /**
-   * Danh sách ví đã liên kết
-   * GET /blockchain/wallets
-   */
   @Get('wallets')
   @ApiOperation({
     summary: 'Danh sách ví liên kết',
@@ -135,13 +137,9 @@ export class BlockchainController {
   @ApiSuccessResponse('Danh sách ví liên kết')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getLinkedWallets(@CurrentUser('userId') userId: string) {
-    return this.getLinkedWalletsQuery.execute(userId);
+    return this.getLinkedWalletsQuery.execute(new GetLinkedWalletsRequest(userId));
   }
 
-  /**
-   * Lấy số dư on-chain của ví liên kết
-   * GET /blockchain/wallets/:linkId/balance
-   */
   @Get('wallets/:linkId/balance')
   @ApiOperation({
     summary: 'Số dư on-chain ví liên kết',
@@ -155,37 +153,27 @@ export class BlockchainController {
     @CurrentUser('userId') userId: string,
     @Param('linkId') linkId: string,
   ) {
-    return this.getLinkedWalletBalanceQuery.execute(userId, linkId);
+    return this.getLinkedWalletBalanceQuery.execute(new GetLinkedWalletBalanceRequest(userId, linkId));
   }
 
-  /**
-   * Huỷ liên kết ví
-   * DELETE /blockchain/wallets/:linkId
-   */
   @Delete('wallets/:linkId')
   @ApiOperation({
     summary: 'Huỷ liên kết ví',
-    description: 'Soft delete — đặt status = REVOKED',
+    description: 'Soft delete - đặt status = REVOKED',
   })
   @ApiParam({ name: 'linkId', description: 'ID ví liên kết' })
   @ApiSuccessResponse('Huỷ liên kết thành công')
   @ApiBadRequestResponse('Ví liên kết không tìm thấy')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async unlinkWallet(@CurrentUser('userId') userId: string, @Param('linkId') linkId: string) {
-    return this.unlinkWalletUc.execute(userId, linkId);
+    return this.unlinkWalletUc.execute(new UnlinkWalletCommand(userId, linkId));
   }
 
-  // ============ NẠP / RÚT TIỀN ============
-
-  /**
-   * Lấy địa chỉ nạp tiền theo mạng
-   * GET /blockchain/deposit/address
-   */
   @Get('deposit/address')
   @ApiOperation({
     summary: 'Lấy địa chỉ nạp tiền theo mạng',
     description:
-      'Tron mainnet (TRC-20): địa chỉ từ transaction_wallets default nạp user. Các chain khác: ví nóng. Không có default Tron → 400.',
+      'Tron mainnet (TRC-20): địa chỉ từ transaction_wallets default nạp user. Các chain khác: ví nóng. Không có default Tron -> 400.',
   })
   @ApiQuery({
     name: 'chain',
@@ -197,45 +185,12 @@ export class BlockchainController {
   @ApiBadRequestResponse('Thiếu chain hoặc chain không hợp lệ')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getDepositAddress(@Query('chain') chain?: string) {
-    if (!chain) {
-      throw new BadRequestException('Thiếu query param chain', 'CHAIN_REQUIRED');
-    }
-
-    const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
-    const depositWallet =
-      await this.managedWalletsService.getConfiguredDepositWallet(normalizedChain);
-
-    if (normalizedChain === BlockchainNetwork.TRON_MAINNET) {
-      if (!depositWallet) {
-        throw new BadRequestException(
-          'Chưa cấu hình ví nạp mặc định cho mạng này. Vui lòng đặt default trong Nạp tiền & ví quản lý.',
-          'DEPOSIT_DEFAULT_NOT_CONFIGURED',
-        );
-      }
-      return {
-        chain: normalizedChain,
-        depositAddress: depositWallet.address,
-        source: depositWallet.source,
-        note: 'Đây là địa chỉ ví nhận nạp on-chain do vận hành chỉ định (transaction wallet default).',
-      };
-    }
-
-    const provider = this.providerFactory.getProvider(normalizedChain);
-    return {
-      chain: normalizedChain,
-      depositAddress: await provider.getHotWalletAddress(),
-      source: 'hot_wallet',
-      note: 'Đây là địa chỉ ví nhận tiền của platform cho mạng đã chọn.',
-    };
+    return this.getDepositAddressQuery.execute(new GetDepositAddressRequest(chain ?? ''));
   }
 
-  /**
-   * Preview giao dịch nạp theo txHash
-   * GET /blockchain/deposit/preview
-   */
   @Get('deposit/preview')
   @ApiOperation({
-    summary: 'Preview nạp tiền theo txHash',
+    summary: 'Preview giao dịch nạp theo txHash',
     description: 'Kiểm tra nhanh giao dịch on-chain để FE tự điền amount trước khi submit deposit.',
   })
   @ApiQuery({ name: 'chain', required: true, type: String, example: 'ETH_MAINNET' })
@@ -256,13 +211,9 @@ export class BlockchainController {
     }
 
     const normalizedChain = chain.toUpperCase() as BlockchainNetwork;
-    return this.previewDeposit.execute(userId, normalizedChain, txHash);
+    return this.previewDeposit.execute(new PreviewDepositQuery(userId, normalizedChain, txHash));
   }
 
-  /**
-   * Nạp tiền thủ công — submit txHash
-   * POST /blockchain/deposit/submit
-   */
   @Post('deposit/submit')
   @ApiOperation({
     summary: 'Nạp tiền (submit txHash)',
@@ -273,13 +224,9 @@ export class BlockchainController {
   @ApiBadRequestResponse('TxHash không hợp lệ hoặc giao dịch lỗi')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async submitDeposit(@CurrentUser('userId') userId: string, @Body() dto: SubmitDepositDto) {
-    return this.submitDepositUc.execute(userId, dto);
+    return this.submitDepositUc.execute(new SubmitDepositCommand(userId, dto));
   }
 
-  /**
-   * Settle nạp tiền theo txId (dùng cho tx đang CONFIRMING)
-   * POST /blockchain/deposit/:txId/settle
-   */
   @Post('deposit/:txId/settle')
   @ApiOperation({
     summary: 'Settle nạp tiền on-chain',
@@ -290,13 +237,9 @@ export class BlockchainController {
   @ApiBadRequestResponse('Giao dịch nạp không hợp lệ hoặc chưa confirm')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async settleDeposit(@CurrentUser('userId') userId: string, @Param('txId') txId: string) {
-    return this.settleDepositUc.execute(userId, txId);
+    return this.settleDepositUc.execute(new SettleDepositCommand(userId, txId));
   }
 
-  /**
-   * Yêu cầu rút tiền
-   * POST /blockchain/withdraw/request
-   */
   @Post('withdraw/request')
   @ApiOperation({
     summary: 'Yêu cầu rút tiền',
@@ -309,13 +252,9 @@ export class BlockchainController {
     @CurrentUser('userId') userId: string,
     @Body() dto: RequestWithdrawalDto,
   ) {
-    return this.requestWithdrawal.execute(userId, dto);
+    return this.requestWithdrawal.execute(new RequestWithdrawalCommand(userId, dto));
   }
 
-  /**
-   * Duyệt yêu cầu rút tiền manual
-   * POST /blockchain/withdraw/manual/:txId/approve
-   */
   @Post('withdraw/manual/:txId/approve')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -334,13 +273,9 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() _dto: ManualWithdrawalActionDto,
   ) {
-    return this.approveWithdrawal.execute(actorUserId, txId);
+    return this.approveWithdrawal.execute(new ApproveWithdrawalCommand(actorUserId, txId));
   }
 
-  /**
-   * Từ chối yêu cầu rút tiền manual
-   * POST /blockchain/withdraw/manual/:txId/reject
-   */
   @Post('withdraw/manual/:txId/reject')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -358,13 +293,9 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() dto: ManualWithdrawalActionDto,
   ) {
-    return this.rejectWithdrawal.execute(actorUserId, txId, dto.reason);
+    return this.rejectWithdrawal.execute(new RejectWithdrawalCommand(actorUserId, txId, dto.reason));
   }
 
-  /**
-   * Worker endpoint để xử lý hàng chờ manual withdrawal
-   * POST /blockchain/withdraw/manual/process-pending?limit=20
-   */
   @Post('withdraw/manual/process-pending')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -382,15 +313,11 @@ export class BlockchainController {
     @Query('limit') limit?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.processPendingWithdrawals.execute(actorUserId, parsedLimit);
+    return this.processPendingWithdrawals.execute(
+      new ProcessPendingWithdrawalsCommand(actorUserId, parsedLimit),
+    );
   }
 
-  // ============ LỊCH SỬ GIAO DỊCH ============
-
-  /**
-   * Lịch sử giao dịch on-chain
-   * GET /blockchain/transactions
-   */
   @Get('transactions')
   @ApiOperation({
     summary: 'Lịch sử giao dịch on-chain',
@@ -401,16 +328,12 @@ export class BlockchainController {
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getTransactions(@CurrentUser('userId') userId: string, @Query('limit') limit?: string) {
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
-    return this.getTransactionsQuery.execute(userId, parsedLimit);
+    return this.getTransactionsQuery.execute(new GetTransactionsRequest(userId, parsedLimit));
   }
 
-  /**
-   * Chi tiết 1 giao dịch
-   * GET /blockchain/transactions/:txId
-   */
   @Get('transactions/:txId')
   @ApiOperation({
-    summary: 'Chi tiết giao dịch on-chain',
+    summary: 'Chi tiết 1 giao dịch',
     description: 'Lấy thông tin chi tiết 1 giao dịch',
   })
   @ApiParam({ name: 'txId', description: 'ID giao dịch on-chain' })
@@ -418,15 +341,9 @@ export class BlockchainController {
   @ApiBadRequestResponse('Giao dịch không tìm thấy')
   @ApiUnauthorizedResponse('Chưa đăng nhập')
   async getTransaction(@CurrentUser('userId') userId: string, @Param('txId') txId: string) {
-    return this.getTransactionByIdQuery.execute(userId, txId);
+    return this.getTransactionByIdQuery.execute(new GetTransactionByIdRequest(userId, txId));
   }
 
-  // ============ ADMIN ============
-
-  /**
-   * Admin: Thống kê yêu cầu rút tiền chờ duyệt
-   * GET /blockchain/admin/withdrawals/stats
-   */
   @Get('admin/withdrawals/stats')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -436,13 +353,9 @@ export class BlockchainController {
     description: 'Pending count and total amount by chain.',
   })
   async getAdminWithdrawalStats() {
-    return this.getAdminWithdrawalStatsQuery.execute();
+    return this.getAdminWithdrawalStatsQuery.execute(new GetAdminWithdrawalStatsRequest());
   }
 
-  /**
-   * Admin: Chi tiết 1 giao dịch rút tiền
-   * GET /blockchain/admin/withdrawals/:txId
-   */
   @Get('admin/withdrawals/:txId')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -453,13 +366,9 @@ export class BlockchainController {
   })
   @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền' })
   async getAdminWithdrawalDetail(@Param('txId') txId: string) {
-    return this.getAdminWithdrawalByIdQuery.execute(txId);
+    return this.getAdminWithdrawalByIdQuery.execute(new GetAdminWithdrawalByIdRequest(txId));
   }
 
-  /**
-   * Admin: Danh sách tất cả giao dịch rút tiền on-chain
-   * GET /blockchain/admin/withdrawals
-   */
   @Get('admin/withdrawals')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -495,24 +404,20 @@ export class BlockchainController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
-    return this.getAdminWithdrawalsQuery.execute({
-      userId,
-      status,
-      chain,
-      search,
-      dateFrom,
-      dateTo,
-      page,
-      limit,
-    });
+    return this.getAdminWithdrawalsQuery.execute(
+      new GetAdminWithdrawalsRequest({
+        userId,
+        status,
+        chain,
+        search,
+        dateFrom,
+        dateTo,
+        page,
+        limit,
+      }),
+    );
   }
 
-  // ============ UTILITIES ============
-
-  /**
-   * Danh sách mạng blockchain được hỗ trợ
-   * GET /blockchain/networks
-   */
   @Get('networks')
   @Public()
   @ApiOperation({
@@ -521,8 +426,6 @@ export class BlockchainController {
   })
   @ApiSuccessResponse('Danh sách mạng')
   getSupportedNetworks() {
-    return {
-      networks: this.providerFactory.getSupportedNetworks(),
-    };
+    return this.getSupportedNetworksQuery.execute(new GetSupportedNetworksRequest());
   }
 }

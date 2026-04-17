@@ -1,53 +1,143 @@
 import { Injectable } from '@nestjs/common';
+import { BaseQuery, type IQueryHandler } from '@/common/cqrs';
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
-import type {
-  CreateManagedWalletDto,
-  ManagedWalletResponseDto,
-  SendManagedTransactionDto,
-  UpdateRecommendedChainDto,
-} from '../../dto';
+import type { UserRole } from '@/common/enums';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
+import type { ManagedWalletResponseDto } from '../../dto';
 import { ManagedWalletsService } from '../../managed-wallets.service';
 
-/**
- * GetManagedWalletsQuery — read-only queries for managed wallet data.
- *
- * Separates reads from writes following CQS principle.
- * Delegates to ManagedWalletsService.
- */
+export class GetManagedWalletsRequest extends BaseQuery {
+  constructor(
+    public readonly userId: string,
+    public readonly role: UserRole,
+    correlationId?: string,
+  ) {
+    super(correlationId);
+  }
+}
+
 @Injectable()
-export class GetManagedWalletsQuery {
+export class GetManagedWalletsQuery
+  implements IQueryHandler<GetManagedWalletsRequest, ManagedWalletResponseDto[]>
+{
   constructor(private readonly managedWalletsService: ManagedWalletsService) {}
 
-  async listWallets(userId: string, role: string): Promise<ManagedWalletResponseDto[]> {
-    return this.managedWalletsService.listWallets(userId, role as never);
+  async execute(query: GetManagedWalletsRequest): Promise<ManagedWalletResponseDto[]> {
+    return this.managedWalletsService.listWallets(query.userId, query.role);
   }
+}
 
-  async getDepositDefaults(): Promise<{
+export class GetManagedWalletDepositDefaultsRequest extends BaseQuery {
+  constructor(correlationId?: string) {
+    super(correlationId);
+  }
+}
+
+@Injectable()
+export class GetManagedWalletDepositDefaultsQuery
+  implements
+    IQueryHandler<
+      GetManagedWalletDepositDefaultsRequest,
+      {
+        recommended_chain: BlockchainChainDbValue;
+        defaults: ManagedWalletResponseDto[];
+      }
+    >
+{
+  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
+
+  async execute(query: GetManagedWalletDepositDefaultsRequest): Promise<{
     recommended_chain: BlockchainChainDbValue;
     defaults: ManagedWalletResponseDto[];
   }> {
     return this.managedWalletsService.getDepositDefaults();
   }
+}
 
-  async getWalletDetail(
-    userId: string,
-    walletId: string,
-    role: string,
+export class GetManagedWalletDetailRequest extends BaseQuery {
+  constructor(
+    public readonly userId: string,
+    public readonly walletId: string,
+    public readonly role: UserRole,
+    correlationId?: string,
+  ) {
+    super(correlationId);
+  }
+}
+
+@Injectable()
+export class GetManagedWalletDetailQuery
+  implements
+    IQueryHandler<
+      GetManagedWalletDetailRequest,
+      ManagedWalletResponseDto & { balance: string; symbol: string }
+    >
+{
+  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
+
+  async execute(
+    query: GetManagedWalletDetailRequest,
   ): Promise<ManagedWalletResponseDto & { balance: string; symbol: string }> {
-    return this.managedWalletsService.getWalletDetail(userId, walletId, role as never);
+    return this.managedWalletsService.getWalletDetail(query.userId, query.walletId, query.role);
   }
+}
 
-  async getWalletTransactions(
-    userId: string,
-    walletId: string,
-    role: string,
-    limit: number = 50,
-  ): Promise<OnchainTransaction[]> {
-    return this.managedWalletsService.getWalletTransactions(userId, walletId, role as never, limit);
+export class GetManagedWalletTransactionsRequest extends BaseQuery {
+  constructor(
+    public readonly userId: string,
+    public readonly walletId: string,
+    public readonly role: UserRole,
+    public readonly limit: number = 50,
+    correlationId?: string,
+  ) {
+    super(correlationId);
   }
+}
 
-  async getDepositMethods(): Promise<{
+@Injectable()
+export class GetManagedWalletTransactionsQuery
+  implements IQueryHandler<GetManagedWalletTransactionsRequest, OnchainTransaction[]>
+{
+  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
+
+  async execute(query: GetManagedWalletTransactionsRequest): Promise<OnchainTransaction[]> {
+    return this.managedWalletsService.getWalletTransactions(
+      query.userId,
+      query.walletId,
+      query.role,
+      query.limit,
+    );
+  }
+}
+
+export class GetDepositMethodsRequest extends BaseQuery {
+  constructor(correlationId?: string) {
+    super(correlationId);
+  }
+}
+
+@Injectable()
+export class GetDepositMethodsQuery
+  implements
+    IQueryHandler<
+      GetDepositMethodsRequest,
+      {
+        recommended_chain: string;
+        methods: Array<{
+          chain: string;
+          label: string;
+          deposit_address: string;
+          is_recommended: boolean;
+          deposit_enabled: boolean;
+          min_confirmations: number;
+          estimated_time: string;
+        }>;
+      }
+    >
+{
+  constructor(private readonly managedWalletsService: ManagedWalletsService) {}
+
+  async execute(query: GetDepositMethodsRequest): Promise<{
     recommended_chain: string;
     methods: Array<{
       chain: string;

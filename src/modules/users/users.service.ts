@@ -4,7 +4,7 @@ import { CloudinaryService } from '@/common/services';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { User } from '@/entities/user.entity';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';

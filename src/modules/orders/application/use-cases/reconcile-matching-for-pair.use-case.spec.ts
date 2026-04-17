@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@/common/exceptions';
-import { MarketRepository } from '@/modules/markets/repositories';
-import { MatchingService } from '@/modules/matching/matching.service';
+import { MARKET_REPOSITORY } from '@/modules/markets/domain/ports';
+import { ReconcileOpenOrdersForPairUseCase as MatchingReconcileOpenOrdersForPairUseCase } from '@/modules/matching/application/use-cases';
 import { ReconcileMatchingForPairUseCase } from '@/modules/orders/application/use-cases/reconcile-matching-for-pair.use-case';
 
 describe('ReconcileMatchingForPairUseCase', () => {
@@ -9,8 +9,8 @@ describe('ReconcileMatchingForPairUseCase', () => {
     findById: jest.fn(),
     findBySymbol: jest.fn(),
   };
-  const matchingService = {
-    reconcileOpenOrdersForPair: jest.fn(),
+  const reconcileOpenOrdersForPairUseCase = {
+    execute: jest.fn(),
   };
 
   let useCase: ReconcileMatchingForPairUseCase;
@@ -20,8 +20,11 @@ describe('ReconcileMatchingForPairUseCase', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ReconcileMatchingForPairUseCase,
-        { provide: MarketRepository, useValue: marketRepository },
-        { provide: MatchingService, useValue: matchingService },
+        { provide: MARKET_REPOSITORY, useValue: marketRepository },
+        {
+          provide: MatchingReconcileOpenOrdersForPairUseCase,
+          useValue: reconcileOpenOrdersForPairUseCase,
+        },
       ],
     }).compile();
 
@@ -36,17 +39,19 @@ describe('ReconcileMatchingForPairUseCase', () => {
       maker_fee_rate: '0.001',
       taker_fee_rate: '0.002',
     });
-    matchingService.reconcileOpenOrdersForPair.mockResolvedValue({ pairId: 'pair-1' });
+    reconcileOpenOrdersForPairUseCase.execute.mockResolvedValue({ pairId: 'pair-1' });
 
     const result = await useCase.execute('BTC/USDT');
 
     expect(marketRepository.findBySymbol).toHaveBeenCalledWith('BTC/USDT');
-    expect(matchingService.reconcileOpenOrdersForPair).toHaveBeenCalledWith({
-      pairId: 'pair-1',
-      feeCurrencyId: 'quote-1',
-      makerFeeRate: '0.001',
-      takerFeeRate: '0.002',
-    });
+    expect(reconcileOpenOrdersForPairUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pairId: 'pair-1',
+        feeCurrencyId: 'quote-1',
+        makerFeeRate: '0.001',
+        takerFeeRate: '0.002',
+      }),
+    );
     expect(result).toEqual({ pairId: 'pair-1' });
   });
 

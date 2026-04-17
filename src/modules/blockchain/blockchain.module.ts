@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EVM_CHAIN_DEFINITIONS } from '@/common/constants/evm-chain-definitions';
 import { BlockchainNetwork } from '@/common/enums';
-import { LinkedWallet } from '@/entities/linked-wallet.entity';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
+import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import { OnchainTransferService } from '@/modules/blockchain/onchain-transfer.service';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
@@ -20,8 +20,10 @@ import {
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalStatsQuery,
   GetAdminWithdrawalsQuery,
+  GetDepositAddressQuery,
   GetLinkedWalletBalanceQuery,
   GetLinkedWalletsQuery,
+  GetSupportedNetworksQuery,
   GetTransactionByIdQuery,
   GetTransactionsQuery,
 } from './application/queries';
@@ -182,7 +184,6 @@ import { WalletLinkingService } from './wallet-linking.service';
     WalletConnectSessionManager,
     WalletConnectService,
 
-    // ─── Application: Use Cases ──────────────────────────────────────────
     RequestLinkWalletUseCase,
     VerifyLinkWalletUseCase,
     UnlinkWalletUseCase,
@@ -194,14 +195,15 @@ import { WalletLinkingService } from './wallet-linking.service';
     RejectWithdrawalUseCase,
     ProcessPendingWithdrawalsUseCase,
 
-    // ─── Application: Queries ────────────────────────────────────────────
     GetLinkedWalletsQuery,
     GetLinkedWalletBalanceQuery,
+    GetDepositAddressQuery,
     GetTransactionsQuery,
     GetTransactionByIdQuery,
     GetAdminWithdrawalsQuery,
     GetAdminWithdrawalByIdQuery,
     GetAdminWithdrawalStatsQuery,
+    GetSupportedNetworksQuery,
   ],
   exports: [
     BlockchainProviderFactory,

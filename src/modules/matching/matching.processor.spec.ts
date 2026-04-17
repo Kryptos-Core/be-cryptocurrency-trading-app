@@ -1,8 +1,8 @@
-import { Test, type TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import type { Job } from 'bull';
+import { RunMatchUseCase } from './application/use-cases';
 import type { OrderBookOrder } from './interfaces';
 import { MatchingProcessor } from './matching.processor';
-import { MatchingService } from './matching.service';
 import { MATCH_ORDER_JOB, type MatchOrderJobData } from './matching-queue.service';
 
 function makeOrder(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
@@ -28,21 +28,21 @@ function makeJob(data: MatchOrderJobData): Job<MatchOrderJobData> {
 
 describe('MatchingProcessor', () => {
   let processor: MatchingProcessor;
-  let matchingService: jest.Mocked<MatchingService>;
+  let runMatchUseCase: jest.Mocked<RunMatchUseCase>;
 
   beforeEach(async () => {
-    matchingService = {
-      runMatch: jest.fn().mockResolvedValue([]),
-    } as unknown as jest.Mocked<MatchingService>;
+    runMatchUseCase = {
+      execute: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<RunMatchUseCase>;
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [MatchingProcessor, { provide: MatchingService, useValue: matchingService }],
+    const moduleRef = await Test.createTestingModule({
+      providers: [MatchingProcessor, { provide: RunMatchUseCase, useValue: runMatchUseCase }],
     }).compile();
 
-    processor = module.get(MatchingProcessor);
+    processor = moduleRef.get(MatchingProcessor);
   });
 
-  it('delegates to MatchingService.runMatch with job data', async () => {
+  it('delegates to RunMatchUseCase with job data', async () => {
     const data: MatchOrderJobData = {
       takerOrder: makeOrder({ order_id: 'tk-1' }),
       pairId: 'pair-1',
@@ -53,17 +53,19 @@ describe('MatchingProcessor', () => {
 
     await processor.handleMatch(makeJob(data));
 
-    expect(matchingService.runMatch).toHaveBeenCalledWith({
-      takerOrder: data.takerOrder,
-      pairId: data.pairId,
-      feeCurrencyId: data.feeCurrencyId,
-      makerFeeRate: data.makerFeeRate,
-      takerFeeRate: data.takerFeeRate,
-      slippageTolerance: undefined,
-    });
+    expect(runMatchUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        takerOrder: data.takerOrder,
+        pairId: data.pairId,
+        feeCurrencyId: data.feeCurrencyId,
+        makerFeeRate: data.makerFeeRate,
+        takerFeeRate: data.takerFeeRate,
+        slippageTolerance: undefined,
+      }),
+    );
   });
 
-  it('forwards slippageTolerance from job data to runMatch', async () => {
+  it('forwards slippageTolerance from job data to use-case', async () => {
     const data: MatchOrderJobData = {
       takerOrder: makeOrder({ order_id: 'tk-slip', type: 'MARKET' }),
       pairId: 'pair-1',
@@ -75,13 +77,13 @@ describe('MatchingProcessor', () => {
 
     await processor.handleMatch(makeJob(data));
 
-    expect(matchingService.runMatch).toHaveBeenCalledWith(
+    expect(runMatchUseCase.execute).toHaveBeenCalledWith(
       expect.objectContaining({ slippageTolerance: '0.02' }),
     );
   });
 
-  it('rethrows MatchingService errors so Bull can retry', async () => {
-    matchingService.runMatch.mockRejectedValueOnce(new Error('matching failed'));
+  it('rethrows use-case errors so Bull can retry', async () => {
+    runMatchUseCase.execute.mockRejectedValueOnce(new Error('matching failed'));
 
     await expect(
       processor.handleMatch(

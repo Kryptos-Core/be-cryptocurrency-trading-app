@@ -5,7 +5,7 @@ import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-res
 import { UserRole } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import { User } from '@/entities/user.entity';
 import type { UserFilterDto } from '@/modules/users/dto/user-filter.dto';
 

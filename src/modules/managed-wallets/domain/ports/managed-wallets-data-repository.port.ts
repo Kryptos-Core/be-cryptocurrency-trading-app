@@ -1,5 +1,5 @@
 import type { DeepPartial } from 'typeorm';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 
 export interface ManagedWalletsDataRepositoryPort {
   listOnchainTransactionsForAddress(

@@ -1,4 +1,4 @@
-import type { LinkedWallet } from '@/entities/linked-wallet.entity';
+import type { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
 
 /**
  * Port: Linked Wallet Repository

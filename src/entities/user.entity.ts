@@ -1,8 +1,8 @@
 import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
 import { Deposit } from './deposit.entity';
-import { LinkedWallet } from './linked-wallet.entity';
+import { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
 import { ManagedWallet } from './managed-wallet.entity';
-import { OnchainTransaction } from './onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import { Order } from './order.entity';
 import { TreasuryOperation } from './treasury-operation.entity';
 import { Wallet } from './wallet.entity';

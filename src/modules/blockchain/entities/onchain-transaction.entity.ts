@@ -13,8 +13,8 @@ import {
   DECIMAL_36_18_COLUMN,
   DECIMAL_36_18_NULLABLE_COLUMN,
 } from '@/common/constants/column-types';
+import { User } from '@/entities/user.entity';
 import { LinkedWallet } from './linked-wallet.entity';
-import { User } from './user.entity';
 
 @Entity('onchain_transactions')
 @Index('uk_onchain_tx_hash', ['chain', 'tx_hash'], { unique: true })

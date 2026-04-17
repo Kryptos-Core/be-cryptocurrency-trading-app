@@ -11,6 +11,19 @@
  * order book state at any point in history.
  */
 
+import { DomainEvent, DomainEventDispatcher } from '@/common/domain-events';
+
+export class MatchingEventStoredEvent extends DomainEvent {
+  public readonly eventType = 'MatchingEventStored' as const;
+
+  constructor(
+    public readonly sequence: number,
+    public readonly payload: OrderBookEvent,
+  ) {
+    super();
+  }
+}
+
 // ── Event Types ─────────────────────────────────────────────────────────────
 
 export interface OrderPlacedEvent {
@@ -67,6 +80,8 @@ export class EventStore {
   private readonly streams = new Map<string, StoredEvent[]>();
   private globalSequence = 0;
 
+  constructor(private readonly domainEventDispatcher?: DomainEventDispatcher) {}
+
   /**
    * Append an event. Returns the assigned sequence number.
    * The event object is frozen to enforce immutability.
@@ -83,6 +98,12 @@ export class EventStore {
       this.streams.set(key, stream);
     }
     stream.push(stored);
+
+    if (this.domainEventDispatcher) {
+      this.domainEventDispatcher
+        .publish(new MatchingEventStoredEvent(seq, stored.event))
+        .catch(() => undefined);
+    }
 
     return seq;
   }

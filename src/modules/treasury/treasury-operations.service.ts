@@ -18,7 +18,7 @@ import { uuidv7 } from 'uuidv7';
 import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
 import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
 import { RedisService } from '@/common/services';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';

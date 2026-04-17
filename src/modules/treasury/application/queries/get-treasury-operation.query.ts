@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { ListTreasuryOperationsDto, ListTreasuryTransactionsDto } from '../../dto';
 import { TreasuryOperationsService } from '../../treasury-operations.service';

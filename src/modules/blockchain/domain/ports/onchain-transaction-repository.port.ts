@@ -1,4 +1,4 @@
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 
 /** DTO dùng trong read-model của user (getTransactions, getTransactionById) */
 export interface OnchainTxRowDto {

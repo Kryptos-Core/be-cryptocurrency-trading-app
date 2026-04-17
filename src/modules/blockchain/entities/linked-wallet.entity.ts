@@ -9,7 +9,7 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { BLOCKCHAIN_CHAIN_DB_VALUES } from '@/common/constants/blockchain-chain-db';
-import { User } from './user.entity';
+import { User } from '@/entities/user.entity';
 
 @Entity('linked_wallets')
 @Index('uk_linked_wallet_user_chain_addr', ['user_id', 'chain', 'address'], {

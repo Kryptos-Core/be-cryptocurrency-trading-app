@@ -15,16 +15,30 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { CurrentUser, RequireFinanceAccess, RequirePermissions } from '@/common/decorators';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
-import { GetManagedWalletsQuery } from './application/queries';
 import {
+  GetManagedWalletDepositDefaultsQuery,
+  GetManagedWalletDepositDefaultsRequest,
+  GetManagedWalletDetailQuery,
+  GetManagedWalletDetailRequest,
+  GetManagedWalletsQuery,
+  GetManagedWalletsRequest,
+  GetManagedWalletTransactionsQuery,
+  GetManagedWalletTransactionsRequest,
+} from './application/queries';
+import {
+  ClearDepositDefaultCommand,
   ClearDepositDefaultUseCase,
+  CreateManagedWalletCommand,
   CreateManagedWalletUseCase,
+  DeactivateManagedWalletCommand,
   DeactivateManagedWalletUseCase,
+  SendManagedWalletTransactionCommand,
   SendManagedWalletTransactionUseCase,
+  SetDepositDefaultCommand,
   SetDepositDefaultUseCase,
+  SetRecommendedChainCommand,
   SetRecommendedChainUseCase,
-} from './application/use-cases';
-import type {
+} from './application/use-cases';import type {
   CreateManagedWalletDto,
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
@@ -37,7 +51,10 @@ import type {
 export class ManagedWalletsController {
   constructor(
     private readonly createManagedWallet: CreateManagedWalletUseCase,
-    private readonly getManagedWalletsQuery: GetManagedWalletsQuery,
+    private readonly getManagedWallets: GetManagedWalletsQuery,
+    private readonly getManagedWalletDepositDefaults: GetManagedWalletDepositDefaultsQuery,
+    private readonly getManagedWalletDetail: GetManagedWalletDetailQuery,
+    private readonly getManagedWalletTransactions: GetManagedWalletTransactionsQuery,
     private readonly setRecommendedChainUseCase: SetRecommendedChainUseCase,
     private readonly sendManagedWalletTransaction: SendManagedWalletTransactionUseCase,
     private readonly setDepositDefaultUseCase: SetDepositDefaultUseCase,
@@ -54,7 +71,7 @@ export class ManagedWalletsController {
     description: 'Returns 403. Wallet creation is only allowed via treasury transaction wallets.',
   })
   async createWallet(@CurrentUser('userId') userId: string, @Body() dto: CreateManagedWalletDto) {
-    return this.createManagedWallet.execute(userId, dto);
+    return this.createManagedWallet.execute(new CreateManagedWalletCommand(userId, dto));
   }
 
   @Get()
@@ -65,7 +82,7 @@ export class ManagedWalletsController {
     summary: 'List Tron transaction wallets eligible for user deposit defaults (DEPOSIT/BOTH)',
   })
   async listWallets(@CurrentUser('userId') userId: string, @CurrentUser('role') role: UserRole) {
-    return this.getManagedWalletsQuery.listWallets(userId, role);
+    return this.getManagedWallets.execute(new GetManagedWalletsRequest(userId, role));
   }
 
   @Get('deposit-defaults')
@@ -74,7 +91,7 @@ export class ManagedWalletsController {
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get current default deposit wallets and recommended chain' })
   async getDepositDefaults() {
-    return this.getManagedWalletsQuery.getDepositDefaults();
+    return this.getManagedWalletDepositDefaults.execute(new GetManagedWalletDepositDefaultsRequest());
   }
 
   @Patch('settings/recommended-chain')
@@ -83,7 +100,7 @@ export class ManagedWalletsController {
   @RequirePermissions(Permission.WALLETS_MANAGE)
   @ApiOperation({ summary: 'Set the recommended deposit chain shown to users' })
   async setRecommendedChain(@Body() dto: UpdateRecommendedChainDto) {
-    return this.setRecommendedChainUseCase.execute(dto);
+    return this.setRecommendedChainUseCase.execute(new SetRecommendedChainCommand(dto));
   }
 
   @Get(':walletId')
@@ -97,7 +114,7 @@ export class ManagedWalletsController {
     @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.getManagedWalletsQuery.getWalletDetail(userId, walletId, role);
+    return this.getManagedWalletDetail.execute(new GetManagedWalletDetailRequest(userId, walletId, role));
   }
 
   @Get(':walletId/transactions')
@@ -113,7 +130,9 @@ export class ManagedWalletsController {
     @Param('walletId') walletId: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
-    return this.getManagedWalletsQuery.getWalletTransactions(userId, walletId, role, limit);
+    return this.getManagedWalletTransactions.execute(
+      new GetManagedWalletTransactionsRequest(userId, walletId, role, limit),
+    );
   }
 
   @Post(':walletId/send')
@@ -128,7 +147,9 @@ export class ManagedWalletsController {
     @Param('walletId') walletId: string,
     @Body() dto: SendManagedTransactionDto,
   ) {
-    return this.sendManagedWalletTransaction.execute(walletId, userId, role, dto);
+    return this.sendManagedWalletTransaction.execute(
+      new SendManagedWalletTransactionCommand(walletId, userId, role, dto),
+    );
   }
 
   @Patch(':walletId/set-deposit-default')
@@ -144,7 +165,7 @@ export class ManagedWalletsController {
     @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.setDepositDefaultUseCase.execute(walletId, userId, role);
+    return this.setDepositDefaultUseCase.execute(new SetDepositDefaultCommand(walletId, userId, role));
   }
 
   @Patch(':walletId/clear-deposit-default')
@@ -162,7 +183,9 @@ export class ManagedWalletsController {
     @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.clearDepositDefaultUseCase.execute(walletId, userId, role);
+    return this.clearDepositDefaultUseCase.execute(
+      new ClearDepositDefaultCommand(walletId, userId, role),
+    );
   }
 
   @Delete(':walletId')
@@ -176,6 +199,8 @@ export class ManagedWalletsController {
     @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.deactivateManagedWalletUseCase.execute(walletId, userId, role);
+    return this.deactivateManagedWalletUseCase.execute(
+      new DeactivateManagedWalletCommand(walletId, userId, role),
+    );
   }
 }

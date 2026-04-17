@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { LinkedWallet } from '@/entities/linked-wallet.entity';
+import { LinkedWallet } from '@/modules/blockchain/entities/linked-wallet.entity';
 import type { LinkedWalletRepositoryPort } from '@/modules/blockchain/domain/ports';
 
 /**

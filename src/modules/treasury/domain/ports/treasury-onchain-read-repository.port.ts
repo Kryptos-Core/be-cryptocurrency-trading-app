@@ -1,4 +1,4 @@
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { ListTreasuryTransactionsDto } from '../../dto';
 
 /**

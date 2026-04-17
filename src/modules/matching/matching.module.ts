@@ -2,6 +2,11 @@ import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
+import {
+  ReconcileOpenOrdersForPairUseCase,
+  RemoveOrderFromBookUseCase,
+  RunMatchUseCase,
+} from './application/use-cases';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { MATCHING_REPOSITORY, TRADE_AUDIT_LOG_REPOSITORY } from './domain/ports';
 import { MatchingProcessor } from './matching.processor';
@@ -42,11 +47,17 @@ import { AuditTradeVisitor, MetricsTradeVisitor } from './visitors';
     MetricsTradeVisitor,
     CircuitBreakerService,
     MatchingService,
+    RunMatchUseCase,
+    RemoveOrderFromBookUseCase,
+    ReconcileOpenOrdersForPairUseCase,
     MatchingQueueService,
     MatchingProcessor,
   ],
   exports: [
     MatchingService,
+    RunMatchUseCase,
+    RemoveOrderFromBookUseCase,
+    ReconcileOpenOrdersForPairUseCase,
     MatchingQueueService,
     MetricsTradeVisitor,
     CircuitBreakerService,

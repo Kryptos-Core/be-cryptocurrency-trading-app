@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
-import { MatchingService } from '@/modules/matching/matching.service';
+import { RemoveOrderFromBookUseCase } from '@/modules/matching/application/use-cases';
 import { CancelOrderUseCase } from '@/modules/orders/application/use-cases/cancel-order.use-case';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
@@ -9,8 +9,8 @@ describe('CancelOrderUseCase', () => {
     findById: jest.fn(),
     cancelOrderViaProcedure: jest.fn(),
   };
-  const matchingService = {
-    removeOrderFromBook: jest.fn(),
+  const removeOrderFromBookUseCase = {
+    execute: jest.fn(),
   };
 
   let useCase: CancelOrderUseCase;
@@ -21,7 +21,7 @@ describe('CancelOrderUseCase', () => {
       providers: [
         CancelOrderUseCase,
         { provide: ORDER_REPOSITORY, useValue: orderRepository },
-        { provide: MatchingService, useValue: matchingService },
+        { provide: RemoveOrderFromBookUseCase, useValue: removeOrderFromBookUseCase },
       ],
     }).compile();
 
@@ -65,7 +65,9 @@ describe('CancelOrderUseCase', () => {
     const result = await useCase.execute({ userId: 'u1', orderId: 'o1' } as any);
 
     expect(orderRepository.cancelOrderViaProcedure).toHaveBeenCalledWith('o1', 'u1');
-    expect(matchingService.removeOrderFromBook).toHaveBeenCalledWith('p1', 'o1', 'BUY');
+    expect(removeOrderFromBookUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ pairId: 'p1', orderId: 'o1', side: 'BUY' }),
+    );
     expect(result.status).toBe('CANCELLED');
   });
 

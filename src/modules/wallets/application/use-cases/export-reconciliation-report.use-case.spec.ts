@@ -1,5 +1,4 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { promises as fs } from 'node:fs';
 import { Test } from '@nestjs/testing';
 import {
   EXCHANGE_SERVICE_PORT,
@@ -10,8 +9,6 @@ import { BalanceCalculationService } from '@/modules/wallets/domain/services/bal
 import { ExportReconciliationReportUseCase } from './export-reconciliation-report.use-case';
 import { ReconcileBalanceUseCase } from './reconcile-balance.use-case';
 
-const TEST_REPORT_DIR = path.join(process.cwd(), 'reports', 'reconciliation');
-
 function mockFs() {
   const originalReadFile = jest.spyOn(fs, 'readFile');
   const originalWriteFile = jest.spyOn(fs, 'writeFile');
@@ -19,7 +16,7 @@ function mockFs() {
 
   beforeEach(() => {
     originalReadFile.mockRejectedValue(new Error('ENOENT'));
-    originalWriteFile.mockResolvedValue(undefined);
+    originalWriteFile.mockResolvedValue();
     originalMkdir.mockResolvedValue(undefined);
   });
 
@@ -34,12 +31,18 @@ describe('ExportReconciliationReportUseCase', () => {
   let useCase: ExportReconciliationReportUseCase;
   let reconcileUseCase: ReconcileBalanceUseCase;
 
-  let walletRepo: jest.Mocked<{ findWalletPairs: jest.Mock }>;
+  let walletRepo: {
+    findWalletPairs: jest.Mock;
+    findByUserCurrency: jest.Mock;
+  };
   let ledgerRepo: jest.Mocked<{ createEntry: jest.Mock }>;
   let exchangeService: jest.Mocked<{ getBalance: jest.Mock }>;
 
   beforeEach(async () => {
-    walletRepo = { findWalletPairs: jest.fn() };
+    walletRepo = {
+      findWalletPairs: jest.fn(),
+      findByUserCurrency: jest.fn(),
+    };
     ledgerRepo = { createEntry: jest.fn().mockResolvedValue({}) };
     exchangeService = { getBalance: jest.fn() };
 
@@ -74,7 +77,7 @@ describe('ExportReconciliationReportUseCase', () => {
       .mockResolvedValueOnce({ available: '100', frozen: '0' })
       .mockResolvedValueOnce({ available: '250', frozen: '0' });
 
-    const writeSpy = jest.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+    const writeSpy = jest.spyOn(fs, 'writeFile');
 
     const result = await useCase.execute('admin-uid', 10);
 
@@ -86,12 +89,12 @@ describe('ExportReconciliationReportUseCase', () => {
     const writtenContent = writeSpy.mock.calls[0][1] as string;
     const report = JSON.parse(writtenContent);
     expect(report).toHaveLength(1);
-    expect(report[0].summary.actorUserId).toBe('admin-uid');
+    expect(report[0].actorUserId).toBe('admin-uid');
   });
 
   it('caps limit to 1000', async () => {
     walletRepo.findWalletPairs.mockResolvedValue([]);
-    const writeSpy = jest.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+    const writeSpy = jest.spyOn(fs, 'writeFile');
 
     await useCase.execute('admin-uid', 5000);
 
@@ -102,7 +105,7 @@ describe('ExportReconciliationReportUseCase', () => {
     walletRepo.findWalletPairs.mockResolvedValue([{ userId: 'uid-1', currencyId: 'cid-1' }]);
     walletRepo.findByUserCurrency.mockResolvedValue(null);
 
-    const writeSpy = jest.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+    const writeSpy = jest.spyOn(fs, 'writeFile');
 
     const result = await useCase.execute('admin-uid', 10);
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { calcSkip } from '@/common/utils/pagination.util';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { TreasuryMainWalletChain } from '@/entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { TreasuryOperationRepositoryPort } from '../../domain/ports';

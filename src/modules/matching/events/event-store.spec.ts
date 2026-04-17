@@ -1,5 +1,8 @@
+import { Logger } from '@nestjs/common';
+import { DomainEventDispatcher } from '@/common/domain-events';
 import {
   EventStore,
+  MatchingEventStoredEvent,
   type OrderCancelledEvent,
   type OrderPlacedEvent,
   type TradeExecutedEvent,
@@ -160,5 +163,36 @@ describe('EventStore', () => {
     store.append(placed);
     store.append({ ...placed, orderId: 'o2' });
     expect(store.getLastSequence('pair-1')).toBe(2);
+  });
+
+  it('publishes MatchingEventStoredEvent when domain dispatcher is provided', async () => {
+    const logger = new Logger('EventStoreSpec');
+    const dispatcher = new DomainEventDispatcher(logger);
+    const storeWithDispatcher = new EventStore(dispatcher);
+    const handler = jest.fn();
+
+    dispatcher.register(MatchingEventStoredEvent, handler);
+
+    const event: OrderPlacedEvent = {
+      type: 'OrderPlaced',
+      timestamp: new Date('2026-01-01T00:00:00Z'),
+      pairId: 'pair-1',
+      orderId: 'o1',
+      userId: 'u1',
+      side: 'BUY',
+      orderType: 'LIMIT',
+      price: '100.000000000000000000',
+      amount: '1.000000000000000000',
+      timeInForce: 'GTC',
+    };
+
+    const seq = storeWithDispatcher.append(event);
+    await Promise.resolve();
+
+    expect(seq).toBe(1);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const publishedEvent = handler.mock.calls[0][0] as MatchingEventStoredEvent;
+    expect(publishedEvent.sequence).toBe(1);
+    expect(publishedEvent.payload).toMatchObject({ type: 'OrderPlaced', pairId: 'pair-1' });
   });
 });

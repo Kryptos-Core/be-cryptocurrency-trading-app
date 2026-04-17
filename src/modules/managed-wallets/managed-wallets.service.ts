@@ -15,7 +15,7 @@ import {
   NotFoundException,
 } from '@/common/exceptions';
 import { WalletEncryptionService } from '@/common/services';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { TransactionWallet } from '@/entities/transaction-wallet.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {

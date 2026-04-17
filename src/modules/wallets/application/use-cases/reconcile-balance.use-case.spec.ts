@@ -50,7 +50,7 @@ describe('ReconcileBalanceUseCase', () => {
     expect(result.externalBalance).toBe('100');
     expect(ledgerRepo.createEntry).toHaveBeenCalledWith(
       expect.objectContaining({
-        direction: 'DEBIT',
+        direction: 'CREDIT',
         amount: '0',
         refType: WalletReferenceType.RECONCILIATION,
       }),

@@ -3,10 +3,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WalletEncryptionService } from '@/common/services';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
-import { GetManagedWalletsQuery } from './application/queries';
+import {
+  GetDepositMethodsQuery,
+  GetManagedWalletDepositDefaultsQuery,
+  GetManagedWalletDetailQuery,
+  GetManagedWalletsQuery,
+  GetManagedWalletTransactionsQuery,
+} from './application/queries';
 import {
   ClearDepositDefaultUseCase,
   CreateManagedWalletUseCase,
@@ -38,6 +44,10 @@ import { ManagedWalletsDataRepository } from './repositories/managed-wallets-dat
     WalletEncryptionService,
     // Queries
     GetManagedWalletsQuery,
+    GetManagedWalletDepositDefaultsQuery,
+    GetManagedWalletDetailQuery,
+    GetManagedWalletTransactionsQuery,
+    GetDepositMethodsQuery,
     // Use-cases
     CreateManagedWalletUseCase,
     SendManagedWalletTransactionUseCase,

@@ -1,5 +1,5 @@
 import type { UserRole } from '@/common/enums';
-import type { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import type { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 import type { User } from '@/entities/user.entity';
 
 /**

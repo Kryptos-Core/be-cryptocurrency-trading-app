@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type DeepPartial } from 'typeorm';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
-import { OnchainTransaction } from '@/entities/onchain-transaction.entity';
+import { OnchainTransaction } from '@/modules/blockchain/entities/onchain-transaction.entity';
 
 export type DepositNetworkAggregateRow = {
   network_code: string;
