@@ -11,6 +11,3 @@ export class CreateTransactionWalletUseCase {
     return this.service.createWallet(dto);
   }
 }
-
-
-

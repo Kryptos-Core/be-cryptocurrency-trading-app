@@ -172,5 +172,3 @@ export class OrderBookService {
     return levels;
   }
 }
-
-

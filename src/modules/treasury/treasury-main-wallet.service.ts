@@ -18,13 +18,13 @@ import {
 } from '@/common/exceptions';
 import { WalletEncryptionService } from '@/common/services';
 import { RedisService } from '@/common/services/redis.service';
+import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import type {
   TreasuryMainWalletChain,
   TreasuryMainWalletRecord,
   TreasuryMainWalletStatus,
 } from '@/modules/treasury';
-import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import {
   TREASURY_MAIN_WALLET_REPOSITORY,
   type TreasuryMainWalletRepositoryPort,
@@ -671,4 +671,3 @@ export class TreasuryMainWalletService implements OnModuleInit {
     }
   }
 }
-

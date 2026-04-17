@@ -1,5 +1,5 @@
-import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { createBullBoard } from '@bull-board/api';
+import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';

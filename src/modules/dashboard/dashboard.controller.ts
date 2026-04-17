@@ -2,7 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@/common/decorators';
 import { OptionalJwtAuthGuard } from '@/common/guards';
-import { DashboardService } from './dashboard.service';
+import { GetDashboardSummaryQuery } from './application/queries/get-dashboard-summary.query';
 
 /**
  * Dashboard Controller
@@ -15,7 +15,7 @@ import { DashboardService } from './dashboard.service';
 @Controller('dashboard')
 @UseGuards(OptionalJwtAuthGuard)
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(private readonly getDashboardSummaryQuery: GetDashboardSummaryQuery) {}
 
   /**
    * GET /api/v1/dashboard
@@ -29,6 +29,6 @@ export class DashboardController {
       'Top 10 markets by 24h volume (public). With a valid JWT: also wallet balances, portfolio total, and wallet counts.',
   })
   getDashboardSummary(@CurrentUser('userId') userId: string | undefined) {
-    return this.dashboardService.getDashboardSummary(userId ?? null);
+    return this.getDashboardSummaryQuery.execute(userId ?? null);
   }
 }

@@ -1,9 +1,5 @@
 import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
-import type {
-  EventStore,
-  OrderPlacedEvent,
-  TradeExecutedEvent,
-} from './event-store';
+import type { EventStore, OrderPlacedEvent, TradeExecutedEvent } from './event-store';
 
 export interface ProjectedOrder {
   readonly orderId: string;
@@ -53,7 +49,9 @@ export class OrderBookProjection {
     return {
       pairId,
       bids: values.filter((o) => o.side === 'BUY').sort((a, b) => this.compareOrders(a, b, 'BUY')),
-      asks: values.filter((o) => o.side === 'SELL').sort((a, b) => this.compareOrders(a, b, 'SELL')),
+      asks: values
+        .filter((o) => o.side === 'SELL')
+        .sort((a, b) => this.compareOrders(a, b, 'SELL')),
       sequence,
     };
   }

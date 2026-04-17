@@ -1,0 +1,9 @@
+# Temporary allowlist for cross-context imports (migrate to ports / integration events).
+# Paths are relative to src/modules/
+orders/application/use-cases/cancel-order.use-case.spec.ts
+orders/application/use-cases/cancel-order.use-case.ts
+orders/application/use-cases/create-order.use-case.spec.ts
+orders/application/use-cases/create-order.use-case.ts
+orders/application/use-cases/reconcile-matching-for-pair.use-case.spec.ts
+orders/application/use-cases/reconcile-matching-for-pair.use-case.ts
+orders/orders-matching.integration.spec.ts

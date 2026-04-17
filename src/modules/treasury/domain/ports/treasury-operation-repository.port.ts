@@ -1,5 +1,8 @@
 import type { QueryDeepPartialEntity } from 'typeorm';
-import type { TreasuryMainWalletChain, TreasuryOperationRecord } from '@/modules/treasury/contracts';
+import type {
+  TreasuryMainWalletChain,
+  TreasuryOperationRecord,
+} from '@/modules/treasury/contracts';
 import type { ListTreasuryOperationsDto } from '../../dto';
 
 /**
@@ -38,10 +41,3 @@ export interface TreasuryOperationRepositoryPort {
     amount: string;
   }): Promise<void>;
 }
-
-
-
-
-
-
-

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { GetDashboardSummaryQuery } from './application/queries/get-dashboard-summary.query';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
@@ -12,6 +13,6 @@ import { DashboardService } from './dashboard.service';
 @Module({
   imports: [MarketsModule, WalletsModule],
   controllers: [DashboardController],
-  providers: [DashboardService],
+  providers: [DashboardService, GetDashboardSummaryQuery],
 })
 export class DashboardModule {}

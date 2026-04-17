@@ -65,4 +65,3 @@ describe('OrderReservePolicy', () => {
     expect(result.marketBuyReservedQuote).toBeNull();
   });
 });
-

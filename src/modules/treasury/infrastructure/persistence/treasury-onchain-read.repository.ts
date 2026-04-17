@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { calcSkip } from '@/common/utils/pagination.util';
-import { OnchainTransaction } from '@/modules/blockchain';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
+import { OnchainTransaction } from '@/modules/blockchain';
 import type { TreasuryOnchainReadRepositoryPort } from '../../domain/ports';
 import type { ListTreasuryTransactionsDto } from '../../dto';
 
@@ -44,5 +44,3 @@ export class TreasuryOnchainReadRepository implements TreasuryOnchainReadReposit
     return { items, total, page, limit };
   }
 }
-
-

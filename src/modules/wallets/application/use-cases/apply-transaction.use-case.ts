@@ -3,14 +3,14 @@ import Decimal from 'decimal.js';
 import { WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import {
-  WALLET_REPOSITORY,
-  type WalletRepositoryPort,
-  WALLET_LEDGER_REPOSITORY,
-  type WalletLedgerRepositoryPort,
-  WALLET_EVENT_PUBLISHER,
-  type WalletEventPublisherPort,
   CURRENCY_LOOKUP,
   type CurrencyLookupPort,
+  WALLET_EVENT_PUBLISHER,
+  WALLET_LEDGER_REPOSITORY,
+  WALLET_REPOSITORY,
+  type WalletEventPublisherPort,
+  type WalletLedgerRepositoryPort,
+  type WalletRepositoryPort,
 } from '@/modules/wallets/domain/ports';
 import {
   BalanceCalculationService,
@@ -105,7 +105,11 @@ export class ApplyTransactionUseCase {
       return result;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
-      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+      if (
+        typeof msg === 'string' &&
+        msg.includes('Duplicate entry') &&
+        msg.includes('uk_ledger_ref')
+      ) {
         throw new ConflictException(
           'Duplicate transaction reference. Please try again.',
           'DUPLICATE_LEDGER_ENTRY',
@@ -138,7 +142,12 @@ export class ApplyTransactionUseCase {
       manager,
     );
 
-    return this.balanceCalc.buildBalanceSnapshot(userId, currencyId, updated.available, updated.frozen);
+    return this.balanceCalc.buildBalanceSnapshot(
+      userId,
+      currencyId,
+      updated.available,
+      updated.frozen,
+    );
   }
 
   private async debit(
@@ -149,7 +158,12 @@ export class ApplyTransactionUseCase {
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepo.getOrCreateForUpdate(userId, currencyId, manager);
-    const updated = await this.applyDelta(wallet.wallet_id, amount.negated(), new Decimal(0), manager);
+    const updated = await this.applyDelta(
+      wallet.wallet_id,
+      amount.negated(),
+      new Decimal(0),
+      manager,
+    );
 
     await this.ledgerRepo.createEntry(
       {
@@ -164,7 +178,12 @@ export class ApplyTransactionUseCase {
       manager,
     );
 
-    return this.balanceCalc.buildBalanceSnapshot(userId, currencyId, updated.available, updated.frozen);
+    return this.balanceCalc.buildBalanceSnapshot(
+      userId,
+      currencyId,
+      updated.available,
+      updated.frozen,
+    );
   }
 
   private async freeze(
@@ -189,7 +208,12 @@ export class ApplyTransactionUseCase {
       manager,
     );
 
-    return this.balanceCalc.buildBalanceSnapshot(userId, currencyId, updated.available, updated.frozen);
+    return this.balanceCalc.buildBalanceSnapshot(
+      userId,
+      currencyId,
+      updated.available,
+      updated.frozen,
+    );
   }
 
   private async unfreeze(
@@ -214,7 +238,12 @@ export class ApplyTransactionUseCase {
       manager,
     );
 
-    return this.balanceCalc.buildBalanceSnapshot(userId, currencyId, updated.available, updated.frozen);
+    return this.balanceCalc.buildBalanceSnapshot(
+      userId,
+      currencyId,
+      updated.available,
+      updated.frozen,
+    );
   }
 
   private async transfer(
@@ -236,14 +265,32 @@ export class ApplyTransactionUseCase {
       userId.localeCompare(targetId) < 0 ? [userId, targetId] : [targetId, userId];
 
     const currencyId = String(dto.currencyId);
-    const firstWallet = await this.walletRepo.getOrCreateForUpdate(firstUserId, currencyId, manager);
-    const secondWallet = await this.walletRepo.getOrCreateForUpdate(secondUserId, currencyId, manager);
+    const firstWallet = await this.walletRepo.getOrCreateForUpdate(
+      firstUserId,
+      currencyId,
+      manager,
+    );
+    const secondWallet = await this.walletRepo.getOrCreateForUpdate(
+      secondUserId,
+      currencyId,
+      manager,
+    );
 
     const sourceWallet = userId === firstUserId ? firstWallet : secondWallet;
     const targetWallet = userId === firstUserId ? secondWallet : firstWallet;
 
-    const sourceUpdated = await this.applyDelta(sourceWallet.wallet_id, amount.negated(), new Decimal(0), manager);
-    const targetUpdated = await this.applyDelta(targetWallet.wallet_id, amount, new Decimal(0), manager);
+    const sourceUpdated = await this.applyDelta(
+      sourceWallet.wallet_id,
+      amount.negated(),
+      new Decimal(0),
+      manager,
+    );
+    const targetUpdated = await this.applyDelta(
+      targetWallet.wallet_id,
+      amount,
+      new Decimal(0),
+      manager,
+    );
 
     await this.ledgerRepo.createDoubleEntry(
       {
@@ -252,7 +299,10 @@ export class ApplyTransactionUseCase {
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
-        balanceAfter: this.balanceCalc.calculateTotal(sourceUpdated.available, sourceUpdated.frozen),
+        balanceAfter: this.balanceCalc.calculateTotal(
+          sourceUpdated.available,
+          sourceUpdated.frozen,
+        ),
       },
       manager,
     );
@@ -264,12 +314,20 @@ export class ApplyTransactionUseCase {
         refType: dto.refType,
         refId: dto.refId,
         amount: amount.toString(),
-        balanceAfter: this.balanceCalc.calculateTotal(targetUpdated.available, targetUpdated.frozen),
+        balanceAfter: this.balanceCalc.calculateTotal(
+          targetUpdated.available,
+          targetUpdated.frozen,
+        ),
       },
       manager,
     );
 
-    return this.balanceCalc.buildBalanceSnapshot(userId, currencyId, sourceUpdated.available, sourceUpdated.frozen);
+    return this.balanceCalc.buildBalanceSnapshot(
+      userId,
+      currencyId,
+      sourceUpdated.available,
+      sourceUpdated.frozen,
+    );
   }
 
   private async applyDelta(

@@ -4,48 +4,43 @@ import { AdminWalletAdjustment } from '@/entities/admin-wallet-adjustment.entity
 import { Wallet } from '@/entities/wallet.entity';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
 import { ExchangeModule } from '@/modules/exchange/exchange.module';
-
-// Domain
-import {
-  WALLET_REPOSITORY,
-  WALLET_LEDGER_REPOSITORY,
-  ADMIN_ADJUSTMENT_REPOSITORY,
-  WALLET_EVENT_PUBLISHER,
-  CURRENCY_LOOKUP,
-  EXCHANGE_SERVICE_PORT,
-} from './domain/ports';
-import { BalanceCalculationService } from './domain/services/balance-calculation.service';
-
-// Application — use cases
-import {
-  ApplyTransactionUseCase,
-  AdminAdjustBalanceUseCase,
-  SyncBalanceWithExchangeUseCase,
-  ReconcileBalanceUseCase,
-  ExportReconciliationReportUseCase,
-} from './application/use-cases';
-
 // Application — queries
 import {
-  GetWalletsQuery,
+  GetAdminAdjustmentHistoryQuery,
   GetBalanceQuery,
   GetTransactionHistoryQuery,
-  GetAdminAdjustmentHistoryQuery,
+  GetWalletsQuery,
 } from './application/queries';
-
-// Infrastructure — persistence
+// Application — use cases
 import {
-  WalletRepositoryImpl,
-  WalletLedgerRepositoryImpl,
-  AdminWalletAdjustmentRepositoryImpl,
-} from './infrastructure/persistence';
-
+  AdminAdjustBalanceUseCase,
+  ApplyTransactionUseCase,
+  ExportReconciliationReportUseCase,
+  ReconcileBalanceUseCase,
+  SyncBalanceWithExchangeUseCase,
+} from './application/use-cases';
+// Domain
+import {
+  ADMIN_ADJUSTMENT_REPOSITORY,
+  CURRENCY_LOOKUP,
+  EXCHANGE_SERVICE_PORT,
+  WALLET_EVENT_PUBLISHER,
+  WALLET_LEDGER_REPOSITORY,
+  WALLET_REPOSITORY,
+} from './domain/ports';
+import { BalanceCalculationService } from './domain/services/balance-calculation.service';
 // Infrastructure — adapters
 import {
-  RedisWalletEventPublisher,
   CurrencyLookupAdapter,
   ExchangeServiceAdapter,
+  RedisWalletEventPublisher,
 } from './infrastructure/adapters';
+// Infrastructure — persistence
+import {
+  AdminWalletAdjustmentRepositoryImpl,
+  WalletLedgerRepositoryImpl,
+  WalletRepositoryImpl,
+} from './infrastructure/persistence';
 
 // Presentation / legacy
 import { WalletsController } from './wallets.controller';

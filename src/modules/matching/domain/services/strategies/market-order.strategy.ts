@@ -123,5 +123,3 @@ export class MarketOrderStrategy implements IMatchingStrategy {
     return results;
   }
 }
-
-

@@ -22,6 +22,3 @@ export function sanitizeAuthUser(user: UserRecord): Partial<UserRecord> {
   const { password_hash, two_fa_secret, ...sanitized } = user;
   return sanitized;
 }
-
-
-

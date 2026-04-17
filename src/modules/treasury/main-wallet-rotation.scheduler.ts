@@ -138,6 +138,3 @@ export class MainWalletRotationScheduler {
     return this.DEFAULT_ROTATION_DAYS;
   }
 }
-
-
-

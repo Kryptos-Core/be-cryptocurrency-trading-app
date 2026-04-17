@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import type { OrderBookOrder } from '../../../interfaces';
-import { OrderBookService } from './order-book.service';
 import { BuyQueueService } from './buy-queue.service';
+import { OrderBookService } from './order-book.service';
 import { SellQueueService } from './sell-queue.service';
 
 function order(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {

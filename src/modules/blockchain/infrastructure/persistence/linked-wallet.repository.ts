@@ -125,4 +125,3 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     return result?.affectedRows ?? result?.[0]?.affectedRows ?? 0;
   }
 }
-

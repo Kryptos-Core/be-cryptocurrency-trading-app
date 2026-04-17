@@ -40,9 +40,7 @@ describe('CoinGeckoProvider', () => {
         updatedAt: '2026-04-14T10:00:00.000Z',
       }),
     );
-    currencyRepository.findActive.mockResolvedValue([
-      { symbol: 'BTC', is_active: true },
-    ] as any);
+    currencyRepository.findActive.mockResolvedValue([{ symbol: 'BTC', is_active: true }] as any);
 
     const result = await provider.getMarketPrices();
 
@@ -92,9 +90,7 @@ describe('CoinGeckoProvider', () => {
 
     const result = await provider.getMarketPrices(['BTC']);
 
-    expect(result.prices).toEqual([
-      { symbol: 'BTC', priceUsd: '63500', priceVnd: '1590000000' },
-    ]);
+    expect(result.prices).toEqual([{ symbol: 'BTC', priceUsd: '63500', priceVnd: '1590000000' }]);
     expect(redisService.set).toHaveBeenCalled();
   });
 });

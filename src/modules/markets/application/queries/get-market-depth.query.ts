@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { MarketsService } from '../../markets.service';
 import type { DepthSnapshot } from '@/modules/matching/domain/services/orderbook/order-book.service';
+import { MarketsService } from '../../markets.service';
 
 @Injectable()
 export class GetMarketDepthQuery {

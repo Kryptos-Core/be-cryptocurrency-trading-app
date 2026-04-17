@@ -26,6 +26,7 @@ import {
   GetTransactionByIdQuery,
   GetTransactionsQuery,
 } from './application/queries';
+import { OnchainTransferQueryService } from './application/queries/transactions/onchain-transfer-query.service';
 import {
   ApproveWithdrawalUseCase,
   PreviewDepositUseCase,
@@ -38,7 +39,6 @@ import {
   UnlinkWalletUseCase,
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
-import { OnchainTransferQueryService } from './application/queries/transactions/onchain-transfer-query.service';
 import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
 import { WalletLinkingService } from './application/use-cases/wallet-linking/wallet-linking.service';
 import { OnchainWithdrawalService } from './application/use-cases/withdrawals/onchain-withdrawal.service';
@@ -52,8 +52,8 @@ import {
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DepositFxService } from './domain/services';
 import { LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
+import { DepositFxService } from './domain/services';
 import { LinkedWalletRepository, OnchainTransactionRepository } from './infrastructure/persistence';
 import { EthereumProvider, SolanaProvider, TronProvider } from './infrastructure/providers';
 import { WalletConnectController } from './wallet-connect/wallet-connect.controller';

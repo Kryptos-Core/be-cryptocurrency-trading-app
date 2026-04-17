@@ -56,5 +56,3 @@ export class OrderQueueService implements IOrderQueue {
     });
   }
 }
-
-

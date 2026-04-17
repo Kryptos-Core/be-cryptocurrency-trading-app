@@ -9,12 +9,16 @@ export interface TreasuryTransactionWalletRepositoryPort {
   createAndSave(partial: DeepPartial<TransactionWalletRecord>): Promise<TransactionWalletRecord>;
   save(wallet: TransactionWalletRecord): Promise<TransactionWalletRecord>;
   findByWalletId(walletId: string): Promise<TransactionWalletRecord | null>;
-  findManyOrdered(where: FindOptionsWhere<TransactionWalletRecord>): Promise<TransactionWalletRecord[]>;
+  findManyOrdered(
+    where: FindOptionsWhere<TransactionWalletRecord>,
+  ): Promise<TransactionWalletRecord[]>;
   findForDepositConfiguration(): Promise<TransactionWalletRecord[]>;
   findDefaultUserDepositWallet(
     chain: BlockchainChainDbValue,
   ): Promise<TransactionWalletRecord | null>;
-  setDefaultUserDepositInTransaction(wallet: TransactionWalletRecord): Promise<TransactionWalletRecord>;
+  setDefaultUserDepositInTransaction(
+    wallet: TransactionWalletRecord,
+  ): Promise<TransactionWalletRecord>;
   findActiveWithdrawalCandidates(chain: BlockchainChainDbValue): Promise<TransactionWalletRecord[]>;
   deleteByWalletId(walletId: string): Promise<void>;
 }

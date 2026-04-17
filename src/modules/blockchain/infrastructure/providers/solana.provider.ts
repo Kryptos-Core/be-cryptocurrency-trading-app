@@ -13,10 +13,10 @@ import {
 import bs58 from 'bs58';
 import * as nacl from 'tweetnacl';
 import { BlockchainNetwork } from '@/common/enums';
-import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import type { BlockchainGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
   BlockchainBalanceDto,
@@ -217,5 +217,3 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
     return hotWallet.publicKey.toBase58();
   }
 }
-
-

@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
 import {
-  WALLET_REPOSITORY,
-  type WalletRepositoryPort,
   EXCHANGE_SERVICE_PORT,
   type ExchangeServicePort,
+  WALLET_REPOSITORY,
+  type WalletRepositoryPort,
 } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 import type { WalletBalanceDto } from '@/modules/wallets/dto/wallet-balance.dto';

@@ -354,4 +354,3 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     };
   }
 }
-

@@ -1,19 +1,19 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
-import { BusinessException, ConflictException } from '@/common/exceptions';
+import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import { newUuid } from '@/common/utils/uuid.util';
 import {
-  WALLET_REPOSITORY,
-  type WalletRepositoryPort,
-  WALLET_LEDGER_REPOSITORY,
-  type WalletLedgerRepositoryPort,
   ADMIN_ADJUSTMENT_REPOSITORY,
   type AdminAdjustmentRepositoryPort,
-  WALLET_EVENT_PUBLISHER,
-  type WalletEventPublisherPort,
   CURRENCY_LOOKUP,
   type CurrencyLookupPort,
+  WALLET_EVENT_PUBLISHER,
+  WALLET_LEDGER_REPOSITORY,
+  WALLET_REPOSITORY,
+  type WalletEventPublisherPort,
+  type WalletLedgerRepositoryPort,
+  type WalletRepositoryPort,
 } from '@/modules/wallets/domain/ports';
 import {
   BalanceCalculationService,
@@ -23,7 +23,6 @@ import type {
   AdminAdjustWalletDto,
   AdminAdjustWalletResponseDto,
 } from '@/modules/wallets/dto/admin-adjust-wallet.dto';
-import { BadRequestException } from '@/common/exceptions';
 
 @Injectable()
 export class AdminAdjustBalanceUseCase {
@@ -32,13 +31,17 @@ export class AdminAdjustBalanceUseCase {
   constructor(
     @Inject(WALLET_REPOSITORY) private readonly walletRepo: WalletRepositoryPort,
     @Inject(WALLET_LEDGER_REPOSITORY) private readonly ledgerRepo: WalletLedgerRepositoryPort,
-    @Inject(ADMIN_ADJUSTMENT_REPOSITORY) private readonly adjustmentRepo: AdminAdjustmentRepositoryPort,
+    @Inject(ADMIN_ADJUSTMENT_REPOSITORY)
+    private readonly adjustmentRepo: AdminAdjustmentRepositoryPort,
     @Inject(WALLET_EVENT_PUBLISHER) private readonly eventPublisher: WalletEventPublisherPort,
     @Inject(CURRENCY_LOOKUP) private readonly currencyLookup: CurrencyLookupPort,
     private readonly balanceCalc: BalanceCalculationService,
   ) {}
 
-  async execute(actorUserId: string, dto: AdminAdjustWalletDto): Promise<AdminAdjustWalletResponseDto> {
+  async execute(
+    actorUserId: string,
+    dto: AdminAdjustWalletDto,
+  ): Promise<AdminAdjustWalletResponseDto> {
     const adjustmentId = newUuid();
     let amount: Decimal;
     try {
@@ -70,7 +73,11 @@ export class AdminAdjustBalanceUseCase {
         const action =
           dto.type === 'DEPOSIT' ? WalletTransactionAction.CREDIT : WalletTransactionAction.DEBIT;
 
-        const wallet = await this.walletRepo.getOrCreateForUpdate(dto.userId, dto.currencyId, manager);
+        const wallet = await this.walletRepo.getOrCreateForUpdate(
+          dto.userId,
+          dto.currencyId,
+          manager,
+        );
 
         const updated = await this.applyDelta(
           wallet.wallet_id,
@@ -117,7 +124,11 @@ export class AdminAdjustBalanceUseCase {
       return result;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
-      if (typeof msg === 'string' && msg.includes('Duplicate entry') && msg.includes('uk_ledger_ref')) {
+      if (
+        typeof msg === 'string' &&
+        msg.includes('Duplicate entry') &&
+        msg.includes('uk_ledger_ref')
+      ) {
         throw new ConflictException(
           'Duplicate transaction reference. Please try again.',
           'DUPLICATE_LEDGER_ENTRY',

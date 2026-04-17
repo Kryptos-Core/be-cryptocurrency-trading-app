@@ -85,7 +85,11 @@ export class ContactEmailVerificationService {
     return { expiresIn: this.otpTtlSeconds };
   }
 
-  async verifyAndUpdateEmail(userId: string, newEmailRaw: string, otpCode: string): Promise<UserRecord> {
+  async verifyAndUpdateEmail(
+    userId: string,
+    newEmailRaw: string,
+    otpCode: string,
+  ): Promise<UserRecord> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
@@ -130,5 +134,3 @@ export class ContactEmailVerificationService {
     return updated;
   }
 }
-
-

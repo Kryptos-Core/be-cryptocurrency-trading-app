@@ -19,7 +19,9 @@ export class RequestLinkWalletUseCase
 {
   constructor(private readonly walletLinkingService: WalletLinkingService) {}
 
-  async execute(command: RequestLinkWalletCommand): Promise<{ message: string; expiresIn: number }> {
+  async execute(
+    command: RequestLinkWalletCommand,
+  ): Promise<{ message: string; expiresIn: number }> {
     return this.walletLinkingService.requestLink(command.userId, command.dto);
   }
 }

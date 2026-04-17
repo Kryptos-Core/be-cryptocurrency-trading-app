@@ -13,8 +13,8 @@ import {
   wcCaip2ForChain,
 } from '@/modules/blockchain/wallet-connect/wc-caip.util';
 import type { WcApprovedSession, WcConnectPairingResult } from '@/types/walletconnect-session';
-import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { WalletLinkingService } from '../application/use-cases/wallet-linking/wallet-linking.service';
+import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { type WcSessionData, WcSessionStatus } from './dto';
 import {
   formatWalletConnectInitError,
@@ -687,5 +687,3 @@ export class WalletConnectService implements OnModuleInit {
     return expected === signature;
   }
 }
-
-

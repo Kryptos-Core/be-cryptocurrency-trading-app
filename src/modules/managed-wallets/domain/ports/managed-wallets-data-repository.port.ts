@@ -17,6 +17,3 @@ export interface ManagedWalletsDataRepositoryPort {
     codes: string[],
   ): Promise<Map<string, { deposit_enabled: boolean; min_confirmations: number }>>;
 }
-
-
-

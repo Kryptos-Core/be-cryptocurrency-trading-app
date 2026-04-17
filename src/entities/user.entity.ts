@@ -1,8 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
+import { LinkedWallet, OnchainTransaction } from '@/modules/blockchain';
 import { Deposit } from './deposit.entity';
-import { LinkedWallet } from '@/modules/blockchain';
 import { ManagedWallet } from './managed-wallet.entity';
-import { OnchainTransaction } from '@/modules/blockchain';
 import { Order } from './order.entity';
 import { TreasuryOperation } from './treasury-operation.entity';
 import { Wallet } from './wallet.entity';
@@ -100,4 +99,3 @@ export class User {
   )
   treasury_operations!: TreasuryOperation[];
 }
-

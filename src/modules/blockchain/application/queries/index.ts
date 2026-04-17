@@ -1,5 +1,9 @@
-export { GetLinkedWalletBalanceQuery, GetLinkedWalletBalanceRequest, GetLinkedWalletsQuery, GetLinkedWalletsRequest } from './linked-wallets.query';
-export { GetDepositAddressQuery, GetDepositAddressRequest, GetSupportedNetworksQuery, GetSupportedNetworksRequest } from './utilities.query';
+export {
+  GetLinkedWalletBalanceQuery,
+  GetLinkedWalletBalanceRequest,
+  GetLinkedWalletsQuery,
+  GetLinkedWalletsRequest,
+} from './linked-wallets.query';
 export {
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalByIdRequest,
@@ -12,3 +16,9 @@ export {
   GetTransactionsQuery,
   GetTransactionsRequest,
 } from './transactions.query';
+export {
+  GetDepositAddressQuery,
+  GetDepositAddressRequest,
+  GetSupportedNetworksQuery,
+  GetSupportedNetworksRequest,
+} from './utilities.query';

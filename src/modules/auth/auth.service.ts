@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UnauthorizedException } from '@/common/exceptions';
-import type { UserRecord } from '@/modules/users';
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
 import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
 import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
+import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
 
@@ -45,6 +45,3 @@ export class AuthService {
     return this.changePasswordUseCase.execute(userId, dto);
   }
 }
-
-
-

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { DataSource } from 'typeorm';
-import { typeormEntityGlobPaths } from './typeorm-entity-glob-paths';
 import { loadEnvFilesForCli } from './load-env-files';
+import { typeormEntityGlobPaths } from './typeorm-entity-glob-paths';
 
 loadEnvFilesForCli();
 

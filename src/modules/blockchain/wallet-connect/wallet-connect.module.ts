@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { WalletLinkingService } from '../application/use-cases/wallet-linking/wallet-linking.service';
+import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { WalletConnectController } from './wallet-connect.controller';
 import { WalletConnectService } from './wallet-connect.service';
 import { WalletConnectSessionManager } from './wallet-connect-session-manager.service';

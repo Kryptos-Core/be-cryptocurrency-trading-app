@@ -1,9 +1,9 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
-import type { UserRecord } from '@/modules/users';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
+import type { UserRecord } from '@/modules/users';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { USERS_REPOSITORY } from './domain/ports';
 import type {
@@ -239,6 +239,3 @@ describe('UserRecordsService', () => {
     });
   });
 });
-
-
-

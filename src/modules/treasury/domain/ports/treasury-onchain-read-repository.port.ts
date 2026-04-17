@@ -12,5 +12,3 @@ export interface TreasuryOnchainReadRepositoryPort {
     limit: number;
   }>;
 }
-
-

@@ -22,5 +22,3 @@ export class UnlinkWalletUseCase
     return this.walletLinkingService.unlinkWallet(command.userId, command.linkId);
   }
 }
-
-

@@ -32,7 +32,10 @@ export class WalletLinkingService {
     return `wallet-link:list:${userId}`;
   }
 
-  async requestLink(userId: string, dto: RequestLinkDto): Promise<{ message: string; expiresIn: number }> {
+  async requestLink(
+    userId: string,
+    dto: RequestLinkDto,
+  ): Promise<{ message: string; expiresIn: number }> {
     const address = dto.address.trim();
     const existing = await this.linkedWalletRepo.findVerifiedByUserChainAddress(
       userId,
@@ -54,7 +57,10 @@ export class WalletLinkingService {
     return { message, expiresIn: WalletLinkingService.NONCE_TTL };
   }
 
-  async verifyLink(userId: string, dto: VerifyLinkDto): Promise<{
+  async verifyLink(
+    userId: string,
+    dto: VerifyLinkDto,
+  ): Promise<{
     linkId: string;
     address: string;
     chain: string;
@@ -62,11 +68,16 @@ export class WalletLinkingService {
   }> {
     const address = dto.address.trim();
     const cacheKey = this.buildNonceCacheKey(userId, dto.chain, address);
-    const cached = await this.cacheService.get<{ nonce: string; message: string; label?: string | null }>(
-      cacheKey,
-    );
+    const cached = await this.cacheService.get<{
+      nonce: string;
+      message: string;
+      label?: string | null;
+    }>(cacheKey);
     if (!cached?.message) {
-      throw new BadRequestException('Nonce challenge khong ton tai hoac da het han.', 'NONCE_EXPIRED');
+      throw new BadRequestException(
+        'Nonce challenge khong ton tai hoac da het han.',
+        'NONCE_EXPIRED',
+      );
     }
 
     const provider = this.providerFactory.getProvider(dto.chain);
@@ -138,5 +149,3 @@ export class WalletLinkingService {
     return this.linkedWalletRepo.findVerifiedByUserChainAddress(userId, chain, address.trim());
   }
 }
-
-

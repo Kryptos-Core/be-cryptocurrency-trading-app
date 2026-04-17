@@ -23,7 +23,11 @@ export class SendManagedWalletTransactionCommand extends BaseCommand {
  */
 @Injectable()
 export class SendManagedWalletTransactionUseCase
-  implements ICommandHandler<SendManagedWalletTransactionCommand, Awaited<ReturnType<ManagedWalletsService['sendTransaction']>>>
+  implements
+    ICommandHandler<
+      SendManagedWalletTransactionCommand,
+      Awaited<ReturnType<ManagedWalletsService['sendTransaction']>>
+    >
 {
   constructor(private readonly managedWalletsService: ManagedWalletsService) {}
 

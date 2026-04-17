@@ -11,14 +11,14 @@ import { CurrencyNetwork } from '../entities/currency-network.entity';
 import { Deposit } from '../entities/deposit.entity';
 import { ExchangeRateAuditLog } from '../entities/exchange-rate-audit-log.entity';
 import { FiatDeposit } from '../entities/fiat-deposit.entity';
-import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
+import { IntegrationOutbox } from '../entities/integration-outbox.entity';
 import { ManagedWallet } from '../entities/managed-wallet.entity';
 import { MarketMakerConfig } from '../entities/market-maker-config.entity';
 import { MarketPair } from '../entities/market-pair.entity';
 import { Notification } from '../entities/notification.entity';
-import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
 import { Order } from '../entities/order.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
+import { ReadMarketPair } from '../entities/read-market-pair.entity';
 import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
 import { TransactionWallet } from '../entities/transaction-wallet.entity';
@@ -29,6 +29,8 @@ import { UserNotification } from '../entities/user-notification.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
+import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
+import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
@@ -37,11 +39,13 @@ const ALL_ENTITIES = [
   CurrencyNetwork,
   Deposit,
   ExchangeRateAuditLog,
+  IntegrationOutbox,
   FiatDeposit,
   LinkedWallet,
   ManagedWallet,
   MarketMakerConfig,
   MarketPair,
+  ReadMarketPair,
   OnchainTransaction,
   Order,
   Trade,
@@ -83,5 +87,3 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     },
   };
 };
-
-

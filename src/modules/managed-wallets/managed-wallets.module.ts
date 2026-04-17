@@ -59,4 +59,3 @@ import { ManagedWalletsDataRepository } from './repositories/managed-wallets-dat
   exports: [ManagedWalletsService],
 })
 export class ManagedWalletsModule {}
-

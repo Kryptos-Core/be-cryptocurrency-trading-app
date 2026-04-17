@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { BaseCommand, type ICommandHandler } from '@/common/cqrs';
+import { MatchingService } from '../../domain/services/matching.service';
 import type { MatchOrderJobData } from '../../infrastructure/queue/matching-queue.service';
 import { MatchingQueueService } from '../../infrastructure/queue/matching-queue.service';
-import { MatchingService } from '../../domain/services/matching.service';
 
 export class EnqueueMatchCommand extends BaseCommand implements MatchOrderJobData {
   constructor(

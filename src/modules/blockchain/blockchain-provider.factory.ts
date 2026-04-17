@@ -9,10 +9,10 @@ import {
   BC_TRON_SHASTA,
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
-import type { IBlockchainProvider } from './interfaces';
 import { EthereumProvider } from './infrastructure/providers/ethereum.provider';
 import { SolanaProvider } from './infrastructure/providers/solana.provider';
 import { TronProvider } from './infrastructure/providers/tron.provider';
+import type { IBlockchainProvider } from './interfaces';
 
 @Injectable()
 export class BlockchainProviderFactory {
@@ -58,4 +58,3 @@ export class BlockchainProviderFactory {
     return Array.from(this.providerMap.keys());
   }
 }
-

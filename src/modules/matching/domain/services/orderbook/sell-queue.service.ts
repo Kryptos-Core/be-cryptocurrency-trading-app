@@ -14,5 +14,3 @@ export class SellQueueService extends OrderQueueService {
     super('SELL', 'ASC', maxPrice);
   }
 }
-
-

@@ -10,6 +10,3 @@ export class UnsetDefaultUserDepositUseCase {
     return this.service.unsetDefaultUserDeposit(walletId);
   }
 }
-
-
-

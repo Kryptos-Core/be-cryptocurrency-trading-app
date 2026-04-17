@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 import { DataSource } from 'typeorm';
 import type { TransactionContext } from '@/common/types/transaction-context';
 
@@ -63,9 +64,16 @@ export class UnitOfWork {
    * @throws The error thrown by the callback (triggers rollback).
    */
   async run<T>(callback: (ctx: TransactionContext) => Promise<T>): Promise<T> {
-    return await this.dataSource.transaction(async (manager) => {
-      const ctx: TransactionContext = manager as unknown as TransactionContext;
-      return await callback(ctx);
+    const tracer = trace.getTracer('be-cryptocurrency-trading-app');
+    return await tracer.startActiveSpan('UnitOfWork.run', async (span) => {
+      try {
+        return await this.dataSource.transaction(async (manager) => {
+          const ctx: TransactionContext = manager as unknown as TransactionContext;
+          return await callback(ctx);
+        });
+      } finally {
+        span.end();
+      }
     });
   }
 }

@@ -38,7 +38,8 @@ import {
   SetDepositDefaultUseCase,
   SetRecommendedChainCommand,
   SetRecommendedChainUseCase,
-} from './application/use-cases';import type {
+} from './application/use-cases';
+import type {
   CreateManagedWalletDto,
   SendManagedTransactionDto,
   UpdateRecommendedChainDto,
@@ -91,7 +92,9 @@ export class ManagedWalletsController {
   @RequirePermissions(Permission.WALLETS_READ)
   @ApiOperation({ summary: 'Get current default deposit wallets and recommended chain' })
   async getDepositDefaults() {
-    return this.getManagedWalletDepositDefaults.execute(new GetManagedWalletDepositDefaultsRequest());
+    return this.getManagedWalletDepositDefaults.execute(
+      new GetManagedWalletDepositDefaultsRequest(),
+    );
   }
 
   @Patch('settings/recommended-chain')
@@ -114,7 +117,9 @@ export class ManagedWalletsController {
     @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.getManagedWalletDetail.execute(new GetManagedWalletDetailRequest(userId, walletId, role));
+    return this.getManagedWalletDetail.execute(
+      new GetManagedWalletDetailRequest(userId, walletId, role),
+    );
   }
 
   @Get(':walletId/transactions')
@@ -165,7 +170,9 @@ export class ManagedWalletsController {
     @CurrentUser('role') role: UserRole,
     @Param('walletId') walletId: string,
   ) {
-    return this.setDepositDefaultUseCase.execute(new SetDepositDefaultCommand(walletId, userId, role));
+    return this.setDepositDefaultUseCase.execute(
+      new SetDepositDefaultCommand(walletId, userId, role),
+    );
   }
 
   @Patch(':walletId/clear-deposit-default')

@@ -25,7 +25,10 @@ describe('ExchangeRateController', () => {
   });
 
   it('delegates market prices query to service', async () => {
-    service.getMarketPrices.mockResolvedValue({ prices: [], updatedAt: '2026-04-14T10:00:00.000Z' });
+    service.getMarketPrices.mockResolvedValue({
+      prices: [],
+      updatedAt: '2026-04-14T10:00:00.000Z',
+    });
 
     const result = await controller.getMarketPrices({ symbols: 'BTC,ETH' });
 
@@ -51,7 +54,10 @@ describe('ExchangeRateController', () => {
 
     const result = await controller.getDepositPreview({ fiatAmount: '500000', fiatSymbol: 'VND' });
 
-    expect(service.getDepositPreview).toHaveBeenCalledWith({ fiatAmount: '500000', fiatSymbol: 'VND' });
+    expect(service.getDepositPreview).toHaveBeenCalledWith({
+      fiatAmount: '500000',
+      fiatSymbol: 'VND',
+    });
     expect(result.netAmount).toBe('19.90000000');
   });
 
@@ -83,7 +89,10 @@ describe('ExchangeRateController', () => {
 
     const result = await controller.syncAdminConfig({ source: 'coingecko' }, 'finance-1');
 
-    expect(service.syncAdminConfig).toHaveBeenCalledWith({ source: 'coingecko' }, { userId: 'finance-1' });
+    expect(service.syncAdminConfig).toHaveBeenCalledWith(
+      { source: 'coingecko' },
+      { userId: 'finance-1' },
+    );
     expect(result.newRate).toBe('0.00003980');
   });
 
@@ -100,12 +109,22 @@ describe('ExchangeRateController', () => {
     });
 
     const result = await controller.updateAdminConfig(
-      { fiatToQuoteRate: '0.00004100', fxSpreadBps: '100', autoSync: true, autoSyncIntervalMinutes: 15 },
+      {
+        fiatToQuoteRate: '0.00004100',
+        fxSpreadBps: '100',
+        autoSync: true,
+        autoSyncIntervalMinutes: 15,
+      },
       'finance-1',
     );
 
     expect(service.updateAdminConfig).toHaveBeenCalledWith(
-      { fiatToQuoteRate: '0.00004100', fxSpreadBps: '100', autoSync: true, autoSyncIntervalMinutes: 15 },
+      {
+        fiatToQuoteRate: '0.00004100',
+        fxSpreadBps: '100',
+        autoSync: true,
+        autoSyncIntervalMinutes: 15,
+      },
       { userId: 'finance-1' },
     );
     expect(result.auditEntryId).toBe('audit-1');

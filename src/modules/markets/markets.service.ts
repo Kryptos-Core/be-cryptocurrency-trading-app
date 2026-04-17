@@ -7,9 +7,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService } from '@/common/services';
-import type { MarketPairRecord } from '@/modules/markets';
+import { getEntityManagerFromTransactionContext } from '@/common/typeorm/entity-manager-from-context';
+import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
+import { MarketPair } from '@/entities/market-pair.entity';
 import { CurrenciesService } from '@/modules/currencies/currencies.service';
+import type { MarketPairRecord } from '@/modules/markets';
 import {
   type DepthSnapshot,
   OrderBookService,
@@ -51,6 +55,8 @@ export class MarketsService implements OnModuleInit {
     @Inject(forwardRef(() => CurrenciesService))
     private readonly currenciesService: CurrenciesService,
     private readonly ohlcvProvider: BinanceOHLCVProvider,
+    private readonly unitOfWork: UnitOfWork,
+    private readonly outboxAppender: OutboxAppender,
     @Optional()
     @Inject(forwardRef(() => OrderBookService))
     private readonly orderBookService?: OrderBookService,
@@ -287,7 +293,8 @@ export class MarketsService implements OnModuleInit {
     }
 
     // Generate symbol if not provided
-    const symbol = createMarketPairRecordDto.symbol || `${baseCurrency.symbol}/${quoteCurrency.symbol}`;
+    const symbol =
+      createMarketPairRecordDto.symbol || `${baseCurrency.symbol}/${quoteCurrency.symbol}`;
 
     // Check if symbol already exists
     const symbolExists = await this.marketRepository.symbolExists(symbol);
@@ -298,32 +305,54 @@ export class MarketsService implements OnModuleInit {
       );
     }
 
-    // Create market pair
-    const pair = await this.marketRepository.create({
-      base_currency_id: String(createMarketPairRecordDto.baseCurrencyId),
-      quote_currency_id: String(createMarketPairRecordDto.quoteCurrencyId),
-      symbol: symbol.toUpperCase(),
-      price_scale: createMarketPairRecordDto.priceScale ?? 2,
-      amount_scale: createMarketPairRecordDto.amountScale ?? 6,
-      min_order_amount: createMarketPairRecordDto.minOrderAmount ?? '0.0001',
-      maker_fee_rate: (createMarketPairRecordDto.makerFeeRate ?? 0.001).toString(),
-      taker_fee_rate: (createMarketPairRecordDto.takerFeeRate ?? 0.001).toString(),
-      is_active: createMarketPairRecordDto.isActive ?? true,
+    const dedupeKey = `MarketPair:Create:${createMarketPairRecordDto.baseCurrencyId}:${createMarketPairRecordDto.quoteCurrencyId}:${symbol.toUpperCase()}`;
+
+    const created = await this.unitOfWork.run(async (ctx) => {
+      const em = getEntityManagerFromTransactionContext(ctx);
+      const row = await this.marketRepository.createWithinTransaction(ctx, {
+        base_currency_id: String(createMarketPairRecordDto.baseCurrencyId),
+        quote_currency_id: String(createMarketPairRecordDto.quoteCurrencyId),
+        symbol: symbol.toUpperCase(),
+        price_scale: createMarketPairRecordDto.priceScale ?? 2,
+        amount_scale: createMarketPairRecordDto.amountScale ?? 6,
+        min_order_amount: createMarketPairRecordDto.minOrderAmount ?? '0.0001',
+        maker_fee_rate: (createMarketPairRecordDto.makerFeeRate ?? 0.001).toString(),
+        taker_fee_rate: (createMarketPairRecordDto.takerFeeRate ?? 0.001).toString(),
+        is_active: createMarketPairRecordDto.isActive ?? true,
+      });
+
+      await this.outboxAppender.append(em, {
+        aggregateType: 'MarketPair',
+        aggregateId: row.pair_id,
+        eventType: 'MarketPair.Created@v1',
+        payload: {
+          pairId: row.pair_id,
+          symbol: row.symbol,
+          baseCurrencyId: row.base_currency_id,
+          quoteCurrencyId: row.quote_currency_id,
+          isActive: row.is_active,
+        },
+        dedupeKey,
+      });
+
+      return row;
     });
 
-    // Invalidate cache
     await this.invalidateCache();
 
-    this.logger.log(`Market pair created: ${pair.symbol} (ID: ${pair.pair_id})`);
+    this.logger.log(`Market pair created: ${created.symbol} (ID: ${created.pair_id})`);
 
-    return pair;
+    return this.mapMarketPairEntityToRecord(created);
   }
 
   /**
    * Update market pair
    * Business Logic: Validate updates, check conflicts
    */
-  async update(pairId: string, updateMarketPairRecordDto: UpdateMarketPairDto): Promise<MarketPairRecord> {
+  async update(
+    pairId: string,
+    updateMarketPairRecordDto: UpdateMarketPairDto,
+  ): Promise<MarketPairRecord> {
     // Verify pair exists
     const pair = await this.findOne(pairId);
 
@@ -395,7 +424,8 @@ export class MarketsService implements OnModuleInit {
       updateData.base_currency_id = String(updateMarketPairRecordDto.baseCurrencyId);
     if (updateMarketPairRecordDto.quoteCurrencyId !== undefined)
       updateData.quote_currency_id = String(updateMarketPairRecordDto.quoteCurrencyId);
-    if (updateMarketPairRecordDto.symbol !== undefined) updateData.symbol = updateMarketPairRecordDto.symbol;
+    if (updateMarketPairRecordDto.symbol !== undefined)
+      updateData.symbol = updateMarketPairRecordDto.symbol;
     if (updateMarketPairRecordDto.priceScale !== undefined)
       updateData.price_scale = updateMarketPairRecordDto.priceScale;
     if (updateMarketPairRecordDto.amountScale !== undefined)
@@ -409,14 +439,33 @@ export class MarketsService implements OnModuleInit {
     if (updateMarketPairRecordDto.isActive !== undefined)
       updateData.is_active = updateMarketPairRecordDto.isActive;
 
-    const updated = await this.marketRepository.update(pairId, updateData);
+    const updatedEntity = await this.unitOfWork.run(async (ctx) => {
+      const em = getEntityManagerFromTransactionContext(ctx);
+      const result = await this.marketRepository.updateWithinTransaction(
+        ctx,
+        pairId,
+        updateData as Partial<MarketPair>,
+      );
+      await this.outboxAppender.append(em, {
+        aggregateType: 'MarketPair',
+        aggregateId: pairId,
+        eventType: 'MarketPair.Updated@v1',
+        payload: {
+          pairId: result.pair_id,
+          symbol: result.symbol,
+          baseCurrencyId: result.base_currency_id,
+          quoteCurrencyId: result.quote_currency_id,
+          isActive: result.is_active,
+        },
+      });
+      return result;
+    });
 
-    // Invalidate cache
     await this.invalidateCache();
 
-    this.logger.log(`Market pair updated: ${updated.symbol} (ID: ${pairId})`);
+    this.logger.log(`Market pair updated: ${updatedEntity.symbol} (ID: ${pairId})`);
 
-    return updated;
+    return this.mapMarketPairEntityToRecord(updatedEntity);
   }
 
   /**
@@ -538,7 +587,10 @@ export class MarketsService implements OnModuleInit {
     return last;
   }
 
-  private buildTickerResponse(pair: MarketPairRecord, tickerData: IMarketTickerData): MarketTickerDto {
+  private buildTickerResponse(
+    pair: MarketPairRecord,
+    tickerData: IMarketTickerData,
+  ): MarketTickerDto {
     return {
       symbol: pair.symbol,
       pairId: pair.pair_id,
@@ -854,6 +906,24 @@ export class MarketsService implements OnModuleInit {
     return this.getDepthSnapshot(pair.pair_id, depth);
   }
 
+  private mapMarketPairEntityToRecord(pair: MarketPair): MarketPairRecord {
+    return {
+      pair_id: pair.pair_id,
+      symbol: pair.symbol,
+      base_currency_id: pair.base_currency_id,
+      quote_currency_id: pair.quote_currency_id,
+      status: pair.is_active ? 'ACTIVE' : 'INACTIVE',
+      amount_scale: pair.amount_scale,
+      price_scale: pair.price_scale,
+      min_order_amount: pair.min_order_amount,
+      maker_fee_rate: pair.maker_fee_rate,
+      taker_fee_rate: pair.taker_fee_rate,
+      is_active: pair.is_active,
+      created_at: pair.created_at,
+      updated_at: (pair as { updated_at?: Date }).updated_at ?? pair.created_at,
+    };
+  }
+
   /**
    * Invalidate all market-related cache
    * Cache Invalidation Pattern: Clear cache when data changes
@@ -893,8 +963,3 @@ export class MarketsService implements OnModuleInit {
     return seconds;
   }
 }
-
-
-
-
-

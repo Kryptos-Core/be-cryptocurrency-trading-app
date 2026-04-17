@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { GetPriceOracleProviderIdQuery } from './application/queries/get-price-oracle-provider-id.query';
 import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
 
 /**
@@ -9,7 +10,7 @@ import { BinanceOHLCVProvider } from './providers/binance-ohlcv.provider';
  */
 @Module({
   imports: [ConfigModule],
-  providers: [BinanceOHLCVProvider],
-  exports: [BinanceOHLCVProvider],
+  providers: [BinanceOHLCVProvider, GetPriceOracleProviderIdQuery],
+  exports: [BinanceOHLCVProvider, GetPriceOracleProviderIdQuery],
 })
 export class PriceOracleModule {}

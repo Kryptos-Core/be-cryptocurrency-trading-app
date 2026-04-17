@@ -27,8 +27,8 @@ import {
 } from '@/common/exceptions';
 import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
 import { WorkerPoolService } from '@/common/worker-pool/worker-pool.service';
-import type { TransactionWalletRecord } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TransactionWalletRecord } from '@/modules/treasury';
 import {
   TREASURY_MAIN_WALLET_REPOSITORY,
   TREASURY_OPERATION_REPOSITORY,
@@ -98,7 +98,7 @@ export class TransactionWalletService {
     readonly _configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
     private readonly workerPool: WorkerPoolService,
-  ) { }
+  ) {}
 
   async createWallet(dto: CreateTransactionWalletDto): Promise<TransactionWalletRecord> {
     const chain = this.assertSupportedChain(dto.chain);
@@ -257,7 +257,9 @@ export class TransactionWalletService {
 
   async getWalletDetail(
     walletId: string,
-  ): Promise<TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
+  ): Promise<
+    TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }
+  > {
     const wallet = await this.getWalletById(walletId);
     const b = await this.getBalanceByAddress(wallet.chain, wallet.address);
 
@@ -370,7 +372,7 @@ export class TransactionWalletService {
     if (!wallet) {
       throw new BusinessException(
         `No active default main wallet configured for chain ${chain}. ` +
-        `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
+          `Import via POST /treasury/main-wallets and approve via PATCH /treasury/main-wallets/:id/approve.`,
         'TREASURY_MAIN_WALLET_NOT_CONFIGURED',
       );
     }
@@ -417,7 +419,9 @@ export class TransactionWalletService {
     }
 
     const updated =
-      await this.treasuryTransactionWalletRecordRepository.setDefaultUserDepositInTransaction(wallet);
+      await this.treasuryTransactionWalletRecordRepository.setDefaultUserDepositInTransaction(
+        wallet,
+      );
     await this.cacheService.invalidatePattern('treasury:wallets:list:*');
     return updated;
   }
@@ -541,9 +545,10 @@ export class TransactionWalletService {
     if (!this.isTreasuryChain(chain)) {
       return null;
     }
-    const wallets = await this.treasuryTransactionWalletRecordRepository.findActiveWithdrawalCandidates(
-      chain as SupportedTreasuryChain,
-    );
+    const wallets =
+      await this.treasuryTransactionWalletRecordRepository.findActiveWithdrawalCandidates(
+        chain as SupportedTreasuryChain,
+      );
     if (!wallets.length) {
       return null;
     }
@@ -706,6 +711,3 @@ export class TransactionWalletService {
     }
   }
 }
-
-
-

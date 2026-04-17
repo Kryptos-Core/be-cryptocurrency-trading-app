@@ -63,6 +63,12 @@ import { MetricsService } from './metrics.service';
     }),
 
     // ── Blockchain RPC ────────────────────────────────────────────────────
+    makeGaugeProvider({
+      name: 'outbox_unpublished_rows',
+      help: 'Approximate backlog of integration_outbox rows not yet relayed (updated by relay job when instrumented)',
+      labelNames: ['aggregate_type'],
+    }),
+
     makeHistogramProvider({
       name: 'blockchain_rpc_duration_seconds',
       help: 'Duration of blockchain RPC calls in seconds',

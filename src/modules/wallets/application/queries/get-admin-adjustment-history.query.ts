@@ -8,7 +8,8 @@ import type { AdminAdjustWalletResponseDto } from '@/modules/wallets/dto/admin-a
 @Injectable()
 export class GetAdminAdjustmentHistoryQuery {
   constructor(
-    @Inject(ADMIN_ADJUSTMENT_REPOSITORY) private readonly adjustmentRepo: AdminAdjustmentRepositoryPort,
+    @Inject(ADMIN_ADJUSTMENT_REPOSITORY)
+    private readonly adjustmentRepo: AdminAdjustmentRepositoryPort,
   ) {}
 
   async execute(

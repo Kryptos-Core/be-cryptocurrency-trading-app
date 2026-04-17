@@ -1,15 +1,20 @@
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { BlockchainNetwork, OnchainTxStatus, WalletReferenceType, WalletTransactionAction } from '@/common/enums';
+import {
+  BlockchainNetwork,
+  OnchainTxStatus,
+  WalletReferenceType,
+  WalletTransactionAction,
+} from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
-import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { DepositFxService } from '../../../domain/services/deposit-fx.service';
-import { ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
-import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
 import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
+import { OnchainDepositService } from './application/use-cases/deposits/onchain-deposit.service';
+import { BlockchainProviderFactory } from './blockchain-provider.factory';
+import { ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
 
 describe('OnchainDepositService', () => {
   const onchainTxRepo = {
@@ -231,7 +236,12 @@ describe('OnchainDepositService', () => {
       'user-9',
       expect.objectContaining({ currencyId: 'usdt', amount: '420' }),
     );
-    expect(onchainTxRepo.updateCreditConversion).toHaveBeenCalledWith('tx-ok', 'usdt', '420', '100');
+    expect(onchainTxRepo.updateCreditConversion).toHaveBeenCalledWith(
+      'tx-ok',
+      'usdt',
+      '420',
+      '100',
+    );
     expect(result).toEqual({
       txId: 'tx-ok',
       status: OnchainTxStatus.COMPLETED,
@@ -263,5 +273,3 @@ describe('OnchainDepositService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
-
-

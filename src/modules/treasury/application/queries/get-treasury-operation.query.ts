@@ -30,8 +30,3 @@ export class GetTreasuryOperationQuery {
     return this.service.listTreasuryTransactions(filter);
   }
 }
-
-
-
-
-

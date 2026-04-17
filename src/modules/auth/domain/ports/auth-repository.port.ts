@@ -23,6 +23,3 @@ export interface AuthRepositoryPort {
   /** Enable/disable 2FA for user */
   setTwoFaEnabled(userId: string, enabled: boolean): Promise<number>;
 }
-
-
-

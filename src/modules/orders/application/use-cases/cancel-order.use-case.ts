@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
-import { RemoveOrderFromBookCommand, RemoveOrderFromBookUseCase } from '@/modules/matching/application/use-cases';
+import {
+  RemoveOrderFromBookCommand,
+  RemoveOrderFromBookUseCase,
+} from '@/modules/matching/application/use-cases';
 import { CancelOrderCommand } from '@/modules/orders/commands/cancel-order.command';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 import { canCancelOrder } from '@/modules/orders/states';

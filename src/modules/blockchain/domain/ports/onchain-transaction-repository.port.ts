@@ -49,9 +49,15 @@ export interface AdminWithdrawalFilters {
  * Domain-level abstraction for on-chain transaction persistence.
  */
 export interface OnchainTransactionRepositoryPort {
-  findByChainAndTxHash(chain: string, txHash: string): Promise<BlockchainOnchainTransactionRecord | null>;
+  findByChainAndTxHash(
+    chain: string,
+    txHash: string,
+  ): Promise<BlockchainOnchainTransactionRecord | null>;
 
-  findByIdAndUserId(txId: string, userId: string): Promise<BlockchainOnchainTransactionRecord | null>;
+  findByIdAndUserId(
+    txId: string,
+    userId: string,
+  ): Promise<BlockchainOnchainTransactionRecord | null>;
 
   findByUserPaginated(
     userId: string,
@@ -60,7 +66,9 @@ export interface OnchainTransactionRepositoryPort {
     offset: number,
   ): Promise<{ items: BlockchainOnchainTransactionRecord[]; total: number }>;
 
-  create(data: Partial<BlockchainOnchainTransactionRecord>): Promise<BlockchainOnchainTransactionRecord>;
+  create(
+    data: Partial<BlockchainOnchainTransactionRecord>,
+  ): Promise<BlockchainOnchainTransactionRecord>;
 
   updateStatus(txId: string, status: string, extra?: Record<string, any>): Promise<void>;
 
@@ -118,9 +126,3 @@ export interface OnchainTransactionRepositoryPort {
 }
 
 export const ONCHAIN_TRANSACTION_REPOSITORY = Symbol('ONCHAIN_TRANSACTION_REPOSITORY');
-
-
-
-
-
-

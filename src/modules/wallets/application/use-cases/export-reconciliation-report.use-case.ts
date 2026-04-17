@@ -1,10 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  WALLET_REPOSITORY,
-  type WalletRepositoryPort,
-} from '@/modules/wallets/domain/ports';
+import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
 import { ReconcileBalanceUseCase } from './reconcile-balance.use-case';
 
 export interface ReconciliationReportResult {

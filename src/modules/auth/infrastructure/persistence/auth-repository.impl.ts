@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-result.util';
-import type { UserRecord } from '@/modules/users';
 import type { AuthRepositoryPort } from '@/modules/auth/domain/ports';
+import type { UserRecord } from '@/modules/users';
 
 /**
  * Auth Repository Implementation — stored-procedure-backed persistence.
@@ -60,4 +60,3 @@ export class AuthRepositoryImpl implements AuthRepositoryPort {
     return Number(spFirstValue<number>(result, 'affected') ?? 0);
   }
 }
-

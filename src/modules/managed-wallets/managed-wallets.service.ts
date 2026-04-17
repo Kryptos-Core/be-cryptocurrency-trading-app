@@ -16,8 +16,8 @@ import {
 } from '@/common/exceptions';
 import { WalletEncryptionService } from '@/common/services';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { TransactionWalletRecord } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TransactionWalletRecord } from '@/modules/treasury';
 import {
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
   type TreasuryTransactionWalletRepositoryPort,
@@ -553,8 +553,3 @@ export class ManagedWalletsService {
     return chain as SupportedManagedWalletChain;
   }
 }
-
-
-
-
-

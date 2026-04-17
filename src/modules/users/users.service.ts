@@ -4,10 +4,10 @@ import { CloudinaryService } from '@/common/services';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
-import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { UserRecord } from '@/modules/users';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
+import type { UserRecord } from '@/modules/users';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 import type {
@@ -66,7 +66,12 @@ export class UsersService {
     userId: string,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{ items: BlockchainOnchainTransactionRecord[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    items: BlockchainOnchainTransactionRecord[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     await this.findOne(userId);
     const skip = calcSkip(page, limit);
     const { items, total } = await this.usersRepository.findOnchainTransactionsByUser(
@@ -356,9 +361,3 @@ export class UsersService {
     await this.usersRepository.saveFcmToken(userId, fcmToken);
   }
 }
-
-
-
-
-
-

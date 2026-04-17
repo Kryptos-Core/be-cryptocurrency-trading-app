@@ -19,19 +19,19 @@ import { ethers } from 'ethers';
 export type ChainType = 'evm' | 'solana';
 
 export interface GenerateAccountInput {
-    type: ChainType;
+  type: ChainType;
 }
 
 /** EVM wallet result from ethers.Wallet.createRandom(). */
 export interface EvmAccountResult {
-    address: string;
-    privateKey: string;
+  address: string;
+  privateKey: string;
 }
 
 /** Solana keypair — address (base58) + secret key (base64 for thread-safe transfer). */
 export interface SolanaAccountResult {
-    address: string;
-    privateKey: string;
+  address: string;
+  privateKey: string;
 }
 
 export type AccountWorkerResult = EvmAccountResult | SolanaAccountResult;
@@ -41,20 +41,20 @@ export type AccountWorkerResult = EvmAccountResult | SolanaAccountResult;
  * For Tron, keep account generation in the main thread (async HTTP call is not ideal for workers).
  */
 export default function generateAccountWorker(input: GenerateAccountInput): AccountWorkerResult {
-    if (input.type === 'evm') {
-        const wallet = ethers.Wallet.createRandom();
-        return { address: wallet.address, privateKey: wallet.privateKey };
-    }
+  if (input.type === 'evm') {
+    const wallet = ethers.Wallet.createRandom();
+    return { address: wallet.address, privateKey: wallet.privateKey };
+  }
 
-    if (input.type === 'solana') {
-        const keypair = Keypair.generate();
-        // Use bs58 encoding — matches the canonical format expected by Solana SDK and
-        // the decoding in TransactionWalletService.resolveMainWalletPrivateKey().
-        return {
-            address: keypair.publicKey.toBase58(),
-            privateKey: bs58.encode(keypair.secretKey),
-        };
-    }
+  if (input.type === 'solana') {
+    const keypair = Keypair.generate();
+    // Use bs58 encoding — matches the canonical format expected by Solana SDK and
+    // the decoding in TransactionWalletService.resolveMainWalletPrivateKey().
+    return {
+      address: keypair.publicKey.toBase58(),
+      privateKey: bs58.encode(keypair.secretKey),
+    };
+  }
 
-    throw new Error(`Unsupported account type: ${input.type}`);
+  throw new Error(`Unsupported account type: ${input.type}`);
 }

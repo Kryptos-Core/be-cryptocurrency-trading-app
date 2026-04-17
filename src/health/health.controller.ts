@@ -1,14 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import {
-  HealthCheck,
-  HealthCheckService,
-  HttpHealthIndicator,
-  TypeOrmHealthIndicator,
-} from '@nestjs/terminus';
+import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { Public } from '@/common/decorators';
+import { RedisService } from '@/common/services/redis.service';
 
 /**
  * Health check endpoint — returns component health for DB and infrastructure.
@@ -23,6 +19,7 @@ export class HealthController {
     private readonly health: HealthCheckService,
     private readonly db: TypeOrmHealthIndicator,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly redisService: RedisService,
   ) {}
 
   @Public()
@@ -48,6 +45,13 @@ export class HealthController {
   readiness() {
     return this.health.check([
       () => this.db.pingCheck('database', { connection: this.dataSource }),
+      async () => {
+        const pong = await this.redisService.getClient().ping();
+        if (pong !== 'PONG') {
+          throw new Error(`Redis ping unexpected: ${String(pong)}`);
+        }
+        return { redis: { status: 'up' as const } };
+      },
     ]);
   }
 }

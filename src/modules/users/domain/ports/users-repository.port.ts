@@ -101,11 +101,3 @@ export interface UsersRepositoryPort {
   /** Save / clear FCM device token for push notifications */
   saveFcmToken(userId: string, fcmToken: string | null): Promise<void>;
 }
-
-
-
-
-
-
-
-

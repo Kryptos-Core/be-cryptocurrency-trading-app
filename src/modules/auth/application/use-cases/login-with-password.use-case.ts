@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BusinessException, UnauthorizedException } from '@/common/exceptions';
-import type { UserRecord } from '@/modules/users';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import type { TokenIssuerPort } from '@/modules/auth/application/ports/token-issuer.port';
 import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
 import type { LoginDto } from '@/modules/auth/dto';
+import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import { buildAuthAccessTokenPayload, sanitizeAuthUser } from './shared/auth-response.util';
 
@@ -47,5 +47,3 @@ export class LoginWithPasswordUseCase {
     };
   }
 }
-
-

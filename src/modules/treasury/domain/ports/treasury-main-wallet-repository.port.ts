@@ -17,7 +17,9 @@ export interface TreasuryMainWalletRepositoryPort {
     chain: TreasuryMainWalletChain,
     address: string,
   ): Promise<TreasuryMainWalletRecord | null>;
-  findActiveDefaultOnChain(chain: TreasuryMainWalletChain): Promise<TreasuryMainWalletRecord | null>;
+  findActiveDefaultOnChain(
+    chain: TreasuryMainWalletChain,
+  ): Promise<TreasuryMainWalletRecord | null>;
   saveWallet(wallet: DeepPartial<TreasuryMainWalletRecord>): Promise<TreasuryMainWalletRecord>;
   saveNew(partial: DeepPartial<TreasuryMainWalletRecord>): Promise<TreasuryMainWalletRecord>;
   clearDefaultAndSetMainWallet(chain: TreasuryMainWalletChain, mainWalletId: string): Promise<void>;

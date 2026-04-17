@@ -1,17 +1,20 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { uuidv7 } from 'uuidv7';
-import { ExchangeRateAuditLog } from '@/entities/exchange-rate-audit-log.entity';
 import { RedisService } from '@/common/services/redis.service';
-import { EXCHANGE_RATE_AUDIT_REPOSITORY, type ExchangeRateAuditRepositoryPort } from './domain/ports';
-import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
-import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { ExchangeRateAuditLog } from '@/entities/exchange-rate-audit-log.entity';
 import { DepositsService } from '@/modules/deposits/deposits.service';
-import { UsersService } from '@/modules/users/users.service';
 import {
   EXCHANGE_RATE_ALERTS_CHANNEL,
   type ExchangeRateAutoSyncAlertEvent,
 } from '@/modules/exchange-rate/constants';
+import type { PayosGatewayConfig } from '@/modules/payment-config/interfaces/payment-gateway-config.interface';
+import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
+import { UsersService } from '@/modules/users/users.service';
+import {
+  EXCHANGE_RATE_AUDIT_REPOSITORY,
+  type ExchangeRateAuditRepositoryPort,
+} from './domain/ports';
 import type { MarketPricesDto } from './dto/market-prices.dto';
 import type { RatePreviewDto } from './dto/rate-preview.dto';
 import type { SyncRateDto } from './dto/sync-rate.dto';
@@ -26,10 +29,7 @@ const SYSTEM_AUTO_SYNC_ACTOR_ID = '00000000-0000-7000-8000-000000000001';
 
 type RateMode = 'manual_override' | 'auto_sync';
 
-type AutoSyncSkipReason =
-  | 'payos_config_not_found'
-  | 'auto_sync_disabled'
-  | 'interval_not_due';
+type AutoSyncSkipReason = 'payos_config_not_found' | 'auto_sync_disabled' | 'interval_not_due';
 
 export type AutoSyncTickResult =
   | {
@@ -164,9 +164,7 @@ export class ExchangeRateService {
       currentConfig.autoSyncIntervalMinutes ??
       DEFAULT_AUTO_SYNC_INTERVAL_MINUTES;
     const nextAutoSyncSource =
-      dto.autoSyncSource ??
-      currentConfig.autoSyncSource ??
-      DEFAULT_AUTO_SYNC_SOURCE;
+      dto.autoSyncSource ?? currentConfig.autoSyncSource ?? DEFAULT_AUTO_SYNC_SOURCE;
     const nextRateChangeAlertThresholdPct =
       dto.rateChangeAlertThresholdPct ??
       currentConfig.rateChangeAlertThresholdPct ??
@@ -234,10 +232,9 @@ export class ExchangeRateService {
   }
 
   async runAutoSyncSchedulerTick(now = new Date()): Promise<AutoSyncTickResult> {
-    const config = (await this.paymentConfigService.getActiveConfig(
-      'PAYOS',
-      'MAINNET',
-    )) as (PayosGatewayConfig & { config_id?: string }) | null;
+    const config = (await this.paymentConfigService.getActiveConfig('PAYOS', 'MAINNET')) as
+      | (PayosGatewayConfig & { config_id?: string })
+      | null;
 
     if (!config) {
       return {
@@ -322,7 +319,9 @@ export class ExchangeRateService {
 
     const configs = await this.paymentConfigService.listConfigs();
     const activePayosConfig = configs
-      .filter((item) => item.type === 'PAYOS' && item.network === 'MAINNET' && item.status === 'ACTIVE')
+      .filter(
+        (item) => item.type === 'PAYOS' && item.network === 'MAINNET' && item.status === 'ACTIVE',
+      )
       .sort((a, b) => Number(b.config_version ?? 0) - Number(a.config_version ?? 0))[0];
 
     if (!activePayosConfig?.config_id) {
@@ -444,7 +443,11 @@ export class ExchangeRateService {
     return source === 'exchangerate_host' ? source : DEFAULT_AUTO_SYNC_SOURCE;
   }
 
-  private isAutoSyncDue(lastSyncAt: string | undefined, intervalMinutes: number, now: Date): boolean {
+  private isAutoSyncDue(
+    lastSyncAt: string | undefined,
+    intervalMinutes: number,
+    now: Date,
+  ): boolean {
     if (!lastSyncAt) {
       return true;
     }
@@ -472,9 +475,7 @@ export class ExchangeRateService {
     try {
       await this.redisService.publish(EXCHANGE_RATE_ALERTS_CHANNEL, JSON.stringify(payload));
     } catch (error) {
-      this.logger.error(
-        `[ExchangeRateAutoSyncAlert] publish failed: ${(error as Error).message}`,
-      );
+      this.logger.error(`[ExchangeRateAutoSyncAlert] publish failed: ${(error as Error).message}`);
     }
   }
 
@@ -493,5 +494,4 @@ export class ExchangeRateService {
       return null;
     }
   }
-
 }

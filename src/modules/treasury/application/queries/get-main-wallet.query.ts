@@ -40,6 +40,3 @@ export class GetMainWalletQuery {
     return this.service.getWalletsDueForRotation(globalIntervalDays);
   }
 }
-
-
-

@@ -43,7 +43,9 @@ export class ExchangeRateAutoSyncScheduler {
         AUTO_SYNC_LOCK_TTL_SECONDS,
       );
       if (!hasDistributedLock) {
-        this.logger.log('[ExchangeRateAutoSyncScheduler] Tick skipped because lock is held by another instance');
+        this.logger.log(
+          '[ExchangeRateAutoSyncScheduler] Tick skipped because lock is held by another instance',
+        );
         return;
       }
 

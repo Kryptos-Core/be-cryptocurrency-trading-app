@@ -1,12 +1,12 @@
-import { Test, type TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { RedisService } from '@/common/services';
 import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from '../../domain/ports';
-import { AuditTradeVisitor, MetricsTradeVisitor } from '../../infrastructure/observers';
 import { MatchingLockContentionError } from '../../errors/matching-lock-contention.error';
+import { AuditTradeVisitor, MetricsTradeVisitor } from '../../infrastructure/observers';
 import type { OrderBookOrder } from '../../interfaces';
-import { MatchingService } from './matching.service';
 import { CircuitBreakerService } from './circuit-breaker.service';
+import { MatchingService } from './matching.service';
 import { OrderBookService } from './orderbook';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';

@@ -1,6 +1,8 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxModule } from '@/common/outbox/outbox.module';
 import { MarketPair } from '@/entities/market-pair.entity';
+import { ReadMarketPair } from '@/entities/read-market-pair.entity';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { MatchingModule } from '@/modules/matching/matching.module';
 import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
@@ -22,7 +24,8 @@ import { MarketRepository } from './repositories';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MarketPair]),
+    TypeOrmModule.forFeature([MarketPair, ReadMarketPair]),
+    OutboxModule,
     forwardRef(() => CurrenciesModule),
     PriceOracleModule,
     forwardRef(() => MatchingModule),

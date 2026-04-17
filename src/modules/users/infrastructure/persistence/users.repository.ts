@@ -5,9 +5,9 @@ import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-res
 import { UserRole } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
-import { OnchainTransaction } from '@/modules/blockchain';
-import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import { User } from '@/entities/user.entity';
+import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
+import { OnchainTransaction } from '@/modules/blockchain';
 import type { UserFilterDto } from '@/modules/users/dto/user-filter.dto';
 
 /**
@@ -367,5 +367,3 @@ export class UsersRepository {
     ]);
   }
 }
-
-

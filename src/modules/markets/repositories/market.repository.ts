@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { MARKET_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import { getEntityManagerFromTransactionContext } from '@/common/typeorm/entity-manager-from-context';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { Trade } from '@/entities/trade.entity';
 import type { IMarketTickerData } from '../interfaces/market-ticker.interface';
+
+type SqlExecutor = Pick<DataSource, 'query'>;
 
 /**
  * Market Repository
@@ -54,9 +59,14 @@ export class MarketRepository extends BaseRepository<MarketPair> {
    * Database Procedure Pattern: sp_market_find_by_id
    */
   async findById(id: number | string): Promise<MarketPair | null> {
-    const result = await this.dataSource.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-      id,
-    ]);
+    return this.findByIdUsingExecutor(this.dataSource, id);
+  }
+
+  private async findByIdUsingExecutor(
+    executor: SqlExecutor,
+    id: number | string,
+  ): Promise<MarketPair | null> {
+    const result = await executor.query(`CALL ${MARKET_STORE_PROCEDURE.FIND_BY_ID}(?)`, [id]);
     if (!result || result.length === 0 || !result[0] || result[0].length === 0) {
       return null;
     }
@@ -475,6 +485,37 @@ export class MarketRepository extends BaseRepository<MarketPair> {
   }
 
   /**
+   * Create within the caller's TypeORM transaction (same connection as outbox append).
+   */
+  async createWithinTransaction(
+    ctx: TransactionContext,
+    entity: Partial<MarketPair>,
+  ): Promise<MarketPair> {
+    const em = getEntityManagerFromTransactionContext(ctx) as unknown as EntityManager;
+    const pairId = entity.pair_id ?? newUuid();
+    const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+
+    await em.query(`CALL ${MARKET_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      pairId,
+      entity.base_currency_id,
+      entity.quote_currency_id,
+      symbol,
+      entity.price_scale ?? 2,
+      entity.amount_scale ?? 6,
+      entity.min_order_amount ?? '0.0001',
+      entity.maker_fee_rate ?? 0.001,
+      entity.taker_fee_rate ?? 0.001,
+      entity.is_active ?? true,
+    ]);
+
+    const createdPair = await this.findByIdUsingExecutor(em, pairId);
+    if (!createdPair) {
+      throw new Error('Failed to fetch created market pair');
+    }
+    return createdPair;
+  }
+
+  /**
    * Override update to use stored procedure
    * Database Procedure Pattern: sp_market_update
    */
@@ -501,6 +542,34 @@ export class MarketRepository extends BaseRepository<MarketPair> {
 
     // Fetch the updated pair using stored procedure
     const updatedPair = await this.findById(id);
+    if (!updatedPair) {
+      throw new Error(`Market pair with id ${id} not found after update`);
+    }
+    return updatedPair;
+  }
+
+  async updateWithinTransaction(
+    ctx: TransactionContext,
+    id: number | string,
+    entity: Partial<MarketPair>,
+  ): Promise<MarketPair> {
+    const em = getEntityManagerFromTransactionContext(ctx) as unknown as EntityManager;
+    const symbol = entity.symbol ? entity.symbol.toUpperCase() : null;
+
+    await em.query(`CALL ${MARKET_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      id,
+      entity.base_currency_id ?? null,
+      entity.quote_currency_id ?? null,
+      symbol,
+      entity.price_scale ?? null,
+      entity.amount_scale ?? null,
+      entity.min_order_amount ?? null,
+      entity.maker_fee_rate ?? null,
+      entity.taker_fee_rate ?? null,
+      entity.is_active ?? null,
+    ]);
+
+    const updatedPair = await this.findByIdUsingExecutor(em, id);
     if (!updatedPair) {
       throw new Error(`Market pair with id ${id} not found after update`);
     }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { BaseQuery, type IQueryHandler } from '@/common/cqrs';
 import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
+import { BaseQuery, type IQueryHandler } from '@/common/cqrs';
 import type { UserRole } from '@/common/enums';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import type { ManagedWalletResponseDto } from '../../dto';
@@ -96,11 +96,14 @@ export class GetManagedWalletTransactionsRequest extends BaseQuery {
 
 @Injectable()
 export class GetManagedWalletTransactionsQuery
-  implements IQueryHandler<GetManagedWalletTransactionsRequest, BlockchainOnchainTransactionRecord[]>
+  implements
+    IQueryHandler<GetManagedWalletTransactionsRequest, BlockchainOnchainTransactionRecord[]>
 {
   constructor(private readonly managedWalletsService: ManagedWalletsService) {}
 
-  async execute(query: GetManagedWalletTransactionsRequest): Promise<BlockchainOnchainTransactionRecord[]> {
+  async execute(
+    query: GetManagedWalletTransactionsRequest,
+  ): Promise<BlockchainOnchainTransactionRecord[]> {
     return this.managedWalletsService.getWalletTransactions(
       query.userId,
       query.walletId,
@@ -152,5 +155,3 @@ export class GetDepositMethodsQuery
     return this.managedWalletsService.getDepositMethods();
   }
 }
-
-

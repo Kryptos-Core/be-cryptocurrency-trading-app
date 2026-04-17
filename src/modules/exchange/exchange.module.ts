@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { RedisModule } from '@/modules/redis/redis.module';
+import { GetExchangeModeQuery } from './application/queries/get-exchange-mode.query';
 import { BinanceExchangeService } from './binance/binance.service';
 import { ExchangeController } from './exchange.controller';
 import { ExchangeService } from './exchange.service';
@@ -23,7 +24,8 @@ import { MockExchangeService } from './mock/mock-exchange.service';
     MarketCatalogBootstrapService,
     BinanceExchangeService,
     MockExchangeService,
+    GetExchangeModeQuery,
   ],
-  exports: [ExchangeService, ExchangeInfoSyncService],
+  exports: [ExchangeService, ExchangeInfoSyncService, GetExchangeModeQuery],
 })
 export class ExchangeModule {}

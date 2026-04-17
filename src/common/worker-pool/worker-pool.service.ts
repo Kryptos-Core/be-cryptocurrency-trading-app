@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 import Piscina from 'piscina';
 
 const DEFAULT_MIN_THREADS = 1;
@@ -49,8 +50,8 @@ export class WorkerPoolService implements OnModuleDestroy {
 
     this.logger.log(
       `WorkerPool initialised — minThreads=${options.minThreads ?? DEFAULT_MIN_THREADS} ` +
-      `maxThreads=${options.maxThreads ?? DEFAULT_MAX_THREADS} ` +
-      `worker=${options.workerFile}`,
+        `maxThreads=${options.maxThreads ?? DEFAULT_MAX_THREADS} ` +
+        `worker=${options.workerFile}`,
     );
   }
 
@@ -59,7 +60,14 @@ export class WorkerPoolService implements OnModuleDestroy {
    * @param data Input serialised to the worker thread.
    */
   async run<TIn, TOut>(data: TIn): Promise<TOut> {
-    return this.pool.run(data) as Promise<TOut>;
+    const tracer = trace.getTracer('be-cryptocurrency-trading-app');
+    return await tracer.startActiveSpan('WorkerPool.run', async (span) => {
+      try {
+        return (await this.pool.run(data)) as TOut;
+      } finally {
+        span.end();
+      }
+    });
   }
 
   /** Current number of threads alive in the pool. */

@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
-import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from '../ports';
 import { MatchingLockContentionError } from '../../errors/matching-lock-contention.error';
+import { AuditTradeVisitor, MetricsTradeVisitor } from '../../infrastructure/observers';
 import type {
   MatchingContext,
   MatchingReconcileResult,
@@ -11,9 +11,9 @@ import type {
   TradeExecutionResult,
   TradeExecutor,
 } from '../../interfaces';
-import { AuditTradeVisitor, MetricsTradeVisitor } from '../../infrastructure/observers';
-import { marketOrderCanFullyFillRemaining } from '../../utils/market-fok-fill.util';
 import { DEFAULT_SCALE, fromBaseUnits, toBaseUnits } from '../../utils';
+import { marketOrderCanFullyFillRemaining } from '../../utils/market-fok-fill.util';
+import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from '../ports';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { OrderBookService } from './orderbook';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';

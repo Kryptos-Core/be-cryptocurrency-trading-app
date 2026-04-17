@@ -101,5 +101,3 @@ export class PriceTimePriorityStrategy implements IMatchingStrategy {
     return results;
   }
 }
-
-

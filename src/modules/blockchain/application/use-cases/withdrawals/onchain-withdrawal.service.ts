@@ -53,13 +53,18 @@ export class OnchainWithdrawalService {
     await this.cacheService.set(lockKey, '1', OnchainWithdrawalService.WITHDRAWAL_LOCK_TTL);
 
     const idempotencyKey = dto.idempotencyKey?.trim();
-    const idempotencyCacheKey = idempotencyKey ? `withdrawal:idempotency:${userId}:${idempotencyKey}` : null;
+    const idempotencyCacheKey = idempotencyKey
+      ? `withdrawal:idempotency:${userId}:${idempotencyKey}`
+      : null;
     if (idempotencyCacheKey && (await this.cacheService.exists(idempotencyCacheKey))) {
       throw new ConflictException('Yeu cau rut tien bi submit trung.', 'WITHDRAWAL_DUPLICATE');
     }
 
     try {
-      const linkedWallet = await this.walletLinkingService.getLinkedWallet(dto.linkedWalletId, userId);
+      const linkedWallet = await this.walletLinkingService.getLinkedWallet(
+        dto.linkedWalletId,
+        userId,
+      );
       const txId = uuidv7();
 
       await this.onchainTxRepo.create({

@@ -1,8 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  WALLET_REPOSITORY,
-  type WalletRepositoryPort,
-} from '@/modules/wallets/domain/ports';
+import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 import type { WalletBalanceDto } from '@/modules/wallets/dto/wallet-balance.dto';
 

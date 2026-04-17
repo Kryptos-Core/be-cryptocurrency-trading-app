@@ -31,9 +31,15 @@ describe('BuyQueueService', () => {
   });
 
   it('sorts by best bid then oldest time', () => {
-    service.add(order({ order_id: 'o1', price: '100', created_at: new Date('2025-01-01T00:00:02Z') }));
-    service.add(order({ order_id: 'o2', price: '101', created_at: new Date('2025-01-01T00:00:03Z') }));
-    service.add(order({ order_id: 'o3', price: '101', created_at: new Date('2025-01-01T00:00:01Z') }));
+    service.add(
+      order({ order_id: 'o1', price: '100', created_at: new Date('2025-01-01T00:00:02Z') }),
+    );
+    service.add(
+      order({ order_id: 'o2', price: '101', created_at: new Date('2025-01-01T00:00:03Z') }),
+    );
+    service.add(
+      order({ order_id: 'o3', price: '101', created_at: new Date('2025-01-01T00:00:01Z') }),
+    );
 
     expect(service.popBest()?.order_id).toBe('o3');
     expect(service.popBest()?.order_id).toBe('o2');

@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TronWeb, Trx } from 'tronweb';
 import { BlockchainNetwork } from '@/common/enums';
-import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TreasuryMainWalletChain } from '@/modules/treasury';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
   BlockchainBalanceDto,
@@ -163,5 +163,3 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     return tw.defaultAddress.base58;
   }
 }
-
-

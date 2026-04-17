@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { MarketsModule } from '@/modules/markets/markets.module';
+import { GetWorkspaceStateQuery } from './application/queries/get-workspace-state.query';
 import { BinancePriceFeedService } from './services/binance-price-feed.service';
 import { DashboardBroadcastService } from './services/dashboard-broadcast.service';
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
@@ -28,6 +29,7 @@ import { TradingGateway } from './websocket/trading.gateway';
     BinancePriceFeedService,
     DashboardBroadcastService,
     WorkspaceService,
+    GetWorkspaceStateQuery,
   ],
   exports: [TradingPriceStreamService, BinancePriceFeedService],
 })

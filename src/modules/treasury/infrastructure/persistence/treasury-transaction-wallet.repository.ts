@@ -50,7 +50,9 @@ export class TreasuryTransactionWalletRepository
     });
   }
 
-  async findDefaultUserDepositWallet(chain: BlockchainChainDbValue): Promise<TransactionWallet | null> {
+  async findDefaultUserDepositWallet(
+    chain: BlockchainChainDbValue,
+  ): Promise<TransactionWallet | null> {
     return this.dataSource.getRepository(TransactionWallet).findOne({
       where: {
         chain,

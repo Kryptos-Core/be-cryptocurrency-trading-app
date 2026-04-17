@@ -19,8 +19,8 @@ import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-de
 import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
 import { RedisService } from '@/common/services';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
-import type { TransactionWalletRecord, TreasuryOperationRecord } from '@/modules/treasury';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TransactionWalletRecord, TreasuryOperationRecord } from '@/modules/treasury';
 import {
   TREASURY_EVENTS_CHANNEL,
   TREASURY_FUND_JOB,
@@ -556,10 +556,3 @@ export class TreasuryOperationsService {
     }
   }
 }
-
-
-
-
-
-
-

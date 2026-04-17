@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type DeepPartial } from 'typeorm';
 import { AppSetting } from '@/entities/app-setting.entity';
 import { CurrencyNetwork } from '@/entities/currency-network.entity';
-import { OnchainTransaction } from '@/modules/blockchain';
 import type {
   BlockchainOnchainTransactionRecord,
   BlockchainOnchainTransactionWriteInput,
 } from '@/modules/blockchain';
+import { OnchainTransaction } from '@/modules/blockchain';
 
 export type DepositNetworkAggregateRow = {
   network_code: string;
@@ -38,7 +38,9 @@ export class ManagedWalletsDataRepository {
       .getMany();
   }
 
-  async saveOnchainTransaction(row: DeepPartial<BlockchainOnchainTransactionWriteInput>): Promise<void> {
+  async saveOnchainTransaction(
+    row: DeepPartial<BlockchainOnchainTransactionWriteInput>,
+  ): Promise<void> {
     const repo = this.dataSource.getRepository(OnchainTransaction);
     await repo.save(repo.create(row as DeepPartial<OnchainTransaction>));
   }
@@ -79,6 +81,3 @@ export class ManagedWalletsDataRepository {
     );
   }
 }
-
-
-

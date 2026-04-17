@@ -7,9 +7,9 @@ import type { BlockchainNetwork, Permission } from '@/common/enums';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
-import type { UserRecord } from '@/modules/users';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
+import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 
 /** Response for wallet auth (login or register) */
@@ -215,6 +215,3 @@ export class WalletAuthService {
     return sanitized;
   }
 }
-
-
-

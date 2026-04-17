@@ -2,12 +2,12 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { WalletReferenceType } from '@/common/enums';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
 import {
-  WALLET_REPOSITORY,
-  type WalletRepositoryPort,
-  WALLET_LEDGER_REPOSITORY,
-  type WalletLedgerRepositoryPort,
   EXCHANGE_SERVICE_PORT,
   type ExchangeServicePort,
+  WALLET_LEDGER_REPOSITORY,
+  WALLET_REPOSITORY,
+  type WalletLedgerRepositoryPort,
+  type WalletRepositoryPort,
 } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 
@@ -29,11 +29,7 @@ export class ReconcileBalanceUseCase {
     private readonly balanceCalc: BalanceCalculationService,
   ) {}
 
-  async execute(
-    userId: string,
-    currencyId: string,
-    manager?: any,
-  ): Promise<ReconcileResult> {
+  async execute(userId: string, currencyId: string, manager?: any): Promise<ReconcileResult> {
     const wallet = await this.walletRepo.findByUserCurrency(userId, currencyId);
     if (!wallet) {
       throw new BadRequestException(

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services/redis.service';
-import type { WalletEventPublisherPort } from '@/modules/wallets/domain/ports';
 import { WALLET_BALANCE_EVENTS_CHANNEL } from '@/modules/wallets/constants';
+import type { WalletEventPublisherPort } from '@/modules/wallets/domain/ports';
 
 /**
  * Infrastructure Adapter: Redis Wallet Event Publisher

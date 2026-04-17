@@ -64,6 +64,13 @@ export class EnvironmentVariables {
   @IsOptional()
   TYPEORM_DEBUG_SQL?: string;
 
+  /**
+   * When true/1/yes: GET /markets list uses read_market_pairs projection when filters are simple.
+   */
+  @IsString()
+  @IsOptional()
+  READ_MARKETS_FROM_PROJECTION?: string;
+
   @IsString()
   @IsOptional()
   MM_DEFAULT_SPREAD_BPS?: string;

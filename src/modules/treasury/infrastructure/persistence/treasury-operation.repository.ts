@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { calcSkip } from '@/common/utils/pagination.util';
+import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import { OnchainTransaction } from '@/modules/blockchain';
 import type { TreasuryMainWalletChain } from '@/modules/treasury';
-import { TreasuryOperation } from '@/entities/treasury-operation.entity';
 import type { TreasuryOperationRepositoryPort } from '../../domain/ports';
 import type { ListTreasuryOperationsDto } from '../../dto';
 
@@ -152,5 +152,3 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
     });
   }
 }
-
-

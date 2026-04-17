@@ -153,7 +153,9 @@ export class BlockchainController {
     @CurrentUser('userId') userId: string,
     @Param('linkId') linkId: string,
   ) {
-    return this.getLinkedWalletBalanceQuery.execute(new GetLinkedWalletBalanceRequest(userId, linkId));
+    return this.getLinkedWalletBalanceQuery.execute(
+      new GetLinkedWalletBalanceRequest(userId, linkId),
+    );
   }
 
   @Delete('wallets/:linkId')
@@ -293,7 +295,9 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() dto: ManualWithdrawalActionDto,
   ) {
-    return this.rejectWithdrawal.execute(new RejectWithdrawalCommand(actorUserId, txId, dto.reason));
+    return this.rejectWithdrawal.execute(
+      new RejectWithdrawalCommand(actorUserId, txId, dto.reason),
+    );
   }
 
   @Post('withdraw/manual/process-pending')

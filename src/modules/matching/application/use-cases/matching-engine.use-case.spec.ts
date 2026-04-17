@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { EnqueueMatchUseCase } from './index';
 import { MatchingQueueService } from '../../infrastructure/queue/matching-queue.service';
+import { EnqueueMatchUseCase } from './index';
 
 describe('EnqueueMatchUseCase', () => {
   const matchingQueueService = {

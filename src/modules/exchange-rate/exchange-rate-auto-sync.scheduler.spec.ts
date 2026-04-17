@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { RedisService } from '@/common/services/redis.service';
-import { ExchangeRateAutoSyncScheduler } from './exchange-rate-auto-sync.scheduler';
 import { ExchangeRateService } from './exchange-rate.service';
+import { ExchangeRateAutoSyncScheduler } from './exchange-rate-auto-sync.scheduler';
 
 describe('ExchangeRateAutoSyncScheduler', () => {
   let scheduler: ExchangeRateAutoSyncScheduler;

@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundException } from '@/common/exceptions';
 import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 import {
-  ReconcileOpenOrdersForPairCommand,
   ReconcileOpenOrdersForPairUseCase as MatchingReconcileOpenOrdersForPairUseCase,
+  ReconcileOpenOrdersForPairCommand,
 } from '@/modules/matching/application/use-cases';
 import type { MatchingReconcileResult } from '@/modules/matching/interfaces/matching.interface';
 
