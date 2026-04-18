@@ -52,10 +52,29 @@ export function resolveSandboxTronDefaultNetwork(
 }
 
 /**
- * App setting `deposit.recommended_chain` may still say TRON_MAINNET while
- * ONCHAIN_OPERATOR_MODE=sandbox exposes only testnets in `onchain_deposit_withdraw`.
- * Map to the effective Tron testnet row (or first picker chain) so UI/API stay consistent.
+ * Treasury ops / main-wallet / history filters: sandbox exposes **both** Tron testnets so
+ * operators can create Nile + Shasta wallets without toggling env. User-facing pickers stay
+ * single-testnet via [listActionableOnchainChainCodes].
+ *
+ * (Related: `resolveRecommendedChainForDepositPicker` maps `deposit.recommended_chain`
+ * TRON_MAINNET → the configured sandbox Tron row when mainnet codes are absent from pickers.)
  */
+export function listTreasuryOpsChainCodes(mainnetOnly: boolean, tronDefaultNetwork?: string): string[] {
+  if (mainnetOnly) {
+    return listActionableOnchainChainCodes(true, tronDefaultNetwork);
+  }
+  const base = [...listActionableOnchainChainCodes(false, tronDefaultNetwork)];
+  const altTron =
+    resolveSandboxTronDefaultNetwork(tronDefaultNetwork) === 'TRON_NILE'
+      ? 'TRON_SHASTA'
+      : 'TRON_NILE';
+  const tronIdx = base.findIndex((c) => c === 'TRON_NILE' || c === 'TRON_SHASTA');
+  if (tronIdx >= 0 && !base.includes(altTron)) {
+    base.splice(tronIdx + 1, 0, altTron);
+  }
+  return base;
+}
+
 export function resolveRecommendedChainForDepositPicker(
   settingChain: string,
   pickerChains: string[],
@@ -76,7 +95,7 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
   const tronDefaultNetwork = mainnetOnly ? 'TRON_MAINNET' : sandboxTron;
 
   const actionable = listActionableOnchainChainCodes(mainnetOnly, input.tronDefaultNetwork);
-  const treasuryList = listActionableOnchainChainCodes(mainnetOnly, input.tronDefaultNetwork);
+  const treasuryOpsList = listTreasuryOpsChainCodes(mainnetOnly, input.tronDefaultNetwork);
   const catalog = buildNetworkCatalog(mainnetOnly, input.tronDefaultNetwork);
 
   return {
@@ -84,9 +103,9 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
     tronDefaultNetwork,
     networkCatalog: catalog,
     pickers: {
-      treasury_ops: [...treasuryList],
-      treasury_main_wallet: [...treasuryList],
-      treasury_history_filter: [...treasuryList],
+      treasury_ops: [...treasuryOpsList],
+      treasury_main_wallet: [...treasuryOpsList],
+      treasury_history_filter: [...treasuryOpsList],
       withdrawal_admin_filter: [...actionable],
       /** Same universe as [onchain_deposit_withdraw] — admin “Nạp tiền & ví quản lý” vs user deposit tab. */
       managed_wallets: [...actionable],

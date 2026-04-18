@@ -87,18 +87,11 @@ export interface TreasuryOnChainBalances {
   usdtTrc20Balance?: string;
 }
 
-/** Same base58 address on Nile, Shasta, and Mainnet — independent ledger balances. */
-export const TRON_TREASURY_ENV_CHAINS = ['TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'] as const;
-export type TronTreasuryEnvChain = (typeof TRON_TREASURY_ENV_CHAINS)[number];
-export type TronCrossEnvBalances = Record<TronTreasuryEnvChain, TreasuryOnChainBalances>;
-
 export interface TreasuryWalletWithBalance
   extends Omit<TransactionWalletRecord, 'encrypted_private_key'> {
   balance: string;
   symbol: string;
   usdtTrc20Balance?: string;
-  /** Present when [chain] is a Tron treasury network — same address read on all three envs. */
-  tron_cross_env_balances?: TronCrossEnvBalances;
 }
 
 @Injectable()
@@ -176,37 +169,15 @@ export class TransactionWalletService {
           w.address,
         );
         const { encrypted_private_key: _, ...rest } = w;
-        let tron_cross_env_balances: TronCrossEnvBalances | undefined;
-        if (TransactionWalletService.isTronTreasuryChain(w.chain)) {
-          tron_cross_env_balances = await this.getTronCrossEnvBalancesCached(w.address);
-        }
         return {
           ...rest,
           balance,
           symbol,
           ...(usdtTrc20Balance != null ? { usdtTrc20Balance } : {}),
-          ...(tron_cross_env_balances != null ? { tron_cross_env_balances } : {}),
         } as TreasuryWalletWithBalance;
       }),
     );
     return enriched;
-  }
-
-  private async getTronCrossEnvBalancesCached(address: string): Promise<TronCrossEnvBalances> {
-    const [nile, shasta, mainnet] = await Promise.all([
-      this.getBalanceCached('TRON_NILE', address),
-      this.getBalanceCached('TRON_SHASTA', address),
-      this.getBalanceCached('TRON_MAINNET', address),
-    ]);
-    return {
-      TRON_NILE: nile,
-      TRON_SHASTA: shasta,
-      TRON_MAINNET: mainnet,
-    };
-  }
-
-  private static isTronTreasuryChain(chain: string): chain is TronTreasuryEnvChain {
-    return chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA';
   }
 
   async getBalanceCached(
@@ -445,26 +416,16 @@ export class TransactionWalletService {
   }
 
   async getWalletDetail(walletId: string): Promise<
-    TransactionWalletRecord & {
-      balance: string;
-      symbol: string;
-      usdtTrc20Balance?: string;
-      tron_cross_env_balances?: TronCrossEnvBalances;
-    }
+    TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }
   > {
     const wallet = await this.getWalletById(walletId);
     const b = await this.getBalanceCached(wallet.chain, wallet.address);
-    let tron_cross_env_balances: TronCrossEnvBalances | undefined;
-    if (TransactionWalletService.isTronTreasuryChain(wallet.chain)) {
-      tron_cross_env_balances = await this.getTronCrossEnvBalancesCached(wallet.address);
-    }
 
     return {
       ...wallet,
       balance: b.balance,
       symbol: b.symbol,
       ...(b.usdtTrc20Balance != null ? { usdtTrc20Balance: b.usdtTrc20Balance } : {}),
-      ...(tron_cross_env_balances != null ? { tron_cross_env_balances } : {}),
     };
   }
 
