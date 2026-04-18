@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundException } from '@/common/exceptions';
 import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 import {
-  ORDER_MATCHING_GATEWAY,
   type MatchingReconcileResultSnapshot,
+  ORDER_MATCHING_GATEWAY,
   type OrderMatchingGatewayPort,
 } from '@/modules/orders/domain/ports';
 

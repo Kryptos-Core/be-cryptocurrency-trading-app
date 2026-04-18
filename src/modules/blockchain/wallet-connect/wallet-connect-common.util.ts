@@ -8,6 +8,25 @@ export function resolveWalletConnectProjectId(configService: ConfigService): str
   return a || b;
 }
 
+/** CAIP-10 `tron:<hexRef>:<base58Address>` (WalletConnect TRON namespace). */
+export function parseTronCaip10Account(full: string): { chainId: string; address: string } {
+  const prefix = 'tron:';
+  if (!full.startsWith(prefix)) {
+    throw new Error(`Invalid TRON CAIP-10 account: ${full}`);
+  }
+  const rest = full.slice(prefix.length);
+  const colonIdx = rest.indexOf(':');
+  if (colonIdx === -1) {
+    throw new Error(`Invalid TRON CAIP-10 account: ${full}`);
+  }
+  const ref = rest.slice(0, colonIdx);
+  const address = rest.slice(colonIdx + 1);
+  if (!address) {
+    throw new Error(`Invalid TRON CAIP-10 account (empty address): ${full}`);
+  }
+  return { chainId: `tron:${ref}`, address };
+}
+
 /** CAIP-10 `solana:<ref>:<pubkey>`. */
 export function parseSolanaCaip10Account(full: string): { chainId: string; pubkey: string } {
   const prefix = 'solana:';
@@ -22,6 +41,24 @@ export function parseSolanaCaip10Account(full: string): { chainId: string; pubke
   const ref = rest.slice(0, colonIdx);
   const pubkey = rest.slice(colonIdx + 1);
   return { chainId: `solana:${ref}`, pubkey };
+}
+
+/** Normalize `tron_signMessage` RPC result to hex string for `Trx.verifyMessageV2`. */
+export function tronWcSignResultToBackendSignature(raw: unknown): string {
+  const sigStr =
+    typeof raw === 'string'
+      ? raw
+      : raw &&
+          typeof raw === 'object' &&
+          raw !== null &&
+          'signature' in raw &&
+          typeof (raw as { signature: unknown }).signature === 'string'
+        ? (raw as { signature: string }).signature
+        : '';
+  if (!sigStr) {
+    throw new Error('Wallet returned empty TRON signature');
+  }
+  return sigStr;
 }
 
 /** WalletConnect Solana signatures are typically base58; backend verifier expects base64 (64-byte ed25519). */

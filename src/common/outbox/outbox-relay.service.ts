@@ -4,8 +4,8 @@ import { DataSource } from 'typeorm';
 import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
-import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-event-types';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
+import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-event-types';
 
 const OUTBOX_RELAY_LOCK_KEY = 'outbox:relay:lock';
 const OUTBOX_RELAY_LOCK_TTL_SECONDS = 45;

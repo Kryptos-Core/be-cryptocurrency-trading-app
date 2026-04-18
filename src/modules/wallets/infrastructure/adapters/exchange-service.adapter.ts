@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ExchangeService } from '@/modules/exchange/exchange.service';
 import type { ExchangeServicePort } from '@/modules/wallets/domain/ports';
 
@@ -9,8 +9,6 @@ import type { ExchangeServicePort } from '@/modules/wallets/domain/ports';
  */
 @Injectable()
 export class ExchangeServiceAdapter implements ExchangeServicePort {
-  private readonly logger = new Logger(ExchangeServiceAdapter.name);
-
   constructor(private readonly exchangeService: ExchangeService) {}
 
   async getBalance(asset: string): Promise<{ available: string; frozen: string }> {

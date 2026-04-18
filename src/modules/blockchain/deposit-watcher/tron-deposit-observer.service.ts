@@ -5,8 +5,8 @@ import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets
 import type { TronTreasuryNetwork } from '@/modules/treasury/treasury-tron-usdt-contracts';
 import { TRON_USDT_CONTRACT } from '@/modules/treasury/treasury-tron-usdt-contracts';
 import { tronContractAddressesEqual } from '../utils/tron-contract-address.util';
-import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
 import { DepositIngestionService } from './deposit-ingestion.service';
+import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
 
 const TRON_GRID: Partial<Record<BlockchainNetwork, string>> = {
   [BlockchainNetwork.TRON_MAINNET]: 'https://api.trongrid.io',
@@ -47,7 +47,9 @@ export class TronDepositObserverService {
       return;
     }
 
-    const deposit = (await this.managedWalletsService.getPublicDepositRecipientAddress(chain))?.trim();
+    const deposit = (
+      await this.managedWalletsService.getPublicDepositRecipientAddress(chain)
+    )?.trim();
     if (!deposit) {
       this.logger.debug(`tron.deposit.watch.skip_no_address chain=${chain}`);
       return;
@@ -94,7 +96,9 @@ export class TronDepositObserverService {
     nativeUrl.searchParams.set('order_by', 'block_timestamp,asc');
     nativeUrl.searchParams.set('min_timestamp', String(minTs));
     const resNative = await fetch(nativeUrl.toString(), { headers });
-    const nativeBody = resNative.ok ? ((await resNative.json()) as { data?: { txID?: string; block_timestamp?: number }[] }) : { data: [] };
+    const nativeBody = resNative.ok
+      ? ((await resNative.json()) as { data?: { txID?: string; block_timestamp?: number }[] })
+      : { data: [] };
     const nativeRows = Array.isArray(nativeBody.data) ? nativeBody.data : [];
 
     const seenTx = new Set<string>();
@@ -129,7 +133,9 @@ export class TronDepositObserverService {
       try {
         await this.ingestion.ingestTxHash(chain, txId);
       } catch (e) {
-        this.logger.warn(`tron.deposit.watch.ingest_failed_native tx=${txId} ${(e as Error).message}`);
+        this.logger.warn(
+          `tron.deposit.watch.ingest_failed_native tx=${txId} ${(e as Error).message}`,
+        );
       }
     }
 

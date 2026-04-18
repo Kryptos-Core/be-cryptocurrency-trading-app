@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import type { Currency } from '@/entities/currency.entity';
@@ -9,8 +9,6 @@ const CACHE_TTL = 3600;
 
 @Injectable()
 export class GetCurrencyByIdQuery {
-  private readonly logger = new Logger(GetCurrencyByIdQuery.name);
-
   constructor(
     @Inject(CURRENCY_REPOSITORY)
     private readonly currencyRepo: CurrencyRepositoryPort,

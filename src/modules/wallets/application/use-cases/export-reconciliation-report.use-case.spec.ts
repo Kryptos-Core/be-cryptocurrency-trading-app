@@ -29,7 +29,7 @@ function mockFs() {
 
 describe('ExportReconciliationReportUseCase', () => {
   let useCase: ExportReconciliationReportUseCase;
-  let reconcileUseCase: ReconcileBalanceUseCase;
+  let _reconcileUseCase: ReconcileBalanceUseCase;
 
   let walletRepo: {
     findWalletPairs: jest.Mock;
@@ -58,7 +58,7 @@ describe('ExportReconciliationReportUseCase', () => {
     }).compile();
 
     useCase = module.get(ExportReconciliationReportUseCase);
-    reconcileUseCase = module.get(ReconcileBalanceUseCase);
+    _reconcileUseCase = module.get(ReconcileBalanceUseCase);
   });
 
   mockFs();
@@ -94,7 +94,7 @@ describe('ExportReconciliationReportUseCase', () => {
 
   it('caps limit to 1000', async () => {
     walletRepo.findWalletPairs.mockResolvedValue([]);
-    const writeSpy = jest.spyOn(fs, 'writeFile');
+    const _writeSpy = jest.spyOn(fs, 'writeFile');
 
     await useCase.execute('admin-uid', 5000);
 

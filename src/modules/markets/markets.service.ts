@@ -805,24 +805,6 @@ export class MarketsService implements OnModuleInit {
     return this.getRecentTrades(pair.pair_id, limit);
   }
 
-  /** Chart range filter: 1d, 1M, 3M, 1y, 5y → fromDate = now - range */
-  private static readonly RANGE_MS: Record<string, number> = {
-    '1d': 24 * 60 * 60 * 1000,
-    '1M': 30 * 24 * 60 * 60 * 1000,
-    '3M': 90 * 24 * 60 * 60 * 1000,
-    '1y': 365 * 24 * 60 * 60 * 1000,
-    '5y': 5 * 365 * 24 * 60 * 60 * 1000,
-  };
-
-  /** Range → interval policy (single source for OHLCV endpoint). */
-  private static readonly RANGE_INTERVAL: Record<string, string> = {
-    '1d': '1m',
-    '1M': '1h',
-    '3M': '4h',
-    '1y': '1d',
-    '5y': '1d',
-  };
-
   /**
    * Get OHLCV data for a market pair (on-demand from Price Oracle; no DB).
    * @param interval Optional direct interval: 1m | 5m | 15m | 1h | 4h | 1d — takes priority over range.
@@ -871,21 +853,6 @@ export class MarketsService implements OnModuleInit {
         volume: c.volume,
       })),
     };
-  }
-
-  private resolveIntervalByRange(range?: string): string {
-    if (!range) {
-      return '1h';
-    }
-
-    const interval = MarketsService.RANGE_INTERVAL[range];
-    if (!interval) {
-      throw new BadRequestException(
-        `Invalid range. Supported: ${Object.keys(MarketsService.RANGE_INTERVAL).join(', ')}`,
-      );
-    }
-
-    return interval;
   }
 
   /**

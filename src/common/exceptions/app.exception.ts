@@ -35,6 +35,14 @@ export class BusinessException extends AppException {
   }
 }
 
+/** Redis per-wallet treasury lock held by another fund/sweep job — processor should defer, not fail. */
+export class TreasuryWalletBusyException extends BusinessException {
+  constructor(context?: Record<string, unknown>) {
+    super('Treasury wallet is busy with another operation', 'TREASURY_WALLET_BUSY', context);
+    Object.setPrototypeOf(this, TreasuryWalletBusyException.prototype);
+  }
+}
+
 /**
  * Resource Not Found Exception
  */

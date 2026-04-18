@@ -29,12 +29,23 @@ export function wcCaip2ForChain(chain: BlockchainNetwork): string {
   }
 }
 
-/** Chains that use SignClient + relay (EVM + Solana). Tron uses legacy URI path. */
+/** Chains that use SignClient + relay (EVM + Solana + Tron via `tron` namespace). */
 export const WC_RELAY_PAIRING_CHAINS: BlockchainNetwork[] = [
   ...EVM_CHAIN_DEFINITIONS.map((d) => d.network),
   BlockchainNetwork.SOLANA_MAINNET,
   BlockchainNetwork.SOLANA_DEVNET,
+  BlockchainNetwork.TRON_MAINNET,
+  BlockchainNetwork.TRON_NILE,
+  BlockchainNetwork.TRON_SHASTA,
 ];
+
+export function isWcTronChain(chain: BlockchainNetwork): boolean {
+  return (
+    chain === BlockchainNetwork.TRON_MAINNET ||
+    chain === BlockchainNetwork.TRON_NILE ||
+    chain === BlockchainNetwork.TRON_SHASTA
+  );
+}
 
 export function isWcEvmChain(chain: BlockchainNetwork): boolean {
   return isEvmBlockchainNetwork(chain);

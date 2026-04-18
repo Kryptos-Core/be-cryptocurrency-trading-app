@@ -56,6 +56,31 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
     });
   }
 
+  async findActiveDuplicateOperation(params: {
+    type: TreasuryOperationType;
+    walletId: string;
+    asset: 'NATIVE' | 'USDT_TRC20';
+    amount: string;
+    actorUserId: string;
+  }): Promise<TreasuryOperation | null> {
+    const repo = this.dataSource.getRepository(TreasuryOperation);
+    const base = {
+      type: params.type,
+      asset: params.asset,
+      amount: params.amount,
+      actor_user_id: params.actorUserId,
+      status: In(['PENDING', 'PROCESSING'] as const),
+    };
+    if (params.type === 'FUND') {
+      return repo.findOne({
+        where: { ...base, to_wallet_id: params.walletId },
+      });
+    }
+    return repo.findOne({
+      where: { ...base, from_wallet_id: params.walletId },
+    });
+  }
+
   /** Count Fund/Sweep rows still in-flight for this transaction wallet (either side). */
   async countNonTerminalForWallet(walletId: string): Promise<number> {
     const active = ['PENDING', 'PROCESSING'] as const;

@@ -87,11 +87,18 @@ export interface TreasuryOnChainBalances {
   usdtTrc20Balance?: string;
 }
 
+/** Same base58 address on Nile, Shasta, and Mainnet — independent ledger balances. */
+export const TRON_TREASURY_ENV_CHAINS = ['TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET'] as const;
+export type TronTreasuryEnvChain = (typeof TRON_TREASURY_ENV_CHAINS)[number];
+export type TronCrossEnvBalances = Record<TronTreasuryEnvChain, TreasuryOnChainBalances>;
+
 export interface TreasuryWalletWithBalance
   extends Omit<TransactionWalletRecord, 'encrypted_private_key'> {
   balance: string;
   symbol: string;
   usdtTrc20Balance?: string;
+  /** Present when [chain] is a Tron treasury network — same address read on all three envs. */
+  tron_cross_env_balances?: TronCrossEnvBalances;
 }
 
 @Injectable()
@@ -169,15 +176,37 @@ export class TransactionWalletService {
           w.address,
         );
         const { encrypted_private_key: _, ...rest } = w;
+        let tron_cross_env_balances: TronCrossEnvBalances | undefined;
+        if (TransactionWalletService.isTronTreasuryChain(w.chain)) {
+          tron_cross_env_balances = await this.getTronCrossEnvBalancesCached(w.address);
+        }
         return {
           ...rest,
           balance,
           symbol,
           ...(usdtTrc20Balance != null ? { usdtTrc20Balance } : {}),
+          ...(tron_cross_env_balances != null ? { tron_cross_env_balances } : {}),
         } as TreasuryWalletWithBalance;
       }),
     );
     return enriched;
+  }
+
+  private async getTronCrossEnvBalancesCached(address: string): Promise<TronCrossEnvBalances> {
+    const [nile, shasta, mainnet] = await Promise.all([
+      this.getBalanceCached('TRON_NILE', address),
+      this.getBalanceCached('TRON_SHASTA', address),
+      this.getBalanceCached('TRON_MAINNET', address),
+    ]);
+    return {
+      TRON_NILE: nile,
+      TRON_SHASTA: shasta,
+      TRON_MAINNET: mainnet,
+    };
+  }
+
+  private static isTronTreasuryChain(chain: string): chain is TronTreasuryEnvChain {
+    return chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA';
   }
 
   async getBalanceCached(
@@ -319,17 +348,21 @@ export class TransactionWalletService {
     if (!tw.isAddress(toBase58)) {
       throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
     }
-    const valueInt = new Decimal(amountHuman)
-      .mul(new Decimal(10).pow(TRON_USDT_DECIMALS))
-      .floor();
+    const valueInt = new Decimal(amountHuman).mul(new Decimal(10).pow(TRON_USDT_DECIMALS)).floor();
     if (valueInt.lte(0)) {
-      throw new BadRequestException('USDT amount must be greater than zero', 'TREASURY_INVALID_AMOUNT');
+      throw new BadRequestException(
+        'USDT amount must be greater than zero',
+        'TREASURY_INVALID_AMOUNT',
+      );
     }
     const contractAddress = TRON_USDT_CONTRACT[chain];
     const contract = tw.contract(TRC20_TRANSFER_ABI as unknown as never[], contractAddress);
     const fromAddr = tw.address.fromPrivateKey(privateKey);
     if (!fromAddr) {
-      throw new BusinessException('Invalid Tron private key for USDT transfer', 'TRON_USDT_SEND_INVALID_KEY');
+      throw new BusinessException(
+        'Invalid Tron private key for USDT transfer',
+        'TRON_USDT_SEND_INVALID_KEY',
+      );
     }
     const raw = await contract.transfer(toBase58, valueInt.toFixed(0)).send({
       feeLimit: 150_000_000,
@@ -343,7 +376,10 @@ export class TransactionWalletService {
     });
     const txid = TransactionWalletService.parseTronContractSendTxId(raw);
     if (!txid) {
-      throw new BusinessException('Failed to resolve TRON USDT transfer tx id', 'TRON_USDT_SEND_FAILED');
+      throw new BusinessException(
+        'Failed to resolve TRON USDT transfer tx id',
+        'TRON_USDT_SEND_FAILED',
+      );
     }
     return txid;
   }
@@ -353,7 +389,12 @@ export class TransactionWalletService {
     if (typeof raw === 'string' && raw.length >= 16) {
       return raw;
     }
-    if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string' && (raw[0] as string).length >= 16) {
+    if (
+      Array.isArray(raw) &&
+      raw.length > 0 &&
+      typeof raw[0] === 'string' &&
+      (raw[0] as string).length >= 16
+    ) {
       return raw[0] as string;
     }
     if (raw && typeof raw === 'object') {
@@ -378,7 +419,10 @@ export class TransactionWalletService {
   ): Promise<{ txHash: string; amount: string }> {
     const chain = this.assertSupportedChain(wallet.chain);
     if (chain !== 'TRON_MAINNET' && chain !== 'TRON_NILE' && chain !== 'TRON_SHASTA') {
-      throw new BadRequestException('USDT sweep is only supported on Tron networks', 'TREASURY_USDT_CHAIN');
+      throw new BadRequestException(
+        'USDT sweep is only supported on Tron networks',
+        'TREASURY_USDT_CHAIN',
+      );
     }
     const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
     const human = await this.getTronUsdtHumanBalanceOnChain(chain, wallet.address);
@@ -400,19 +444,27 @@ export class TransactionWalletService {
     return wallet;
   }
 
-  async getWalletDetail(
-    walletId: string,
-  ): Promise<
-    TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }
+  async getWalletDetail(walletId: string): Promise<
+    TransactionWalletRecord & {
+      balance: string;
+      symbol: string;
+      usdtTrc20Balance?: string;
+      tron_cross_env_balances?: TronCrossEnvBalances;
+    }
   > {
     const wallet = await this.getWalletById(walletId);
-    const b = await this.getBalanceByAddress(wallet.chain, wallet.address);
+    const b = await this.getBalanceCached(wallet.chain, wallet.address);
+    let tron_cross_env_balances: TronCrossEnvBalances | undefined;
+    if (TransactionWalletService.isTronTreasuryChain(wallet.chain)) {
+      tron_cross_env_balances = await this.getTronCrossEnvBalancesCached(wallet.address);
+    }
 
     return {
       ...wallet,
       balance: b.balance,
       symbol: b.symbol,
       ...(b.usdtTrc20Balance != null ? { usdtTrc20Balance: b.usdtTrc20Balance } : {}),
+      ...(tron_cross_env_balances != null ? { tron_cross_env_balances } : {}),
     };
   }
 
@@ -464,7 +516,10 @@ export class TransactionWalletService {
   }
 
   /** Direct on-chain USDT (TRC-20) human balance — not Redis-cached. */
-  async getTronUsdtHumanBalanceOnChain(chain: TronTreasuryNetwork, ownerBase58: string): Promise<string> {
+  async getTronUsdtHumanBalanceOnChain(
+    chain: TronTreasuryNetwork,
+    ownerBase58: string,
+  ): Promise<string> {
     const tronWeb = await this.buildTronReadOnlyClient(chain);
     return this.readTronUsdtBalance(tronWeb, chain, ownerBase58);
   }

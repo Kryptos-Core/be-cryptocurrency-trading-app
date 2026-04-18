@@ -60,6 +60,7 @@ import { TreasuryController } from './treasury.controller';
 import { TreasuryProcessor } from './treasury.processor';
 import { TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
+import { treasuryDeferBackoff } from './treasury-queue-backoff';
 
 @Module({
   imports: [
@@ -80,9 +81,14 @@ import { TreasuryOperationsService } from './treasury-operations.service';
     forwardRef(() => AuthModule), // forwardRef avoids potential circular deps
     BullModule.registerQueue({
       name: TREASURY_QUEUE,
+      settings: {
+        backoffStrategies: {
+          treasuryDefer: treasuryDeferBackoff,
+        },
+      },
       defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2_000 },
+        attempts: 100,
+        backoff: { type: 'treasuryDefer', delay: 3_000 },
         removeOnComplete: 100, // keep last 100 completed jobs for inspection
         removeOnFail: false, // failed jobs stay in Bull's failed set (acts as DLQ)
       },

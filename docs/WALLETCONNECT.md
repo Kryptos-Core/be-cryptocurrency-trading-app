@@ -60,7 +60,7 @@ Mỗi môi trường client có **một** luồng / thư viện chính (desktop 
 | **QR server `/auth/wallet/wc/*`** | Web (nâng cao), **desktop** | Chi tiết: mục **Desktop native** ở trên. |
 | **Solana / thiếu project id BE** | Cùng endpoint | URI giả; dán address + signature. |
 
-Tron không phải EVM: trên web dùng **TronLink**, không gom chung luồng EVM WalletConnect.
+Tron không phải EVM: **Flutter web** vẫn liên kết Tron qua **TronLink extension** (challenge). **Desktop / native** (Windows, Android, iOS): **WalletConnect v2** với namespace `tron`, method **`tron_signMessage`** — QR scan bằng ví (ví dụ **TronLink mobile**).
 
 ---
 

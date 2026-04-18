@@ -34,7 +34,11 @@ export class OnchainDepositReadModelSyncApplierService {
     }
   }
 
-  private async applySubmitted(em: EntityManager, outboxId: string, p: OnchainDepositOutboxPayloadV1): Promise<void> {
+  private async applySubmitted(
+    em: EntityManager,
+    outboxId: string,
+    p: OnchainDepositOutboxPayloadV1,
+  ): Promise<void> {
     const createdAt = new Date(p.createdAt);
     const confirmedAt = p.confirmedAt != null ? new Date(p.confirmedAt) : null;
 
@@ -62,8 +66,14 @@ export class OnchainDepositReadModelSyncApplierService {
     );
   }
 
-  private async applySettled(em: EntityManager, outboxId: string, p: OnchainDepositOutboxPayloadV1): Promise<void> {
-    const existing = await em.getRepository(ReadOnchainDeposit).findOne({ where: { tx_id: p.txId } });
+  private async applySettled(
+    em: EntityManager,
+    outboxId: string,
+    p: OnchainDepositOutboxPayloadV1,
+  ): Promise<void> {
+    const existing = await em
+      .getRepository(ReadOnchainDeposit)
+      .findOne({ where: { tx_id: p.txId } });
     const createdAt = existing?.created_at ?? new Date(p.createdAt);
     const base = {
       tx_id: p.txId,
@@ -81,7 +91,8 @@ export class OnchainDepositReadModelSyncApplierService {
       credited_amount: p.creditedAmount ?? existing?.credited_amount ?? null,
       conversion_rate: p.conversionRate ?? existing?.conversion_rate ?? null,
       created_at: createdAt,
-      confirmed_at: p.confirmedAt != null ? new Date(p.confirmedAt) : (existing?.confirmed_at ?? new Date()),
+      confirmed_at:
+        p.confirmedAt != null ? new Date(p.confirmedAt) : (existing?.confirmed_at ?? new Date()),
       last_outbox_id: outboxId,
     };
 

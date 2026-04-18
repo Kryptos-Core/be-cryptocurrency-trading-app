@@ -24,11 +24,9 @@ export class LoginWithPasswordUseCase {
   ) {}
 
   async execute(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<UserRecord> }> {
-    return runInSpan(
-      'Auth.LoginWithPassword',
-      async () => this.executeImpl(loginDto),
-      { module: 'auth' },
-    );
+    return runInSpan('Auth.LoginWithPassword', async () => this.executeImpl(loginDto), {
+      module: 'auth',
+    });
   }
 
   private async executeImpl(

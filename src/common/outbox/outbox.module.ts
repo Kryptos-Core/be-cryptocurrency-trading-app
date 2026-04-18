@@ -1,8 +1,8 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
 import { MarketPairReadModelProjectionHandler } from '@/common/read-model/market-pair-read-model.handler';
+import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
 import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/onchain-deposit-read-model-sync-applier.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ReadMarketPair } from '@/entities/read-market-pair.entity';

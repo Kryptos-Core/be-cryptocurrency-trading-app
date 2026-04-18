@@ -23,7 +23,7 @@ export class OnchainTransferQueryService {
     @Inject(CURRENCY_REPOSITORY)
     private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly systemConfigService: SystemConfigService,
-    private readonly config: ConfigService,
+    readonly _config: ConfigService,
     private readonly readOnchainMerged: ReadOnchainUserTransactionsQueryService,
   ) {}
 

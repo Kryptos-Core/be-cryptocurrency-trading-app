@@ -51,7 +51,9 @@ describe('resolveOhlcvInterval', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(BadRequestException);
         const msg = (err as BadRequestException).message;
-        VALID_INTERVALS.forEach((v) => expect(msg).toContain(v));
+        for (const v of VALID_INTERVALS) {
+          expect(msg).toContain(v);
+        }
       }
     });
 

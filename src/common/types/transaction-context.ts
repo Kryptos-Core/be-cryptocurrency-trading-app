@@ -10,5 +10,4 @@
  * while preserving the ability to propagate transactions across repository
  * calls.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export type TransactionContext = {};
+export type TransactionContext = Record<string, never>;

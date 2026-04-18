@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import {
   GetAdminAdjustmentHistoryQuery,
   GetBalanceQuery,
@@ -19,7 +20,6 @@ import type {
 import type { WalletBalanceDto } from './dto/wallet-balance.dto';
 import type { WalletLedgerEntryDto } from './dto/wallet-ledger-entry.dto';
 import type { WalletListItemDto } from './dto/wallet-list-item.dto';
-import type { TransactionContext } from '@/common/types/transaction-context';
 import type { WalletTransactionDto } from './dto/wallet-transaction.dto';
 
 /**

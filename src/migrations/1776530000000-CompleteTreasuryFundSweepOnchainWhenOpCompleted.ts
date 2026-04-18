@@ -5,7 +5,9 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * `onchain_transactions` row, but the row was saved as PENDING — leaving the
  * user activity feed stuck. Align with completed `treasury_operations`.
  */
-export class CompleteTreasuryFundSweepOnchainWhenOpCompleted1776530000000 implements MigrationInterface {
+export class CompleteTreasuryFundSweepOnchainWhenOpCompleted1776530000000
+  implements MigrationInterface
+{
   name = 'CompleteTreasuryFundSweepOnchainWhenOpCompleted1776530000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

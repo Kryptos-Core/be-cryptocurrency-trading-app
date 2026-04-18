@@ -1,15 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BlockchainNetwork } from '@/common/enums';
 import { EVM_USDT_CONTRACT, evmUsdtDecimals } from '@/common/constants/evm-usdt-contracts';
+import { BlockchainNetwork } from '@/common/enums';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { EthereumProvider } from '../infrastructure/providers/ethereum.provider';
-import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
 import { DepositIngestionService } from './deposit-ingestion.service';
 import { DepositWatcherConfigService } from './deposit-watcher-config.service';
+import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
 
 function isEthereumProvider(p: unknown): p is EthereumProvider {
-  return typeof p === 'object' && p !== null && typeof (p as EthereumProvider).scanUsdtTransfersToDeposit === 'function';
+  return (
+    typeof p === 'object' &&
+    p !== null &&
+    typeof (p as EthereumProvider).scanUsdtTransfersToDeposit === 'function'
+  );
 }
 
 @Injectable()
@@ -31,7 +35,9 @@ export class EvmDepositObserverService {
     const prov = this.factory.getProvider(chain);
     if (!isEthereumProvider(prov)) return;
 
-    const deposit = (await this.managedWalletsService.getPublicDepositRecipientAddress(chain))?.trim();
+    const deposit = (
+      await this.managedWalletsService.getPublicDepositRecipientAddress(chain)
+    )?.trim();
     if (!deposit) {
       this.logger.debug(`evm.deposit.watch.skip_no_address chain=${chain}`);
       return;
@@ -47,7 +53,9 @@ export class EvmDepositObserverService {
 
     const row = await this.cursors.findByChain(chain);
     let fromBlock =
-      row?.cursor_kind === 'BLOCK_NUMBER' ? Number(BigInt(row.cursor_value || '0')) : safeLatest - initialLookback;
+      row?.cursor_kind === 'BLOCK_NUMBER'
+        ? Number(BigInt(row.cursor_value || '0'))
+        : safeLatest - initialLookback;
     if (!Number.isFinite(fromBlock) || fromBlock < 1) fromBlock = 1;
     fromBlock = Math.min(fromBlock, safeLatest);
 

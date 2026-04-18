@@ -16,7 +16,13 @@ function makeRow(id: string, eventType: string): IntegrationOutbox {
   row.aggregate_type = 'Test';
   row.aggregate_id = 'agg';
   row.event_type = eventType;
-  row.payload = { pairId: 'p1', symbol: 'btcusdt', baseCurrencyId: 'b', quoteCurrencyId: 'q', isActive: true };
+  row.payload = {
+    pairId: 'p1',
+    symbol: 'btcusdt',
+    baseCurrencyId: 'b',
+    quoteCurrencyId: 'q',
+    isActive: true,
+  };
   row.published_at = null as any;
   row.occurred_at = new Date();
   row.dedupe_key = null as any;
@@ -66,8 +72,14 @@ describe('OutboxRelayService', () => {
   });
 
   it('marks published_at only after dispatch succeeds (per-row commits)', async () => {
-    const rowA = makeRow('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', OutboxIntegrationEventType.MarketPairCreatedV1);
-    const rowB = makeRow('bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb', OutboxIntegrationEventType.MarketPairUpdatedV1);
+    const rowA = makeRow(
+      'aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa',
+      OutboxIntegrationEventType.MarketPairCreatedV1,
+    );
+    const rowB = makeRow(
+      'bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb',
+      OutboxIntegrationEventType.MarketPairUpdatedV1,
+    );
     const ds = buildDataSource([[rowA], [rowB], []]);
 
     const moduleRef = await Test.createTestingModule({

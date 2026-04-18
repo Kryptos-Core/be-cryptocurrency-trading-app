@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { InjectQueue } from '@nestjs/bull';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -10,13 +11,19 @@ import {
   Transaction,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import type { Queue } from 'bull';
+import type { Job, Queue } from 'bull';
 import Decimal from 'decimal.js';
 import { ethers } from 'ethers';
 import { TronWeb } from 'tronweb';
 import { uuidv7 } from 'uuidv7';
 import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-definitions';
-import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
+import {
+  BadRequestException,
+  BusinessException,
+  NotFoundException,
+  ServiceUnavailableException,
+  TreasuryWalletBusyException,
+} from '@/common/exceptions';
 import { RedisService } from '@/common/services';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
@@ -53,9 +60,26 @@ interface TreasuryJobData {
   mainWalletId?: string;
 }
 
+export type TreasuryEnqueueResult = {
+  operationId: string;
+  status: string;
+  alreadyQueued?: boolean;
+};
+
+/** Bull typings omit getJob/getState — runtime provides them. */
+type TreasuryJob = Job & { getState(): Promise<string> };
+type TreasuryQueue = Queue & { getJob(jobId: string): Promise<TreasuryJob | null> };
+
+/** Wall-clock cap for waiting on the per-wallet Redis lock (not enqueue time — avoids TZ / clock skew). */
+const TREASURY_LOCK_WAIT_MAX_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class TreasuryOperationsService {
   private readonly logger = new Logger(TreasuryOperationsService.name);
+
+  private static readonly LOCK_WAIT_TIMER_PREFIX = 'treasury:lock-wait-since:';
+  /** TTL longer than max wait so the key survives until timeout or successful lock. */
+  private static readonly LOCK_WAIT_TIMER_TTL_SEC = 25 * 60;
 
   constructor(
     private readonly redisService: RedisService,
@@ -67,14 +91,14 @@ export class TreasuryOperationsService {
     private readonly treasuryOperationRepository: TreasuryOperationRepositoryPort,
     @Inject(TREASURY_ONCHAIN_READ_REPOSITORY)
     private readonly treasuryOnchainReadRepository: TreasuryOnchainReadRepositoryPort,
-    @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: Queue,
+    @InjectQueue(TREASURY_QUEUE) private readonly treasuryQueue: TreasuryQueue,
   ) {}
 
   async enqueueSweep(
     walletId: string,
     actorUserId: string,
     dto: SweepWalletDto,
-  ): Promise<{ operationId: string; status: string }> {
+  ): Promise<TreasuryEnqueueResult> {
     const wallet = await this.transactionWalletService.getWalletById(walletId);
     if (!wallet.is_active) {
       throw new BadRequestException('Transaction wallet is inactive', 'TREASURY_WALLET_INACTIVE');
@@ -88,34 +112,82 @@ export class TreasuryOperationsService {
       );
     }
 
-    const operation = await this.createOperation({
+    const jobId = this.buildSweepJobId(wallet.wallet_id, asset, dto.mainWalletId, actorUserId);
+
+    const fromJob = await this.resolveExistingTreasuryJob(jobId);
+    if (fromJob) {
+      return fromJob;
+    }
+
+    const dup = await this.treasuryOperationRepository.findActiveDuplicateOperation({
       type: 'SWEEP',
-      chain: wallet.chain,
-      fromWalletId: wallet.wallet_id,
-      toWalletId: null,
-      amount: '0',
+      walletId: wallet.wallet_id,
       asset,
+      amount: '0',
       actorUserId,
     });
+    if (dup) {
+      return {
+        operationId: dup.operation_id,
+        status: dup.status,
+        alreadyQueued: true,
+      };
+    }
 
-    await this.treasuryQueue.add(
-      TREASURY_SWEEP_JOB,
-      { operationId: operation.operation_id, mainWalletId: dto.mainWalletId } satisfies TreasuryJobData,
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5_000 },
-        removeOnComplete: true,
-      },
-    );
+    return await this.runWithEnqueueLock(jobId, async () => {
+      const dup2 = await this.treasuryOperationRepository.findActiveDuplicateOperation({
+        type: 'SWEEP',
+        walletId: wallet.wallet_id,
+        asset,
+        amount: '0',
+        actorUserId,
+      });
+      if (dup2) {
+        return {
+          operationId: dup2.operation_id,
+          status: dup2.status,
+          alreadyQueued: true,
+        };
+      }
 
-    return { operationId: operation.operation_id, status: operation.status };
+      const fromJob2 = await this.resolveExistingTreasuryJob(jobId);
+      if (fromJob2) {
+        return fromJob2;
+      }
+
+      const operation = await this.createOperation({
+        type: 'SWEEP',
+        chain: wallet.chain,
+        fromWalletId: wallet.wallet_id,
+        toWalletId: null,
+        amount: '0',
+        asset,
+        actorUserId,
+      });
+
+      await this.treasuryQueue.add(
+        TREASURY_SWEEP_JOB,
+        {
+          operationId: operation.operation_id,
+          mainWalletId: dto.mainWalletId,
+        } satisfies TreasuryJobData,
+        {
+          jobId,
+          attempts: 100,
+          backoff: { type: 'treasuryDefer', delay: 3_000 },
+          removeOnComplete: true,
+        },
+      );
+
+      return { operationId: operation.operation_id, status: operation.status };
+    });
   }
 
   async enqueueFund(
     walletId: string,
     dto: FundWalletDto,
     actorUserId: string,
-  ): Promise<{ operationId: string; status: string }> {
+  ): Promise<TreasuryEnqueueResult> {
     const wallet = await this.transactionWalletService.getWalletById(walletId);
     if (!wallet.is_active) {
       throw new BadRequestException('Transaction wallet is inactive', 'TREASURY_WALLET_INACTIVE');
@@ -135,27 +207,72 @@ export class TreasuryOperationsService {
         ? new Decimal(rawAmount).toDecimalPlaces(6, Decimal.ROUND_DOWN).toFixed()
         : rawAmount;
 
-    const operation = await this.createOperation({
+    const jobId = this.buildFundJobId(wallet.wallet_id, asset, amount, actorUserId);
+
+    const fromJob = await this.resolveExistingTreasuryJob(jobId);
+    if (fromJob) {
+      return fromJob;
+    }
+
+    const dup = await this.treasuryOperationRepository.findActiveDuplicateOperation({
       type: 'FUND',
-      chain: wallet.chain,
-      fromWalletId: null,
-      toWalletId: wallet.wallet_id,
-      amount,
+      walletId: wallet.wallet_id,
       asset,
+      amount,
       actorUserId,
     });
+    if (dup) {
+      return {
+        operationId: dup.operation_id,
+        status: dup.status,
+        alreadyQueued: true,
+      };
+    }
 
-    await this.treasuryQueue.add(
-      TREASURY_FUND_JOB,
-      { operationId: operation.operation_id } satisfies TreasuryJobData,
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5_000 },
-        removeOnComplete: true,
-      },
-    );
+    return await this.runWithEnqueueLock(jobId, async () => {
+      const dup2 = await this.treasuryOperationRepository.findActiveDuplicateOperation({
+        type: 'FUND',
+        walletId: wallet.wallet_id,
+        asset,
+        amount,
+        actorUserId,
+      });
+      if (dup2) {
+        return {
+          operationId: dup2.operation_id,
+          status: dup2.status,
+          alreadyQueued: true,
+        };
+      }
 
-    return { operationId: operation.operation_id, status: operation.status };
+      const fromJob2 = await this.resolveExistingTreasuryJob(jobId);
+      if (fromJob2) {
+        return fromJob2;
+      }
+
+      const operation = await this.createOperation({
+        type: 'FUND',
+        chain: wallet.chain,
+        fromWalletId: null,
+        toWalletId: wallet.wallet_id,
+        amount,
+        asset,
+        actorUserId,
+      });
+
+      await this.treasuryQueue.add(
+        TREASURY_FUND_JOB,
+        { operationId: operation.operation_id } satisfies TreasuryJobData,
+        {
+          jobId,
+          attempts: 100,
+          backoff: { type: 'treasuryDefer', delay: 3_000 },
+          removeOnComplete: true,
+        },
+      );
+
+      return { operationId: operation.operation_id, status: operation.status };
+    });
   }
 
   async processSweepJob(data: TreasuryJobData): Promise<void> {
@@ -168,7 +285,28 @@ export class TreasuryOperationsService {
     }
 
     const lockKey = `treasury:lock:${operation.from_wallet_id}`;
-    await this.withWalletLock(lockKey, async () => {
+    const lockToken = await this.tryAcquireWalletLock(lockKey);
+    if (!lockToken) {
+      const waitStartedAt = await this.startOrGetLockWaitTimer(operation.operation_id);
+      if (Date.now() - waitStartedAt > TREASURY_LOCK_WAIT_MAX_MS) {
+        await this.clearLockWaitTimer(operation.operation_id);
+        throw new BusinessException(
+          'Exceeded max wait while another treasury operation was using this wallet',
+          'TREASURY_WALLET_BUSY_TIMEOUT',
+        );
+      }
+      throw new TreasuryWalletBusyException({
+        operationId: operation.operation_id,
+        lockKey,
+        createdAt: operation.created_at,
+      });
+    }
+
+    await this.clearLockWaitTimer(operation.operation_id);
+
+    /** Hold only while broadcasting; balance polls can take 60–90s and must not block other treasury ops on the same wallet. */
+    let lockHeld = true;
+    try {
       await this.markProcessing(operation.operation_id);
       const wallet = await this.transactionWalletService.getWalletById(operation.from_wallet_id!);
       const mainAddress = await this.treasuryMainWalletService.getMainWalletAddress(
@@ -186,6 +324,10 @@ export class TreasuryOperationsService {
       }
 
       const result = await this.sendSweepFromWallet(wallet, mainAddress, asset);
+
+      await this.releaseWalletLock(lockKey, lockToken);
+      lockHeld = false;
+
       if (TreasuryOperationsService.isTronChain(wallet.chain)) {
         if (asset === 'USDT_TRC20' && usdtBeforeSweep != null) {
           const swept = await this.transactionWalletService.waitForTronUsdtBalanceReflectSweep(
@@ -194,7 +336,10 @@ export class TreasuryOperationsService {
             usdtBeforeSweep,
           );
           if (!swept) {
-            await this.transactionWalletService.invalidateBalanceCache(wallet.chain, wallet.address);
+            await this.transactionWalletService.invalidateBalanceCache(
+              wallet.chain,
+              wallet.address,
+            );
             throw new BusinessException(
               'USDT sweep did not reduce on-chain balance in time. Check TRX for fees/energy and TronGrid.',
               'TREASURY_SWEEP_USDT_BALANCE_NOT_UPDATED',
@@ -221,7 +366,11 @@ export class TreasuryOperationsService {
         txHash: result.txHash,
         amount: result.amount,
       });
-    });
+    } finally {
+      if (lockHeld) {
+        await this.releaseWalletLock(lockKey, lockToken);
+      }
+    }
   }
 
   async processFundJob(data: TreasuryJobData): Promise<void> {
@@ -234,7 +383,28 @@ export class TreasuryOperationsService {
     }
 
     const lockKey = `treasury:lock:${operation.to_wallet_id}`;
-    await this.withWalletLock(lockKey, async () => {
+    const lockToken = await this.tryAcquireWalletLock(lockKey);
+    if (!lockToken) {
+      const waitStartedAt = await this.startOrGetLockWaitTimer(operation.operation_id);
+      if (Date.now() - waitStartedAt > TREASURY_LOCK_WAIT_MAX_MS) {
+        await this.clearLockWaitTimer(operation.operation_id);
+        throw new BusinessException(
+          'Exceeded max wait while another treasury operation was using this wallet',
+          'TREASURY_WALLET_BUSY_TIMEOUT',
+        );
+      }
+      throw new TreasuryWalletBusyException({
+        operationId: operation.operation_id,
+        lockKey,
+        createdAt: operation.created_at,
+      });
+    }
+
+    await this.clearLockWaitTimer(operation.operation_id);
+
+    /** Hold only while broadcasting; balance polls can take 60–90s and must not block other treasury ops on the same wallet. */
+    let lockHeld = true;
+    try {
       await this.markProcessing(operation.operation_id);
       const wallet = await this.transactionWalletService.getWalletById(operation.to_wallet_id!);
       const amount = this.normalizePositiveAmount(operation.amount);
@@ -260,6 +430,14 @@ export class TreasuryOperationsService {
       let txHash: string;
       if (asset === 'USDT_TRC20' && TreasuryOperationsService.isTronChain(wallet.chain)) {
         txHash = await this.sendFundUsdtFromMain(wallet.chain, wallet.address, amount);
+      } else {
+        txHash = await this.sendFundFromMain(wallet.chain, wallet.address, amount);
+      }
+
+      await this.releaseWalletLock(lockKey, lockToken);
+      lockHeld = false;
+
+      if (asset === 'USDT_TRC20' && TreasuryOperationsService.isTronChain(wallet.chain)) {
         const funded = await this.transactionWalletService.waitForTronUsdtBalanceReflectFund(
           wallet.chain,
           wallet.address,
@@ -272,15 +450,12 @@ export class TreasuryOperationsService {
             'TREASURY_FUND_USDT_BALANCE_NOT_UPDATED',
           );
         }
-      } else {
-        txHash = await this.sendFundFromMain(wallet.chain, wallet.address, amount);
-        if (tronPreFundSun !== null && TreasuryOperationsService.isTronChain(wallet.chain)) {
-          await this.transactionWalletService.waitForTronBalanceReflectFund(
-            wallet.chain,
-            wallet.address,
-            tronPreFundSun,
-          );
-        }
+      } else if (tronPreFundSun !== null && TreasuryOperationsService.isTronChain(wallet.chain)) {
+        await this.transactionWalletService.waitForTronBalanceReflectFund(
+          wallet.chain,
+          wallet.address,
+          tronPreFundSun,
+        );
       }
 
       await this.finalizeSuccess(operation, mainAddress, wallet.address, txHash, amount);
@@ -291,7 +466,11 @@ export class TreasuryOperationsService {
         txHash,
         amount,
       });
-    });
+    } finally {
+      if (lockHeld) {
+        await this.releaseWalletLock(lockKey, lockToken);
+      }
+    }
   }
 
   async markFailed(operationId: string, reason: string): Promise<void> {
@@ -410,7 +589,12 @@ export class TreasuryOperationsService {
     amount: string,
   ): Promise<string> {
     const pk = await this.transactionWalletService.resolveMainWalletPrivateKey(chain);
-    return this.transactionWalletService.transferTronUsdtFromPrivateKey(chain, pk, toAddress, amount);
+    return this.transactionWalletService.transferTronUsdtFromPrivateKey(
+      chain,
+      pk,
+      toAddress,
+      amount,
+    );
   }
 
   private async sendSweepFromWallet(
@@ -566,25 +750,117 @@ export class TreasuryOperationsService {
     return tx.txid;
   }
 
-  private async withWalletLock(lockKey: string, fn: () => Promise<void>): Promise<void> {
+  /**
+   * First time this operation hits lock contention, records `Date.now()` in Redis; later retries read it.
+   * Avoids using DB `created_at` (timezone / driver skew vs `Date.now()` caused false 15-minute timeouts).
+   */
+  private async startOrGetLockWaitTimer(operationId: string): Promise<number> {
+    const client = this.redisService.getClient();
+    const key = `${TreasuryOperationsService.LOCK_WAIT_TIMER_PREFIX}${operationId}`;
+    const now = Date.now();
+    const setOk = await client.set(
+      key,
+      String(now),
+      'EX',
+      TreasuryOperationsService.LOCK_WAIT_TIMER_TTL_SEC,
+      'NX',
+    );
+    if (setOk === 'OK') {
+      return now;
+    }
+    const raw = await client.get(key);
+    const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : now;
+  }
+
+  private async clearLockWaitTimer(operationId: string): Promise<void> {
+    await this.redisService
+      .getClient()
+      .del(`${TreasuryOperationsService.LOCK_WAIT_TIMER_PREFIX}${operationId}`);
+  }
+
+  private async tryAcquireWalletLock(lockKey: string): Promise<string | null> {
     const token = uuidv7();
     const client = this.redisService.getClient();
     const lock = await client.set(lockKey, token, 'EX', 120, 'NX');
+    return lock === 'OK' ? token : null;
+  }
 
-    if (lock !== 'OK') {
-      throw new BusinessException(
-        'Another treasury operation is running on this wallet',
-        'TREASURY_WALLET_LOCKED',
+  private async releaseWalletLock(lockKey: string, token: string): Promise<void> {
+    const client = this.redisService.getClient();
+    await client.eval(
+      'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end',
+      1,
+      lockKey,
+      token,
+    );
+  }
+
+  private buildFundJobId(
+    walletId: string,
+    asset: string,
+    amount: string,
+    actorUserId: string,
+  ): string {
+    const h = createHash('sha256').update(`${amount}|${actorUserId}`).digest('hex').slice(0, 16);
+    return `treasury-fund:${walletId}:${asset}:${h}`;
+  }
+
+  private buildSweepJobId(
+    walletId: string,
+    asset: string,
+    mainWalletId: string | undefined,
+    actorUserId: string,
+  ): string {
+    const main = mainWalletId ?? 'default';
+    const h = createHash('sha256').update(actorUserId).digest('hex').slice(0, 12);
+    return `treasury-sweep:${walletId}:${asset}:${main}:${h}`;
+  }
+
+  private async resolveExistingTreasuryJob(jobId: string): Promise<TreasuryEnqueueResult | null> {
+    try {
+      const existing = await this.treasuryQueue.getJob(jobId);
+      if (!existing) {
+        return null;
+      }
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed') {
+        return null;
+      }
+      const data = existing.data as TreasuryJobData;
+      const op = await this.treasuryOperationRepository.findByOperationId(data.operationId);
+      if (op && (op.status === 'PENDING' || op.status === 'PROCESSING')) {
+        return {
+          operationId: op.operation_id,
+          status: op.status,
+          alreadyQueued: true,
+        };
+      }
+    } catch {
+      /* ignore queue read errors */
+    }
+    return null;
+  }
+
+  private async runWithEnqueueLock<T>(jobId: string, fn: () => Promise<T>): Promise<T> {
+    const client = this.redisService.getClient();
+    const lockKey = `treasury:enqueue-lock:${jobId}`;
+    const token = uuidv7();
+    let acquired = await client.set(lockKey, token, 'EX', 30, 'NX');
+    let spins = 0;
+    while (acquired !== 'OK' && spins < 40) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      spins++;
+      acquired = await client.set(lockKey, token, 'EX', 30, 'NX');
+    }
+    if (acquired !== 'OK') {
+      throw new ServiceUnavailableException(
+        'Treasury enqueue is temporarily contended; please retry',
+        'TREASURY_ENQUEUE_LOCK_BUSY',
       );
     }
-
     try {
-      await fn();
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error(String(error));
+      return await fn();
     } finally {
       await client.eval(
         'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end',

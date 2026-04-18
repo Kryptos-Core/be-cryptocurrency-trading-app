@@ -1,4 +1,4 @@
-import { Brand, BrandedId, createBrandedIdFactory, OrderId, UserId, WalletId } from './primitives';
+import { createBrandedIdFactory, OrderId, UserId, WalletId } from './primitives';
 
 describe('createBrandedIdFactory', () => {
   const TestId = createBrandedIdFactory('TestId');

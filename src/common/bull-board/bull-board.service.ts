@@ -6,10 +6,10 @@ import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core';
 import type { Queue } from 'bull';
 import type { Express } from 'express';
+import { DEPOSIT_WATCHER_QUEUE } from '@/modules/blockchain/deposit-watcher/deposit-watcher.constants';
 import { MATCHING_QUEUE } from '@/modules/matching/infrastructure/queue/matching-queue.service';
 import { PAYMENT_CONFIG_QUEUE } from '@/modules/payment-config/payment-config.service';
 import { TREASURY_QUEUE } from '@/modules/treasury/constants';
-import { DEPOSIT_WATCHER_QUEUE } from '@/modules/blockchain/deposit-watcher/deposit-watcher.constants';
 
 @Injectable()
 export class BullBoardService implements OnApplicationBootstrap {

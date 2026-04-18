@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import {
   CURRENCY_LOOKUP,
   WALLET_EVENT_PUBLISHER,
@@ -9,7 +10,6 @@ import {
 } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 import type { WalletTransactionDto } from '@/modules/wallets/dto/wallet-transaction.dto';
-import type { TransactionContext } from '@/common/types/transaction-context';
 import { ApplyTransactionUseCase } from './apply-transaction.use-case';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -125,12 +125,7 @@ describe('ApplyTransactionUseCase', () => {
       await useCase.execute('uid-1', dto({ action: WalletTransactionAction.CREDIT }), joinCtx);
 
       expect(walletRepo.transaction).not.toHaveBeenCalled();
-      expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith(
-        'wid-1',
-        '100',
-        '0',
-        joinCtx,
-      );
+      expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith('wid-1', '100', '0', joinCtx);
     });
   });
 

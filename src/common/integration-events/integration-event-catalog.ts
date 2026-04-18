@@ -27,7 +27,8 @@ export const IntegrationEventType = {
   OnchainMovement: 'OnchainMovement',
 } as const;
 
-export type IntegrationEventTypeName = (typeof IntegrationEventType)[keyof typeof IntegrationEventType];
+export type IntegrationEventTypeName =
+  (typeof IntegrationEventType)[keyof typeof IntegrationEventType];
 
 const ALL: ReadonlySet<string> = new Set(Object.values(IntegrationEventType));
 

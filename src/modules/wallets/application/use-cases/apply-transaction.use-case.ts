@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
@@ -22,8 +22,6 @@ import type { WalletTransactionDto } from '@/modules/wallets/dto/wallet-transact
 
 @Injectable()
 export class ApplyTransactionUseCase {
-  private readonly logger = new Logger(ApplyTransactionUseCase.name);
-
   constructor(
     @Inject(WALLET_REPOSITORY) private readonly walletRepo: WalletRepositoryPort,
     @Inject(WALLET_LEDGER_REPOSITORY) private readonly ledgerRepo: WalletLedgerRepositoryPort,
@@ -82,7 +80,7 @@ export class ApplyTransactionUseCase {
       });
 
       if (dto.action === WalletTransactionAction.TRANSFER && dto.targetUserId) {
-        const targetBalance = this.balanceCalc.buildBalanceSnapshot(
+        const _targetBalance = this.balanceCalc.buildBalanceSnapshot(
           String(dto.targetUserId),
           currencyId,
           '0',

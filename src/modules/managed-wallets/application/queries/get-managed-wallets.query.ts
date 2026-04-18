@@ -27,11 +27,7 @@ export class GetManagedWalletsQuery
   }
 }
 
-export class GetManagedWalletDepositDefaultsRequest extends BaseQuery {
-  constructor(correlationId?: string) {
-    super(correlationId);
-  }
-}
+export class GetManagedWalletDepositDefaultsRequest extends BaseQuery {}
 
 @Injectable()
 export class GetManagedWalletDepositDefaultsQuery
@@ -46,7 +42,7 @@ export class GetManagedWalletDepositDefaultsQuery
 {
   constructor(private readonly managedWalletsService: ManagedWalletsService) {}
 
-  async execute(query: GetManagedWalletDepositDefaultsRequest): Promise<{
+  async execute(_query: GetManagedWalletDepositDefaultsRequest): Promise<{
     recommended_chain: BlockchainChainDbValue;
     defaults: ManagedWalletResponseDto[];
   }> {
@@ -113,11 +109,7 @@ export class GetManagedWalletTransactionsQuery
   }
 }
 
-export class GetDepositMethodsRequest extends BaseQuery {
-  constructor(correlationId?: string) {
-    super(correlationId);
-  }
-}
+export class GetDepositMethodsRequest extends BaseQuery {}
 
 @Injectable()
 export class GetDepositMethodsQuery
@@ -140,7 +132,7 @@ export class GetDepositMethodsQuery
 {
   constructor(private readonly managedWalletsService: ManagedWalletsService) {}
 
-  async execute(query: GetDepositMethodsRequest): Promise<{
+  async execute(_query: GetDepositMethodsRequest): Promise<{
     recommended_chain: string;
     methods: Array<{
       chain: string;

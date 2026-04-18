@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { BlockchainNetwork } from '@/common/enums';
 import { EVM_USDT_CONTRACT } from '@/common/constants/evm-usdt-contracts';
-import { BlockchainProviderFactory } from '../blockchain-provider.factory';
+import { BlockchainNetwork } from '@/common/enums';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 
 const TRON_CHAINS: BlockchainNetwork[] = [
   BlockchainNetwork.TRON_MAINNET,

@@ -63,11 +63,7 @@ export class GetDepositAddressQuery
   }
 }
 
-export class GetSupportedNetworksRequest extends BaseQuery {
-  constructor(correlationId?: string) {
-    super(correlationId);
-  }
-}
+export class GetSupportedNetworksRequest extends BaseQuery {}
 
 @Injectable()
 export class GetSupportedNetworksQuery

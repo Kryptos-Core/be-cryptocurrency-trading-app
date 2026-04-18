@@ -4,13 +4,13 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { ethers, JsonRpcProvider } from 'ethers';
 import type { EvmChainDefinition } from '@/common/constants/evm-chain-definitions';
 import { BlockchainNetwork } from '@/common/enums';
-import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import type { TreasuryMainWalletChain } from '@/modules/treasury';
-import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
   ResolveDepositTransfersContext,
   ResolvedDepositTransfer,
 } from '@/modules/blockchain/deposit-transfer.types';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import type { TreasuryMainWalletChain } from '@/modules/treasury';
+import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import type {
   BlockchainBalanceDto,
   BlockchainTxStatusDto,

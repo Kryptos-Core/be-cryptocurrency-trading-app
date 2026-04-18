@@ -104,7 +104,7 @@ export function extractTronUsdtTrc20TransfersToRecipient(
 
     let amountRaw: bigint;
     try {
-      amountRaw = BigInt('0x' + amountWord);
+      amountRaw = BigInt(`0x${amountWord}`);
     } catch {
       continue;
     }

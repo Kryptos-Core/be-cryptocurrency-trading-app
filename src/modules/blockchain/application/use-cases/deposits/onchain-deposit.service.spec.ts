@@ -7,14 +7,14 @@ import {
   WalletTransactionAction,
 } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
-import { CacheService } from '@/common/services';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import { CacheService } from '@/common/services';
 import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { BlockchainProviderFactory } from '../../../blockchain-provider.factory';
-import { DepositFxService } from '../../../domain/services/deposit-fx.service';
 import { ONCHAIN_TRANSACTION_REPOSITORY } from '../../../domain/ports';
+import { DepositFxService } from '../../../domain/services/deposit-fx.service';
 import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 import { OnchainDepositService } from './onchain-deposit.service';
 
@@ -90,12 +90,14 @@ describe('OnchainDepositService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     managedWalletsService.getPublicDepositRecipientAddress.mockResolvedValue('0xdeposit');
-    unitOfWork.run.mockImplementation(async (fn: (ctx: { query: typeof dataSource.query }) => Promise<unknown>) => {
-      const ctx = {
-        query: (...args: unknown[]) => (dataSource as any).query(...args),
-      };
-      return fn(ctx as any);
-    });
+    unitOfWork.run.mockImplementation(
+      async (fn: (ctx: { query: typeof dataSource.query }) => Promise<unknown>) => {
+        const ctx = {
+          query: (...args: unknown[]) => (dataSource as any).query(...args),
+        };
+        return fn(ctx as any);
+      },
+    );
     const moduleRef = await Test.createTestingModule({
       providers: [
         OnchainDepositService,

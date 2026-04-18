@@ -109,11 +109,7 @@ export class GetAdminWithdrawalByIdQuery
   }
 }
 
-export class GetAdminWithdrawalStatsRequest extends BaseQuery {
-  constructor(correlationId?: string) {
-    super(correlationId);
-  }
-}
+export class GetAdminWithdrawalStatsRequest extends BaseQuery {}
 
 @Injectable()
 export class GetAdminWithdrawalStatsQuery

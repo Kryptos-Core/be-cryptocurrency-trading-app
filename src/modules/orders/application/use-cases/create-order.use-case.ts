@@ -126,7 +126,8 @@ export class CreateOrderUseCase {
         feeCurrencyId,
         makerFeeRate: makerFeeRate ?? '0.001',
         takerFeeRate: takerFeeRate ?? '0.001',
-        slippageTolerance: order.type === 'MARKET' ? (order.slippage_tolerance ?? undefined) : undefined,
+        slippageTolerance:
+          order.type === 'MARKET' ? (order.slippage_tolerance ?? undefined) : undefined,
       });
     } catch (error) {
       this.logger.warn(

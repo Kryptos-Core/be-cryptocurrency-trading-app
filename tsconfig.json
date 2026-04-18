@@ -6,8 +6,7 @@
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
-     "ignoreDeprecations": "5.0",
-    "baseUrl": "./",
+    "ignoreDeprecations": "5.0",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
@@ -21,7 +20,8 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"],
+      "*": ["./*"]
     },
     "types": ["node", "jest"]
   },

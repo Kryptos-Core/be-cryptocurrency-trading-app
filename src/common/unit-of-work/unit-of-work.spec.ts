@@ -8,9 +8,9 @@ function createMockDataSource() {
 
   // Single jest.fn reference — used both as the property and as the mock implementation.
   // Returns a new object each call to simulate distinct transaction contexts.
-  let callCount = 0;
+  let _callCount = 0;
   const tx = jest.fn().mockImplementation(async (fn: (em: EntityManager) => Promise<unknown>) => {
-    callCount++;
+    _callCount++;
     return fn(mockManager);
   });
 
@@ -57,7 +57,7 @@ describe('UnitOfWork', () => {
   // ─── commit() ─────────────────────────────────────────────────────────────
 
   it('should commit when a transaction completes without error', async () => {
-    const ctx = await uow.start();
+    const _ctx = await uow.start();
 
     // commit is called implicitly when the transaction callback resolves
     // The TypeORM DataSource.transaction auto-commits on success
@@ -75,7 +75,7 @@ describe('UnitOfWork', () => {
   // ─── run() ────────────────────────────────────────────────────────────────
 
   it('should execute a function within a transaction', async () => {
-    const result = await uow.run(async (ctx: TransactionContext) => {
+    const result = await uow.run(async (_ctx: TransactionContext) => {
       return 42;
     });
 

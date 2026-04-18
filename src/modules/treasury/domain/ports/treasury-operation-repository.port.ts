@@ -22,6 +22,15 @@ export interface TreasuryOperationRepositoryPort {
 
   findByOperationIdWithWallets(operationId: string): Promise<TreasuryOperationRecord | null>;
   findByOperationId(operationId: string): Promise<TreasuryOperationRecord | null>;
+
+  /** Same wallet + type + asset + actor still PENDING/PROCESSING (fund/sweep idempotency). */
+  findActiveDuplicateOperation(params: {
+    type: 'SWEEP' | 'FUND';
+    walletId: string;
+    asset: TreasuryOperationAsset;
+    amount: string;
+    actorUserId: string;
+  }): Promise<TreasuryOperationRecord | null>;
   countNonTerminalForWallet(walletId: string): Promise<number>;
   updateByOperationId(
     operationId: string,

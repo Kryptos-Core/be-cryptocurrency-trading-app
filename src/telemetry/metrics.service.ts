@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import { Counter, Gauge, Histogram } from 'prom-client';
 
@@ -14,8 +14,6 @@ import { Counter, Gauge, Histogram } from 'prom-client';
  */
 @Injectable()
 export class MetricsService {
-  private readonly logger = new Logger(MetricsService.name);
-
   constructor(
     @InjectMetric('http_request_duration_seconds')
     private readonly httpDuration: Histogram,

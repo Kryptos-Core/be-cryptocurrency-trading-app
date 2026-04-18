@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
+import { ORDER_MATCHING_GATEWAY } from '@/modules/orders/domain/ports/order-matching-gateway.port';
 import {
   EnqueueMatchUseCase,
   ReconcileOpenOrdersForPairUseCase,
@@ -22,7 +23,6 @@ import { OrderMatchingGatewayAdapter } from './infrastructure/adapters';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './infrastructure/observers';
 import { MatchingRepository, TradeAuditLogRepository } from './infrastructure/persistence';
 import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infrastructure/queue';
-import { ORDER_MATCHING_GATEWAY } from '@/modules/orders/domain/ports/order-matching-gateway.port';
 
 @Module({
   imports: [

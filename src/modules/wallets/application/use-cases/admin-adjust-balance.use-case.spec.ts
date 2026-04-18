@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
+import { WalletReferenceType } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import {
   ADMIN_ADJUSTMENT_REPOSITORY,

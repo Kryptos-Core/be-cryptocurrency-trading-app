@@ -3,12 +3,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { BlockchainNetwork } from '@/common/enums';
 import {
+  DEPOSIT_WATCHER_EVM_SCAN_JOB,
   DEPOSIT_WATCHER_QUEUE,
   DEPOSIT_WATCHER_TRON_SCAN_JOB,
-  DEPOSIT_WATCHER_EVM_SCAN_JOB,
 } from './deposit-watcher.constants';
-import { TronDepositObserverService } from './tron-deposit-observer.service';
 import { EvmDepositObserverService } from './evm-deposit-observer.service';
+import { TronDepositObserverService } from './tron-deposit-observer.service';
 
 @Injectable()
 @Processor(DEPOSIT_WATCHER_QUEUE)

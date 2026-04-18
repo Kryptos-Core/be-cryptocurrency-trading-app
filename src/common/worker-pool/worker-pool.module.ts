@@ -21,6 +21,7 @@ import { WorkerPoolService } from './worker-pool.service';
  * export class ReportsModule {}
  */
 @Module({})
+// biome-ignore lint/complexity/noStaticOnlyClass: NestJS dynamic module uses static forRoot
 export class WorkerPoolModule {
   static forRoot(options: WorkerPoolOptions): DynamicModule {
     return {

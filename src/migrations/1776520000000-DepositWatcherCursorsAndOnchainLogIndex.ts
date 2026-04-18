@@ -27,7 +27,9 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE onchain_transactions DROP INDEX uk_onchain_tx_chain_hash_log`);
+    await queryRunner.query(
+      `ALTER TABLE onchain_transactions DROP INDEX uk_onchain_tx_chain_hash_log`,
+    );
     await queryRunner.query(`
       CREATE UNIQUE INDEX uk_onchain_tx_hash ON onchain_transactions (chain, tx_hash(128))
     `);

@@ -11,7 +11,7 @@ export class OnchainTransferService {
   constructor(
     private readonly depositService: OnchainDepositService,
     private readonly withdrawalService: OnchainWithdrawalService,
-    private readonly queryService: OnchainTransferQueryService,
+    readonly _queryService: OnchainTransferQueryService,
   ) {}
 
   async previewDepositTx(userId: string, chain: BlockchainNetwork, txHash: string) {

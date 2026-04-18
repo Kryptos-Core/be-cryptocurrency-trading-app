@@ -30,7 +30,7 @@ function order(overrides: Partial<OrderBookOrder> & { order_id: string }): Order
 
 describe('MatchingService', () => {
   let service: MatchingService;
-  let orderBookService: OrderBookService;
+  let _orderBookService: OrderBookService;
   let matchingRepository: jest.Mocked<MatchingRepositoryPort>;
   let circuitBreaker: jest.Mocked<CircuitBreakerService>;
   let redisClient: { set: jest.Mock; eval: jest.Mock };
@@ -76,7 +76,7 @@ describe('MatchingService', () => {
     }).compile();
 
     service = module.get(MatchingService);
-    orderBookService = module.get(OrderBookService);
+    _orderBookService = module.get(OrderBookService);
     circuitBreaker = module.get(CircuitBreakerService);
   });
 

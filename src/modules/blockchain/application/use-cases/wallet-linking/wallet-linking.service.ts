@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { type BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
@@ -11,7 +11,6 @@ import type { RequestLinkDto, VerifyLinkDto } from '../../../dto';
 
 @Injectable()
 export class WalletLinkingService {
-  private readonly logger = new Logger(WalletLinkingService.name);
   private static readonly NONCE_TTL = 300;
   private static readonly LINKED_CACHE_TTL = 600;
   private static readonly TEST_SIGNATURE_PREFIX = 'TEST_SIG::';
@@ -21,7 +20,7 @@ export class WalletLinkingService {
     private readonly linkedWalletRepo: LinkedWalletRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
-    private readonly systemConfigService: SystemConfigService,
+    readonly _systemConfigService: SystemConfigService,
   ) {}
 
   private buildNonceCacheKey(userId: string, chain: BlockchainNetwork, address: string): string {

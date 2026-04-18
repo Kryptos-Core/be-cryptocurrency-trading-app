@@ -1,12 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
-import {
-  BlockchainNetwork,
-  OnchainTxStatus,
-  OnchainTxType,
-  WalletReferenceType,
-  WalletTransactionAction,
-} from '@/common/enums';
+import { OnchainTxStatus, OnchainTxType } from '@/common/enums';
 import { ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import {
@@ -27,22 +21,20 @@ import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
 
 @Injectable()
 export class OnchainWithdrawalService {
-  private readonly logger = new Logger(OnchainWithdrawalService.name);
   private static readonly WITHDRAWAL_LOCK_TTL = 60;
   private static readonly WITHDRAWAL_IDEM_TTL = 24 * 60 * 60;
 
   constructor(
     @Inject(ONCHAIN_TRANSACTION_REPOSITORY)
     private readonly onchainTxRepo: OnchainTransactionRepositoryPort,
-    @Inject(CURRENCY_REPOSITORY)
-    private readonly currencyRepository: CurrencyRepositoryPort,
+    @Inject(CURRENCY_REPOSITORY) readonly _currencyRepository: CurrencyRepositoryPort,
     private readonly cacheService: CacheService,
-    private readonly providerFactory: BlockchainProviderFactory,
+    readonly _providerFactory: BlockchainProviderFactory,
     private readonly walletLinkingService: WalletLinkingService,
-    private readonly walletsService: WalletsService,
-    private readonly transactionWalletService: TransactionWalletService,
-    private readonly notificationsService: NotificationsService,
-    private readonly systemConfigService: SystemConfigService,
+    readonly _walletsService: WalletsService,
+    readonly _transactionWalletService: TransactionWalletService,
+    readonly _notificationsService: NotificationsService,
+    readonly _systemConfigService: SystemConfigService,
   ) {}
 
   async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {

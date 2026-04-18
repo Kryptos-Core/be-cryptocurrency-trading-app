@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BlockchainNetwork } from '@/common/enums';
 import { ConflictException } from '@/common/exceptions';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
-import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 import { OnchainDepositService } from '../application/use-cases/deposits/onchain-deposit.service';
 import { WalletLinkingService } from '../application/use-cases/wallet-linking/wallet-linking.service';
+import { BlockchainProviderFactory } from '../blockchain-provider.factory';
 
 /**
  * Maps observed on-chain activity to linked users and idempotent deposit rows.
@@ -25,18 +25,23 @@ export class DepositIngestionService {
    * When [logIndex] is set (EVM), only that leg is considered.
    */
   async ingestTxHash(chain: BlockchainNetwork, txHash: string, logIndex?: number): Promise<void> {
-    const expected = (await this.managedWalletsService.getPublicDepositRecipientAddress(chain))?.trim();
+    const expected = (
+      await this.managedWalletsService.getPublicDepositRecipientAddress(chain)
+    )?.trim();
     if (!expected) {
       this.logger.debug(`deposit.ingest.skip_no_recipient chain=${chain}`);
       return;
     }
 
     const provider = this.providerFactory.getProvider(chain);
-    const legs = await provider.resolveDepositTransfers(txHash, { expectedDepositAddress: expected });
-    const filtered =
-      logIndex === undefined ? legs : legs.filter((l) => l.logIndex === logIndex);
+    const legs = await provider.resolveDepositTransfers(txHash, {
+      expectedDepositAddress: expected,
+    });
+    const filtered = logIndex === undefined ? legs : legs.filter((l) => l.logIndex === logIndex);
     if (filtered.length === 0) {
-      this.logger.debug(`deposit.ingest.skip_no_leg chain=${chain} tx=${txHash} log=${logIndex ?? 'any'}`);
+      this.logger.debug(
+        `deposit.ingest.skip_no_leg chain=${chain} tx=${txHash} log=${logIndex ?? 'any'}`,
+      );
       return;
     }
 

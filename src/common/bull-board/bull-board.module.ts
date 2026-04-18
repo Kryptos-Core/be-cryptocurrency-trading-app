@@ -1,10 +1,10 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { OUTBOX_RELAY_QUEUE } from '@/common/outbox/outbox.constants';
+import { DEPOSIT_WATCHER_QUEUE } from '@/modules/blockchain/deposit-watcher/deposit-watcher.constants';
 import { MATCHING_QUEUE } from '@/modules/matching/infrastructure/queue/matching-queue.service';
 import { PAYMENT_CONFIG_QUEUE } from '@/modules/payment-config/payment-config.service';
 import { TREASURY_QUEUE } from '@/modules/treasury/constants';
-import { DEPOSIT_WATCHER_QUEUE } from '@/modules/blockchain/deposit-watcher/deposit-watcher.constants';
 import { BullBoardService } from './bull-board.service';
 
 @Module({

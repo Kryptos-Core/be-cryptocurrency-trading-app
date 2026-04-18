@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import {
   DepositConfirmedEvent,
-  OrderCancelledEvent,
   OrderPlacedEvent,
   TradeExecutedEvent,
   WalletBalanceChangedEvent,

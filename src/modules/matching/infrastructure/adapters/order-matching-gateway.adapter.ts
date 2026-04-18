@@ -45,7 +45,11 @@ export class OrderMatchingGatewayAdapter implements OrderMatchingGatewayPort {
     );
   }
 
-  async removeOrderFromBook(pairId: string, orderId: string, side: 'BUY' | 'SELL'): Promise<boolean> {
+  async removeOrderFromBook(
+    pairId: string,
+    orderId: string,
+    side: 'BUY' | 'SELL',
+  ): Promise<boolean> {
     return this.removeOrderFromBookUseCase.execute(
       new RemoveOrderFromBookCommand(pairId, orderId, side),
     );

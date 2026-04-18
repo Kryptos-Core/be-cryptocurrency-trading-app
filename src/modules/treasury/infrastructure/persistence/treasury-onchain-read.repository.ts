@@ -91,9 +91,7 @@ export class TreasuryOnchainReadRepository implements TreasuryOnchainReadReposit
     const items = rows.map((tx) =>
       mapOnchainToTreasuryHistoryRecord(
         tx,
-        tx.treasury_operation_id
-          ? (assetByOpId.get(tx.treasury_operation_id) ?? 'NATIVE')
-          : null,
+        tx.treasury_operation_id ? (assetByOpId.get(tx.treasury_operation_id) ?? 'NATIVE') : null,
       ),
     );
 

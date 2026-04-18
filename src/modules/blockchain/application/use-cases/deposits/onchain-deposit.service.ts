@@ -113,7 +113,9 @@ export class OnchainDepositService {
   async previewDepositTx(userId: string, chain: BlockchainNetwork, txHash: string) {
     const provider = this.providerFactory.getProvider(chain);
     const expected = await this.requireExpectedDepositAddress(chain);
-    const legs = await provider.resolveDepositTransfers(txHash, { expectedDepositAddress: expected });
+    const legs = await provider.resolveDepositTransfers(txHash, {
+      expectedDepositAddress: expected,
+    });
     if (legs.length === 0) {
       const st = await provider.getTransactionStatus(txHash);
       if (st.status === 'NOT_FOUND') {
@@ -171,7 +173,9 @@ export class OnchainDepositService {
     direction: 'CREDIT' | 'DEBIT',
     joinTransaction?: TransactionContext,
   ): Promise<boolean> {
-    const runner = joinTransaction ? (joinTransaction as unknown as EntityManager) : this.dataSource;
+    const runner = joinTransaction
+      ? (joinTransaction as unknown as EntityManager)
+      : this.dataSource;
     const rows = await runner.query(
       `SELECT ledger_id FROM wallet_ledger WHERE user_id = ? AND currency_id = ? AND ref_type = ? AND ref_id = ? AND direction = ? LIMIT 1`,
       [userId, currencyId, refType, String(refId), direction],
@@ -194,7 +198,11 @@ export class OnchainDepositService {
     conversionRate?: string;
   }> {
     const fxAsset =
-      settlementAsset === 'NATIVE' ? 'NATIVE' : settlementAsset === 'USDT_ERC20' ? 'USDT_ERC20' : 'USDT_TRC20';
+      settlementAsset === 'NATIVE'
+        ? 'NATIVE'
+        : settlementAsset === 'USDT_ERC20'
+          ? 'USDT_ERC20'
+          : 'USDT_TRC20';
     const conversion = await this.depositFxService.convertToPlatformCash(chain, amount, fxAsset);
     const { creditCurrencyId, creditAmount, conversionRate } = conversion;
 
@@ -262,7 +270,13 @@ export class OnchainDepositService {
   async ingestIncomingDepositForUser(
     userId: string,
     resolved: ResolvedDepositTransfer,
-  ): Promise<{ txId: string; status: string; amount: string; chain: string; settled: boolean } | null> {
+  ): Promise<{
+    txId: string;
+    status: string;
+    amount: string;
+    chain: string;
+    settled: boolean;
+  } | null> {
     const linked = await this.walletLinkingService.findVerifiedWallet(
       userId,
       resolved.chain,
@@ -277,7 +291,11 @@ export class OnchainDepositService {
       });
       return null;
     }
-    const lockKey = this.depositProcessingLockKey(resolved.chain, resolved.txHash, resolved.logIndex);
+    const lockKey = this.depositProcessingLockKey(
+      resolved.chain,
+      resolved.txHash,
+      resolved.logIndex,
+    );
     if (await this.cacheService.exists(lockKey)) {
       return null;
     }
@@ -363,7 +381,11 @@ export class OnchainDepositService {
     resolved: ResolvedDepositTransfer,
     opts?: { lockHeld?: boolean },
   ): Promise<{ txId: string; status: string; amount: string; chain: string; settled: boolean }> {
-    const lockKey = this.depositProcessingLockKey(resolved.chain, resolved.txHash, resolved.logIndex);
+    const lockKey = this.depositProcessingLockKey(
+      resolved.chain,
+      resolved.txHash,
+      resolved.logIndex,
+    );
     const lockHeld = opts?.lockHeld === true;
     if (!lockHeld) {
       await this.cacheService.set(lockKey, '1', OnchainDepositService.DEPOSIT_LOCK_TTL);
@@ -384,7 +406,9 @@ export class OnchainDepositService {
 
       const onchainAmount = new Decimal(resolved.amountHuman || '0');
       const status =
-        resolved.chainStatus === 'CONFIRMED' ? OnchainTxStatus.COMPLETED : OnchainTxStatus.CONFIRMING;
+        resolved.chainStatus === 'CONFIRMED'
+          ? OnchainTxStatus.COMPLETED
+          : OnchainTxStatus.CONFIRMING;
 
       let settled = false;
       let creditPayload: Record<string, string> = {};
@@ -446,8 +470,7 @@ export class OnchainDepositService {
             toAddress: resolved.to,
             confirmations: resolved.confirmations,
             createdAt: new Date().toISOString(),
-            confirmedAt:
-              status === OnchainTxStatus.COMPLETED ? new Date().toISOString() : null,
+            confirmedAt: status === OnchainTxStatus.COMPLETED ? new Date().toISOString() : null,
             ...creditPayload,
           },
         });
@@ -494,13 +517,19 @@ export class OnchainDepositService {
         (l) =>
           l.logIndex === storedLog &&
           l.from === tx.from_address &&
-          new Decimal(l.amountHuman).minus(new Decimal(String(tx.amount))).abs().lte('0.0000001'),
+          new Decimal(l.amountHuman)
+            .minus(new Decimal(String(tx.amount)))
+            .abs()
+            .lte('0.0000001'),
       ) ??
       legs.find((l) => l.logIndex === storedLog && l.from === tx.from_address) ??
       legs.find(
         (l) =>
           l.from === tx.from_address &&
-          new Decimal(l.amountHuman).minus(new Decimal(String(tx.amount))).abs().lte('0.0000001'),
+          new Decimal(l.amountHuman)
+            .minus(new Decimal(String(tx.amount)))
+            .abs()
+            .lte('0.0000001'),
       ) ??
       legs.find((l) => l.from === tx.from_address);
 

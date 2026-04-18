@@ -18,7 +18,7 @@ describe('OrdersService', () => {
   let findOneOrderQuery: jest.Mocked<FindOneOrderQuery>;
   let getOrderBookQuery: jest.Mocked<GetOrderBookQuery>;
   let findAllOrdersAdminQuery: jest.Mocked<FindAllOrdersAdminQuery>;
-  let findOrdersByUserQuery: jest.Mocked<FindOrdersByUserQuery>;
+  let _findOrdersByUserQuery: jest.Mocked<FindOrdersByUserQuery>;
   let listOpenOrdersForPairQuery: jest.Mocked<ListOpenOrdersForPairQuery>;
 
   const mockOrder = {
@@ -60,7 +60,7 @@ describe('OrdersService', () => {
     findOneOrderQuery = module.get(FindOneOrderQuery);
     getOrderBookQuery = module.get(GetOrderBookQuery);
     findAllOrdersAdminQuery = module.get(FindAllOrdersAdminQuery);
-    findOrdersByUserQuery = module.get(FindOrdersByUserQuery);
+    _findOrdersByUserQuery = module.get(FindOrdersByUserQuery);
     listOpenOrdersForPairQuery = module.get(ListOpenOrdersForPairQuery);
     jest.clearAllMocks();
   });

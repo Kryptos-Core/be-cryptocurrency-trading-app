@@ -2,11 +2,10 @@ import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import type { Queue } from 'bull';
-import { BlockchainNetwork } from '@/common/enums';
 import {
+  DEPOSIT_WATCHER_EVM_SCAN_JOB,
   DEPOSIT_WATCHER_QUEUE,
   DEPOSIT_WATCHER_TRON_SCAN_JOB,
-  DEPOSIT_WATCHER_EVM_SCAN_JOB,
 } from './deposit-watcher.constants';
 import { DepositWatcherConfigService } from './deposit-watcher-config.service';
 

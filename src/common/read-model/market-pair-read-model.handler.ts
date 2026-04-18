@@ -1,7 +1,7 @@
 import { EventsHandler, type IEventHandler } from '@nestjs/cqrs';
+import { DataSource } from 'typeorm';
 import { MarketPairReadModelSyncEvent } from '@/common/integration-events/market-pair-read-model-sync.integration-event';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
-import { DataSource } from 'typeorm';
 
 @EventsHandler(MarketPairReadModelSyncEvent)
 export class MarketPairReadModelProjectionHandler

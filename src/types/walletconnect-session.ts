@@ -7,6 +7,7 @@ export interface WcApprovedSession {
   namespaces?: {
     solana?: { accounts?: string[] };
     eip155?: { accounts?: string[] };
+    tron?: { accounts?: string[] };
   };
 }
 
