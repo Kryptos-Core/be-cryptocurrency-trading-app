@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import type { OnchainTxRowDto } from '@/modules/blockchain/domain/ports';
 
 /**
- * Merged list: DEPOSIT rows from read_onchain_deposits + user-facing rows from onchain_transactions.
+ * Merged list: DEPOSIT rows (read model + any on-chain row not yet projected) + other user-facing rows.
  * Excludes treasury-only types (FUND/SWEEP) — those belong on treasury admin APIs, not retail history.
  * Used when READ_MODEL_ONCHAIN_DEPOSITS is enabled.
  */
@@ -35,12 +35,22 @@ export class ReadOnchainUserTransactionsQueryService {
                 tx.credited_currency_id, tx.credited_amount, tx.conversion_rate
          FROM onchain_transactions tx
          WHERE tx.user_id = ?
+           AND tx.type = 'DEPOSIT'
+           AND NOT EXISTS (
+             SELECT 1 FROM read_onchain_deposits r2 WHERE r2.tx_id = tx.tx_id
+           )
+         UNION ALL
+         SELECT tx.tx_id, tx.chain, tx.type, tx.tx_hash, tx.from_address, tx.to_address, tx.amount, tx.status,
+                tx.confirmations, tx.created_at, tx.confirmed_at,
+                tx.credited_currency_id, tx.credited_amount, tx.conversion_rate
+         FROM onchain_transactions tx
+         WHERE tx.user_id = ?
            AND tx.type <> 'DEPOSIT'
            AND tx.type NOT IN ('FUND', 'SWEEP')
        ) u
        ORDER BY u.created_at DESC
        LIMIT ?`,
-      [userId, userId, lim],
+      [userId, userId, userId, lim],
     );
     return (rows || []).map((r: Record<string, unknown>) => this.mapTxRow(r));
   }
