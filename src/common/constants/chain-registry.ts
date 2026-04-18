@@ -40,7 +40,8 @@ const PRODUCTION_UI_ORDER: BlockchainNetwork[] = [
   BlockchainNetwork.TRON_MAINNET,
 ];
 
-const SANDBOX_UI_ORDER_BASE: BlockchainNetwork[] = [
+/** Sandbox catalog rows except Tron — Tron testnets are appended via [sandboxUiOrder]. */
+const SANDBOX_UI_ORDER_WITHOUT_TRON: BlockchainNetwork[] = [
   BlockchainNetwork.TON_TESTNET,
   BlockchainNetwork.BSC_CHAPEL,
   BlockchainNetwork.SOLANA_DEVNET,
@@ -53,7 +54,6 @@ const SANDBOX_UI_ORDER_BASE: BlockchainNetwork[] = [
   BlockchainNetwork.GNOSIS_CHIADO,
   BlockchainNetwork.LINEA_SEPOLIA,
   BlockchainNetwork.FANTOM_TESTNET,
-  BlockchainNetwork.TRON_NILE,
 ];
 
 export function resolveSandboxTronNetworkEnum(
@@ -64,9 +64,17 @@ export function resolveSandboxTronNetworkEnum(
   return BlockchainNetwork.TRON_NILE;
 }
 
+/**
+ * Sandbox exposes **both** Tron testnets (Nile + Shasta) so traders/QC can pick the network
+ * for WC QR / deposits; order puts `TRON_DEFAULT_NETWORK` first.
+ */
 function sandboxUiOrder(tronDefaultNetwork?: string): BlockchainNetwork[] {
-  const tron = resolveSandboxTronNetworkEnum(tronDefaultNetwork);
-  return SANDBOX_UI_ORDER_BASE.map((n) => (n === BlockchainNetwork.TRON_NILE ? tron : n));
+  const defaultTron = resolveSandboxTronNetworkEnum(tronDefaultNetwork);
+  const secondaryTron =
+    defaultTron === BlockchainNetwork.TRON_SHASTA
+      ? BlockchainNetwork.TRON_NILE
+      : BlockchainNetwork.TRON_SHASTA;
+  return [...SANDBOX_UI_ORDER_WITHOUT_TRON, defaultTron, secondaryTron];
 }
 
 function chainFamily(network: BlockchainNetwork): ChainFamily {

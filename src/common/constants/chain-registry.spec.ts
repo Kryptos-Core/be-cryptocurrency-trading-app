@@ -26,10 +26,13 @@ describe('chain-registry', () => {
     expect(codes).toContain(BlockchainNetwork.BASE_MAINNET);
   });
 
-  it('sandbox uses ETH_SEPOLIA and ends with configured Tron testnet', () => {
+  it('sandbox uses ETH_SEPOLIA and lists both Tron testnets (default first)', () => {
     const codes = listActionableOnchainChainCodes(false, 'TRON_SHASTA');
     expect(codes).toContain(BlockchainNetwork.ETH_SEPOLIA);
-    expect(codes[codes.length - 1]).toBe(BlockchainNetwork.TRON_SHASTA);
+    expect(codes.filter((c) => c === 'TRON_NILE' || c === 'TRON_SHASTA')).toEqual([
+      BlockchainNetwork.TRON_SHASTA,
+      BlockchainNetwork.TRON_NILE,
+    ]);
   });
 
   it('resolveSandboxTronNetworkEnum respects TRON_SHASTA', () => {

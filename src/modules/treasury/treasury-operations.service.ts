@@ -20,6 +20,7 @@ import { getEvmDefinitionByTreasuryChain } from '@/common/constants/evm-chain-de
 import {
   BadRequestException,
   BusinessException,
+  ConflictException,
   NotFoundException,
   ServiceUnavailableException,
   TreasuryWalletBusyException,
@@ -207,49 +208,10 @@ export class TreasuryOperationsService {
         ? new Decimal(rawAmount).toDecimalPlaces(6, Decimal.ROUND_DOWN).toFixed()
         : rawAmount;
 
-    const jobId = this.buildFundJobId(wallet.wallet_id, asset, amount, actorUserId);
-
-    const fromJob = await this.resolveExistingTreasuryJob(jobId);
-    if (fromJob) {
-      return fromJob;
-    }
-
-    const dup = await this.treasuryOperationRepository.findActiveDuplicateOperation({
-      type: 'FUND',
-      walletId: wallet.wallet_id,
-      asset,
-      amount,
-      actorUserId,
-    });
-    if (dup) {
-      return {
-        operationId: dup.operation_id,
-        status: dup.status,
-        alreadyQueued: true,
-      };
-    }
+    /** Unique per enqueue so repeated same-amount funds create distinct ops & Bull jobs (serialized by per-wallet lock in processFundJob). */
+    const jobId = this.buildFundJobId(wallet.wallet_id, asset);
 
     return await this.runWithEnqueueLock(jobId, async () => {
-      const dup2 = await this.treasuryOperationRepository.findActiveDuplicateOperation({
-        type: 'FUND',
-        walletId: wallet.wallet_id,
-        asset,
-        amount,
-        actorUserId,
-      });
-      if (dup2) {
-        return {
-          operationId: dup2.operation_id,
-          status: dup2.status,
-          alreadyQueued: true,
-        };
-      }
-
-      const fromJob2 = await this.resolveExistingTreasuryJob(jobId);
-      if (fromJob2) {
-        return fromJob2;
-      }
-
       const operation = await this.createOperation({
         type: 'FUND',
         chain: wallet.chain,
@@ -517,6 +479,196 @@ export class TreasuryOperationsService {
     limit: number;
   }> {
     return this.treasuryOnchainReadRepository.listFundSweepTransactions(filter);
+  }
+
+  /**
+   * Operator escape hatch: re-queue worker after jobs died, Redis lock stuck, or balance wait timeout.
+   * Releases per-wallet Redis lock and sets row back to PENDING before enqueueing a new Bull job.
+   */
+  async manualRetryTreasuryOperation(
+    operationId: string,
+    mainWalletId: string | undefined,
+    actorUserId: string,
+  ): Promise<TreasuryEnqueueResult> {
+    const op = await this.treasuryOperationRepository.findByOperationIdWithWallets(operationId);
+    if (!op) {
+      throw new NotFoundException('Treasury operation', operationId);
+    }
+    if (op.status !== 'PENDING' && op.status !== 'PROCESSING') {
+      throw new BadRequestException(
+        'Only PENDING or PROCESSING operations can be manually retried',
+        'TREASURY_MANUAL_RETRY_INVALID_STATUS',
+      );
+    }
+
+    const walletId = op.type === 'FUND' ? op.to_wallet_id : op.from_wallet_id;
+    if (!walletId) {
+      throw new BadRequestException(
+        'Operation has no linked transaction wallet',
+        'TREASURY_MANUAL_MISSING_WALLET',
+      );
+    }
+
+    await this.forceReleaseTreasuryWalletLock(walletId, operationId);
+
+    await this.treasuryOperationRepository.updateByOperationId(operationId, {
+      status: 'PENDING',
+      failure_reason: null,
+    });
+
+    const jobData: TreasuryJobData =
+      op.type === 'SWEEP'
+        ? { operationId, mainWalletId }
+        : { operationId };
+
+    const jobLabel = op.type === 'FUND' ? TREASURY_FUND_JOB : TREASURY_SWEEP_JOB;
+    const jobId = `treasury-manual-retry:${operationId}:${uuidv7()}`;
+
+    await this.treasuryQueue.add(jobLabel, jobData, {
+      jobId,
+      attempts: 100,
+      backoff: { type: 'treasuryDefer', delay: 3_000 },
+      removeOnComplete: true,
+    });
+
+    this.logger.warn(
+      `Treasury manual retry: operation=${operationId} type=${op.type} actor=${actorUserId}`,
+    );
+
+    return { operationId, status: 'PENDING' };
+  }
+
+  async manualAbortTreasuryOperation(
+    operationId: string,
+    reason: string | undefined,
+    actorUserId: string,
+  ): Promise<{ ok: true }> {
+    const op = await this.treasuryOperationRepository.findByOperationId(operationId);
+    if (!op) {
+      throw new NotFoundException('Treasury operation', operationId);
+    }
+    if (op.status !== 'PENDING' && op.status !== 'PROCESSING') {
+      throw new BadRequestException(
+        'Only PENDING or PROCESSING operations can be manually aborted',
+        'TREASURY_MANUAL_ABORT_INVALID_STATUS',
+      );
+    }
+
+    const walletId = op.type === 'FUND' ? op.to_wallet_id : op.from_wallet_id;
+    if (walletId) {
+      await this.forceReleaseTreasuryWalletLock(walletId, operationId);
+    }
+
+    const msg = reason?.trim()
+      ? `Manual abort by operator: ${reason.trim()}`.slice(0, 512)
+      : 'Manual abort by operator';
+    await this.markFailed(operationId, msg);
+
+    this.logger.warn(`Treasury manual abort: operation=${operationId} actor=${actorUserId}`);
+
+    return { ok: true };
+  }
+
+  /**
+   * Operator attestation: chain tx succeeded but automation did not finalize (still PENDING/PROCESSING).
+   */
+  async manualSettleTreasuryOperation(
+    operationId: string,
+    dto: { txHash: string; mainWalletId?: string },
+    actorUserId: string,
+  ): Promise<{ operationId: string; status: string }> {
+    const op = await this.treasuryOperationRepository.findByOperationIdWithWallets(operationId);
+    if (!op) {
+      throw new NotFoundException('Treasury operation', operationId);
+    }
+    if (op.status !== 'PENDING' && op.status !== 'PROCESSING') {
+      throw new BadRequestException(
+        'Only PENDING or PROCESSING operations can be manually settled',
+        'TREASURY_MANUAL_SETTLE_INVALID_STATUS',
+      );
+    }
+
+    const normalizedHash = dto.txHash.trim();
+    if (!normalizedHash) {
+      throw new BadRequestException('txHash is required', 'TREASURY_MANUAL_SETTLE_TX_EMPTY');
+    }
+
+    const logIndex = 0;
+    const existing = await this.treasuryOperationRepository.findOnchainTreasuryLeg(
+      op.chain,
+      normalizedHash,
+      logIndex,
+    );
+    if (existing?.treasury_operation_id && existing.treasury_operation_id !== operationId) {
+      throw new ConflictException(
+        'This transaction hash is already linked to another treasury operation',
+        'TREASURY_MANUAL_SETTLE_TX_CONFLICT',
+      );
+    }
+    if (existing?.treasury_operation_id === operationId) {
+      return { operationId, status: 'COMPLETED' };
+    }
+
+    let fromAddress: string;
+    let toAddress: string;
+
+    if (op.type === 'FUND') {
+      if (!op.to_wallet?.address) {
+        throw new BadRequestException(
+          'Fund operation missing destination wallet address',
+          'TREASURY_MANUAL_SETTLE_NO_DEST',
+        );
+      }
+      fromAddress = await this.transactionWalletService.getMainWalletAddress(
+        op.chain as SupportedTreasuryChain,
+      );
+      toAddress = op.to_wallet.address;
+    } else {
+      if (!op.from_wallet?.address) {
+        throw new BadRequestException(
+          'Sweep operation missing source wallet address',
+          'TREASURY_MANUAL_SETTLE_NO_SOURCE',
+        );
+      }
+      fromAddress = op.from_wallet.address;
+      toAddress = await this.treasuryMainWalletService.getMainWalletAddress(
+        op.chain,
+        dto.mainWalletId,
+      );
+    }
+
+    const walletId = op.type === 'FUND' ? op.to_wallet_id : op.from_wallet_id;
+    if (walletId) {
+      await this.forceReleaseTreasuryWalletLock(walletId, operationId);
+    }
+
+    await this.finalizeSuccess(
+      op,
+      fromAddress,
+      toAddress,
+      normalizedHash,
+      this.normalizePositiveAmount(op.amount),
+    );
+    await this.publishEvent('operation.completed', {
+      operationId: op.operation_id,
+      type: op.type,
+      chain: op.chain,
+      txHash: normalizedHash,
+      amount: op.amount,
+      manualSettle: true,
+      actorUserId,
+    });
+
+    this.logger.warn(
+      `Treasury manual settle: operation=${operationId} tx=${normalizedHash} actor=${actorUserId}`,
+    );
+
+    return { operationId, status: 'COMPLETED' };
+  }
+
+  private async forceReleaseTreasuryWalletLock(walletId: string, operationId: string): Promise<void> {
+    await this.redisService.getClient().del(`treasury:lock:${walletId}`);
+    await this.clearLockWaitTimer(operationId);
   }
 
   private async createOperation(params: {
@@ -800,14 +952,8 @@ export class TreasuryOperationsService {
     );
   }
 
-  private buildFundJobId(
-    walletId: string,
-    asset: string,
-    amount: string,
-    actorUserId: string,
-  ): string {
-    const h = createHash('sha256').update(`${amount}|${actorUserId}`).digest('hex').slice(0, 16);
-    return `treasury-fund:${walletId}:${asset}:${h}`;
+  private buildFundJobId(walletId: string, asset: string): string {
+    return `treasury-fund:${walletId}:${asset}:${uuidv7()}`;
   }
 
   private buildSweepJobId(

@@ -98,20 +98,21 @@ describe('buildChainPickerOptions', () => {
     expect(dto.pickers.onchain_deposit_withdraw).not.toContain('TON_TESTNET');
     expect(dto.networkCatalog.map((c) => c.code)).toContain('TON_TESTNET');
     expect(dto.pickers.onchain_deposit_withdraw.filter((c) => c.startsWith('TRON_')).length).toBe(
-      1,
+      2,
     );
     expect(dto.pickers.treasury_ops).toContain('TRON_NILE');
     expect(dto.pickers.treasury_ops).toContain('TRON_SHASTA');
-    expect(dto.pickers.treasury_ops.length).toBe(dto.pickers.onchain_deposit_withdraw.length + 1);
+    expect(dto.pickers.treasury_ops.length).toBe(dto.pickers.onchain_deposit_withdraw.length);
   });
 
-  it('sandbox TRON_DEFAULT_NETWORK=TRON_NILE keeps user-facing picker to a single Tron row (Nile)', () => {
+  it('sandbox TRON_DEFAULT_NETWORK=TRON_NILE lists Nile then Shasta in user-facing pickers', () => {
     const dto = buildChainPickerOptions({
       onchainOperatorMode: 'sandbox',
       tronDefaultNetwork: 'TRON_NILE',
     });
     expect(dto.pickers.onchain_deposit_withdraw.filter((c) => c.startsWith('TRON_'))).toEqual([
       'TRON_NILE',
+      'TRON_SHASTA',
     ]);
     expect(dto.pickers.treasury_ops.filter((c) => c.startsWith('TRON_'))).toEqual([
       'TRON_NILE',
@@ -119,7 +120,7 @@ describe('buildChainPickerOptions', () => {
     ]);
   });
 
-  it('TRON_DEFAULT_NETWORK=TRON_SHASTA ends actionable list with TRON_SHASTA; treasury_ops includes both Tron testnets', () => {
+  it('TRON_DEFAULT_NETWORK=TRON_SHASTA orders Shasta before Nile in actionable pickers', () => {
     const dto = buildChainPickerOptions({
       onchainOperatorMode: 'sandbox',
       tronDefaultNetwork: 'TRON_SHASTA',
@@ -128,7 +129,7 @@ describe('buildChainPickerOptions', () => {
     expect(dto.tronDefaultNetwork).toBe('TRON_SHASTA');
     expect(
       dto.pickers.onchain_deposit_withdraw[dto.pickers.onchain_deposit_withdraw.length - 1],
-    ).toBe('TRON_SHASTA');
+    ).toBe('TRON_NILE');
     expect(dto.pickers.treasury_ops.filter((c) => c.startsWith('TRON_'))).toEqual([
       'TRON_SHASTA',
       'TRON_NILE',

@@ -1,4 +1,5 @@
 import type { QueryDeepPartialEntity } from 'typeorm';
+import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 import type {
   TreasuryMainWalletChain,
   TreasuryOperationAsset,
@@ -51,4 +52,11 @@ export interface TreasuryOperationRepositoryPort {
     txHash: string;
     amount: string;
   }): Promise<void>;
+
+  /** Existing on-chain row for duplicate (chain + tx_hash + log_index unique). */
+  findOnchainTreasuryLeg(
+    chain: BlockchainChainDbValue,
+    txHash: string,
+    logIndex: number,
+  ): Promise<{ treasury_operation_id: string | null } | null>;
 }

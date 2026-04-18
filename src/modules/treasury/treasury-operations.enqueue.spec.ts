@@ -29,6 +29,7 @@ describe('TreasuryOperationsService enqueue idempotency', () => {
       updateByOperationId: jest.fn(),
       listWithFilters: jest.fn(),
       finalizeSuccessWithOnchainTx: jest.fn(),
+      findOnchainTreasuryLeg: jest.fn(),
     };
 
     queueAdd = jest.fn().mockResolvedValue(undefined);
@@ -73,25 +74,21 @@ describe('TreasuryOperationsService enqueue idempotency', () => {
     svc = moduleRef.get(TreasuryOperationsService);
   });
 
-  it('returns existing op when findActiveDuplicateOperation matches', async () => {
-    repo.findActiveDuplicateOperation.mockResolvedValue({
-      operation_id: 'existing-op',
-      status: 'PENDING',
-    } as never);
+  it('enqueues a new fund job on every call (no same-amount dedupe)', async () => {
+    repo.createPendingOperation
+      .mockResolvedValueOnce({ operation_id: 'op-1', status: 'PENDING' } as never)
+      .mockResolvedValueOnce({ operation_id: 'op-2', status: 'PENDING' } as never);
 
-    const result = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+    const a = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+    const b = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
 
-    expect(result).toEqual({
-      operationId: 'existing-op',
-      status: 'PENDING',
-      alreadyQueued: true,
-    });
-    expect(repo.createPendingOperation).not.toHaveBeenCalled();
-    expect(queueAdd).not.toHaveBeenCalled();
+    expect(a.operationId).toBe('op-1');
+    expect(b.operationId).toBe('op-2');
+    expect(repo.createPendingOperation).toHaveBeenCalledTimes(2);
+    expect(queueAdd).toHaveBeenCalledTimes(2);
   });
 
-  it('enqueues with stable jobId and treasuryDefer backoff', async () => {
-    repo.findActiveDuplicateOperation.mockResolvedValue(null);
+  it('enqueues with unique jobId and treasuryDefer backoff', async () => {
     repo.createPendingOperation.mockResolvedValue({
       operation_id: 'new-op',
       status: 'PENDING',
@@ -103,7 +100,7 @@ describe('TreasuryOperationsService enqueue idempotency', () => {
       TREASURY_FUND_JOB,
       { operationId: 'new-op' },
       expect.objectContaining({
-        jobId: expect.stringMatching(/^treasury-fund:w1:NATIVE:[a-f0-9]{16}$/),
+        jobId: expect.stringMatching(/^treasury-fund:w1:NATIVE:/),
         backoff: { type: 'treasuryDefer', delay: 3000 },
       }),
     );

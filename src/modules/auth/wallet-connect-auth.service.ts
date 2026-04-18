@@ -12,12 +12,15 @@ import { WcSessionStatus } from '@/modules/blockchain/wallet-connect/dto';
 import {
   formatWalletConnectInitError,
   parseSolanaCaip10Account,
+  parseTronCaip10Account,
   resolveWalletConnectProjectId,
   solanaWcResultToBackendSignature,
+  tronWcSignResultToBackendSignature,
   withWalletConnectTimeout,
 } from '@/modules/blockchain/wallet-connect/wallet-connect-common.util';
 import { withWalletConnectSignClientLock } from '@/modules/blockchain/wallet-connect/wallet-connect-sign-client-gate';
 import {
+  isWcTronChain,
   WC_RELAY_PAIRING_CHAINS,
   wcCaip2ForChain,
 } from '@/modules/blockchain/wallet-connect/wc-caip.util';
@@ -114,15 +117,25 @@ export class WalletConnectAuthService implements OnModuleInit {
                           },
                         },
                       })
-                    : client.connect({
-                        optionalNamespaces: {
-                          eip155: {
-                            chains: [wcCaip2ForChain(chain)],
-                            methods: ['personal_sign', 'eth_sendTransaction'],
-                            events: [],
+                    : isWcTronChain(chain)
+                      ? client.connect({
+                          optionalNamespaces: {
+                            tron: {
+                              chains: [wcCaip2ForChain(chain)],
+                              methods: ['tron_signMessage', 'tron_signTransaction'],
+                              events: [],
+                            },
                           },
-                        },
-                      });
+                        })
+                      : client.connect({
+                          optionalNamespaces: {
+                            eip155: {
+                              chains: [wcCaip2ForChain(chain)],
+                              methods: ['personal_sign', 'eth_sendTransaction'],
+                              events: [],
+                            },
+                          },
+                        });
                   const { uri, approval } = await withWalletConnectTimeout(
                     connectPromise as Promise<WcConnectPairingResult>,
                     WalletConnectAuthService.WC_CONNECT_TIMEOUT_MS,
@@ -350,6 +363,64 @@ export class WalletConnectAuthService implements OnModuleInit {
         signature = solanaWcResultToBackendSignature(raw);
       } catch (e) {
         this.logger.warn(`[WC-Auth] solana_signMessage failed sessionId=${sessionId}`, e);
+        await this.patchSession(sessionId, { status: WcSessionStatus.FAILED, address });
+        try {
+          await client.disconnect({
+            topic: wcSession.topic,
+            reason: { code: 6000, message: 'Sign failed' },
+          });
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+    } else if (isWcTronChain(chain)) {
+      const tronAccounts = wcSession?.namespaces?.tron?.accounts ?? [];
+      const fullTron = tronAccounts[0];
+      if (!fullTron) {
+        this.logger.warn(`[WC-Auth] no tron account sessionId=${sessionId}`);
+        await this.patchSession(sessionId, { status: WcSessionStatus.FAILED });
+        return;
+      }
+      let parsed: { chainId: string; address: string };
+      try {
+        parsed = parseTronCaip10Account(fullTron);
+      } catch (e) {
+        this.logger.warn(`[WC-Auth] bad tron CAIP-10 sessionId=${sessionId}: ${fullTron}`, e);
+        await this.patchSession(sessionId, { status: WcSessionStatus.FAILED });
+        return;
+      }
+      address = parsed.address;
+      const sessionTronChainId = parsed.chainId;
+      if (sessionTronChainId !== expectedCaip2) {
+        this.logger.debug(
+          `[WC-Auth] WC TRON chain ${sessionTronChainId}; expected ${expectedCaip2} — signing with approved chain.`,
+        );
+      }
+
+      await this.patchSession(sessionId, { status: WcSessionStatus.CONNECTED, address });
+
+      const msLeftSign = Math.max(5_000, deadline - Date.now());
+
+      try {
+        const raw = await withWalletConnectTimeout(
+          client.request({
+            topic: wcSession.topic,
+            chainId: sessionTronChainId || expectedCaip2,
+            request: {
+              method: 'tron_signMessage',
+              params: {
+                address,
+                message,
+              },
+            },
+          }),
+          Math.min(msLeftSign, 120_000),
+          'WC_SIGN_TIMEOUT',
+        );
+        signature = tronWcSignResultToBackendSignature(raw);
+      } catch (e) {
+        this.logger.warn(`[WC-Auth] tron_signMessage failed sessionId=${sessionId}`, e);
         await this.patchSession(sessionId, { status: WcSessionStatus.FAILED, address });
         try {
           await client.disconnect({

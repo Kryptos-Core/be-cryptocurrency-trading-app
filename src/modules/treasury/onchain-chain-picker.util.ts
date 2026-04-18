@@ -52,9 +52,9 @@ export function resolveSandboxTronDefaultNetwork(
 }
 
 /**
- * Treasury ops / main-wallet / history filters: sandbox exposes **both** Tron testnets so
- * operators can create Nile + Shasta wallets without toggling env. User-facing pickers stay
- * single-testnet via [listActionableOnchainChainCodes].
+ * Treasury ops / main-wallet / history filters: sandbox lists the same chain universe as
+ * user-facing pickers (both Tron testnets in catalog). If the actionable list already
+ * contains both Tron rows, no extra insert is applied.
  *
  * (Related: `resolveRecommendedChainForDepositPicker` maps `deposit.recommended_chain`
  * TRON_MAINNET → the configured sandbox Tron row when mainnet codes are absent from pickers.)

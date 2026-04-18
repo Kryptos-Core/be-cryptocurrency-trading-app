@@ -33,6 +33,11 @@ import {
   UnsetDefaultUserDepositUseCase,
   UpdateMainWalletLabelUseCase,
 } from './application';
+import {
+  ManualAbortTreasuryOperationDto,
+  ManualRetryTreasuryOperationDto,
+  ManualSettleTreasuryOperationDto,
+} from './dto';
 import type {
   CreateTransactionWalletDto,
   FundWalletDto,
@@ -374,6 +379,61 @@ export class TreasuryController {
   @ApiOperation({ summary: 'Get treasury operation detail' })
   async getOperation(@Param('operationId') operationId: string) {
     return this.getTreasuryOperationQuery.getOperation(operationId);
+  }
+
+  @Post('operations/:operationId/manual-retry')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+  @ApiOperation({
+    summary:
+      'Re-queue a stuck Fund/Sweep job (releases wallet lock, sets PENDING, enqueues worker). SWEEP: optional mainWalletId when sweep targeted a specific main wallet.',
+  })
+  async manualRetryTreasuryOperation(
+    @Param('operationId') operationId: string,
+    @Body() dto: ManualRetryTreasuryOperationDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    return this.treasuryOperationsService.manualRetryTreasuryOperation(
+      operationId,
+      dto.mainWalletId,
+      actorUserId,
+    );
+  }
+
+  @Post('operations/:operationId/manual-abort')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+  @ApiOperation({
+    summary: 'Mark a stuck Fund/Sweep operation as FAILED and release wallet lock (operator escape hatch)',
+  })
+  async manualAbortTreasuryOperation(
+    @Param('operationId') operationId: string,
+    @Body() dto: ManualAbortTreasuryOperationDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    return this.treasuryOperationsService.manualAbortTreasuryOperation(
+      operationId,
+      dto.reason,
+      actorUserId,
+    );
+  }
+
+  @Post('operations/:operationId/manual-settle')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
+  @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
+  @ApiOperation({
+    summary:
+      'Finalize operation with an on-chain tx hash when automation did not complete (operator attestation). SWEEP: optional mainWalletId if destination main wallet was non-default.',
+  })
+  async manualSettleTreasuryOperation(
+    @Param('operationId') operationId: string,
+    @Body() dto: ManualSettleTreasuryOperationDto,
+    @CurrentUser('userId') actorUserId: string,
+  ) {
+    return this.treasuryOperationsService.manualSettleTreasuryOperation(operationId, dto, actorUserId);
   }
 
   @Get('transactions')

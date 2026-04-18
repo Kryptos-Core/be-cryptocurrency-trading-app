@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, type QueryDeepPartialEntity } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import type { BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
 import { OnchainTxStatus } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { TreasuryOperation } from '@/entities/treasury-operation.entity';
@@ -181,5 +182,24 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
         },
       );
     });
+  }
+
+  async findOnchainTreasuryLeg(
+    chain: BlockchainChainDbValue,
+    txHash: string,
+    logIndex: number,
+  ): Promise<{ treasury_operation_id: string | null } | null> {
+    const row = await this.dataSource.getRepository(OnchainTransaction).findOne({
+      where: {
+        chain,
+        tx_hash: txHash,
+        log_index: logIndex,
+      },
+      select: ['treasury_operation_id'],
+    });
+    if (!row) {
+      return null;
+    }
+    return { treasury_operation_id: row.treasury_operation_id };
   }
 }
