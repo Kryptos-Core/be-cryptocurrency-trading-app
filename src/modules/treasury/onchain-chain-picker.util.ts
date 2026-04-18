@@ -59,7 +59,10 @@ export function resolveSandboxTronDefaultNetwork(
  * (Related: `resolveRecommendedChainForDepositPicker` maps `deposit.recommended_chain`
  * TRON_MAINNET → the configured sandbox Tron row when mainnet codes are absent from pickers.)
  */
-export function listTreasuryOpsChainCodes(mainnetOnly: boolean, tronDefaultNetwork?: string): string[] {
+export function listTreasuryOpsChainCodes(
+  mainnetOnly: boolean,
+  tronDefaultNetwork?: string,
+): string[] {
   if (mainnetOnly) {
     return listActionableOnchainChainCodes(true, tronDefaultNetwork);
   }

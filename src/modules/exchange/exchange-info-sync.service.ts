@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ServiceUnavailableException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { BinanceRestClient } from '@/modules/binance-rest/binance-rest-client.service';
+import { GetCurrenciesQuery } from '@/modules/currencies/application/queries/get-currencies.query';
 import {
   CURRENCY_REPOSITORY,
   type CurrencyRepositoryPort,
@@ -57,6 +58,7 @@ export class ExchangeInfoSyncService {
     private readonly marketRepository: MarketRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly binanceRestClient: BinanceRestClient,
+    private readonly getCurrenciesQuery: GetCurrenciesQuery,
   ) {}
 
   /**
@@ -215,6 +217,20 @@ export class ExchangeInfoSyncService {
       await this.cacheService.invalidatePattern('markets:*');
     } catch (e) {
       this.logger.warn('Cache invalidation after sync failed', e);
+    }
+
+    /** Repopulate Redis (`currencies:active`, `currencies:tradable`, …) so clients do not cold-miss until first HTTP GET. */
+    try {
+      await Promise.all([
+        this.getCurrenciesQuery.getActive(),
+        this.getCurrenciesQuery.getTradable(),
+      ]);
+      this.logger.debug('Currency catalog Redis caches warmed after sync');
+    } catch (e) {
+      this.logger.warn(
+        'Currency cache warm-up after sync failed; keys will refill on next GET /currencies',
+        e,
+      );
     }
 
     this.logger.log(

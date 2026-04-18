@@ -1,7 +1,15 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
 import { ExchangeInfoSyncService } from './exchange-info-sync.service';
 
+/**
+ * Ensures Spot catalog (currencies + market pairs) exists after a wiped DB or partial sync.
+ * Mirrors “count active markets → if 0 sync Binance”; also requires active currencies — same upsert pipeline.
+ */
 @Injectable()
 export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MarketCatalogBootstrapService.name);
@@ -10,6 +18,8 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
   constructor(
     @Inject(MARKET_REPOSITORY)
     private readonly marketRepository: MarketRepositoryPort,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly exchangeInfoSyncService: ExchangeInfoSyncService,
   ) {}
 
@@ -19,8 +29,12 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
     }
     this.bootstrapStarted = true;
 
-    const activeMarketCount = await this.getActiveMarketCount();
-    if (activeMarketCount === 0) {
+    const [activeMarketCount, activeCurrencyCount] = await Promise.all([
+      this.getActiveMarketCount(),
+      this.getActiveCurrencyCount(),
+    ]);
+
+    if (activeMarketCount === 0 || activeCurrencyCount === 0) {
       await this.initializeCatalogFromBinance();
     }
   }
@@ -30,12 +44,22 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
     return markets.length;
   }
 
+  private async getActiveCurrencyCount(): Promise<number> {
+    const currencies = await this.currencyRepository.findActive();
+    return currencies.length;
+  }
+
   private async initializeCatalogFromBinance(): Promise<void> {
-    this.logger.log('Market catalog is empty. Syncing real market data from Binance.');
+    this.logger.log(
+      'Market and/or currency catalog is empty. Syncing Spot catalog from Binance (exchangeInfo).',
+    );
 
     try {
       const result = await this.exchangeInfoSyncService.syncFromBinance(false);
-      const activeMarketCount = await this.getActiveMarketCount();
+      const [activeMarketCount, activeCurrencyCount] = await Promise.all([
+        this.getActiveMarketCount(),
+        this.getActiveCurrencyCount(),
+      ]);
 
       this.logger.log(
         `Initial Binance sync completed: +${result.currenciesCreated} currencies, +${result.pairsCreated} pairs.`,
@@ -44,18 +68,18 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
         this.logger.warn(`Initial Binance sync completed with ${result.errors.length} errors.`);
       }
 
-      if (activeMarketCount === 0) {
+      if (activeMarketCount === 0 || activeCurrencyCount === 0) {
         throw new Error(
-          'Startup bootstrap failed: Binance sync did not populate market catalog while DB is empty.',
+          'Startup bootstrap failed: Binance sync did not populate active markets and currencies while DB catalog is empty.',
         );
       }
-    } catch (error: any) {
-      const message = error?.message || String(error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Startup aborted: cannot bootstrap market catalog from Binance while DB is empty. Reason: ${message}`,
+        `Startup aborted: cannot bootstrap Spot catalog from Binance while DB is empty. Reason: ${message}`,
       );
       throw new Error(
-        `Startup bootstrap failed: market catalog is empty and Binance sync failed (${message}).`,
+        `Startup bootstrap failed: Spot catalog is empty and Binance sync failed (${message}).`,
       );
     }
   }

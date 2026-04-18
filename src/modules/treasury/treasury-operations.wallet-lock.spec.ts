@@ -71,7 +71,7 @@ describe('TreasuryOperationsService wallet lock', () => {
     }).compile();
 
     svc = moduleRef.get(TreasuryOperationsService);
-    repo.findByOperationId!.mockResolvedValue({
+    repo.findByOperationId?.mockResolvedValue({
       operation_id: 'op-1',
       type: 'FUND',
       chain: 'TRON_NILE',

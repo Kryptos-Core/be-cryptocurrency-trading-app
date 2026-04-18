@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -27,15 +27,21 @@
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "warn"
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "complexity": {
+        "noBannedTypes": "warn"
       },
       "style": {
         "noCommonJs": "off",
-        "noNonNullAssertion": "off",
+        "noNonNullAssertion": "warn",
         "useImportType": "off"
       },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noDebugger": "error",
+        "noDoubleEquals": "warn",
+        "noExplicitAny": "warn"
       }
     }
   },
@@ -68,5 +74,67 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "src/modules/treasury/**/*.ts",
+        "src/modules/**/domain/**/*.ts",
+        "src/common/ddd/**/*.ts",
+        "src/common/domain-events/**/*.ts",
+        "src/modules/blockchain/**/*.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["scripts/**/*.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "warn",
+            "noUnusedVariables": "warn"
+          },
+          "style": {
+            "noNonNullAssertion": "warn"
+          },
+          "suspicious": {
+            "noExplicitAny": "warn"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/**/*.spec.ts", "src/**/*.integration.spec.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "warn",
+            "noUnusedVariables": "warn"
+          },
+          "style": {
+            "noNonNullAssertion": "warn"
+          },
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/types/**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ]
 }

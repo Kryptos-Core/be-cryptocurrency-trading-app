@@ -205,7 +205,10 @@ export class CurrencyRepository extends BaseRepository<Currency> {
     const [rows, total] = await qb.skip(skip).take(params.limit).getManyAndCount();
 
     return {
-      currencies: rows.map((row) => this.mapProcedureResultToEntity(row)!),
+      currencies: rows.flatMap((row) => {
+        const c = this.mapProcedureResultToEntity(row);
+        return c ? [c] : [];
+      }),
       total,
       page: params.page,
       limit: params.limit,

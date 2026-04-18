@@ -171,8 +171,12 @@ export class MatchingService implements OnModuleInit {
           this.logger.error(`Trade execute failed: ${result.error_code} ${result.error_message}`);
           return null;
         }
+        if (result.trade_id == null) {
+          this.logger.error('Trade execute succeeded but trade_id is missing');
+          return null;
+        }
         const execResult: TradeExecutionResult = {
-          trade_id: result.trade_id!,
+          trade_id: result.trade_id,
           pair_id: pairId,
           maker_order_id: makerOrder.order_id,
           taker_order_id: takerOrder.order_id,

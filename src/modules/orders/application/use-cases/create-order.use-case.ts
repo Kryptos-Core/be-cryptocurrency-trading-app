@@ -66,13 +66,21 @@ export class CreateOrderUseCase {
 
     this.validationService.validate(prepared.validationContext);
 
+    let limitPrice: string | null = null;
+    if (dto.type === 'LIMIT') {
+      if (dto.price == null || dto.price === '') {
+        this.throwFromProcedureError('INVALID_INPUT', 'price is required for LIMIT orders');
+      }
+      limitPrice = dto.price;
+    }
+
     const result = await this.orderRepository.createOrderViaProcedure({
       orderId: newUuid(),
       userId,
       pairId: dto.pairId,
       side: dto.side,
       type: dto.type,
-      price: dto.type === 'LIMIT' ? dto.price! : null,
+      price: limitPrice,
       amount: dto.amount,
       timeInForce: dto.timeInForce ?? 'GTC',
       clientOrderId: dto.clientOrderId ?? null,

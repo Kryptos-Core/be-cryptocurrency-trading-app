@@ -56,7 +56,10 @@ export function buildPaymentConfigFormOptions(
   const types = TYPE_ORDER.filter((t) => (networksByType[t] ?? []).length > 0);
   const trimmed: Record<string, string[]> = {};
   for (const t of types) {
-    trimmed[t] = networksByType[t]!;
+    const nets = networksByType[t];
+    if (nets) {
+      trimmed[t] = nets;
+    }
   }
 
   return { types, networksByType: trimmed };

@@ -38,6 +38,12 @@ import { CurrencyRepository } from './infrastructure/persistence/currency.reposi
     GetCurrencyByIdQuery,
   ],
   controllers: [CurrenciesController],
-  exports: [CurrenciesService, CurrencyRepository, CURRENCY_REPOSITORY],
+  exports: [
+    CurrenciesService,
+    CurrencyRepository,
+    CURRENCY_REPOSITORY,
+    /** Read-side query (e.g. Redis warm-up after exchange catalog sync). */
+    GetCurrenciesQuery,
+  ],
 })
 export class CurrenciesModule {}

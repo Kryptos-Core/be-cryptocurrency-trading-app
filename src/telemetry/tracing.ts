@@ -60,8 +60,10 @@ if (enabled) {
   sdk.start();
   console.log(`[OTel] Tracing started — service: ${serviceName}, endpoint: ${otlpEndpoint}`);
 
+  const otelSdk = sdk;
   process.on('SIGTERM', () => {
-    sdk!
+    if (!otelSdk) return;
+    void otelSdk
       .shutdown()
       .then(() => console.log('[OTel] SDK shut down'))
       .catch((err: Error) => console.error('[OTel] SDK shutdown error', err))

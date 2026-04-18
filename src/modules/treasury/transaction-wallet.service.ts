@@ -415,7 +415,9 @@ export class TransactionWalletService {
     return wallet;
   }
 
-  async getWalletDetail(walletId: string): Promise<
+  async getWalletDetail(
+    walletId: string,
+  ): Promise<
     TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }
   > {
     const wallet = await this.getWalletById(walletId);

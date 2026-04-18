@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminWalletAdjustment } from '@/entities/admin-wallet-adjustment.entity';
 import { Wallet } from '@/entities/wallet.entity';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
+import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ExchangeModule } from '@/modules/exchange/exchange.module';
 // Application — queries
 import {
@@ -60,6 +61,7 @@ import { WalletsService } from './wallets.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Wallet, WalletLedger, AdminWalletAdjustment]),
+    CurrenciesModule,
     ExchangeModule,
   ],
   providers: [

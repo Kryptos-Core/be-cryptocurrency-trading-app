@@ -48,8 +48,11 @@ export class OrderReservePolicy {
       requiredQuoteForBuy = reservedQuote;
       marketBuyReservedQuote = reservedQuote;
       slippageTolerance = slippage;
-    } else if (dto.type === 'MARKET' && (dto.slippageTolerance?.trim().length ?? 0) > 0) {
-      slippageTolerance = dto.slippageTolerance!.trim();
+    } else if (dto.type === 'MARKET') {
+      const tol = dto.slippageTolerance?.trim();
+      if (tol) {
+        slippageTolerance = tol;
+      }
     }
 
     return {

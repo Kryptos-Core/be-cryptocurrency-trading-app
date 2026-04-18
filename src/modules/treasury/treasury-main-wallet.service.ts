@@ -300,6 +300,9 @@ export class TreasuryMainWalletService implements OnModuleInit {
     await this.mainWalletRepository.clearDefaultAndSetMainWallet(wallet.chain, mainWalletId);
 
     const updated = await this.mainWalletRepository.findByMainWalletId(mainWalletId);
+    if (!updated) {
+      throw new NotFoundException('Treasury main wallet', mainWalletId);
+    }
 
     this.logger.log(
       `Main wallet set as default: ${mainWalletId} (chain=${wallet.chain}) by ${actorUserId}`,
@@ -311,7 +314,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       changedBy: actorUserId,
     });
 
-    return this.toDto(updated!);
+    return this.toDto(updated);
   }
 
   async revealPrivateKey(

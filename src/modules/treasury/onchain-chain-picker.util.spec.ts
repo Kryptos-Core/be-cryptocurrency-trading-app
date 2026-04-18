@@ -97,7 +97,9 @@ describe('buildChainPickerOptions', () => {
     expect(dto.pickers.onchain_deposit_withdraw).toContain('ETH_SEPOLIA');
     expect(dto.pickers.onchain_deposit_withdraw).not.toContain('TON_TESTNET');
     expect(dto.networkCatalog.map((c) => c.code)).toContain('TON_TESTNET');
-    expect(dto.pickers.onchain_deposit_withdraw.filter((c) => c.startsWith('TRON_')).length).toBe(1);
+    expect(dto.pickers.onchain_deposit_withdraw.filter((c) => c.startsWith('TRON_')).length).toBe(
+      1,
+    );
     expect(dto.pickers.treasury_ops).toContain('TRON_NILE');
     expect(dto.pickers.treasury_ops).toContain('TRON_SHASTA');
     expect(dto.pickers.treasury_ops.length).toBe(dto.pickers.onchain_deposit_withdraw.length + 1);

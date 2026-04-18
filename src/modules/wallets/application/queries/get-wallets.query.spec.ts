@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { CURRENCY_REPOSITORY } from '@/modules/currencies/domain/ports';
 import { WALLET_REPOSITORY } from '@/modules/wallets/domain/ports';
 import { GetWalletsQuery } from './get-wallets.query';
 
@@ -27,12 +28,18 @@ describe('GetWalletsQuery', () => {
   let query: GetWalletsQuery;
 
   let walletRepo: jest.Mocked<{ findByUser: jest.Mock }>;
+  let currencyRepo: jest.Mocked<{ findTradable: jest.Mock }>;
 
   beforeEach(async () => {
     walletRepo = { findByUser: jest.fn() };
+    currencyRepo = { findTradable: jest.fn() };
 
     const module = await Test.createTestingModule({
-      providers: [GetWalletsQuery, { provide: WALLET_REPOSITORY, useValue: walletRepo }],
+      providers: [
+        GetWalletsQuery,
+        { provide: WALLET_REPOSITORY, useValue: walletRepo },
+        { provide: CURRENCY_REPOSITORY, useValue: currencyRepo },
+      ],
     }).compile();
 
     query = module.get(GetWalletsQuery);
@@ -71,6 +78,26 @@ describe('GetWalletsQuery', () => {
     await query.execute('uid-1', false);
 
     expect(walletRepo.findByUser).toHaveBeenCalledWith('uid-1', false);
+    expect(currencyRepo.findTradable).not.toHaveBeenCalled();
+  });
+
+  it('fills synthetic zero rows from tradable currencies when DB wallets empty and includeZero true', async () => {
+    walletRepo.findByUser.mockResolvedValue([]);
+    currencyRepo.findTradable.mockResolvedValue([
+      {
+        currency_id: '018f0000-0000-7000-a000-000000000001',
+        symbol: 'BTC',
+        name: 'Bitcoin',
+      } as any,
+    ]);
+
+    const result = await query.execute('uid-1', true);
+
+    expect(currencyRepo.findTradable).toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0].symbol).toBe('BTC');
+    expect(result[0].available).toBe('0');
+    expect(result[0].total).toBe('0');
   });
 
   it('defaults null fields to 0 in total calculation', async () => {

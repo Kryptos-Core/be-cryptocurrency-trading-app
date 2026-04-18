@@ -31,7 +31,9 @@ export class OrderQueueService implements IOrderQueue {
   }
 
   popBest(): OrderBookOrder | null {
-    return this.orders.length > 0 ? this.orders.shift()! : null;
+    if (this.orders.length === 0) return null;
+    const next = this.orders.shift();
+    return next ?? null;
   }
 
   size(): number {

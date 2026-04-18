@@ -304,11 +304,13 @@ export class TreasuryOperationsService {
 
     await this.clearLockWaitTimer(operation.operation_id);
 
+    const sourceWalletId = operation.from_wallet_id;
+
     /** Hold only while broadcasting; balance polls can take 60–90s and must not block other treasury ops on the same wallet. */
     let lockHeld = true;
     try {
       await this.markProcessing(operation.operation_id);
-      const wallet = await this.transactionWalletService.getWalletById(operation.from_wallet_id!);
+      const wallet = await this.transactionWalletService.getWalletById(sourceWalletId);
       const mainAddress = await this.treasuryMainWalletService.getMainWalletAddress(
         wallet.chain,
         data.mainWalletId,
@@ -402,11 +404,13 @@ export class TreasuryOperationsService {
 
     await this.clearLockWaitTimer(operation.operation_id);
 
+    const destinationWalletId = operation.to_wallet_id;
+
     /** Hold only while broadcasting; balance polls can take 60–90s and must not block other treasury ops on the same wallet. */
     let lockHeld = true;
     try {
       await this.markProcessing(operation.operation_id);
-      const wallet = await this.transactionWalletService.getWalletById(operation.to_wallet_id!);
+      const wallet = await this.transactionWalletService.getWalletById(destinationWalletId);
       const amount = this.normalizePositiveAmount(operation.amount);
       const mainAddress = await this.transactionWalletService.getMainWalletAddress(wallet.chain);
       const asset = operation.asset ?? 'NATIVE';

@@ -1,8 +1,17 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '@/common/services';
 import { runInSpan } from '@/common/telemetry';
+import type { Wallet } from '@/entities/wallet.entity';
+import {
+  CURRENCY_REPOSITORY,
+  type CurrencyRepositoryPort,
+} from '@/modules/currencies/domain/ports';
 import type { MarketPairRecord } from '@/modules/markets';
 import { MarketsService } from '@/modules/markets/markets.service';
+import {
+  mapTradableCurrenciesToSyntheticWalletRows,
+  type SyntheticWalletRow,
+} from '@/modules/wallets/application/helpers/synthetic-zero-wallet-rows';
 import { WALLET_REPOSITORY, type WalletRepositoryPort } from '@/modules/wallets/domain/ports';
 import type {
   DashboardMarketDto,
@@ -24,6 +33,9 @@ const STABLE_QUOTE_SUFFIXES = ['/USDT', '/USDC', '/FDUSD', '/BUSD'] as const;
  */
 const CANDIDATE_LIMIT = TOP_MARKETS_LIMIT * 5; // 50 candidates → top 10
 
+type WalletListRow = Wallet & { currency_symbol: string; currency_name: string };
+type DashboardPortfolioWalletSource = WalletListRow | SyntheticWalletRow;
+
 /**
  * Dashboard Service
  * Aggregates top markets (with live tickers) + portfolio valuation in a single call.
@@ -42,6 +54,8 @@ export class DashboardService {
     private readonly marketsService: MarketsService,
     @Inject(WALLET_REPOSITORY)
     private readonly walletRepository: WalletRepositoryPort,
+    @Inject(CURRENCY_REPOSITORY)
+    private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly redisService: RedisService,
   ) {}
 
@@ -54,15 +68,22 @@ export class DashboardService {
   }
 
   private async getDashboardSummaryImpl(userId: string | null): Promise<DashboardResponseDto> {
-    const [activePairs, wallets] = await Promise.all([
+    const [activePairs, rawWallets] = await Promise.all([
       this.marketsService.findActive(),
       userId
         ? // includeZero: true → return all wallets so walletCount reflects every
           // currency wallet the user owns, even those with 0 balance.
           // The FE filters what is *displayed* (only > 0), but the count is accurate.
           this.walletRepository.findByUser(userId, true)
-        : Promise.resolve([] as any[]),
+        : Promise.resolve([] as WalletListRow[]),
     ]);
+
+    /** After db:clean, users often have no `wallets` rows until first ledger event — show zero rows from catalog. */
+    let wallets: DashboardPortfolioWalletSource[] = rawWallets;
+    if (userId && rawWallets.length === 0) {
+      const tradable = await this.currencyRepository.findTradable();
+      wallets = mapTradableCurrenciesToSyntheticWalletRows(tradable);
+    }
 
     // Index pairs by symbol for O(1) scale lookup
     const pairScaleMap = new Map(
@@ -118,7 +139,7 @@ export class DashboardService {
 
     return {
       portfolioTotal,
-      walletCount: wallets.length,
+      walletCount: rawWallets.length,
       activeWalletCount: walletDtos.filter((w) => parseFloat(w.total) > 0).length,
       topMarkets,
       wallets: walletDtos,
@@ -151,7 +172,9 @@ export class DashboardService {
    * Reads price:{SYMBOL}USDT:latest from Redis (TTL 5m, set by BinancePriceFeedService).
    * Stablecoins counted at 1 USD.
    */
-  private async buildWalletDtos(wallets: any[]): Promise<DashboardWalletDto[]> {
+  private async buildWalletDtos(
+    wallets: DashboardPortfolioWalletSource[],
+  ): Promise<DashboardWalletDto[]> {
     if (wallets.length === 0) return [];
 
     const STABLECOINS = new Set(['USDT', 'USDC', 'FDUSD', 'BUSD', 'DAI', 'TUSD']);

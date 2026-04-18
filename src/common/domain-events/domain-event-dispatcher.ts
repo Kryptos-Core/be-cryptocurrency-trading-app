@@ -40,10 +40,12 @@ export class DomainEventDispatcher {
     eventClass: new (...args: any[]) => T,
     handler: DomainEventHandler<T>,
   ): void {
-    if (!this.handlers.has(eventClass)) {
-      this.handlers.set(eventClass, new Set());
+    let bucket = this.handlers.get(eventClass);
+    if (!bucket) {
+      bucket = new Set();
+      this.handlers.set(eventClass, bucket);
     }
-    this.handlers.get(eventClass)!.add(handler as DomainEventHandler);
+    bucket.add(handler as DomainEventHandler);
   }
 
   /**
