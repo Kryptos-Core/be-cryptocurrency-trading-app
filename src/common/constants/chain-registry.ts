@@ -92,6 +92,99 @@ function chainFamily(network: BlockchainNetwork): ChainFamily {
   return 'evm';
 }
 
+function blockchainLabel(network: BlockchainNetwork): string {
+  switch (network) {
+    case BlockchainNetwork.TON_MAINNET:
+    case BlockchainNetwork.TON_TESTNET:
+      return 'TON';
+    case BlockchainNetwork.BSC_MAINNET:
+    case BlockchainNetwork.BSC_CHAPEL:
+      return 'BNB Smart Chain';
+    case BlockchainNetwork.SOLANA_MAINNET:
+    case BlockchainNetwork.SOLANA_DEVNET:
+      return 'Solana';
+    case BlockchainNetwork.ETH_MAINNET:
+    case BlockchainNetwork.ETH_SEPOLIA:
+      return 'Ethereum';
+    case BlockchainNetwork.BASE_MAINNET:
+    case BlockchainNetwork.BASE_SEPOLIA:
+      return 'Base';
+    case BlockchainNetwork.ARBITRUM_MAINNET:
+    case BlockchainNetwork.ARBITRUM_SEPOLIA:
+      return 'Arbitrum';
+    case BlockchainNetwork.OPTIMISM_MAINNET:
+    case BlockchainNetwork.OPTIMISM_SEPOLIA:
+      return 'Optimism';
+    case BlockchainNetwork.POLYGON_MAINNET:
+    case BlockchainNetwork.POLYGON_AMOY:
+      return 'Polygon';
+    case BlockchainNetwork.AVALANCHE_MAINNET:
+    case BlockchainNetwork.AVALANCHE_FUJI:
+      return 'Avalanche';
+    case BlockchainNetwork.GNOSIS_MAINNET:
+    case BlockchainNetwork.GNOSIS_CHIADO:
+      return 'Gnosis';
+    case BlockchainNetwork.LINEA_MAINNET:
+    case BlockchainNetwork.LINEA_SEPOLIA:
+      return 'Linea';
+    case BlockchainNetwork.FANTOM_MAINNET:
+    case BlockchainNetwork.FANTOM_TESTNET:
+      return 'Fantom';
+    case BlockchainNetwork.TRON_MAINNET:
+    case BlockchainNetwork.TRON_NILE:
+    case BlockchainNetwork.TRON_SHASTA:
+      return 'Tron';
+    default:
+      return String(network);
+  }
+}
+
+function networkLabel(network: BlockchainNetwork): string {
+  switch (network) {
+    case BlockchainNetwork.TRON_MAINNET:
+    case BlockchainNetwork.SOLANA_MAINNET:
+    case BlockchainNetwork.ETH_MAINNET:
+    case BlockchainNetwork.BSC_MAINNET:
+    case BlockchainNetwork.BASE_MAINNET:
+    case BlockchainNetwork.OPTIMISM_MAINNET:
+    case BlockchainNetwork.POLYGON_MAINNET:
+    case BlockchainNetwork.LINEA_MAINNET:
+    case BlockchainNetwork.FANTOM_MAINNET:
+    case BlockchainNetwork.TON_MAINNET:
+      return 'mainnet';
+    case BlockchainNetwork.TRON_NILE:
+      return 'Nile';
+    case BlockchainNetwork.TRON_SHASTA:
+      return 'Shasta';
+    case BlockchainNetwork.SOLANA_DEVNET:
+      return 'devnet';
+    case BlockchainNetwork.ETH_SEPOLIA:
+    case BlockchainNetwork.BASE_SEPOLIA:
+    case BlockchainNetwork.ARBITRUM_SEPOLIA:
+    case BlockchainNetwork.OPTIMISM_SEPOLIA:
+    case BlockchainNetwork.LINEA_SEPOLIA:
+      return 'Sepolia';
+    case BlockchainNetwork.BSC_CHAPEL:
+      return 'Chapel';
+    case BlockchainNetwork.ARBITRUM_MAINNET:
+      return 'One';
+    case BlockchainNetwork.POLYGON_AMOY:
+      return 'Amoy';
+    case BlockchainNetwork.AVALANCHE_MAINNET:
+      return 'C-Chain';
+    case BlockchainNetwork.AVALANCHE_FUJI:
+      return 'Fuji';
+    case BlockchainNetwork.GNOSIS_MAINNET:
+      return 'Chain';
+    case BlockchainNetwork.GNOSIS_CHIADO:
+      return 'Chiado';
+    case BlockchainNetwork.FANTOM_TESTNET:
+    case BlockchainNetwork.TON_TESTNET:
+      return 'testnet';
+    default:
+      return String(network);
+  }
+}
 function iconKey(network: BlockchainNetwork): string {
   switch (network) {
     case BlockchainNetwork.TON_MAINNET:
@@ -179,6 +272,9 @@ export function buildNetworkCatalog(
       code: network,
       iconKey: iconKey(network),
       family: chainFamily(network),
+      blockchainKey: iconKey(network),
+      blockchainLabel: blockchainLabel(network),
+      networkLabel: networkLabel(network),
       isTestnet: isTestnetChain(network),
       sortOrder: (index + 1) * 10,
       capabilities: caps,
@@ -215,3 +311,6 @@ export function nativeSymbolForChain(network: BlockchainNetwork): string {
       throw new Error(`nativeSymbolForChain: unsupported ${network}`);
   }
 }
+
+
+
