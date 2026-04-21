@@ -10,7 +10,7 @@
 import * as path from 'node:path';
 import { DataSource } from 'typeorm';
 import { loadEnvFilesForCli } from '@/config/load-env-files';
-import { typeormEntityGlobPaths } from '@/config/typeorm-entity-glob-paths';
+import { typeormEntityGlobPaths, typeormMigrationFilePaths } from '@/config/typeorm-entity-glob-paths';
 
 loadEnvFilesForCli();
 
@@ -36,7 +36,7 @@ async function run() {
     password: process.env.DB_PASSWORD,
     database,
     entities: typeormEntityGlobPaths(__dirname),
-    migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+    migrations: typeormMigrationFilePaths(__dirname),
     synchronize: false,
     logging: false,
   });

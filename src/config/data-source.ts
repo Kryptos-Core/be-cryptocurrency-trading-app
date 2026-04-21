@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { DataSource } from 'typeorm';
 import { loadEnvFilesForCli } from './load-env-files';
-import { typeormEntityGlobPaths } from './typeorm-entity-glob-paths';
+import { typeormEntityGlobPaths, typeormMigrationFilePaths } from './typeorm-entity-glob-paths';
 
 loadEnvFilesForCli();
 
@@ -28,7 +28,7 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   entities: typeormEntityGlobPaths(__dirname),
-  migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+  migrations: typeormMigrationFilePaths(__dirname),
   synchronize: false, // Always false for migrations
   logging: true,
   /** Tránh `PROTOCOL_CONNECTION_LOST` sớm khi MySQL/Docker trên Windows khởi động chậm. */

@@ -4,6 +4,9 @@ export class AddTreasuryOperationAsset1776510000000 implements MigrationInterfac
   name = 'AddTreasuryOperationAsset1776510000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (await queryRunner.hasColumn('treasury_operations', 'asset')) {
+      return;
+    }
     await queryRunner.query(`
       ALTER TABLE \`treasury_operations\`
       ADD COLUMN \`asset\` varchar(24) NOT NULL DEFAULT 'NATIVE'

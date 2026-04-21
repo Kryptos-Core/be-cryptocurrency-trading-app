@@ -33,6 +33,7 @@ import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
 import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
 import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
+import { typeormMigrationFilePaths } from './typeorm-entity-glob-paths';
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
@@ -80,7 +81,7 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     password: configService.get<string>('DB_PASSWORD'),
     database: configService.get<string>('DB_NAME'),
     entities: ALL_ENTITIES,
-    migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+    migrations: typeormMigrationFilePaths(__dirname),
     migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
     synchronize: false,
     logging: debugSql ? (['query', 'error'] as const) : false,

@@ -12,7 +12,7 @@ import { DataSource } from 'typeorm';
 import { UserRole } from '@/common/enums';
 import { newUuid } from '@/common/utils/uuid.util';
 import { loadEnvFilesForCli } from '@/config/load-env-files';
-import { typeormEntityGlobPaths } from '@/config/typeorm-entity-glob-paths';
+import { typeormEntityGlobPaths, typeormMigrationFilePaths } from '@/config/typeorm-entity-glob-paths';
 import { parseAndValidateSeedUsers } from '@/seed/seed-users-json.util';
 import { resolveSeedUsersJsonPath } from '@/seed/seed-users-path.util';
 
@@ -29,7 +29,7 @@ async function run() {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     entities: typeormEntityGlobPaths(__dirname),
-    migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+    migrations: typeormMigrationFilePaths(__dirname),
     synchronize: false,
     logging: false,
   });
