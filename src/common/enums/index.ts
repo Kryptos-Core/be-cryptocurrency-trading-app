@@ -86,6 +86,8 @@ export enum Permission {
   PAYMENT_CONFIGS_MANAGE = 'payment_configs:manage',
   /** Approve or reject withdrawal requests (manual review queue) */
   WITHDRAWALS_APPROVE = 'withdrawals:approve',
+  /** Admin: force-ingest deposits, manage UNMATCHED records */
+  DEPOSITS_MANAGE = 'deposits:manage',
 }
 
 // ============================================
@@ -233,6 +235,7 @@ export enum OnchainTxType {
 
 /** Trạng thái giao dịch on-chain */
 export enum OnchainTxStatus {
+  UNMATCHED = 'UNMATCHED',
   PENDING = 'PENDING',
   CONFIRMING = 'CONFIRMING',
   COMPLETED = 'COMPLETED',

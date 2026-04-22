@@ -7,6 +7,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import {
   BLOCKCHAIN_CHAIN_DB_VALUES,
@@ -58,10 +59,14 @@ export class TreasuryOperation {
 
   @Column({
     type: 'enum',
-    enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'],
+    enum: ['PENDING', 'PROCESSING', 'TX_BROADCAST', 'COMPLETED', 'FAILED'],
     default: 'PENDING',
   })
-  status!: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status!: 'PENDING' | 'PROCESSING' | 'TX_BROADCAST' | 'COMPLETED' | 'FAILED';
+
+  /** Set BEFORE the RPC broadcast call. On retry: if set but tx_hash is NULL → broadcast was attempted. */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  broadcast_idempotency_key!: string | null;
 
   @Column({ type: 'char', length: 36 })
   @ForeignKey(() => User)
@@ -72,6 +77,9 @@ export class TreasuryOperation {
 
   @CreateDateColumn()
   created_at!: Date;
+
+  @UpdateDateColumn()
+  updated_at!: Date;
 
   @Column({ type: 'datetime', nullable: true })
   completed_at!: Date | null;

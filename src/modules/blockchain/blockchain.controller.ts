@@ -65,6 +65,7 @@ import {
   VerifyLinkWalletCommand,
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
+import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
 import type {
   ManualWithdrawalActionDto,
   RequestLinkDto,
@@ -102,6 +103,7 @@ export class BlockchainController {
     private readonly getAdminWithdrawalByIdQuery: GetAdminWithdrawalByIdQuery,
     private readonly getAdminWithdrawalStatsQuery: GetAdminWithdrawalStatsQuery,
     private readonly getSupportedNetworksQuery: GetSupportedNetworksQuery,
+    private readonly depositIngestionService: DepositIngestionService,
   ) {}
 
   @Post('wallets/request-link')
@@ -431,5 +433,31 @@ export class BlockchainController {
   @ApiSuccessResponse('Danh sách mạng')
   getSupportedNetworks() {
     return this.getSupportedNetworksQuery.execute(new GetSupportedNetworksRequest());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin: manual deposit ingest
+  // ---------------------------------------------------------------------------
+
+  @Post('admin/deposits/ingest')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireFinanceAccess()
+  @RequirePermissions(Permission.DEPOSITS_MANAGE)
+  @ApiOperation({
+    summary: '[Admin] Force-ingest một tx hash cụ thể',
+    description:
+      'Cho phép admin re-ingest một giao dịch bị bỏ sót hoặc tạo UNMATCHED record thủ công. Idempotent — gọi lại khi đã có row sẽ trả ConflictException.',
+  })
+  @ApiSuccessResponse('Kết quả ingest')
+  @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  async adminForceIngestDeposit(
+    @Body() body: { chain: BlockchainNetwork; txHash: string; logIndex?: number },
+  ) {
+    if (!body.chain || !body.txHash?.trim()) {
+      throw new BadRequestException('chain và txHash là bắt buộc', 'ADMIN_INGEST_MISSING_PARAMS');
+    }
+    await this.depositIngestionService.ingestTxHash(body.chain, body.txHash.trim(), body.logIndex);
+    return { ok: true, chain: body.chain, txHash: body.txHash.trim() };
   }
 }

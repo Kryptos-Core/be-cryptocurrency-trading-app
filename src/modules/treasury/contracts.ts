@@ -54,10 +54,12 @@ export interface TreasuryOperationRecord {
   asset: TreasuryOperationAsset;
   tx_hash: string | null;
   onchain_tx_id: string | null;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'PROCESSING' | 'TX_BROADCAST' | 'COMPLETED' | 'FAILED';
+  broadcast_idempotency_key: string | null;
   actor_user_id: string;
   failure_reason: string | null;
   created_at: Date;
+  updated_at: Date;
   completed_at: Date | null;
   from_wallet?: TransactionWalletRecord | null;
   to_wallet?: TransactionWalletRecord | null;

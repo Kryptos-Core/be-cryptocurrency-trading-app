@@ -57,6 +57,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
     });
   }
 
+  /** Also update findActiveDuplicateOperation to include TX_BROADCAST in non-terminal states */
   async findActiveDuplicateOperation(params: {
     type: TreasuryOperationType;
     walletId: string;
@@ -70,7 +71,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
       asset: params.asset,
       amount: params.amount,
       actor_user_id: params.actorUserId,
-      status: In(['PENDING', 'PROCESSING'] as const),
+      status: In(['PENDING', 'PROCESSING', 'TX_BROADCAST'] as const),
     };
     if (params.type === 'FUND') {
       return repo.findOne({
@@ -84,7 +85,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
 
   /** Count Fund/Sweep rows still in-flight for this transaction wallet (either side). */
   async countNonTerminalForWallet(walletId: string): Promise<number> {
-    const active = ['PENDING', 'PROCESSING'] as const;
+    const active = ['PENDING', 'PROCESSING', 'TX_BROADCAST'] as const;
     return this.dataSource.getRepository(TreasuryOperation).count({
       where: [
         { from_wallet_id: walletId, status: In([...active]) },
@@ -201,5 +202,31 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
       return null;
     }
     return { treasury_operation_id: row.treasury_operation_id };
+  }
+
+  /**
+   * Atomic: set broadcast_idempotency_key + status=TX_BROADCAST only if currently
+   * in PENDING or PROCESSING state (prevents double-broadcast on concurrent retries).
+   * Returns true if the row was updated, false if already past this stage.
+   */
+  async setBroadcastIdempotencyKey(operationId: string, key: string): Promise<boolean> {
+    const result = await this.dataSource
+      .getRepository(TreasuryOperation)
+      .update(
+        { operation_id: operationId, status: In(['PENDING', 'PROCESSING'] as const) },
+        { status: 'TX_BROADCAST', broadcast_idempotency_key: key },
+      );
+    return (result.affected ?? 0) > 0;
+  }
+
+  /** Find operations stuck in TX_BROADCAST for longer than olderThanMinutes. */
+  async findStaleTxBroadcastOperations(olderThanMinutes: number): Promise<TreasuryOperation[]> {
+    const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+    return this.dataSource
+      .getRepository(TreasuryOperation)
+      .createQueryBuilder('op')
+      .where('op.status = :status', { status: 'TX_BROADCAST' })
+      .andWhere('op.updated_at < :cutoff', { cutoff })
+      .getMany();
   }
 }

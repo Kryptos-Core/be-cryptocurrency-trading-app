@@ -5,7 +5,6 @@ import { DepositWatcherCursor } from '@/entities/deposit-watcher-cursor.entity';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { BlockchainModule } from '../blockchain.module';
-import { DepositIngestionService } from './deposit-ingestion.service';
 import { DEPOSIT_WATCHER_QUEUE } from './deposit-watcher.constants';
 import { DepositWatcherProcessor } from './deposit-watcher.processor';
 import { DepositWatcherScheduler } from './deposit-watcher.scheduler';
@@ -35,7 +34,6 @@ import { TronDepositObserverService } from './tron-deposit-observer.service';
   providers: [
     DepositWatcherCursorRepository,
     DepositWatcherConfigService,
-    DepositIngestionService,
     TronDepositObserverService,
     EvmDepositObserverService,
     DepositWatcherProcessor,

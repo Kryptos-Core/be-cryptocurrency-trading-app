@@ -53,6 +53,18 @@ export interface TreasuryOperationRepositoryPort {
     amount: string;
   }): Promise<void>;
 
+  /** Atomic: set broadcast_idempotency_key + status=TX_BROADCAST BEFORE calling RPC.
+   * Conditional — only updates if status is PENDING or PROCESSING (not already TX_BROADCAST/COMPLETED).
+   * Returns true if the row was updated (this attempt owns the broadcast), false otherwise.
+   */
+  setBroadcastIdempotencyKey(
+    operationId: string,
+    key: string,
+  ): Promise<boolean>;
+
+  /** Find stale TX_BROADCAST operations for reconciliation. */
+  findStaleTxBroadcastOperations(olderThanMinutes: number): Promise<TreasuryOperationRecord[]>;
+
   /** Existing on-chain row for duplicate (chain + tx_hash + log_index unique). */
   findOnchainTreasuryLeg(
     chain: BlockchainChainDbValue,

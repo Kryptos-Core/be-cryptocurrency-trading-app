@@ -44,6 +44,7 @@ import { OnchainDepositService } from './application/use-cases/deposits/onchain-
 import { WalletLinkingService } from './application/use-cases/wallet-linking/wallet-linking.service';
 import { OnchainWithdrawalService } from './application/use-cases/withdrawals/onchain-withdrawal.service';
 import { BlockchainController } from './blockchain.controller';
+import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
 import {
   BC_SOLANA_DEVNET,
   BC_SOLANA_MAINNET,
@@ -173,6 +174,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     DepositFxService,
     WalletLinkingService,
     OnchainDepositService,
+    DepositIngestionService,
     OnchainWithdrawalService,
     OnchainTransferQueryService,
     OnchainTransferService,
@@ -206,6 +208,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     OnchainTransferService,
     DepositFxService,
     OnchainDepositService,
+    DepositIngestionService,
   ],
 })
 export class BlockchainModule {}

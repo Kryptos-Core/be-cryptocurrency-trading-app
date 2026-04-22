@@ -34,11 +34,11 @@ export class ReadOnchainUserTransactionsQueryService {
                 tx.confirmations, tx.created_at, tx.confirmed_at,
                 tx.credited_currency_id, tx.credited_amount, tx.conversion_rate
          FROM onchain_transactions tx
+         LEFT JOIN read_onchain_deposits r2
+           ON r2.tx_id = tx.tx_id AND r2.user_id = tx.user_id
          WHERE tx.user_id = ?
            AND tx.type = 'DEPOSIT'
-           AND NOT EXISTS (
-             SELECT 1 FROM read_onchain_deposits r2 WHERE r2.tx_id = tx.tx_id
-           )
+           AND r2.tx_id IS NULL
          UNION ALL
          SELECT tx.tx_id, tx.chain, tx.type, tx.tx_hash, tx.from_address, tx.to_address, tx.amount, tx.status,
                 tx.confirmations, tx.created_at, tx.confirmed_at,

@@ -6,6 +6,72 @@
 
 ---
 
+## Trạng thái triển khai
+
+**Cập nhật:** 2026-04-22  
+**Trạng thái tổng quan:** ✅ Phase 1 hoàn thành · ✅ Phase 2 hoàn thành · ✅ Phase 3 (core) hoàn thành · 🔄 Dual-approval đang triển khai · ⏳ Còn lại: chaos tests
+
+### Phase 1 — Fix FUND jobId, dedupe, lock, retry ✅
+
+| Hạng mục | Trạng thái | Ghi chú |
+|---------|-----------|---------|
+| `buildFundJobId` → deterministic (bỏ `uuidv7()`) | ✅ | `treasury-fund:{walletId}:{asset}` |
+| `enqueueFund` thêm dedupe check (giống SWEEP) | ✅ | `resolveExistingTreasuryJob` + `findActiveDuplicateOperation` |
+| `resolveExistingTreasuryJob` remove terminal jobs | ✅ | Tránh Bull silent-reject trên cùng jobId |
+| Lock TTL 120s → 300s + heartbeat (30s extend, cap 10 phút) | ✅ | Tránh expire giữa chừng broadcast |
+| Retry attempts 100 → 10, timeout 60s, `removeOnFail: true` | ✅ | Giảm thundering herd |
+| Backoff delay 3 000ms → 5 000ms | ✅ | |
+| Module defaults cập nhật | ✅ | |
+| UNION LEFT JOIN thay NOT EXISTS trong read model | ✅ | `read-onchain-user-transactions.query.service.ts` |
+
+### Phase 2 — Broadcast idempotency key + TX_BROADCAST + confirm job + reconciliation ✅
+
+| Hạng mục | Trạng thái | Ghi chú |
+|---------|-----------|---------|
+| Migration `1776540000000`: `broadcast_idempotency_key` + `TX_BROADCAST` enum | ✅ | |
+| Entity `TreasuryOperation` cập nhật | ✅ | |
+| Port `setBroadcastIdempotencyKey`, `findStaleTxBroadcastOperations` | ✅ | |
+| `processFundJob` / `processSweepJob`: ghi key trước broadcast, enqueue confirm job | ✅ | Worker không block 60–90s |
+| `TREASURY_CONFIRM_JOB` processor (poll on-chain, finalize/FAILED) | ✅ | `treasury.processor.ts` |
+| `TreasuryReconciliationScheduler` — cron 1 phút, re-enqueue stale TX_BROADCAST | ✅ | Xử lý crash scenario C3 |
+
+### Phase 3 — UNMATCHED deposit records + admin endpoint ✅ (core)
+
+| Hạng mục | Trạng thái | Ghi chú |
+|---------|-----------|---------|
+| Migration `1776550000000`: `UNMATCHED` status + `user_id` nullable | ✅ | |
+| Entity `OnchainTransaction`: `user_id: string \| null`, thêm `UNMATCHED` | ✅ | |
+| `deposit-ingestion.service.ts`: tạo UNMATCHED record khi không tìm thấy user | ✅ | Thay vì skip silently |
+| `onchain-deposit.service.ts`: `ingestUnmatchedDeposit()` | ✅ | Outbox `UnmatchedDepositDetectedV1` |
+| `POST /blockchain/admin/deposits/ingest` | ✅ | Guard `DEPOSITS_MANAGE` |
+| `Permission.DEPOSITS_MANAGE` thêm vào enum | ✅ | |
+| `contracts.ts`: `user_id: string \| null` | ✅ | |
+| `POST /blockchain/admin/deposits/{txId}/match-user` (dual approval) | 🔄 | Đang triển khai — xem §Phase 3 Dual-Approval bên dưới |
+
+### Phase 3 — Dual-Approval match-user 🔄
+
+| Hạng mục | Trạng thái | File |
+|---------|-----------|------|
+| Migration `1776560000000`: bảng `deposit_match_requests` | ✅ | `migrations/1776560000000-AddDepositMatchRequests.ts` |
+| Entity `DepositMatchRequest` (TypeORM) | ✅ | `blockchain/entities/deposit-match-request.entity.ts` |
+| Port `DepositMatchRequestRepositoryPort` | ✅ | `blockchain/domain/ports/deposit-match-request-repository.port.ts` |
+| Repository `DepositMatchRequestRepository` (impl) | ✅ | `blockchain/infrastructure/persistence/deposit-match-request.repository.ts` |
+| Service `DepositMatchService` (`proposeMatch`, `approveMatch`) | 🔄 | `blockchain/application/use-cases/deposits/deposit-match.service.ts` |
+| DTO `MatchDepositDto` | ⏳ | `blockchain/dto/` |
+| Endpoint `POST /blockchain/admin/deposits/{txId}/match-user` | ⏳ | `blockchain.controller.ts` |
+| Wire vào `blockchain.module.ts` | ⏳ | |
+| Integration event `DepositMatchedV1` (outbox catalog + relay) | ⏳ | |
+
+### Còn lại
+
+| Hạng mục | Ghi chú |
+|---------|---------|
+| Chaos test suite (`test/chaos/`) | Các scenario A1–A4, B1–B5, C1–C4, D1–D3 |
+| Prometheus metrics (`/admin/treasury/metrics`) | `prom-client` hoặc OpenTelemetry |
+| SLO tracking cron (§8.2) | Cron 5 phút đếm FAILED / total |
+
+---
+
 ## 1. Chẩn đoán vấn đề hiện tại
 
 ### 1.1 Fund/Sweep bị treo (hanging)
@@ -785,20 +851,28 @@ Kết quả chaos test phải pass trước mỗi Phase 2 release.
 
 ## 7. Files cần thay đổi (tổng hợp)
 
-| File | Phase | Loại thay đổi |
-|------|-------|--------------|
-| `treasury/treasury-operations.service.ts` | 1, 2 | Fix jobId, TTL, attempts, remove lock |
-| `treasury/treasury.processor.ts` | 2 | Add confirm processor |
-| `treasury/treasury.module.ts` | 1, 2 | Concurrency config |
-| `treasury/treasury-queue-backoff.ts` | 1 | Tune delays |
-| `treasury/treasury-reconciliation.scheduler.ts` | 2 | Reconcile TX_BROADCAST stale ops |
-| `blockchain/blockchain.controller.ts` | 1, 3 | Admin endpoints |
-| `blockchain/application/use-cases/deposits/onchain-deposit.service.ts` | 3 | UNMATCHED logic |
-| `blockchain/deposit-watcher/deposit-ingestion.service.ts` | 3 | createUnmatched flow |
-| `entities/onchain-transaction.entity.ts` | 3 | UNMATCHED status enum |
-| DB migrations | 2, 3 | TX_BROADCAST, UNMATCHED, broadcast_idempotency_key |
-| `read-onchain-user-transactions.query.service.ts` | 1 | Verify UNION fallback |
-| `test/chaos/` | 2 | Chaos test suite |
+| File | Phase | Loại thay đổi | Trạng thái |
+|------|-------|--------------|-----------|
+| `treasury/treasury-operations.service.ts` | 1, 2 | Fix jobId, TTL, heartbeat, attempts, broadcast idempotency | ✅ |
+| `treasury/treasury.processor.ts` | 2 | Add confirm processor | ✅ |
+| `treasury/treasury.module.ts` | 1, 2 | Defaults, register scheduler | ✅ |
+| `treasury/treasury-queue-backoff.ts` | 1 | Tune delays | ✅ |
+| `treasury/treasury-reconciliation.scheduler.ts` | 2 | Reconcile TX_BROADCAST stale ops | ✅ (new file) |
+| `treasury/constants.ts` | 2 | `TREASURY_CONFIRM_JOB` | ✅ |
+| `treasury/domain/ports/treasury-operation-repository.port.ts` | 2 | New port methods | ✅ |
+| `treasury/infrastructure/persistence/treasury-operation.repository.ts` | 2 | Implement new methods | ✅ |
+| `entities/treasury-operation.entity.ts` | 2 | `broadcast_idempotency_key`, `TX_BROADCAST` | ✅ |
+| `blockchain/blockchain.controller.ts` | 1, 3 | Admin ingest endpoint | ✅ |
+| `blockchain/blockchain.module.ts` | 3 | Import DepositIngestionService in exports | ✅ |
+| `blockchain/application/use-cases/deposits/onchain-deposit.service.ts` | 3 | `ingestUnmatchedDeposit()` | ✅ |
+| `blockchain/deposit-watcher/deposit-ingestion.service.ts` | 3 | createUnmatched flow | ✅ |
+| `blockchain/entities/onchain-transaction.entity.ts` | 3 | `UNMATCHED` status, `user_id` nullable | ✅ |
+| `blockchain/contracts.ts` | 3 | `user_id: string \| null` | ✅ |
+| `common/enums/index.ts` | 3 | `Permission.DEPOSITS_MANAGE` | ✅ |
+| `migrations/1776540000000-AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus.ts` | 2 | `broadcast_idempotency_key`, `TX_BROADCAST` | ✅ |
+| `migrations/1776550000000-AddUnmatchedDepositStatusAndNullableUserId.ts` | 3 | `UNMATCHED`, `user_id` nullable, indexes | ✅ |
+| `blockchain/infrastructure/queries/read-onchain-user-transactions.query.service.ts` | 1 | LEFT JOIN thay NOT EXISTS | ✅ |
+| `test/chaos/` | 2 | Chaos test suite | ⏳ chưa triển khai |
 
 ---
 

@@ -19,28 +19,12 @@ describe('TreasuryOperationsService enqueue idempotency', () => {
   let queueAdd: jest.Mock;
   let getJob: jest.Mock;
 
-  beforeEach(async () => {
-    repo = {
-      createPendingOperation: jest.fn(),
-      findByOperationIdWithWallets: jest.fn(),
-      findByOperationId: jest.fn(),
-      findActiveDuplicateOperation: jest.fn(),
-      countNonTerminalForWallet: jest.fn(),
-      updateByOperationId: jest.fn(),
-      listWithFilters: jest.fn(),
-      finalizeSuccessWithOnchainTx: jest.fn(),
-      findOnchainTreasuryLeg: jest.fn(),
-    };
-
+  function buildModule(getJobImpl: () => jest.Mock) {
+    getJob = getJobImpl();
     queueAdd = jest.fn().mockResolvedValue(undefined);
-    getJob = jest.fn().mockResolvedValue(null);
+    const mockQueue = { add: queueAdd, getJob };
 
-    const mockQueue = {
-      add: queueAdd,
-      getJob,
-    };
-
-    const moduleRef = await Test.createTestingModule({
+    return Test.createTestingModule({
       providers: [
         TreasuryOperationsService,
         {
@@ -70,39 +54,178 @@ describe('TreasuryOperationsService enqueue idempotency', () => {
         { provide: getQueueToken(TREASURY_QUEUE), useValue: mockQueue },
       ],
     }).compile();
+  }
 
-    svc = moduleRef.get(TreasuryOperationsService);
+  beforeEach(() => {
+    repo = {
+      createPendingOperation: jest.fn(),
+      findByOperationIdWithWallets: jest.fn(),
+      findByOperationId: jest.fn(),
+      findActiveDuplicateOperation: jest.fn(),
+      countNonTerminalForWallet: jest.fn(),
+      updateByOperationId: jest.fn(),
+      listWithFilters: jest.fn(),
+      finalizeSuccessWithOnchainTx: jest.fn(),
+      findOnchainTreasuryLeg: jest.fn(),
+      setBroadcastIdempotencyKey: jest.fn(),
+      findStaleTxBroadcastOperations: jest.fn(),
+    };
   });
 
-  it('enqueues a new fund job on every call (no same-amount dedupe)', async () => {
-    repo.createPendingOperation
-      .mockResolvedValueOnce({ operation_id: 'op-1', status: 'PENDING' } as never)
-      .mockResolvedValueOnce({ operation_id: 'op-2', status: 'PENDING' } as never);
+  describe('deterministic jobId — no uuidv7 suffix', () => {
+    beforeEach(async () => {
+      const moduleRef = await buildModule(() => jest.fn().mockResolvedValue(null));
+      svc = moduleRef.get(TreasuryOperationsService);
+      repo.createPendingOperation.mockResolvedValue({
+        operation_id: 'new-op',
+        status: 'PENDING',
+      } as never);
+    });
 
-    const a = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
-    const b = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+    it('uses deterministic jobId treasury-fund:{walletId}:{asset} (no UUID suffix)', async () => {
+      await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
 
-    expect(a.operationId).toBe('op-1');
-    expect(b.operationId).toBe('op-2');
-    expect(repo.createPendingOperation).toHaveBeenCalledTimes(2);
-    expect(queueAdd).toHaveBeenCalledTimes(2);
+      expect(queueAdd).toHaveBeenCalledWith(
+        TREASURY_FUND_JOB,
+        { operationId: 'new-op' },
+        expect.objectContaining({
+          jobId: 'treasury-fund:w1:NATIVE',
+        }),
+      );
+    });
+
+    it('uses attempts=10, timeout=60_000 and delay=5_000 on fund job', async () => {
+      await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+
+      expect(queueAdd).toHaveBeenCalledWith(
+        TREASURY_FUND_JOB,
+        expect.anything(),
+        expect.objectContaining({
+          attempts: 10,
+          timeout: 60_000,
+          backoff: { type: 'treasuryDefer', delay: 5_000 },
+          removeOnComplete: true,
+          removeOnFail: true,
+        }),
+      );
+    });
   });
 
-  it('enqueues with unique jobId and treasuryDefer backoff', async () => {
-    repo.createPendingOperation.mockResolvedValue({
-      operation_id: 'new-op',
-      status: 'PENDING',
-    } as never);
+  describe('deduplication — second enqueue for same wallet returns alreadyQueued', () => {
+    it('returns alreadyQueued:true when FUND job for same wallet is already waiting', async () => {
+      // First call: no existing job
+      const getJobOnce = jest.fn().mockResolvedValueOnce(null);
+      const mockQueue = { add: jest.fn().mockResolvedValue(undefined), getJob: getJobOnce };
+      repo.createPendingOperation.mockResolvedValue({
+        operation_id: 'op-1',
+        status: 'PENDING',
+      } as never);
 
-    await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          TreasuryOperationsService,
+          {
+            provide: RedisService,
+            useValue: {
+              getClient: () => ({ set: jest.fn().mockResolvedValue('OK'), eval: jest.fn() }),
+            },
+          },
+          {
+            provide: TransactionWalletService,
+            useValue: {
+              getWalletById: jest.fn().mockResolvedValue({
+                wallet_id: 'w1',
+                chain: 'TRON_NILE',
+                is_active: true,
+              }),
+            },
+          },
+          { provide: TreasuryMainWalletService, useValue: {} },
+          { provide: ConfigService, useValue: { get: jest.fn() } },
+          {
+            provide: SystemConfigService,
+            useValue: { get: jest.fn(), getEffectiveString: jest.fn() },
+          },
+          { provide: TREASURY_OPERATION_REPOSITORY, useValue: repo },
+          { provide: TREASURY_ONCHAIN_READ_REPOSITORY, useValue: {} },
+          { provide: getQueueToken(TREASURY_QUEUE), useValue: mockQueue },
+        ],
+      }).compile();
 
-    expect(queueAdd).toHaveBeenCalledWith(
-      TREASURY_FUND_JOB,
-      { operationId: 'new-op' },
-      expect.objectContaining({
-        jobId: expect.stringMatching(/^treasury-fund:w1:NATIVE:/),
-        backoff: { type: 'treasuryDefer', delay: 3000 },
-      }),
-    );
+      svc = moduleRef.get(TreasuryOperationsService);
+
+      // Second call: getJob returns a waiting job with the original operation ID
+      getJobOnce.mockResolvedValue({
+        getState: jest.fn().mockResolvedValue('waiting'),
+        data: { operationId: 'op-1' },
+        remove: jest.fn(),
+      });
+      repo.findByOperationId.mockResolvedValue({
+        operation_id: 'op-1',
+        status: 'PENDING',
+      } as never);
+
+      const result = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+
+      expect(result).toEqual({ operationId: 'op-1', status: 'PENDING', alreadyQueued: true });
+      expect(mockQueue.add).not.toHaveBeenCalledTimes(2);
+    });
+
+    it('removes completed job and creates fresh FUND operation when stale completed job exists', async () => {
+      const staleJob = {
+        getState: jest.fn().mockResolvedValue('completed'),
+        data: { operationId: 'old-op' },
+        remove: jest.fn().mockResolvedValue(undefined),
+      };
+      const getJobMock = jest.fn().mockResolvedValue(staleJob);
+      const addMock = jest.fn().mockResolvedValue(undefined);
+      const mockQueue = { add: addMock, getJob: getJobMock };
+
+      repo.createPendingOperation.mockResolvedValue({
+        operation_id: 'new-op',
+        status: 'PENDING',
+      } as never);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          TreasuryOperationsService,
+          {
+            provide: RedisService,
+            useValue: {
+              getClient: () => ({ set: jest.fn().mockResolvedValue('OK'), eval: jest.fn() }),
+            },
+          },
+          {
+            provide: TransactionWalletService,
+            useValue: {
+              getWalletById: jest.fn().mockResolvedValue({
+                wallet_id: 'w1',
+                chain: 'TRON_NILE',
+                is_active: true,
+              }),
+            },
+          },
+          { provide: TreasuryMainWalletService, useValue: {} },
+          { provide: ConfigService, useValue: { get: jest.fn() } },
+          {
+            provide: SystemConfigService,
+            useValue: { get: jest.fn(), getEffectiveString: jest.fn() },
+          },
+          { provide: TREASURY_OPERATION_REPOSITORY, useValue: repo },
+          { provide: TREASURY_ONCHAIN_READ_REPOSITORY, useValue: {} },
+          { provide: getQueueToken(TREASURY_QUEUE), useValue: mockQueue },
+        ],
+      }).compile();
+
+      svc = moduleRef.get(TreasuryOperationsService);
+
+      const result = await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
+
+      expect(staleJob.remove).toHaveBeenCalled();
+      expect(repo.createPendingOperation).toHaveBeenCalledTimes(1);
+      expect(addMock).toHaveBeenCalledTimes(1);
+      expect(result.operationId).toBe('new-op');
+      expect(result.alreadyQueued).toBeFalsy();
+    });
   });
 });

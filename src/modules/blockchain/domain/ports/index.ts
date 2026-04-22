@@ -10,6 +10,11 @@ export type {
 } from '@/modules/blockchain/interfaces/blockchain.interface';
 
 export {
+  DEPOSIT_MATCH_REQUEST_REPOSITORY,
+  type DepositMatchRequestRepositoryPort,
+} from './deposit-match-request-repository.port';
+
+export {
   LINKED_WALLET_REPOSITORY,
   type LinkedWalletRepositoryPort,
 } from './linked-wallet-repository.port';

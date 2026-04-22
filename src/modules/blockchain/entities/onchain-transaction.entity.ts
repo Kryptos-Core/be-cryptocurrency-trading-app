@@ -25,9 +25,9 @@ export class OnchainTransaction {
   @PrimaryColumn({ type: 'char', length: 36 })
   tx_id!: string;
 
-  @Column({ type: 'char', length: 36 })
+  @Column({ type: 'char', length: 36, nullable: true })
   @ForeignKey(() => User)
-  user_id!: string;
+  user_id!: string | null;
 
   @Column({ type: 'char', length: 36, nullable: true })
   @ForeignKey(() => LinkedWallet)
@@ -69,10 +69,10 @@ export class OnchainTransaction {
 
   @Column({
     type: 'enum',
-    enum: ['PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'],
+    enum: ['UNMATCHED', 'PENDING', 'CONFIRMING', 'COMPLETED', 'FAILED'],
     default: 'PENDING',
   })
-  status!: 'PENDING' | 'CONFIRMING' | 'COMPLETED' | 'FAILED';
+  status!: 'UNMATCHED' | 'PENDING' | 'CONFIRMING' | 'COMPLETED' | 'FAILED';
 
   @CreateDateColumn()
   created_at!: Date;

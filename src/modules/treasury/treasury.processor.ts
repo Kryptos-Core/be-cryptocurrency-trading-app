@@ -2,7 +2,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { BusinessException, TreasuryWalletBusyException } from '@/common/exceptions';
-import { TREASURY_FUND_JOB, TREASURY_QUEUE, TREASURY_SWEEP_JOB } from './constants';
+import { TREASURY_CONFIRM_JOB, TREASURY_FUND_JOB, TREASURY_QUEUE, TREASURY_SWEEP_JOB } from './constants';
 import { TreasuryOperationsService } from './treasury-operations.service';
 
 interface TreasuryJobData {
@@ -67,6 +67,26 @@ export class TreasuryProcessor {
       await this.treasuryOperationsService.processFundJob(job.data);
     } catch (error) {
       await this.handleTreasuryError(job, error, 'fund');
+    }
+  }
+
+  @Process(TREASURY_CONFIRM_JOB)
+  async handleConfirm(job: Job<TreasuryJobData>): Promise<void> {
+    try {
+      await this.treasuryOperationsService.processTreasuryConfirmJob(job.data as never);
+    } catch (error) {
+      if (this.isTreasuryDuplicateJobAfterTerminalState(error)) {
+        this.logger.debug(
+          `Treasury confirm job skipped (already terminal): operation=${job.data.operationId}`,
+        );
+        return;
+      }
+      const message = (error as Error).message;
+      this.logger.error(
+        `Treasury confirm job failed: operation=${job.data.operationId}, ${message}`,
+      );
+      // Don't mark failed here — confirm job retries on its own; let Bull exhaust attempts first.
+      throw error;
     }
   }
 }

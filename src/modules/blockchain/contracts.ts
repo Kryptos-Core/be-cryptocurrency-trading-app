@@ -12,7 +12,7 @@ export interface BlockchainLinkedWalletRecord {
 
 export interface BlockchainOnchainTransactionRecord {
   tx_id: string;
-  user_id: string;
+  user_id: string | null;
   linked_wallet_id: string | null;
   chain: string;
   type: string;

@@ -652,4 +652,73 @@ export class OnchainDepositService {
       confirmations,
     };
   }
+
+  /**
+   * Create an UNMATCHED onchain_transactions row for a deposit whose sender is not linked to any user.
+   * Idempotent: throws ConflictException if the tx+logIndex was already recorded.
+   * Emits UnmatchedDepositDetectedV1 for admin notification.
+   */
+  async ingestUnmatchedDeposit(resolved: ResolvedDepositTransfer): Promise<void> {
+    const txId = uuidv7();
+
+    await this.dataSource.transaction(async (em: EntityManager) => {
+      // Check unique constraint before insert to give a clean ConflictException.
+      const existing = await em
+        .getRepository('onchain_transactions')
+        .findOne({
+          where: {
+            chain: resolved.chain,
+            tx_hash: resolved.txHash,
+            log_index: resolved.logIndex ?? 0,
+          },
+          select: ['tx_id'],
+        });
+
+      if (existing) {
+        throw new ConflictException(
+          `Onchain tx ${resolved.txHash}:${resolved.logIndex ?? 0} already recorded`,
+          'DEPOSIT_ALREADY_RECORDED',
+        );
+      }
+
+      await em.getRepository('onchain_transactions').save({
+        tx_id: txId,
+        user_id: null,
+        linked_wallet_id: null,
+        treasury_operation_id: null,
+        chain: resolved.chain,
+        type: 'DEPOSIT',
+        tx_hash: resolved.txHash,
+        log_index: resolved.logIndex ?? 0,
+        from_address: resolved.from,
+        to_address: resolved.to,
+        amount: resolved.amountHuman,
+        confirmations: 0,
+        status: OnchainTxStatus.UNMATCHED,
+        confirmed_at: null,
+        credited_currency_id: null,
+        credited_amount: null,
+        conversion_rate: null,
+      });
+
+      await this.outboxAppender.append(em, {
+        aggregateType: 'OnchainTransaction',
+        aggregateId: txId,
+        eventType: OutboxIntegrationEventType.UnmatchedDepositDetectedV1,
+        dedupeKey: `unmatched:deposit:${resolved.chain}:${resolved.txHash}:${resolved.logIndex ?? 0}`,
+        payload: {
+          payloadVersion: 1,
+          txId,
+          chain: resolved.chain,
+          txHash: resolved.txHash,
+          logIndex: resolved.logIndex ?? 0,
+          fromAddress: resolved.from,
+          toAddress: resolved.to,
+          amount: resolved.amountHuman,
+          asset: resolved.asset,
+          detectedAt: new Date().toISOString(),
+        },
+      });
+    });
+  }
 }

@@ -10,6 +10,7 @@ export const OutboxIntegrationEventType = {
   MarketPairUpdatedV1: 'MarketPair.Updated@v1',
   OnchainDepositSubmittedV1: 'OnchainDeposit.Submitted@v1',
   OnchainDepositSettledV1: 'OnchainDeposit.Settled@v1',
+  UnmatchedDepositDetectedV1: 'UnmatchedDeposit.Detected@v1',
 } as const;
 
 export type OutboxIntegrationEventTypeName =

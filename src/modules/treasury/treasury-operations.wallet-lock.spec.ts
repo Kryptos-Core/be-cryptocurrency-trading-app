@@ -93,7 +93,7 @@ describe('TreasuryOperationsService wallet lock', () => {
     await expect(svc.processFundJob({ operationId: 'op-1' })).rejects.toBeInstanceOf(
       TreasuryWalletBusyException,
     );
-    expect(redisSet).toHaveBeenCalledWith('treasury:lock:w1', expect.any(String), 'EX', 120, 'NX');
+    expect(redisSet).toHaveBeenCalledWith('treasury:lock:w1', expect.any(String), 'EX', 300, 'NX');
     expect(redisSet).toHaveBeenCalledWith(
       'treasury:lock-wait-since:op-1',
       expect.any(String),

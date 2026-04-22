@@ -23,6 +23,7 @@ export class DepositIngestionService {
   /**
    * Resolve legs for a tx hash and ingest the first linked sender (USDT preferred over native).
    * When [logIndex] is set (EVM), only that leg is considered.
+   * If no sender wallet is linked to any user, creates an UNMATCHED record so ops can manually match.
    */
   async ingestTxHash(chain: BlockchainNetwork, txHash: string, logIndex?: number): Promise<void> {
     const expected = (
@@ -54,7 +55,32 @@ export class DepositIngestionService {
         chain,
         leg.from,
       );
-      if (!link?.user_id) continue;
+
+      if (!link?.user_id) {
+        // Sender not linked — persist an UNMATCHED record for admin resolution.
+        try {
+          await this.onchainDepositService.ingestUnmatchedDeposit(leg);
+          this.logger.warn(
+            JSON.stringify({
+              domain: 'treasury',
+              event: 'deposit.ingest.unmatched',
+              chain,
+              txHash,
+              from: leg.from,
+              amount: leg.amountHuman,
+            }),
+          );
+        } catch (err) {
+          if (err instanceof ConflictException) {
+            // Already recorded as UNMATCHED on a previous attempt.
+            return;
+          }
+          this.logger.warn(
+            `deposit.ingest.unmatched_failed chain=${chain} tx=${txHash} from=${leg.from} ${(err as Error).message}`,
+          );
+        }
+        continue;
+      }
 
       try {
         const result = await this.onchainDepositService.ingestIncomingDepositForUser(
@@ -85,3 +111,4 @@ export class DepositIngestionService {
     }
   }
 }
+

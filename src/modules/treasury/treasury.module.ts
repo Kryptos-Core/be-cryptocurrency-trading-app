@@ -60,6 +60,7 @@ import { TreasuryController } from './treasury.controller';
 import { TreasuryProcessor } from './treasury.processor';
 import { TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
+import { TreasuryReconciliationScheduler } from './treasury-reconciliation.scheduler';
 import { treasuryDeferBackoff } from './treasury-queue-backoff';
 
 @Module({
@@ -87,10 +88,11 @@ import { treasuryDeferBackoff } from './treasury-queue-backoff';
         },
       },
       defaultJobOptions: {
-        attempts: 100,
-        backoff: { type: 'treasuryDefer', delay: 3_000 },
-        removeOnComplete: 100, // keep last 100 completed jobs for inspection
-        removeOnFail: false, // failed jobs stay in Bull's failed set (acts as DLQ)
+        attempts: 10,
+        backoff: { type: 'treasuryDefer', delay: 5_000 },
+        removeOnComplete: true,
+        removeOnFail: true,
+        timeout: 60_000,
       },
     }),
   ],
@@ -110,6 +112,7 @@ import { treasuryDeferBackoff } from './treasury-queue-backoff';
     TreasuryMainWalletService,
     TreasuryOperationsService,
     TreasuryProcessor,
+    TreasuryReconciliationScheduler,
     MainWalletRotationScheduler,
     OnchainChainPickerService,
     // Application layer — queries
