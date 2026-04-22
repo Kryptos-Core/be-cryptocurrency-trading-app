@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   Body,
   Controller,
@@ -11,8 +12,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { createHash } from 'node:crypto';
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   ApiBadRequestResponse,
   ApiSuccessResponse,
@@ -26,6 +33,8 @@ import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import {
+  GetAdminUnmatchedDepositsQuery,
+  GetAdminUnmatchedDepositsRequest,
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalByIdRequest,
   GetAdminWithdrawalStatsQuery,
@@ -67,8 +76,8 @@ import {
   VerifyLinkWalletCommand,
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
-import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
 import { DepositMatchService } from './application/use-cases/deposits/deposit-match.service';
+import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
 import type {
   ManualWithdrawalActionDto,
   MatchDepositDto,
@@ -109,6 +118,7 @@ export class BlockchainController {
     private readonly getSupportedNetworksQuery: GetSupportedNetworksQuery,
     private readonly depositIngestionService: DepositIngestionService,
     private readonly depositMatchService: DepositMatchService,
+    private readonly getAdminUnmatchedDepositsQuery: GetAdminUnmatchedDepositsQuery,
   ) {}
 
   @Post('wallets/request-link')
@@ -470,6 +480,40 @@ export class BlockchainController {
   // Admin: dual-approval match unmatched deposit to user
   // ---------------------------------------------------------------------------
 
+  @Get('admin/deposits/unmatched')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireFinanceAccess()
+  @RequirePermissions(Permission.DEPOSITS_MANAGE)
+  @ApiOperation({
+    summary: '[Admin] Danh sách deposit UNMATCHED',
+    description: 'Paginated list các giao dịch deposit chưa khớp được user.',
+  })
+  @ApiQuery({ name: 'chain', required: false, type: String })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Tìm theo txHash hoặc địa chỉ ví',
+  })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'dateTo', required: false, type: String, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiSuccessResponse('Danh sách deposit UNMATCHED')
+  @ApiUnauthorizedResponse()
+  async adminListUnmatchedDeposits(
+    @Query('chain') chain?: string,
+    @Query('search') search?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.getAdminUnmatchedDepositsQuery.execute(
+      new GetAdminUnmatchedDepositsRequest({ chain, search, dateFrom, dateTo, page, limit }),
+    );
+  }
+
   @Post('admin/deposits/:txId/match-user')
   @UseGuards(RoleGuard, PermissionGuard)
   @RequireFinanceAccess()
@@ -484,7 +528,8 @@ export class BlockchainController {
   @ApiHeader({
     name: 'idempotency-key',
     required: false,
-    description: 'Client-provided idempotency key (hex string). Tự động tạo từ txId+userId nếu không có.',
+    description:
+      'Client-provided idempotency key (hex string). Tự động tạo từ txId+userId nếu không có.',
   })
   @ApiParam({ name: 'txId', description: 'ID giao dịch UNMATCHED cần gán user' })
   @ApiSuccessResponse('Kết quả propose / approve match')
@@ -501,6 +546,12 @@ export class BlockchainController {
       idempotencyKeyHeader?.trim() ||
       createHash('sha256').update(`${txId}|${dto.userId}`).digest('hex');
 
-    return this.depositMatchService.proposeOrApprove(actorId, actorRole, txId, dto.userId, idempotencyKey);
+    return this.depositMatchService.proposeOrApprove(
+      actorId,
+      actorRole,
+      txId,
+      dto.userId,
+      idempotencyKey,
+    );
   }
 }

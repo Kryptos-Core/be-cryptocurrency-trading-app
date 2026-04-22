@@ -5,6 +5,8 @@ export {
   GetLinkedWalletsRequest,
 } from './linked-wallets.query';
 export {
+  GetAdminUnmatchedDepositsQuery,
+  GetAdminUnmatchedDepositsRequest,
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalByIdRequest,
   GetAdminWithdrawalStatsQuery,

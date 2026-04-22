@@ -19,6 +19,8 @@ export {
   type LinkedWalletRepositoryPort,
 } from './linked-wallet-repository.port';
 export {
+  type AdminUnmatchedDepositFilters,
+  type AdminUnmatchedDepositRowDto,
   type AdminWithdrawalDetailDto,
   type AdminWithdrawalFilters,
   type AdminWithdrawalRowDto,

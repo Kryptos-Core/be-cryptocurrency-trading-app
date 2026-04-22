@@ -9,6 +9,7 @@ import {
 } from '@/modules/currencies/domain/ports';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
+  type AdminUnmatchedDepositFilters,
   type AdminWithdrawalFilters,
   ONCHAIN_TRANSACTION_REPOSITORY,
   type OnchainTransactionRepositoryPort,
@@ -54,6 +55,10 @@ export class OnchainTransferQueryService {
 
   async getAdminWithdrawalStats() {
     return this.onchainTxRepo.getWithdrawalStats();
+  }
+
+  async getAdminUnmatchedDeposits(filters: AdminUnmatchedDepositFilters) {
+    return this.onchainTxRepo.listAdminUnmatchedDeposits(filters);
   }
 
   private async getChainAssetSymbol(chain: BlockchainNetwork): Promise<string> {

@@ -5,6 +5,8 @@ import type { TransactionContext } from '@/common/types/transaction-context';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { OnchainTransaction } from '@/modules/blockchain';
 import type {
+  AdminUnmatchedDepositFilters,
+  AdminUnmatchedDepositRowDto,
   AdminWithdrawalDetailDto,
   AdminWithdrawalFilters,
   AdminWithdrawalRowDto,
@@ -394,6 +396,80 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     }
 
     return { pendingCount, pendingTotalByChain };
+  }
+
+  async listAdminUnmatchedDeposits(
+    filters: AdminUnmatchedDepositFilters,
+  ): Promise<{ data: AdminUnmatchedDepositRowDto[]; total: number; page: number; limit: number }> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = calcSkip(page, limit);
+
+    let sql = `
+      SELECT tx.tx_id, tx.user_id, tx.chain, tx.type, tx.tx_hash, tx.from_address, tx.to_address,
+             tx.amount, tx.status, tx.confirmations, tx.created_at, tx.confirmed_at,
+             tx.credited_currency_id, tx.credited_amount, tx.conversion_rate,
+             mr.match_id AS pending_match_id,
+             mr.requested_user_id AS pending_match_requested_user_id
+      FROM onchain_transactions tx
+      LEFT JOIN deposit_match_requests mr ON mr.tx_id = tx.tx_id AND mr.status = 'PENDING'
+      WHERE tx.status = 'UNMATCHED'
+    `;
+    const params: (string | number)[] = [];
+
+    if (filters.chain) {
+      sql += ` AND tx.chain = ?`;
+      params.push(filters.chain);
+    }
+    if (filters.dateFrom) {
+      sql += ` AND tx.created_at >= ?`;
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      sql += ` AND tx.created_at <= ?`;
+      params.push(`${filters.dateTo} 23:59:59`);
+    }
+    if (filters.search?.trim()) {
+      const s = `%${filters.search.trim()}%`;
+      sql += ` AND (tx.from_address LIKE ? OR tx.tx_hash LIKE ? OR tx.tx_id LIKE ?)`;
+      params.push(s, s, s);
+    }
+
+    const countSql = `
+      SELECT COUNT(*) AS total FROM onchain_transactions tx
+      WHERE tx.status = 'UNMATCHED'
+      ${filters.chain ? ' AND tx.chain = ?' : ''}
+      ${filters.dateFrom ? ' AND tx.created_at >= ?' : ''}
+      ${filters.dateTo ? ' AND tx.created_at <= ?' : ''}
+      ${filters.search?.trim() ? ' AND (tx.from_address LIKE ? OR tx.tx_hash LIKE ? OR tx.tx_id LIKE ?)' : ''}
+    `;
+    const countParams: (string | number)[] = [];
+    if (filters.chain) countParams.push(filters.chain);
+    if (filters.dateFrom) countParams.push(filters.dateFrom);
+    if (filters.dateTo) countParams.push(`${filters.dateTo} 23:59:59`);
+    if (filters.search?.trim()) {
+      const s = `%${filters.search.trim()}%`;
+      countParams.push(s, s, s);
+    }
+
+    const countRows = await this.dataSource.query(countSql.trim(), countParams);
+    const total = Number(countRows?.[0]?.total ?? 0);
+
+    sql += ` ORDER BY tx.created_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit, skip);
+
+    const rows = await this.dataSource.query(sql, params);
+
+    const data = (rows || []).map((r: Record<string, unknown>) => ({
+      ...this.mapTxRow(r),
+      userId: r.user_id ? String(r.user_id) : null,
+      pendingMatchId: r.pending_match_id ? String(r.pending_match_id) : null,
+      pendingMatchRequestedUserId: r.pending_match_requested_user_id
+        ? String(r.pending_match_requested_user_id)
+        : null,
+    }));
+
+    return { data, total, page, limit };
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────

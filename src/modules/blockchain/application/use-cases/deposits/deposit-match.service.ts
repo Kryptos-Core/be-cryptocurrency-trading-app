@@ -234,6 +234,12 @@ export class DepositMatchService {
     return { matchId, status: 'APPROVED', settled };
   }
 
+  /**
+   * Orchestrates the dual-approval flow from a single HTTP endpoint.
+   * Step 1 — no pending match: proposeMatch.
+   * Step 2 — pending match with same userId: approveMatch.
+   * Conflict — pending match targets a different userId: throws.
+   */
   async proposeOrApprove(
     actorId: string,
     actorRole: UserRole,
@@ -246,6 +252,12 @@ export class DepositMatchService {
   > {
     const pending = await this.matchRepo.findPendingByTxId(txId);
     if (pending) {
+      if (pending.requested_user_id !== requestedUserId) {
+        throw new ConflictException(
+          `Đang có yêu cầu match PENDING cho userId khác (${pending.requested_user_id}). Hãy cancel trước.`,
+          'MATCH_USER_MISMATCH',
+        );
+      }
       return this.approveMatch(actorId, actorRole, pending.match_id);
     }
     return this.proposeMatch(actorId, actorRole, txId, requestedUserId, idempotencyKey);

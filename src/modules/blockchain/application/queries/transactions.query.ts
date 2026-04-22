@@ -125,3 +125,34 @@ export class GetAdminWithdrawalStatsQuery
     return this.queryService.getAdminWithdrawalStats();
   }
 }
+
+export class GetAdminUnmatchedDepositsRequest extends BaseQuery {
+  constructor(
+    public readonly filters: {
+      chain?: string;
+      search?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      page?: number;
+      limit?: number;
+    },
+    correlationId?: string,
+  ) {
+    super(correlationId);
+  }
+}
+
+@Injectable()
+export class GetAdminUnmatchedDepositsQuery
+  implements
+    IQueryHandler<
+      GetAdminUnmatchedDepositsRequest,
+      Awaited<ReturnType<OnchainTransferQueryService['getAdminUnmatchedDeposits']>>
+    >
+{
+  constructor(private readonly queryService: OnchainTransferQueryService) {}
+
+  async execute(query: GetAdminUnmatchedDepositsRequest) {
+    return this.queryService.getAdminUnmatchedDeposits(query.filters);
+  }
+}

@@ -17,6 +17,7 @@ import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import {
+  GetAdminUnmatchedDepositsQuery,
   GetAdminWithdrawalByIdQuery,
   GetAdminWithdrawalStatsQuery,
   GetAdminWithdrawalsQuery,
@@ -45,7 +46,6 @@ import { OnchainDepositService } from './application/use-cases/deposits/onchain-
 import { WalletLinkingService } from './application/use-cases/wallet-linking/wallet-linking.service';
 import { OnchainWithdrawalService } from './application/use-cases/withdrawals/onchain-withdrawal.service';
 import { BlockchainController } from './blockchain.controller';
-import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
 import {
   BC_SOLANA_DEVNET,
   BC_SOLANA_MAINNET,
@@ -55,7 +55,12 @@ import {
   EVM_PROVIDERS_MAP,
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
-import { DEPOSIT_MATCH_REQUEST_REPOSITORY, LINKED_WALLET_REPOSITORY, ONCHAIN_TRANSACTION_REPOSITORY } from './domain/ports';
+import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
+import {
+  DEPOSIT_MATCH_REQUEST_REPOSITORY,
+  LINKED_WALLET_REPOSITORY,
+  ONCHAIN_TRANSACTION_REPOSITORY,
+} from './domain/ports';
 import { DepositFxService } from './domain/services';
 import { DepositMatchRequest } from './entities/deposit-match-request.entity';
 import {
@@ -208,6 +213,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     GetAdminWithdrawalByIdQuery,
     GetAdminWithdrawalStatsQuery,
     GetSupportedNetworksQuery,
+    GetAdminUnmatchedDepositsQuery,
   ],
   exports: [
     BlockchainProviderFactory,

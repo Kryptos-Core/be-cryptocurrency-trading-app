@@ -41,7 +41,11 @@ describe('DepositWatcherCursorsAndOnchainLogIndex1776520000000', () => {
   });
 
   it('skips log_index changes when the schema is already upgraded', async () => {
-    const queryRunner = createQueryRunnerMock({ hasLogIndex: true, hasOldIndex: false, hasNewIndex: true });
+    const queryRunner = createQueryRunnerMock({
+      hasLogIndex: true,
+      hasOldIndex: false,
+      hasNewIndex: true,
+    });
     const migration = new DepositWatcherCursorsAndOnchainLogIndex1776520000000();
 
     await migration.up(queryRunner);
@@ -55,6 +59,9 @@ describe('DepositWatcherCursorsAndOnchainLogIndex1776520000000', () => {
     expect(queryRunner.query).not.toHaveBeenCalledWith(
       'CREATE UNIQUE INDEX uk_onchain_tx_chain_hash_log ON onchain_transactions (chain, tx_hash(128), log_index)',
     );
-    expect(queryRunner.hasIndex).toHaveBeenCalledWith('onchain_transactions', 'uk_onchain_tx_chain_hash_log');
+    expect((queryRunner as any).hasIndex).toHaveBeenCalledWith(
+      'onchain_transactions',
+      'uk_onchain_tx_chain_hash_log',
+    );
   });
 });

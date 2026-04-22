@@ -33,10 +33,27 @@ export interface AdminWithdrawalDetailDto extends AdminWithdrawalRowDto {
   userWalletBalance: string | null;
 }
 
+/** DTO dùng trong admin read-model (getAdminUnmatchedDeposits) — user_id có thể null */
+export interface AdminUnmatchedDepositRowDto extends OnchainTxRowDto {
+  userId: string | null;
+  pendingMatchId: string | null;
+  pendingMatchRequestedUserId: string | null;
+}
+
 /** Bộ lọc cho admin withdrawal list */
 export interface AdminWithdrawalFilters {
   userId?: string;
   status?: string;
+  chain?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Bộ lọc cho admin unmatched deposits list */
+export interface AdminUnmatchedDepositFilters {
   chain?: string;
   search?: string;
   dateFrom?: string;
@@ -154,6 +171,11 @@ export interface OnchainTransactionRepositoryPort {
     pendingCount: number;
     pendingTotalByChain: Record<string, string>;
   }>;
+
+  /** Danh sách UNMATCHED deposits cho admin (có join pending match request) */
+  listAdminUnmatchedDeposits(
+    filters: AdminUnmatchedDepositFilters,
+  ): Promise<{ data: AdminUnmatchedDepositRowDto[]; total: number; page: number; limit: number }>;
 }
 
 export const ONCHAIN_TRANSACTION_REPOSITORY = Symbol('ONCHAIN_TRANSACTION_REPOSITORY');
