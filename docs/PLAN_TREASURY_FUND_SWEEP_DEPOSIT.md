@@ -38,17 +38,19 @@ enqueueFund/enqueueSweep
 #### Ví dụ scenario treo vĩnh viễn thực tế
 
 ```
-T+0s:   FUND-A enqueue cho ví-1 (job-1)
-T+1s:   FUND-B enqueue cho ví-1 (job-2)  ← cùng ví, khác jobId (uuidv7)
-T+0s:   job-1 acquire lock ví-1 (EX 120)
-T+0s:   job-2 không acquire được → throw WALLET_BUSY → Bull retry sau 3s
-T+5s:   job-1 broadcast tx ví-1 → release lock → bắt đầu waitForBalance (60s)
-T+5s:   job-2 retry → acquire lock ví-1 (lock đã release)
-T+5s:   job-2 broadcast tx ví-1 → NONCE CONFLICT hoặc insufficient balance
-T+5s:   job-2 markFailed("nonce") → FAILED
-T+65s:  job-1 waitForBalance timeout (balance không tăng vì NONCE conflict)
-T+65s:  job-1 throw TREASURY_FUND_USDT_BALANCE_NOT_UPDATED → FAILED
+T+0s:    FUND-A enqueue cho ví-1 (job-1)
+T+1s:    FUND-B enqueue cho ví-1 (job-2)  ← cùng ví, khác jobId (uuidv7)
+T+1s:    job-1 acquire lock ví-1 (EX 120)
+T+1s:    job-2 không acquire → throw WALLET_BUSY → treasuryDeferBackoff (3s → 6s → …)
+T+5s:    job-1 broadcast tx ví-1 → release lock → bắt đầu waitForBalance (60s)
+T+5s:    job-2 retry (deferred) → acquire lock ví-1 (lock đã release)
+T+5s:    job-2 broadcast tx ví-1 lần 2 → TRON trả về DUP_TRANSACTION_ERROR
+         hoặc insufficient balance (vì tx-1 đã consume) → markFailed("broadcast")
+T+65s:   job-1 waitForBalance timeout (balance không phản ánh vì job-2 cũng tác động) → FAILED
+T+65s+:  Timer lockWait 15min cũ vẫn tồn tại → manual retry bị reject
 ```
+
+> **Chú ý chuẩn TRON:** TRON không dùng account nonce như EVM — thay bằng `ref_block_bytes` + `expiration`. Double broadcast cho cùng contract call thường gặp `DUP_TRANSACTION_ERROR` hoặc `CONTRACT_VALIDATE_ERROR` (insufficient balance), không phải "nonce conflict". Nếu mở rộng sang EVM thì scenario nonce mới đúng.
 
 ---
 
@@ -89,75 +91,108 @@ TronGrid API poll (5s)
 > **Một ví → một worker → một job tại một thời điểm**  
 > Không dùng Redis lock để serialize → dùng Bull queue per-wallet hoặc concurrency=1 per wallet key
 
-#### Phương án A — Concurrency=1 + Named Job Group per Wallet (Khuyến nghị)
+#### Phương án A — Deterministic jobId + `removeOnComplete: true` (Khuyến nghị)
 
-```
-enqueueFund(walletId) → Bull job với jobId = "treasury:{type}:{walletId}:SINGLE"
-```
+> **Cảnh báo về Bull behavior:** `bull` (legacy) và `bullmq` **không throw `JobExistsError`** khi add job với jobId đã tồn tại — nó **silently return existing job**. Nếu dùng `removeOnComplete: false`, job `completed` cũ giữ nguyên ID → lần enqueue kế tiếp cho cùng ví sẽ **không tạo job mới** → FUND thứ hai **không bao giờ chạy**. Vì vậy deterministic jobId **phải** đi kèm `removeOnComplete: true` + `removeOnFail: true` (hoặc cơ chế dọn job completed/failed trước khi add).
 
-- **`jobId` cố định per ví per type**: thay vì `uuidv7()` làm suffix, dùng deterministic ID
-  - FUND: `treasury-fund:{walletId}:{asset}` (không có UUID)  
-  - SWEEP: `treasury-sweep:{walletId}:{asset}:{mainWalletId}`
-- **Kiểm tra job tồn tại trước khi add**: nếu job đã tồn tại (waiting/active) → trả về `alreadyQueued: true`
-- **Bull tự serialize**: vì `jobId` giống nhau, Bull sẽ không add duplicate (throw `JobExistsError` hoặc return existing)
-- **Loại bỏ per-wallet Redis lock**: không còn `tryAcquireWalletLock` — Bull job queue là serializer duy nhất
-- **Tách `waitForBalance` ra khỏi job chính**: sau khi broadcast tx, emit event `TreasuryTxBroadcast` → separate "confirmation poller" job
+- **`jobId` cố định per ví per type** (thay vì `uuidv7()`):
+  - FUND: `treasury-fund:{walletId}:{asset}`
+  - SWEEP: `treasury-sweep:{walletId}:{asset}:{mainWalletId}` (hiện đã deterministic)
+- **Dedupe chủ động**:
+  1. Call `resolveExistingTreasuryJob(jobId)` — nếu tồn tại ở `waiting/active/delayed` → return `alreadyQueued: true`.
+  2. Nếu tồn tại ở `completed/failed` → `job.remove()` trước khi `queue.add` (tránh silent-reject).
+  3. Bọc cả 2 bước trong **Postgres advisory lock** `pg_try_advisory_xact_lock(hashtext(walletId))` thay vì Redis enqueue-lock — atomic theo DB transaction, không lo Redis partition.
+- **Tách `waitForBalance` ra khỏi job chính** (§2.1 bản gốc đúng): sau broadcast, enqueue `TREASURY_CONFIRM_JOB` riêng. Main job hoàn tất nhanh → worker không bị block 60s.
+- **Serialization per-wallet dùng BullMQ group limiter** thay vì `concurrency: 1` global:
+  ```typescript
+  // BullMQ (nếu upgrade): limiter group key theo walletId
+  new Worker(queueName, processor, {
+    limiter: { max: 1, duration: 1_000, groupKey: 'walletId' },
+  });
+  ```
+  Hoặc fallback với Bull legacy: **partition queues** — mỗi ví 1 sub-queue tên `treasury-wallet-{walletId}` với concurrency=1.
+- **Không bỏ hẳn Redis lock per-wallet** — giữ như "defensive layer" phát hiện double-broadcast do bug logic; nhưng không dùng như primary serializer.
 
 #### Luồng mới
 
 ```
 enqueueFund(walletId, asset, amount)
+  → BEGIN; SELECT pg_try_advisory_xact_lock(hashtext(walletId)); ← atomic dedupe
   → jobId = "treasury-fund:{walletId}:{asset}"     ← deterministic, không UUID
-  → treasuryQueue.add(FUND_JOB, data, { jobId, removeOnComplete: false })
-    ├─ Nếu job đã tồn tại → return { alreadyQueued: true, operationId: existing.data.operationId }
-    └─ Job mới → create operation PENDING → add to queue
+  → existing = resolveExistingTreasuryJob(jobId)
+      ├─ active/waiting/delayed → return { alreadyQueued: true }
+      ├─ completed/failed       → existing.remove(); fallthrough
+      └─ none                   → fallthrough
+  → INSERT treasury_operation (status=PENDING, idempotency_key=hash(operationId))
+  → treasuryQueue.add(FUND_JOB, data, {
+      jobId,
+      attempts: 10,
+      backoff: { type: 'treasuryDefer', delay: 5_000 },
+      removeOnComplete: true,    ← BẮT BUỘC để tránh silent-reject
+      removeOnFail: true,        ← để cleanup terminal jobs
+      timeout: 60_000,           ← guard against infinite hang
+    })
+  → COMMIT;
 
 processFundJob(job)
-  → operation = getOperationForProcessing(data.operationId)
-  → broadcast tx (không cần lock vì queue serialize)
-  → update operation: status=PROCESSING, tx_hash=txHash
-  → remove job từ queue
-  → enqueue TREASURY_CONFIRM_JOB (polling job riêng, không block queue)
-  → return (job done)
+  → operation = getOperationForProcessing(data.operationId)  ← idempotent re-entry
+  → IF operation.status == 'TX_BROADCAST' → goto enqueueConfirmJob (reuse tx_hash)
+  → IF operation.broadcast_idempotency_key đã set → đã broadcast trước → reuse
+  → tạo broadcast_idempotency_key = sha256(operationId|nonce/refBlock)
+  → UPDATE operation: status=TX_BROADCAST, broadcast_idempotency_key=<key>  ← BEFORE RPC
+  → broadcast tx
+  → UPDATE operation: tx_hash=<hash>
+  → enqueue TREASURY_CONFIRM_JOB { operationId, txHash }
+  → return  ← worker không block, queue tiến tiếp
 
 processTreasuryConfirmJob(job)
-  → poll balance / check tx status trên chain (timeout 5 phút)
-  → nếu confirmed → finalizeSuccess → COMPLETED
-  → nếu timeout → markFailed / operator retry
+  → poll tx receipt + balance trên chain (timeout 5 phút, exponential backoff)
+  → confirmed → finalizeSuccess → COMPLETED
+  → timeout    → markFailed (operator runbook §3.3)
+  → tx_failed  → markFailed
 ```
 
-#### Phương án B — Concurrency=1 per queue + Single FIFO per wallet (Đơn giản hơn)
+#### Phương án B — Per-wallet Sub-queue (Đơn giản, dùng được với Bull legacy)
 
-- Tạo **N sub-queues** (một per ví active) hoặc dùng **priority queue** với wallet partition key
-- Phức tạp hơn về infra, không khuyến nghị
+- Tạo **N sub-queues** dynamic theo ví: `treasury-wallet-{walletId}` với `concurrency: 1`.
+- Quản lý lifecycle: tạo lazy khi enqueue lần đầu, GC sau 24h idle.
+- **Ưu điểm vs Phương án A:** không phụ thuộc upgrade BullMQ; serialize đúng per-wallet.
+- **Nhược điểm:** số queue tăng tuyến tính theo số ví active, monitor Bull Board phức tạp.
+
+> **Khuyến nghị thực tế:** Phase 2 dùng **Phương án A + Postgres advisory lock**. Nếu sau 1 sprint vẫn flaky, fallback Phương án B.
 
 ---
 
 ### 2.2 Loại bỏ lock TTL race condition
 
-**Vấn đề cụ thể:** Lock TTL 120s < broadcast (biến thiên) + waitForBalance (60–90s)
+**Vấn đề cụ thể:** Lock TTL 120s < broadcast (biến thiên do RPC) + `waitForBalance` (60–90s)
 
-**Fix ngắn hạn** (trong khi chờ refactor lớn):
-- Tăng lock TTL lên 300s
-- `waitForBalance` chạy **sau khi** release lock (đã làm rồi trong code với `lockHeld = false`)  
-  → Kiểm tra lại: `releaseWalletLock` được gọi trước `waitForBalance` → OK
-- **Vẫn còn vấn đề**: nếu broadcast bị block >120s (RPC slow) → lock expire giữa chừng
+**Fix ngắn hạn** (trong khi chờ refactor Phase 2):
+- Tăng lock TTL lên **300s** (đủ buffer cho cả broadcast + wait).
+- Verify thứ tự: code hiện tại release lock **trước** `waitForBalance` (`lockHeld = false` tại line ~292/403) → race vẫn tồn tại nếu 2 job chạy concurrent sau khi job-1 release lock nhưng balance chưa reflect.
+- **Broadcast idempotency key (BẮT BUỘC):** lưu `broadcast_idempotency_key` vào `treasury_operation` **trước khi** call RPC broadcast. Nếu worker crash giữa chừng, retry đọc key và **không broadcast lại**. Key = `sha256(operationId || refBlockBytes || expiration)`.
+- **Lock heartbeat thay vì TTL dài cứng:** spawn setInterval mỗi 30s gọi Lua `EXPIRE` extend lock 60s trong lúc processing. Dừng heartbeat khi release. Giới hạn tổng thời gian heartbeat 10 phút để tránh lock vĩnh viễn.
 
-**Fix dài hạn**: Dùng lock refresh (heartbeat) hoặc bỏ hẳn lock (Phương án A).
+**Fix dài hạn (Phase 2):** Loại lock khỏi critical path, chỉ giữ như "defensive detector" (log warning nếu 2 job cùng ví acquire concurrent).
 
 ---
 
 ### 2.3 Thundering herd — giới hạn retry và queue depth
 
 ```typescript
-// Thay vì 100 attempts:
+// Thay vì 100 attempts × exponential backoff (có thể lên tới vài giờ):
 attempts: 10,
-backoff: { type: 'treasuryDefer', delay: 5_000 },
+backoff: { type: 'treasuryDefer', delay: 5_000 }, // cap 20s/step (giữ nguyên)
+timeout: 60_000, // Bull timeout per attempt — kill worker nếu treo
 
-// Giới hạn số job PENDING trên 1 ví:
-const pendingCount = await this.treasuryQueue.getJobCountByTypes('waiting', 'active', 'delayed');
-if (pendingCount > MAX_PENDING_PER_WALLET) throw new ServiceUnavailableException(...)
+// Giới hạn số job PENDING trên 1 ví (kiểm tra trong enqueueFund/Sweep):
+const active = await resolveExistingTreasuryJob(jobId);
+if (active) return active; // đã có job → return alreadyQueued
+// KHÔNG dùng getJobCountByTypes toàn queue — nó đếm mọi ví và cost O(n).
+// Dùng check theo jobId deterministic là đủ (atomic + cheap).
 ```
+
+**Concurrency:** không dùng `@Process({concurrency: 1})` vì sẽ global-serialize mọi ví. Dùng **per-wallet partition** (Phương án A hoặc B §2.1). Nếu tạm thời chưa refactor, đặt `concurrency = min(numWallets, 4)` để tránh oversubscribe Redis/RPC.
 
 ---
 
@@ -200,16 +235,22 @@ Body: { chain, txHash, logIndex? }
 → Trả về operationId và status
 ```
 
-#### API cho admin: Match unmatched deposit
+#### API cho admin: Match unmatched deposit (dual approval BẮT BUỘC)
 
 ```
-POST /blockchain/admin/deposits/{txId}/match-user  
-Body: { userId }
-→ Tìm UNMATCHED record
-→ Associate với userId
-→ Trigger settlement nếu tx đã confirmed
-→ Emit OnchainDepositSettledV1 outbox event
+POST /blockchain/admin/deposits/{txId}/match-user
+Body: { userId, approverRole: 'RISK_OFFICER' | 'FINANCE_ADMIN' }
+Headers: Idempotency-Key: sha256(txId|userId)
+→ Bước 1 (RISK_OFFICER đề nghị): tạo match_request PENDING
+→ Bước 2 (FINANCE_ADMIN duyệt): verify txId + userId không đổi + PENDING
+   → Associate UNMATCHED record với userId
+   → Trigger settlement nếu tx đã confirmed
+   → Emit OnchainDepositSettledV1 outbox event
+→ Audit log: immutable entry (actor, timestamp, txId, userId, before/after)
+→ Anti-abuse: rate limit 5 match/ngày/admin; reject nếu txId đã match rồi
 ```
+
+> **Lý do dual approval:** Credit user sai tiền on-chain không thể rollback. Single-admin match có thể bị social-engineer hoặc insider threat. Chuẩn: tách "propose" và "approve" sang 2 role, hai người khác nhau.
 
 ---
 
@@ -217,20 +258,44 @@ Body: { userId }
 
 **Vấn đề:** Read model sync chạy async qua Outbox → có thể lag
 
-**Fix:** Khi query lịch sử deposit, merge từ **cả hai nguồn**:
+**Fix:** Khi query lịch sử deposit, merge từ **cả hai nguồn** bằng `LEFT JOIN … IS NULL` (tránh `NOT IN` subquery vì không hiệu quả trên `tx_id` lớn và trả NULL sai khi có NULL row):
 
 ```sql
 -- Priority: read_onchain_deposits (đã sync) UNION onchain_transactions (chưa sync)
-SELECT * FROM read_onchain_deposits WHERE user_id = $1
+SELECT r.tx_id, r.user_id, r.amount, r.status, r.created_at
+  FROM read_onchain_deposits r
+  WHERE r.user_id = $1
 UNION ALL
-SELECT * FROM onchain_transactions 
-WHERE user_id = $1 
-  AND type IN ('DEPOSIT')
-  AND tx_id NOT IN (SELECT tx_id FROM read_onchain_deposits WHERE user_id = $1)
+SELECT o.tx_id, o.user_id, o.amount, o.status, o.created_at
+  FROM onchain_transactions o
+  LEFT JOIN read_onchain_deposits r
+    ON r.tx_id = o.tx_id AND r.user_id = o.user_id
+  WHERE o.user_id = $1
+    AND o.type = 'DEPOSIT'
+    AND r.tx_id IS NULL
 ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
 ```
 
-→ Đã có logic này (file `read-onchain-user-transactions.query.service.ts`) nhưng cần verify flag `READ_MODEL_ONCHAIN_DEPOSITS` và đảm bảo fallback đúng.
+**Indexes cần có** (nếu chưa):
+- `idx_read_onchain_deposits_user_created (user_id, created_at DESC)`
+- `idx_onchain_transactions_user_type_created (user_id, type, created_at DESC)`
+- `idx_onchain_transactions_tx_id (tx_id)` cho LEFT JOIN
+
+### 2.6 Chain reorg & confirmations (mới)
+
+TRON hiện tại rất ít reorg nhưng vẫn phải có policy để tránh "phantom deposit":
+
+- **Confirmations threshold:** 19 blocks cho TRON (~1 phút) trước khi chuyển `CONFIRMING → COMPLETED` và credit wallet. Cấu hình env `TRON_CONFIRMATIONS=19`.
+- **Reorg handling:** `DepositConfirmationJob` phải re-check tx còn trong canonical chain trước finalize. Nếu tx disappear → `status=REORGED`, không credit, alert ops.
+- **EVM khi mở rộng:** 12 blocks (ETH mainnet), 30 blocks (BSC), documented per-chain.
+
+### 2.7 Logging & PII (mới)
+
+- Log structured hiện có `userId + amount` — **không** log địa chỉ ví đầy đủ (mask 6 ký tự đầu + 4 ký tự cuối).
+- `txHash` có thể log full (public on-chain data).
+- Retention log: 90 ngày cho structured logs có PII, 1 năm cho anonymized metrics.
+- Áp dụng cho `deposit.ingest.success`, `treasury.fund/sweep.*` log lines.
 
 ---
 
@@ -238,17 +303,20 @@ ORDER BY created_at DESC
 
 ### 3.1 Dashboard giám sát Treasury
 
-**Metrics cần có** (expose qua `/admin/treasury/metrics` hoặc Prometheus):
+**Metrics cần có** (expose qua `/admin/treasury/metrics` theo format Prometheus; emit tại event-time, **không** dùng `SCAN` Redis key-space trên prod vì O(n) và block):
 
-| Metric | Cách tính |
-|--------|-----------|
-| `treasury_queue_depth` | Bull queue waiting + delayed |
-| `treasury_operations_by_status` | COUNT grouped by status |
-| `treasury_lock_wait_p95` | từ `treasury:lock-wait-since:*` keys |
-| `treasury_stuck_operations` | PROCESSING > 10 phút |
-| `treasury_failed_last_1h` | COUNT FAILED trong 60 phút |
-| `deposit_unmatched_count` | COUNT UNMATCHED trong onchain_transactions |
-| `deposit_outbox_lag` | MAX(now - created_at) WHERE published_at IS NULL |
+| Metric | Loại | Nguồn / cách tính |
+|--------|------|-----------|
+| `treasury_queue_depth{type}` | Gauge | `queue.getJobCounts()` mỗi 15s (không SCAN keys) |
+| `treasury_operations_total{status}` | Counter | tăng khi transition DB status |
+| `treasury_lock_wait_seconds` | Histogram | observe khi release lock (start timestamp trong memory/DB row) |
+| `treasury_stuck_operations` | Gauge | `COUNT(*) WHERE status='PROCESSING' AND updated_at < now()-interval '10 min'` |
+| `treasury_failed_total{reason}` | Counter | tăng khi markFailed với label reason |
+| `deposit_unmatched_total` | Counter | tăng khi tạo UNMATCHED record |
+| `deposit_outbox_lag_seconds` | Gauge | `EXTRACT(epoch FROM now()-MIN(created_at)) WHERE published_at IS NULL` |
+| `treasury_broadcast_duration_seconds` | Histogram | đo tại `broadcast tx` span |
+
+Dùng `prom-client` hoặc OpenTelemetry exporter; scrape interval 15s.
 
 ### 3.2 Alert rules
 
@@ -321,13 +389,15 @@ ORDER BY created_at DESC
 
 | Task | File | Thay đổi |
 |------|------|---------|
-| 1.1 Tăng lock TTL 120s → 300s | `treasury-operations.service.ts:941` | `EX, 300` |
-| 1.2 Giảm attempts 100 → 15 | `treasury-operations.service.ts` | `attempts: 15` |
-| 1.3 Fix `buildFundJobId` — bỏ `uuidv7()` để detect duplicate | `treasury-operations.service.ts:955` | Xem §4.1 |
+| 1.1 Tăng lock TTL 120s → 300s + heartbeat | `treasury-operations.service.ts:941` | `EX, 300` + setInterval extend |
+| 1.2 Giảm attempts 100 → 10, thêm `timeout: 60_000` | `treasury-operations.service.ts:177,230,529` + module | `attempts: 10, timeout: 60_000` |
+| 1.3 Fix `buildFundJobId` — bỏ `uuidv7()` + dọn completed/failed trước add | `treasury-operations.service.ts:955` | Xem §4.1 |
 | 1.4 Reset `lockWaitTimer` trong `manualRetryTreasuryOperation` | `treasury-operations.service.ts:488` | Gọi `clearLockWaitTimer(operationId)` |
-| 1.5 Add Bull concurrency limit (1 per processor) | `treasury.module.ts` hoặc processor | `@Process({name, concurrency: 1})` |
-| 1.6 Manual ingest admin endpoint | `blockchain.controller.ts` | POST endpoint mới |
-| 1.7 Verify `READ_MODEL_ONCHAIN_DEPOSITS` fallback | query service | Integration test |
+| 1.5 Giới hạn concurrency per partition (tạm 4, KHÔNG global 1) | `treasury.module.ts` / processor | Xem §2.3 |
+| 1.6 Manual ingest admin endpoint | `blockchain.controller.ts` | POST endpoint mới + RBAC FINANCE_ADMIN |
+| 1.7 Verify `READ_MODEL_ONCHAIN_DEPOSITS` fallback | query service | Integration test + EXPLAIN ANALYZE |
+| 1.8 Thêm cột `broadcast_idempotency_key` vào `treasury_operation` | migration | Nullable, unique index partial |
+| 1.9 Ghi idempotency key trước RPC broadcast | `treasury-operations.service.ts` processFund/Sweep | Write-before-RPC |
 
 **§4.1 Fix `buildFundJobId`:**
 ```typescript
@@ -340,32 +410,55 @@ private buildFundJobId(walletId: string, asset: string): string {
 private buildFundJobId(walletId: string, asset: string): string {
   return `treasury-fund:${walletId}:${asset}`;
 }
-// → Cần handle JobExistsError từ Bull và trả về alreadyQueued: true
-// → Hoặc check existing job trước khi add (đã có resolveExistingTreasuryJob)
+
+// Bổ sung khi enqueue:
+const existing = await this.treasuryQueue.getJob(jobId);
+if (existing) {
+  const state = await existing.getState();
+  if (state === 'waiting' || state === 'active' || state === 'delayed') {
+    return { operationId: existing.data.operationId, status: 'PENDING', alreadyQueued: true };
+  }
+  // completed/failed → dọn để add không bị silent-reject
+  await existing.remove();
+}
+await this.treasuryQueue.add(TREASURY_FUND_JOB, data, {
+  jobId,
+  attempts: 10,
+  backoff: { type: 'treasuryDefer', delay: 5_000 },
+  removeOnComplete: true,  // BẮT BUỘC vì deterministic jobId
+  removeOnFail: true,
+  timeout: 60_000,
+});
 ```
 
-**Lưu ý:** Khi `jobId` deterministic, nhiều FUND cùng lúc sẽ serialize tự nhiên. Cần đảm bảo logic sau khi job complete, jobId được giải phóng để job tiếp theo có thể add.
+> **Chú ý Bull behavior:** `bull` v4 `queue.add()` với jobId đã tồn tại (bất kể state) sẽ **không throw**, trả về job cũ. Vì vậy `existing.remove()` là bắt buộc khi muốn re-enqueue. Test path này kỹ với `removeOnComplete: true` để đảm bảo job completed được dọn tự động.
+
+**Lưu ý:** Khi `jobId` deterministic + `removeOnComplete: true`, job hoàn tất sẽ biến mất khỏi Redis → lần FUND tiếp theo cho cùng ví có thể add bình thường. Enqueue đồng thời 2 FUND sẽ có một request trả `alreadyQueued: true` và một tạo mới — đây chính là dedupe mong muốn.
 
 ---
 
 ### Phase 2 — Refactor luồng Fund/Sweep (3–5 ngày)
 
-**Mục tiêu:** Loại bỏ lock hoàn toàn, dùng queue làm serializer
+**Mục tiêu:** Serialize per-wallet qua queue, broadcast idempotent, tách confirmation
 
 | Task | Mô tả |
 |------|-------|
 | 2.1 Tách `waitForBalance` thành `TREASURY_CONFIRM_JOB` | Job riêng, không block main processor |
-| 2.2 Bỏ `tryAcquireWalletLock` / `releaseWalletLock` | Queue serialize thay thế |
-| 2.3 Thêm trạng thái `TX_BROADCAST` cho operation | Biết tx đã broadcast chưa settled |
-| 2.4 Implement `processTreasuryConfirmJob` | Retry-able, timeout riêng |
-| 2.5 Migration: thêm column `status TX_BROADCAST` | DB migration |
-| 2.6 Unit tests cho các scenario treo | `treasury-operations.service.spec.ts` |
+| 2.2 Chuyển Redis lock từ primary serializer → defensive detector | Lock vẫn acquire nhưng nếu fail → log WARN, không throw (queue đã dedupe) |
+| 2.3 Thêm trạng thái `TX_BROADCAST` cho operation | **Migration riêng** dùng `ALTER TYPE … ADD VALUE IF NOT EXISTS 'TX_BROADCAST'` — deploy **trước** code dùng (Postgres enum ALTER non-transactional) |
+| 2.4 Implement `processTreasuryConfirmJob` | Retry-able, timeout 5 phút, backoff exponential, reorg re-check |
+| 2.5 Migration: thêm `broadcast_idempotency_key`, `tx_broadcast_at` | DB migration additive |
+| 2.6 Postgres advisory lock cho enqueueFund/Sweep | Thay `runWithEnqueueLock` Redis spin → `pg_try_advisory_xact_lock(hashtext($walletId))` trong TX |
+| 2.7 Per-wallet partition strategy | Khuyến nghị BullMQ group limiter (nếu upgrade); fallback: sub-queue per wallet |
+| 2.8 Unit + integration tests scenario treo | `treasury-operations.service.spec.ts`, mô phỏng double-enqueue, RPC timeout, reorg |
 
 **Sơ đồ trạng thái mới:**
 ```
 PENDING → PROCESSING → TX_BROADCAST → COMPLETED
                     ↘              ↘
-                     FAILED         FAILED (confirm timeout)
+                     FAILED         FAILED (confirm timeout / reorg)
+                                   ↘
+                                    REORGED (không credit, alert ops)
 ```
 
 ---
@@ -389,27 +482,41 @@ PENDING → PROCESSING → TX_BROADCAST → COMPLETED
 
 | Rủi ro | Mức độ | Mitigation |
 |--------|--------|------------|
-| Fix `buildFundJobId` khiến nhiều FUND không được queued | Cao | Test kỹ; implement proper "queue after complete" flow |
-| Tách `waitForBalance` → có thể miss completion event | Trung bình | Confirm job cũng retry, fallback manual settle |
-| Admin endpoint match-user credit nhầm user | Cao | Require 2FA / approval từ RISK_OFFICER; audit log bắt buộc |
-| Migration `UNMATCHED` status break backward compat | Thấp | Migration additive, không xóa enum cũ |
-| Outbox relay chậm → phase 3 items delay | Thấp | Merge query (§2.5) đã cover |
+| Deterministic jobId + `removeOnComplete: false` → silent-reject job mới | **Cao** | BẮT BUỘC `removeOnComplete: true` + `removeOnFail: true`; kèm `existing.remove()` cho state completed/failed; test unit |
+| Fix `buildFundJobId` khiến nhiều FUND hợp lệ bị dedupe nhầm | Trung bình | Test kỹ; `alreadyQueued: true` trả về API, caller cần hiểu UX (không phải lỗi) |
+| Tách `waitForBalance` → confirm job miss event | Trung bình | Confirm job retry-able, timeout 5 phút, fallback manual settle via runbook |
+| Admin match-user credit nhầm user | **Cao** | Dual approval (RISK_OFFICER → FINANCE_ADMIN), idempotency key, immutable audit log, rate limit |
+| Migration `UNMATCHED`/`TX_BROADCAST` enum break rolling deploy | Trung bình | Enum ADD VALUE non-transactional — migration deploy trước code dùng 1 release; additive, không xóa |
+| Outbox relay chậm → phase 3 items delay | Thấp | Merge query §2.5 + metric `deposit_outbox_lag_seconds` alert |
+| Postgres advisory lock key collision do `hashtext` | Thấp | Dùng 2 tham số `pg_try_advisory_xact_lock(classid, objid)` với classid cố định + `hashtextextended(walletId)` |
+| TRON reorg gây phantom credit | Thấp (TRON) / Cao (EVM mở rộng) | §2.6 confirmations threshold + reorg re-check trong confirm job |
+| Broadcast idempotency key miss → double-broadcast sau crash | Trung bình | Write-before-RPC; partial unique index; test crash recovery |
+| Bull queue flood nếu caller spam FUND | Thấp sau fix §4.1 | Deterministic jobId tự dedupe; thêm rate limit ở controller (5 req/phút/admin) |
 
 ---
 
 ## 6. Thứ tự ưu tiên tuyệt đối
 
 ```
-[NGAY BÂY]  Phase 1.3 — Fix buildFundJobId (bỏ uuidv7, dùng deterministic)
+[NGAY BÂY]  Phase 1.3 — Fix buildFundJobId (bỏ uuidv7) + removeOnComplete:true + dọn job cũ
 [NGAY BÂY]  Phase 1.4 — Reset lockWaitTimer trong manualRetry
+[NGAY BÂY]  Phase 1.8 + 1.9 — broadcast_idempotency_key (chống double-broadcast sau crash)
 [NGAY BÂY]  Phase 1.6 — Manual ingest admin endpoint (unblock ops)
 
-[TUẦN NÀY]  Phase 1.1, 1.2, 1.5 — Tune TTL/attempts/concurrency
-[TUẦN NÀY]  Phase 1.7 — Verify deposit query fallback
+[TUẦN NÀY]  Phase 1.1 — Lock TTL 300s + heartbeat
+[TUẦN NÀY]  Phase 1.2 — attempts=10, timeout=60s
+[TUẦN NÀY]  Phase 1.5 — concurrency tuning (KHÔNG global=1)
+[TUẦN NÀY]  Phase 1.7 — Verify deposit query fallback + EXPLAIN ANALYZE
 
-[SPRINT NÀY] Phase 2 — Refactor queue-as-serializer
-[SPRINT SAU] Phase 3 — UNMATCHED status + admin tools + monitoring
+[SPRINT NÀY] Phase 2 — Queue-as-serializer + advisory lock + confirm job
+[SPRINT SAU] Phase 3 — UNMATCHED + dual-approval admin tools + monitoring + reorg guard
 ```
+
+### 6.1 Rollout strategy
+
+- **Feature flag** `TREASURY_DETERMINISTIC_JOBID=true` để bật/tắt fix §4.1 trong production; rollback nhanh nếu có hồi quy.
+- **Shadow-run** Phase 2 confirm job song song với luồng cũ (poll nhưng không finalize) trong 48h để compare kết quả.
+- **Migration deploy trước code** dùng enum values mới 1 release cycle.
 
 ---
 
@@ -427,6 +534,271 @@ PENDING → PROCESSING → TX_BROADCAST → COMPLETED
 | `entities/onchain-transaction.entity.ts` | 3 | UNMATCHED status enum |
 | DB migrations | 2, 3 | TX_BROADCAST, UNMATCHED columns |
 | `read-onchain-user-transactions.query.service.ts` | 1 | Verify UNION fallback |
+
+---
+
+## 8. SLO/SLI cho Fund/Sweep
+
+### 8.1 Định nghĩa SLI & SLO
+
+| SLI | Đo bằng | SLO Target |
+|-----|---------|------------|
+| **Fund success rate** | `COUNT(status=COMPLETED) / COUNT(total FUND ops) trong 24h` | ≥ 99.0% |
+| **Sweep success rate** | tương tự | ≥ 99.0% |
+| **Fund latency P95** | Thời gian từ `created_at` → `updated_at WHERE status=COMPLETED` | ≤ 3 phút |
+| **Fund latency P99** | | ≤ 10 phút |
+| **Confirm job latency P95** | Thời gian từ `TX_BROADCAST` → `COMPLETED` | ≤ 2 phút |
+| **Manual retry resolution time** | Thời gian từ FAILED → COMPLETED sau manual retry | ≤ 30 phút |
+| **Queue depth** | `treasury_queue_depth` P95 tại bất kỳ 5-phút nào | ≤ 10 jobs |
+
+### 8.2 Error budget
+
+- Monthly budget (99.0% SLO): **~7.3 giờ downtime** hoặc ~0.01 × tổng số FUND ops có thể fail trong tháng.
+- **Burn rate alert:** nếu error rate > 5% trong 1 giờ bất kỳ → page on-call ngay (burn rate ≈ 120× → budget hết trong 36h).
+- Tracking: cron job chạy mỗi 5 phút, đếm FAILED / total trong `treasury_operations` và write vào metrics table.
+
+### 8.3 SLO violation thresholds cho alert
+
+```yaml
+# Prometheus alert rules (bổ sung vào §3.2)
+- alert: TreasuryFundSuccessRateLow
+  expr: |
+    (
+      count_over_time(treasury_operations_total{status="COMPLETED",type="FUND"}[1h])
+      /
+      count_over_time(treasury_operations_total{type="FUND"}[1h])
+    ) < 0.99
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "Fund success rate < 99% trong 1h"
+
+- alert: TreasuryFundLatencyHigh
+  expr: histogram_quantile(0.95, rate(treasury_operation_duration_seconds_bucket{type="FUND"}[10m])) > 180
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Fund P95 latency > 3 phút"
+
+- alert: TreasuryErrorBudgetBurnHigh
+  expr: |
+    (
+      1 - count_over_time(treasury_operations_total{status="COMPLETED",type=~"FUND|SWEEP"}[1h])
+          / count_over_time(treasury_operations_total{type=~"FUND|SWEEP"}[1h])
+    ) > 0.05
+  for: 10m
+  labels:
+    severity: critical
+  annotations:
+    summary: "Treasury error rate > 5% — error budget burning fast"
+```
+
+---
+
+## 9. Runbook: Tx broadcast "success" nhưng không lên chain (ghost tx)
+
+**Triệu chứng:** `treasury_operation.status = TX_BROADCAST`, `tx_hash` đã có, nhưng sau >10 phút tx không xuất hiện trên TronScan / không có confirmation nào.
+
+**Nguyên nhân phổ biến:**
+- TronGrid API trả `200 OK` nhưng thực ra tx bị drop (RPC node chưa broadcast ra mạng, hoặc `bandwidth/energy` không đủ, hoặc tx expired do `expiration` ngắn).
+- Tx bị reject ở mempool sau khi RPC trả thành công.
+- Race với tx khác tiêu hết bandwidth → contract validate fail sau khi accept.
+
+### Bước 1 — Xác nhận ghost tx
+
+```sql
+-- Tìm operation TX_BROADCAST > 10 phút không có confirmation
+SELECT operation_id, wallet_id, type, tx_hash, tx_broadcast_at, updated_at
+  FROM treasury_operations
+  WHERE status = 'TX_BROADCAST'
+    AND tx_broadcast_at < now() - interval '10 minutes';
+```
+
+```bash
+# Kiểm tra TronScan (thay {TXHASH}):
+curl "https://apilist.tronscan.org/api/transaction-info?hash={TXHASH}" | jq '{contractRet, confirmed, block}'
+# Nếu contractRet rỗng hoặc 404 → tx không tồn tại on-chain
+```
+
+### Bước 2 — Kiểm tra `broadcast_idempotency_key`
+
+```sql
+SELECT broadcast_idempotency_key FROM treasury_operations WHERE operation_id = '{id}';
+```
+
+- Nếu key **đã set** → tx đã được gửi đi ít nhất một lần; tiếp §Bước 3.
+- Nếu key **NULL** → worker crash trước khi gửi; safe to rebroadcast (§Bước 4b).
+
+### Bước 3 — Kiểm tra bandwidth/energy ví
+
+```bash
+# TronGrid: lấy account resource
+curl "https://api.trongrid.io/v1/accounts/{WALLET_ADDRESS}/resources"
+# Xem FreeBandWidth, NetLimit vs NetUsed → nếu NetUsed gần MaxLimit → thiếu bandwidth
+```
+
+Nếu thiếu bandwidth: nạp TRX vào ví nguồn, sau đó rebroadcast (§Bước 4a).
+
+### Bước 4 — Xử lý
+
+**4a. Tx confirmed nhưng TronScan lag:** đợi thêm 5 phút, re-check. Nếu vẫn không có → 4b.
+
+**4b. Tx thực sự dropped — rebroadcast an toàn:**
+```
+POST /treasury/operations/{operationId}/manual-retry
+```
+- `manualRetryTreasuryOperation` sẽ: release Redis lock + reset status=PENDING + enqueue job mới.
+- Job mới sẽ đọc `broadcast_idempotency_key` hiện có → **tạo key mới** (key cũ ứng với tx đã drop, không còn valid) → rebroadcast.
+- Monitor lại: tx hash mới phải xuất hiện trên TronScan trong vòng 60s.
+
+**4c. Tx dropped do thiếu energy (contract call) — nạp energy trước:**
+- Delegate energy từ main wallet hoặc dùng energy rental service.
+- Sau đó mới `manual-retry`.
+
+**4d. Nếu sau 3 lần manual retry vẫn fail:**
+```
+POST /treasury/operations/{operationId}/manual-abort
+```
+→ Đánh dấu FAILED với reason `GHOST_TX_UNRECOVERABLE`.
+→ Escalate với `RISK_OFFICER`: kiểm tra balance ví xem có bị deduct không, cân nhắc manual journal entry.
+
+### Bước 5 — Post-mortem checklist
+
+- [ ] Nguyên nhân gốc rễ: TronGrid flaky / bandwidth depleted / tx expiration quá ngắn?
+- [ ] Tăng `TRON_TX_EXPIRATION_SECONDS` nếu cần (hiện tại bao nhiêu?).
+- [ ] Thêm pre-flight check bandwidth trước khi broadcast.
+- [ ] Xem xét gọi TronGrid qua 2 endpoint song song để xác nhận tx accepted.
+- [ ] Update metric `treasury_ghost_tx_total` (cần thêm counter).
+
+---
+
+## 10. Chaos Testing Plan
+
+**Mục tiêu:** Verify hệ thống hoạt động đúng khi infrastructure bị lỗi đột ngột.
+
+### 10.1 Scope và môi trường
+
+- **Chỉ chạy trên staging**, không bao giờ production.
+- Reset full state (DB + Redis) sau mỗi scenario.
+- Dùng mock TronGrid provider (`MockBlockchainProvider`) với điều khiển inject lỗi.
+
+### 10.2 Scenario matrix
+
+#### Group A — Redis failures
+
+| Scenario | Cách inject | Expected behavior |
+|----------|------------|-------------------|
+| **A1 Redis flush giữa chừng** | Flush Redis sau khi job enqueued nhưng trước khi processed | Confirm job mất → manual retry; operation vẫn ở PENDING; không double-broadcast |
+| **A2 Redis down khi acquire lock** | `redis.set` throw `ECONNREFUSED` | `tryAcquireWalletLock` return null → WALLET_BUSY retry; sau khi Redis recover → job tiếp tục |
+| **A3 Redis eviction (maxmemory)** | Set Redis `maxmemory 1mb`, enqueue nhiều jobs | Bull job data bị evict → Bull reconnect + reprocess; assert `broadcast_idempotency_key` prevent double-send |
+| **A4 Lock TTL expire giữa broadcast** | TTL 5s (test only), broadcast mock delay 10s | Lock expire giữa chừng → defensive detector log WARN; **không** double-broadcast vì jobId dedupe + idempotency key |
+
+```typescript
+// Test helper để inject Redis error:
+jest.spyOn(redisClient, 'set').mockRejectedValueOnce(new Error('ECONNREFUSED'));
+```
+
+#### Group B — RPC / TronGrid failures
+
+| Scenario | Cách inject | Expected behavior |
+|----------|------------|-------------------|
+| **B1 RPC trả HTTP 500** | MockProvider throw `RpcException('500')` | Job fail → `treasuryDeferBackoff` retry; sau `attempts` hết → FAILED; manual retry available |
+| **B2 RPC timeout (30s)** | MockProvider delay 35s, job `timeout: 60_000` | Bull timeout kills job → rethrow; Bull retry; confirm idempotency key set trước RPC → retry biết đã broadcast |
+| **B3 RPC trả success nhưng tx dropped** | MockProvider trả txHash hợp lệ nhưng `resolveDepositTransfers` không tìm thấy tx sau 2 phút | Confirm job timeout → status=FAILED; runbook §9 |
+| **B4 RPC trả duplicate tx hash** | MockProvider trả cùng txHash cho 2 operation khác nhau | Unique constraint trên `tx_hash` column → second update fails → alert ops |
+| **B5 RPC intermittent (50% fail rate)** | MockProvider random throw/success | Backoff retry eventually succeeds; P95 latency SLO vẫn đạt |
+
+```typescript
+// Chaos helper:
+class ChaosMockProvider implements BlockchainProvider {
+  private failRate = 0;
+  setFailRate(rate: number) { this.failRate = rate; }
+  async broadcastTransaction() {
+    if (Math.random() < this.failRate) throw new RpcException('chaos inject');
+    return { txHash: 'mock-' + uuidv7() };
+  }
+}
+```
+
+#### Group C — Worker crash scenarios
+
+| Scenario | Cách inject | Expected behavior |
+|----------|------------|-------------------|
+| **C1 Worker crash sau write idempotency key, trước broadcast** | `process.exit(1)` sau `UPDATE broadcast_idempotency_key` | Retry worker đọc key → tạo key mới (tx cũ drop) → rebroadcast safe |
+| **C2 Worker crash sau broadcast, trước update tx_hash** | `process.exit(1)` sau RPC call, trước DB write | Retry đọc key đã set → biết đã broadcast → check tx_hash trên chain by re-polling → cập nhật tx_hash |
+| **C3 Worker crash sau TX_BROADCAST status, trước enqueue confirm job** | `process.exit(1)` giữa 2 writes | Confirm job không được enqueue; cần **reconciliation job** chạy mỗi 1 phút: tìm `TX_BROADCAST` > 2 phút không có confirm job → re-enqueue |
+| **C4 OOM kill (SIGKILL)** | `docker kill --signal=SIGKILL worker` | Bull job trở về `active` state rồi failed → retry mechanism kicks in |
+
+#### Group D — Database failures
+
+| Scenario | Cách inject | Expected behavior |
+|----------|------------|-------------------|
+| **D1 DB timeout khi update status** | Inject `pg_sleep(10)` via query hook | TX timeout → job retry; `broadcast_idempotency_key` đã set → không double-broadcast |
+| **D2 DB connection pool exhausted** | Set pool max=1, flood concurrent requests | Queue up, no double-broadcast; SLO latency alert fires |
+| **D3 DB primary failover** | Stop primary, promote replica | 30–60s downtime; jobs pause; resume after failover; no data loss |
+
+### 10.3 Reconciliation job (bắt buộc cho C3)
+
+```typescript
+// Chạy mỗi 1 phút bởi NestJS @Cron
+@Cron('*/1 * * * *')
+async reconcileTxBroadcastOperations(): Promise<void> {
+  const stale = await this.treasuryOperationRepository.findByStatusOlderThan(
+    'TX_BROADCAST',
+    2, // minutes
+  );
+  for (const op of stale) {
+    const confirmJob = await this.treasuryQueue.getJob(`treasury-confirm:${op.operation_id}`);
+    if (!confirmJob) {
+      this.logger.warn(`Reconcile: re-enqueue confirm for operation=${op.operation_id}`);
+      await this.treasuryQueue.add(TREASURY_CONFIRM_JOB, { operationId: op.operation_id }, {
+        jobId: `treasury-confirm:${op.operation_id}`,
+        attempts: 10,
+        removeOnComplete: true,
+      });
+    }
+  }
+}
+```
+
+### 10.4 Automation
+
+```bash
+# Script chạy full chaos suite (staging):
+npm run test:chaos -- --scenario=A1,A4,B1,B3,C1,C2,C3
+
+# Mỗi scenario:
+# 1. Setup state (seed DB, flush Redis)
+# 2. Inject failure
+# 3. Trigger operation
+# 4. Wait timeout
+# 5. Assert expected final state
+# 6. Assert no double-credit in wallet balance
+# 7. Teardown
+```
+
+Kết quả chaos test phải pass trước mỗi Phase 2 release.
+
+---
+
+## 7. Files cần thay đổi (tổng hợp)
+
+| File | Phase | Loại thay đổi |
+|------|-------|--------------|
+| `treasury/treasury-operations.service.ts` | 1, 2 | Fix jobId, TTL, attempts, remove lock |
+| `treasury/treasury.processor.ts` | 2 | Add confirm processor |
+| `treasury/treasury.module.ts` | 1, 2 | Concurrency config |
+| `treasury/treasury-queue-backoff.ts` | 1 | Tune delays |
+| `treasury/treasury-reconciliation.scheduler.ts` | 2 | Reconcile TX_BROADCAST stale ops |
+| `blockchain/blockchain.controller.ts` | 1, 3 | Admin endpoints |
+| `blockchain/application/use-cases/deposits/onchain-deposit.service.ts` | 3 | UNMATCHED logic |
+| `blockchain/deposit-watcher/deposit-ingestion.service.ts` | 3 | createUnmatched flow |
+| `entities/onchain-transaction.entity.ts` | 3 | UNMATCHED status enum |
+| DB migrations | 2, 3 | TX_BROADCAST, UNMATCHED, broadcast_idempotency_key |
+| `read-onchain-user-transactions.query.service.ts` | 1 | Verify UNION fallback |
+| `test/chaos/` | 2 | Chaos test suite |
 
 ---
 

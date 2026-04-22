@@ -48,17 +48,42 @@ export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterfa
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // 1. Extend chain enum to include Solana (mỗi bảng một query — MySQL driver không chạy multi-statement)
-    const chainEnumValues = `'ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'`;
-    for (const table of [
-      'treasury_main_wallets',
-      'transaction_wallets',
-      'treasury_operations',
-      'onchain_transactions',
-    ] as const) {
-      await queryRunner.query(
-        `ALTER TABLE \`${table}\` MODIFY \`chain\` enum (${chainEnumValues}) NOT NULL`,
-      );
+    // 1. Extend chain enum to include Solana — skip if a later migration already expanded the enum
+    const chainColRows: { Type?: string }[] = await queryRunner.query(
+      `SHOW COLUMNS FROM \`treasury_main_wallets\` LIKE 'chain'`,
+    );
+    const currentEnumType = chainColRows[0]?.Type ?? '';
+    if (!currentEnumType.includes('SOLANA_DEVNET')) {
+      const chainTables = [
+        'treasury_main_wallets',
+        'transaction_wallets',
+        'treasury_operations',
+        'onchain_transactions',
+      ] as const;
+
+      // Transitional enum keeps legacy SOL_* values long enough to rewrite rows safely.
+      const transitionChainEnumValues = `'ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOL_DEVNET', 'SOL_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'`;
+      const chainEnumValues = `'ETH_SEPOLIA', 'ETH_MAINNET', 'TRON_NILE', 'TRON_SHASTA', 'TRON_MAINNET', 'SOLANA_DEVNET', 'SOLANA_MAINNET'`;
+      for (const table of chainTables) {
+        await queryRunner.query(
+          `ALTER TABLE \`${table}\` MODIFY \`chain\` enum (${transitionChainEnumValues}) NOT NULL`,
+        );
+      }
+
+      for (const table of chainTables) {
+        await queryRunner.query(
+          `UPDATE \`${table}\` SET \`chain\` = 'SOLANA_DEVNET' WHERE \`chain\` = 'SOL_DEVNET'`,
+        );
+        await queryRunner.query(
+          `UPDATE \`${table}\` SET \`chain\` = 'SOLANA_MAINNET' WHERE \`chain\` = 'SOL_MAINNET'`,
+        );
+      }
+
+      for (const table of chainTables) {
+        await queryRunner.query(
+          `ALTER TABLE \`${table}\` MODIFY \`chain\` enum (${chainEnumValues}) NOT NULL`,
+        );
+      }
     }
 
     // 2. Add status column for approval workflow
