@@ -207,6 +207,18 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     return rows || [];
   }
 
+  async setMatchedUser(
+    ctx: TransactionContext,
+    txId: string,
+    userId: string,
+    status: string,
+  ): Promise<void> {
+    await toEntityManager(ctx).query(
+      `UPDATE onchain_transactions SET user_id = ?, status = ? WHERE tx_id = ?`,
+      [userId, status, txId],
+    );
+  }
+
   // ─── Read-model queries ─────────────────────────────────────────────────
 
   async listByUser(userId: string, limit: number): Promise<OnchainTxRowDto[]> {

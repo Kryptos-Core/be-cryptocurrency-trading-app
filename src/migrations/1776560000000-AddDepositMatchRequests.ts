@@ -30,13 +30,12 @@ export class AddDepositMatchRequests1776560000000 implements MigrationInterface 
         \`audit_log\`         json          NOT NULL DEFAULT (JSON_ARRAY()),
         PRIMARY KEY (\`match_id\`),
         UNIQUE KEY \`uk_deposit_match_idempotency\` (\`idempotency_key\`),
-        UNIQUE KEY \`uk_deposit_match_pending_tx\` (\`tx_id\`, \`status\`(7)),
-        INDEX \`idx_deposit_match_tx\` (\`tx_id\`),
+        UNIQUE KEY \`uk_deposit_match_tx\` (\`tx_id\`),
         INDEX \`idx_deposit_match_proposer_date\` (\`proposer_id\`, \`proposed_at\`),
         INDEX \`idx_deposit_match_approver_date\` (\`approver_id\`, \`resolved_at\`),
         CONSTRAINT \`fk_deposit_match_tx\`
           FOREIGN KEY (\`tx_id\`) REFERENCES \`onchain_transactions\` (\`tx_id\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      ) ENGINE=InnoDB
     `);
   }
 

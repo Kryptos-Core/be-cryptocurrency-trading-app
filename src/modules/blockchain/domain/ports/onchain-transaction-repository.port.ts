@@ -125,6 +125,14 @@ export interface OnchainTransactionRepositoryPort {
   /** Tìm pending withdrawal chưa có txHash (manual review queue). */
   findPendingManualWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
+  /** Gán user_id cho UNMATCHED onchain_transaction (admin match-user flow). */
+  setMatchedUser(
+    ctx: TransactionContext,
+    txId: string,
+    userId: string,
+    status: string,
+  ): Promise<void>;
+
   // ─── Read-model queries (cho OnchainTransferQueryService) ─────────────
 
   /** Lấy lịch sử giao dịch on-chain của user (read-model, không có pagination đầy đủ) */

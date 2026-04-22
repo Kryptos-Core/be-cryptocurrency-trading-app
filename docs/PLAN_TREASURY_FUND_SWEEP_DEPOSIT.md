@@ -8,8 +8,8 @@
 
 ## Trạng thái triển khai
 
-**Cập nhật:** 2026-04-22  
-**Trạng thái tổng quan:** ✅ Phase 1 hoàn thành · ✅ Phase 2 hoàn thành · ✅ Phase 3 (core) hoàn thành · 🔄 Dual-approval đang triển khai · ⏳ Còn lại: chaos tests
+**Cập nhật:** 2026-04-23  
+**Trạng thái tổng quan:** ✅ Phase 1 hoàn thành · ✅ Phase 2 hoàn thành · ✅ Phase 3 (core) hoàn thành · 🔄 Dual-approval gần xong (còn controller + module) · ⏳ Còn lại: chaos tests
 
 ### Phase 1 — Fix FUND jobId, dedupe, lock, retry ✅
 
@@ -56,11 +56,11 @@
 | Entity `DepositMatchRequest` (TypeORM) | ✅ | `blockchain/entities/deposit-match-request.entity.ts` |
 | Port `DepositMatchRequestRepositoryPort` | ✅ | `blockchain/domain/ports/deposit-match-request-repository.port.ts` |
 | Repository `DepositMatchRequestRepository` (impl) | ✅ | `blockchain/infrastructure/persistence/deposit-match-request.repository.ts` |
-| Service `DepositMatchService` (`proposeMatch`, `approveMatch`) | 🔄 | `blockchain/application/use-cases/deposits/deposit-match.service.ts` |
-| DTO `MatchDepositDto` | ⏳ | `blockchain/dto/` |
+| Service `DepositMatchService` (`proposeMatch`, `approveMatch`) | ✅ | `blockchain/application/use-cases/deposits/deposit-match.service.ts` |
+| DTO `MatchDepositDto` | ✅ | `blockchain/dto/match-deposit.dto.ts` |
 | Endpoint `POST /blockchain/admin/deposits/{txId}/match-user` | ⏳ | `blockchain.controller.ts` |
 | Wire vào `blockchain.module.ts` | ⏳ | |
-| Integration event `DepositMatchedV1` (outbox catalog + relay) | ⏳ | |
+| Integration event `DepositMatchedV1` (outbox catalog + relay) | ✅ | `common/integration-events/integration-event-catalog.ts` + `outbox-relay-supported-event-types.ts` |
 
 ### Còn lại
 
@@ -871,6 +871,16 @@ Kết quả chaos test phải pass trước mỗi Phase 2 release.
 | `common/enums/index.ts` | 3 | `Permission.DEPOSITS_MANAGE` | ✅ |
 | `migrations/1776540000000-AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus.ts` | 2 | `broadcast_idempotency_key`, `TX_BROADCAST` | ✅ |
 | `migrations/1776550000000-AddUnmatchedDepositStatusAndNullableUserId.ts` | 3 | `UNMATCHED`, `user_id` nullable, indexes | ✅ |
+| `migrations/1776560000000-AddDepositMatchRequests.ts` | 3 | Bảng `deposit_match_requests` | ✅ |
+| `blockchain/entities/deposit-match-request.entity.ts` | 3 | Entity TypeORM | ✅ |
+| `blockchain/domain/ports/deposit-match-request-repository.port.ts` | 3 | Port interface | ✅ |
+| `blockchain/infrastructure/persistence/deposit-match-request.repository.ts` | 3 | Repository impl | ✅ |
+| `blockchain/application/use-cases/deposits/deposit-match.service.ts` | 3 | `proposeMatch`, `approveMatch` | ✅ |
+| `blockchain/dto/match-deposit.dto.ts` | 3 | DTO cho endpoint match-user | ✅ |
+| `common/integration-events/integration-event-catalog.ts` | 3 | `DepositMatchedV1` enum | ✅ |
+| `common/outbox/outbox-relay-supported-event-types.ts` | 3 | Register `DepositMatchedV1` | ✅ |
+| `blockchain/blockchain.controller.ts` | 3 dual | Endpoint `POST /{txId}/match-user` (propose + approve) | ⏳ |
+| `blockchain/blockchain.module.ts` | 3 dual | Wire `DepositMatchService`, `DepositMatchRequestRepository` | ⏳ |
 | `blockchain/infrastructure/queries/read-onchain-user-transactions.query.service.ts` | 1 | LEFT JOIN thay NOT EXISTS | ✅ |
 | `test/chaos/` | 2 | Chaos test suite | ⏳ chưa triển khai |
 
