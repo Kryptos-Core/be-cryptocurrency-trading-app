@@ -1,11 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type {
   DepositMatchAuditEntry,
   DepositMatchRequestStatus,
 } from '../../entities/deposit-match-request.entity';
 import { DepositMatchRequest } from '../../entities/deposit-match-request.entity';
 import type { DepositMatchRequestRepositoryPort } from '../../domain/ports/deposit-match-request-repository.port';
+
+function toEntityManager(ctx: TransactionContext): EntityManager {
+  return ctx as unknown as EntityManager;
+}
 
 @Injectable()
 export class DepositMatchRequestRepository implements DepositMatchRequestRepositoryPort {
@@ -62,6 +67,29 @@ export class DepositMatchRequestRepository implements DepositMatchRequestReposit
     },
   ): Promise<void> {
     await this.dataSource.getRepository(DepositMatchRequest).update(
+      { match_id: matchId },
+      {
+        status,
+        approver_id: extra.approver_id ?? null,
+        approver_role: extra.approver_role ?? null,
+        resolved_at: extra.resolved_at ?? null,
+        audit_log: extra.audit_log,
+      },
+    );
+  }
+
+  async updateStatusWithinTransaction(
+    ctx: TransactionContext,
+    matchId: string,
+    status: DepositMatchRequestStatus,
+    extra: {
+      approver_id?: string;
+      approver_role?: string;
+      resolved_at?: Date;
+      audit_log: DepositMatchAuditEntry[];
+    },
+  ): Promise<void> {
+    await toEntityManager(ctx).getRepository(DepositMatchRequest).update(
       { match_id: matchId },
       {
         status,

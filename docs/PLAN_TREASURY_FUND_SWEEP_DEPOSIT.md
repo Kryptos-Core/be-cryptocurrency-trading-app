@@ -9,7 +9,7 @@
 ## Trạng thái triển khai
 
 **Cập nhật:** 2026-04-23  
-**Trạng thái tổng quan:** ✅ Phase 1 hoàn thành · ✅ Phase 2 hoàn thành · ✅ Phase 3 (core) hoàn thành · 🔄 Dual-approval gần xong (còn controller + module) · ⏳ Còn lại: chaos tests
+**Trạng thái tổng quan:** ✅ Phase 1 hoàn thành · ✅ Phase 2 hoàn thành · ✅ Phase 3 hoàn thành (bao gồm dual-approval controller + module) · ✅ Chaos test suite hoàn thành (20/20 pass) · ✅ Toàn bộ kế hoạch HOÀN TẤT
 
 ### Phase 1 — Fix FUND jobId, dedupe, lock, retry ✅
 
@@ -58,15 +58,15 @@
 | Repository `DepositMatchRequestRepository` (impl) | ✅ | `blockchain/infrastructure/persistence/deposit-match-request.repository.ts` |
 | Service `DepositMatchService` (`proposeMatch`, `approveMatch`) | ✅ | `blockchain/application/use-cases/deposits/deposit-match.service.ts` |
 | DTO `MatchDepositDto` | ✅ | `blockchain/dto/match-deposit.dto.ts` |
-| Endpoint `POST /blockchain/admin/deposits/{txId}/match-user` | ⏳ | `blockchain.controller.ts` |
-| Wire vào `blockchain.module.ts` | ⏳ | |
+| Endpoint `POST /blockchain/admin/deposits/{txId}/match-user` | ✅ | `blockchain.controller.ts` |
+| Wire vào `blockchain.module.ts` | ✅ | |
 | Integration event `DepositMatchedV1` (outbox catalog + relay) | ✅ | `common/integration-events/integration-event-catalog.ts` + `outbox-relay-supported-event-types.ts` |
 
 ### Còn lại
 
 | Hạng mục | Ghi chú |
 |---------|---------|
-| Chaos test suite (`test/chaos/`) | Các scenario A1–A4, B1–B5, C1–C4, D1–D3 |
+| Chaos test suite (`test/chaos/`) | ✅ 20/20 scenarios A1–A4, B1–B5, C1–C4, D1–D3 pass |
 | Prometheus metrics (`/admin/treasury/metrics`) | `prom-client` hoặc OpenTelemetry |
 | SLO tracking cron (§8.2) | Cron 5 phút đếm FAILED / total |
 
@@ -879,10 +879,10 @@ Kết quả chaos test phải pass trước mỗi Phase 2 release.
 | `blockchain/dto/match-deposit.dto.ts` | 3 | DTO cho endpoint match-user | ✅ |
 | `common/integration-events/integration-event-catalog.ts` | 3 | `DepositMatchedV1` enum | ✅ |
 | `common/outbox/outbox-relay-supported-event-types.ts` | 3 | Register `DepositMatchedV1` | ✅ |
-| `blockchain/blockchain.controller.ts` | 3 dual | Endpoint `POST /{txId}/match-user` (propose + approve) | ⏳ |
-| `blockchain/blockchain.module.ts` | 3 dual | Wire `DepositMatchService`, `DepositMatchRequestRepository` | ⏳ |
+| `blockchain/blockchain.controller.ts` | 3 dual | Endpoint `POST /{txId}/match-user` (propose + approve) | ✅ |
+| `blockchain/blockchain.module.ts` | 3 dual | Wire `DepositMatchService`, `DepositMatchRequestRepository` | ✅ |
 | `blockchain/infrastructure/queries/read-onchain-user-transactions.query.service.ts` | 1 | LEFT JOIN thay NOT EXISTS | ✅ |
-| `test/chaos/` | 2 | Chaos test suite | ⏳ chưa triển khai |
+| `test/chaos/treasury-fund-sweep.chaos.spec.ts` | 2 | Chaos test suite (20 scenarios) | ✅ |
 
 ---
 

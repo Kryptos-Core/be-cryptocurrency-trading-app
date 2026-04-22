@@ -4,13 +4,15 @@ import {
   DefaultValuePipe,
   Delete,
   Get,
+  Headers,
   Param,
   ParseIntPipe,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { createHash } from 'node:crypto';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   ApiBadRequestResponse,
   ApiSuccessResponse,
@@ -20,7 +22,7 @@ import {
   RequireFinanceAccess,
   RequirePermissions,
 } from '@/common/decorators';
-import { BlockchainNetwork, Permission } from '@/common/enums';
+import { BlockchainNetwork, Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import {
@@ -66,8 +68,10 @@ import {
   VerifyLinkWalletUseCase,
 } from './application/use-cases';
 import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
+import { DepositMatchService } from './application/use-cases/deposits/deposit-match.service';
 import type {
   ManualWithdrawalActionDto,
+  MatchDepositDto,
   RequestLinkDto,
   RequestWithdrawalDto,
   SubmitDepositDto,
@@ -104,6 +108,7 @@ export class BlockchainController {
     private readonly getAdminWithdrawalStatsQuery: GetAdminWithdrawalStatsQuery,
     private readonly getSupportedNetworksQuery: GetSupportedNetworksQuery,
     private readonly depositIngestionService: DepositIngestionService,
+    private readonly depositMatchService: DepositMatchService,
   ) {}
 
   @Post('wallets/request-link')
@@ -459,5 +464,43 @@ export class BlockchainController {
     }
     await this.depositIngestionService.ingestTxHash(body.chain, body.txHash.trim(), body.logIndex);
     return { ok: true, chain: body.chain, txHash: body.txHash.trim() };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin: dual-approval match unmatched deposit to user
+  // ---------------------------------------------------------------------------
+
+  @Post('admin/deposits/:txId/match-user')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireFinanceAccess()
+  @RequirePermissions(Permission.DEPOSITS_MANAGE)
+  @ApiOperation({
+    summary: '[Admin] Gán user cho deposit UNMATCHED (dual-approval)',
+    description:
+      'Bước 1 (RISK_OFFICER): tạo match request PENDING. ' +
+      'Bước 2 (FINANCE_ADMIN / khác proposer): approve match request đang PENDING cho txId này. ' +
+      'Cùng endpoint; hành động phụ thuộc vào trạng thái hiện tại của match request.',
+  })
+  @ApiHeader({
+    name: 'idempotency-key',
+    required: false,
+    description: 'Client-provided idempotency key (hex string). Tự động tạo từ txId+userId nếu không có.',
+  })
+  @ApiParam({ name: 'txId', description: 'ID giao dịch UNMATCHED cần gán user' })
+  @ApiSuccessResponse('Kết quả propose / approve match')
+  @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  async adminMatchDepositUser(
+    @CurrentUser('userId') actorId: string,
+    @CurrentUser('role') actorRole: UserRole,
+    @Param('txId') txId: string,
+    @Body() dto: MatchDepositDto,
+    @Headers('idempotency-key') idempotencyKeyHeader?: string,
+  ) {
+    const idempotencyKey =
+      idempotencyKeyHeader?.trim() ||
+      createHash('sha256').update(`${txId}|${dto.userId}`).digest('hex');
+
+    return this.depositMatchService.proposeOrApprove(actorId, actorRole, txId, dto.userId, idempotencyKey);
   }
 }

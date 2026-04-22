@@ -86,7 +86,7 @@ type TreasuryQueue = Queue & { getJob(jobId: string): Promise<TreasuryJob | null
 const TREASURY_LOCK_WAIT_MAX_MS = 15 * 60 * 1000;
 
 /** Lock TTL for per-wallet Redis lock. Heartbeat extends this every HEARTBEAT_INTERVAL. */
-const TREASURY_WALLET_LOCK_TTL_SEC = 120;
+const TREASURY_WALLET_LOCK_TTL_SEC = 300;
 /** Heartbeat refresh interval — extends lock TTL to prevent expiry during long operations. */
 const TREASURY_WALLET_LOCK_HEARTBEAT_INTERVAL_MS = 30_000;
 /** Max total lock hold time via heartbeat — prevents infinite lock on stuck workers. */
@@ -533,7 +533,10 @@ export class TreasuryOperationsService {
 
     if (operation.type === 'SWEEP') {
       if (!operation.from_wallet_id) {
-        throw new BusinessException('Confirm: missing from_wallet_id', 'TREASURY_CONFIRM_NO_WALLET');
+        throw new BusinessException(
+          'Confirm: missing from_wallet_id',
+          'TREASURY_CONFIRM_NO_WALLET',
+        );
       }
       const wallet = await this.transactionWalletService.getWalletById(operation.from_wallet_id);
       const mainAddress = await this.treasuryMainWalletService.getMainWalletAddress(
@@ -550,7 +553,10 @@ export class TreasuryOperationsService {
             data.usdtPreBalance,
           );
           if (!swept) {
-            await this.transactionWalletService.invalidateBalanceCache(wallet.chain, wallet.address);
+            await this.transactionWalletService.invalidateBalanceCache(
+              wallet.chain,
+              wallet.address,
+            );
             throw new BusinessException(
               'USDT sweep did not reduce on-chain balance in time.',
               'TREASURY_SWEEP_USDT_BALANCE_NOT_UPDATED',
@@ -596,7 +602,11 @@ export class TreasuryOperationsService {
             'TREASURY_FUND_USDT_BALANCE_NOT_UPDATED',
           );
         }
-      } else if (data.nativePreBalanceSun !== null && data.nativePreBalanceSun !== undefined && TreasuryOperationsService.isTronChain(wallet.chain)) {
+      } else if (
+        data.nativePreBalanceSun !== null &&
+        data.nativePreBalanceSun !== undefined &&
+        TreasuryOperationsService.isTronChain(wallet.chain)
+      ) {
         await this.transactionWalletService.waitForTronBalanceReflectFund(
           wallet.chain,
           wallet.address,
@@ -722,9 +732,7 @@ export class TreasuryOperationsService {
     });
 
     const jobData: TreasuryJobData =
-      op.type === 'SWEEP'
-        ? { operationId, mainWalletId }
-        : { operationId };
+      op.type === 'SWEEP' ? { operationId, mainWalletId } : { operationId };
 
     const jobLabel = op.type === 'FUND' ? TREASURY_FUND_JOB : TREASURY_SWEEP_JOB;
     const jobId = `treasury-manual-retry:${operationId}:${uuidv7()}`;
@@ -873,7 +881,10 @@ export class TreasuryOperationsService {
     return { operationId, status: 'COMPLETED' };
   }
 
-  private async forceReleaseTreasuryWalletLock(walletId: string, operationId: string): Promise<void> {
+  private async forceReleaseTreasuryWalletLock(
+    walletId: string,
+    operationId: string,
+  ): Promise<void> {
     await this.redisService.getClient().del(`treasury:lock:${walletId}`);
     await this.clearLockWaitTimer(operationId);
   }
@@ -1223,7 +1234,9 @@ export class TreasuryOperationsService {
       if (state === 'completed' || state === 'failed') {
         // Remove terminal jobs so deterministic IDs can be re-added — Bull silently
         // rejects queue.add when a job with the same ID already exists in any state.
-        await existing.remove().catch(() => {/* ignore remove errors */});
+        await existing.remove().catch(() => {
+          /* ignore remove errors */
+        });
         return null;
       }
       const data = existing.data as TreasuryJobData;

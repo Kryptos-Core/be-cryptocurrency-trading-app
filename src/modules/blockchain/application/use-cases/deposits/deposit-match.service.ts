@@ -233,4 +233,21 @@ export class DepositMatchService {
 
     return { matchId, status: 'APPROVED', settled };
   }
+
+  async proposeOrApprove(
+    actorId: string,
+    actorRole: UserRole,
+    txId: string,
+    requestedUserId: string,
+    idempotencyKey: string,
+  ): Promise<
+    | { matchId: string; status: 'PENDING' }
+    | { matchId: string; status: 'APPROVED'; settled: boolean }
+  > {
+    const pending = await this.matchRepo.findPendingByTxId(txId);
+    if (pending) {
+      return this.approveMatch(actorId, actorRole, pending.match_id);
+    }
+    return this.proposeMatch(actorId, actorRole, txId, requestedUserId, idempotencyKey);
+  }
 }
