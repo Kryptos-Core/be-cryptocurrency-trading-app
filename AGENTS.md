@@ -32,18 +32,9 @@ Mở **đúng thư mục gốc repo NestJS này** làm folder workspace (cùng c
 
 **Lệnh slash / multi-agent ECC:** [ECC-COMMANDS.md](./ECC-COMMANDS.md).
 
-## Upstream ECC — [everything-claude-code](https://github.com/affaan-m/everything-claude-code.git) (tùy chọn)
+## Optional upstream
 
-Dùng khi bạn muốn **Codex toàn máy** hoặc **Claude Code full plugin** giống bản upstream; hằng ngày chỉ mở repo NestJS này vẫn đủ nhờ `.codex/` + `.agents/` đã có sẵn.
-
-| Mục đích | Việc cần làm |
-|----------|----------------|
-| **Codex trong repo này** | Mở folder này làm workspace; không bắt buộc clone upstream. |
-| **Merge ECC → `~/.codex/`** | Clone upstream (trong monorepo cha: `../everything-claude-code`). `cd` vào đó → `npm install` → `bash scripts/sync-ecc-to-codex.sh` (Git Bash / WSL). Tuỳ chọn `--dry-run`, `--update-mcp`. Chi tiết merge MCP: [`.codex/AGENTS.md`](./.codex/AGENTS.md). |
-| **Plugin Codex (preview)** | Từ **root** clone upstream: `codex plugin install ./` — xem `everything-claude-code/.codex-plugin/README.md`. |
-| **Claude Code đầy đủ ECC** | Plugin: `/plugin marketplace add https://github.com/affaan-m/everything-claude-code` → `/plugin install ecc@ecc`. Hoặc OSS: trong clone upstream `npm install` rồi Windows `.\install.ps1`, Unix `./install.sh` (xem upstream README). Repo này chỉ bổ sung ngữ cảnh qua `.claude/CLAUDE.md`. |
-
-Chi tiết và lưu ý xung đột với Vibe Code: [AGENTS.md ở monorepo cha](../AGENTS.md) (mục “Upstream ECC”).
+The upstream ECC project can be used for personal machine-wide sync, but it is not part of the team's default workflow. Day-to-day work stays in this repo.
 
 ## Nguyên tắc ngắn
 

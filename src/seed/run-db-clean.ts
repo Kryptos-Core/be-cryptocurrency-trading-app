@@ -1,5 +1,5 @@
 /**
- * Truncate every BASE TABLE in the configured MySQL schema (all rows, all tables).
+ * Delete all rows from every BASE TABLE in the configured MySQL schema.
  * Includes `migrations` — TypeORM migration history is cleared; run `npm run migration:run` after if needed.
  *
  * Usage: npm run db:clean
@@ -61,15 +61,20 @@ async function run() {
       return;
     }
 
-    console.log(`🗑️  Truncating all ${toTruncate.length} table(s) in "${database}"...`);
+    console.log(`🗑️  Clearing all ${toTruncate.length} table(s) in "${database}"...`);
 
     await q.query('SET FOREIGN_KEY_CHECKS = 0');
-    for (const table of toTruncate) {
-      await q.query(`TRUNCATE TABLE \`${table.replace(/`/g, '``')}\``);
+    try {
+      for (const table of toTruncate) {
+        const escapedTable = table.replace(/`/g, '``');
+        await q.query(`DELETE FROM \`${escapedTable}\``);
+        await q.query(`ALTER TABLE \`${escapedTable}\` AUTO_INCREMENT = 1`);
+      }
+    } finally {
+      await q.query('SET FOREIGN_KEY_CHECKS = 1');
     }
-    await q.query('SET FOREIGN_KEY_CHECKS = 1');
 
-    console.log('✅ All tables truncated (including migrations).');
+    console.log('✅ All table data cleared (including migrations).');
     console.log(
       '   Run npm run migration:run if you need migration rows back, then npm run db:seed if you use seed data.',
     );
