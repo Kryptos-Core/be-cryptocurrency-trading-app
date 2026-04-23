@@ -24,6 +24,7 @@ import {
   BusinessException,
   ConflictException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@/common/exceptions';
 import { CacheService, RedisService, WalletEncryptionService } from '@/common/services';
 import { WorkerPoolService } from '@/common/worker-pool/worker-pool.service';
@@ -52,6 +53,8 @@ import {
 const LIST_CACHE_TTL_SECONDS = 60;
 /** Short TTL: on-chain reads can lag right after a tx; stale values must expire quickly. */
 const BALANCE_CACHE_TTL_SECONDS = 12;
+const BALANCE_STALE_CACHE_TTL_SECONDS = 15 * 60;
+const LIST_BALANCE_CONCURRENCY = 3;
 
 type SupportedTreasuryChain = BlockchainChainDbValue;
 
@@ -162,22 +165,33 @@ export class TransactionWalletService {
       LIST_CACHE_TTL_SECONDS,
     );
 
-    const enriched = await Promise.all(
-      wallets.map(async (w) => {
+    return mapWithConcurrency(wallets, LIST_BALANCE_CONCURRENCY, async (w) => {
+      const { encrypted_private_key: _, ...rest } = w;
+      try {
         const { balance, symbol, usdtTrc20Balance } = await this.getBalanceCached(
           w.chain,
           w.address,
         );
-        const { encrypted_private_key: _, ...rest } = w;
         return {
           ...rest,
           balance,
           symbol,
           ...(usdtTrc20Balance != null ? { usdtTrc20Balance } : {}),
         } as TreasuryWalletWithBalance;
-      }),
-    );
-    return enriched;
+      } catch (error) {
+        if (!this.isTronRateLimitError(error)) {
+          throw error;
+        }
+        this.logger.warn(
+          `Balance lookup rate-limited for ${w.wallet_id} on ${w.chain}: ${(error as Error).message}`,
+        );
+        return {
+          ...rest,
+          balance: '0',
+          symbol: this.getFallbackSymbolForChain(w.chain),
+        } as TreasuryWalletWithBalance;
+      }
+    });
   }
 
   async getBalanceCached(
@@ -185,16 +199,34 @@ export class TransactionWalletService {
     address: string,
   ): Promise<TreasuryOnChainBalances> {
     const cacheKey = `treasury:balance:${chain}:${address}`;
-    return this.cacheService.getOrSet(
-      cacheKey,
-      () => this.getBalanceByAddress(chain, address),
-      BALANCE_CACHE_TTL_SECONDS,
-    );
+    const staleCacheKey = `${cacheKey}:stale`;
+
+    const cached = await this.cacheService.get<TreasuryOnChainBalances>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
+    try {
+      const value = await this.getBalanceByAddress(chain, address);
+      await this.cacheService.set(cacheKey, value, BALANCE_CACHE_TTL_SECONDS);
+      await this.cacheService.set(staleCacheKey, value, BALANCE_STALE_CACHE_TTL_SECONDS);
+      return value;
+    } catch (error) {
+      const stale = await this.cacheService.get<TreasuryOnChainBalances>(staleCacheKey);
+      if (stale !== null && this.isTronRateLimitError(error)) {
+        this.logger.warn(
+          `Using stale balance for ${address} on ${chain} after rate limit: ${(error as Error).message}`,
+        );
+        await this.cacheService.set(cacheKey, stale, BALANCE_CACHE_TTL_SECONDS);
+        return stale;
+      }
+      throw error;
+    }
   }
 
   invalidateBalanceCache(chain: SupportedTreasuryChain, address: string): Promise<void> {
     const cacheKey = `treasury:balance:${chain}:${address}`;
-    return this.cacheService.delete(cacheKey);
+    return this.cacheService.deleteMany(cacheKey, `${cacheKey}:stale`);
   }
 
   /** Clears cached on-chain balances for all treasury transaction wallets (after Fund/Sweep). */
@@ -319,6 +351,11 @@ export class TransactionWalletService {
     if (!tw.isAddress(toBase58)) {
       throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
     }
+    await this.assertTronAccountExistsOrThrow(
+      tw,
+      toBase58,
+      'TRON_USDT_DESTINATION_NOT_ACTIVATED',
+    );
     const valueInt = new Decimal(amountHuman).mul(new Decimal(10).pow(TRON_USDT_DECIMALS)).floor();
     if (valueInt.lte(0)) {
       throw new BadRequestException(
@@ -456,16 +493,14 @@ export class TransactionWalletService {
 
     if (chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA') {
       const tronWeb = await this.buildTronReadOnlyClient(chain);
-      const sun = await tronWeb.trx.getBalance(address);
-      let usdtTrc20Balance: string | undefined;
-      try {
-        usdtTrc20Balance = await this.readTronUsdtBalance(tronWeb, chain, address);
-      } catch (err) {
-        this.logger.warn(
-          `USDT TRC-20 balance skipped for ${address} on ${chain}: ${(err as Error).message}`,
-        );
-        usdtTrc20Balance = '0';
-      }
+      const sun = await this.retryTronRead(
+        () => tronWeb.trx.getBalance(address),
+        `TRX balance ${address} on ${chain}`,
+      );
+      const usdtTrc20Balance = await this.retryTronRead(
+        () => this.readTronUsdtBalance(tronWeb, chain, address),
+        `USDT TRC-20 balance ${address} on ${chain}`,
+      );
       return {
         balance: new Decimal(sun).div(1_000_000).toString(),
         symbol: 'TRX',
@@ -865,6 +900,70 @@ export class TransactionWalletService {
     return new TronWeb({ fullHost });
   }
 
+  private async assertTronAccountExistsOrThrow(
+    tronWeb: TronWeb,
+    address: string,
+    code: string,
+  ): Promise<void> {
+    let account: unknown;
+    try {
+      account = await this.retryTronRead(
+        () => tronWeb.trx.getAccount(address),
+        `TRON account lookup ${address}`,
+      );
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'TRON account lookup is temporarily unavailable. Retry the operation later.',
+        'TRON_ACCOUNT_PREFLIGHT_UNAVAILABLE',
+        { address, cause: (error as Error).message },
+      );
+    }
+
+    if (account == null || (typeof account === 'object' && Object.keys(account).length === 0)) {
+      throw new BusinessException(
+        'Destination Tron account is not activated yet. Fund TRX or activate the address before sending USDT.',
+        code,
+      );
+    }
+  }
+
+  private getFallbackSymbolForChain(chain: SupportedTreasuryChain): string {
+    const evmDef = getEvmDefinitionByTreasuryChain(chain);
+    if (evmDef) return evmDef.nativeSymbol;
+    if (chain === 'SOLANA_MAINNET' || chain === 'SOLANA_DEVNET') return 'SOL';
+    if (chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA') {
+      return 'TRX';
+    }
+    return '';
+  }
+
+  private async retryTronRead<T>(
+    operation: () => Promise<T>,
+    label: string,
+    attempts = 3,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        const isRateLimited = this.isTronRateLimitError(error);
+        if (!isRateLimited || attempt === attempts) {
+          throw error;
+        }
+        this.logger.warn(`TRON RPC rate limited for ${label}; retrying (${attempt}/${attempts})`);
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(`TRON RPC failed for ${label}`);
+  }
+
+  private isTronRateLimitError(error: unknown): boolean {
+    const message = (error as Error)?.message ?? '';
+    return message.includes('status code 429') || message.includes('Too Many Requests');
+  }
+
   private async publishEvent(event: string, payload: Record<string, unknown>): Promise<void> {
     try {
       await this.redisService.publish(
@@ -875,4 +974,24 @@ export class TransactionWalletService {
       this.logger.warn(`Failed to publish treasury event ${event}: ${(error as Error).message}`);
     }
   }
+}
+
+async function mapWithConcurrency<T, U>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<U>,
+): Promise<U[]> {
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) return;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }

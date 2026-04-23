@@ -355,10 +355,19 @@ export class TreasuryOperationsService {
       const asset = operation.asset ?? 'NATIVE';
       let usdtBeforeSweep: string | null = null;
       if (TreasuryOperationsService.isTronChain(wallet.chain) && asset === 'USDT_TRC20') {
-        usdtBeforeSweep = await this.transactionWalletService.getTronUsdtHumanBalanceOnChain(
-          wallet.chain,
-          wallet.address,
-        );
+        try {
+          usdtBeforeSweep = await this.transactionWalletService.getTronUsdtHumanBalanceOnChain(
+            wallet.chain,
+            wallet.address,
+          );
+        } catch (error) {
+          if (!this.isTronRateLimitError(error)) {
+            throw error;
+          }
+          this.logger.warn(
+            `Skipping TRON pre-sweep balance snapshot for ${operation.operation_id} due to rate limit: ${(error as Error).message}`,
+          );
+        }
       }
 
       // Set idempotency key BEFORE RPC — crash-safe broadcast tracking.
@@ -451,15 +460,24 @@ export class TreasuryOperationsService {
       let tronPreFundSun: number | null = null;
       let tronPreUsdtHuman: string | null = null;
       if (TreasuryOperationsService.isTronChain(wallet.chain)) {
-        if (asset === 'USDT_TRC20') {
-          tronPreUsdtHuman = await this.transactionWalletService.getTronUsdtHumanBalanceOnChain(
-            wallet.chain,
-            wallet.address,
-          );
-        } else {
-          tronPreFundSun = await this.transactionWalletService.getTronNativeBalanceSun(
-            wallet.chain,
-            wallet.address,
+        try {
+          if (asset === 'USDT_TRC20') {
+            tronPreUsdtHuman = await this.transactionWalletService.getTronUsdtHumanBalanceOnChain(
+              wallet.chain,
+              wallet.address,
+            );
+          } else {
+            tronPreFundSun = await this.transactionWalletService.getTronNativeBalanceSun(
+              wallet.chain,
+              wallet.address,
+            );
+          }
+        } catch (error) {
+          if (!this.isTronRateLimitError(error)) {
+            throw error;
+          }
+          this.logger.warn(
+            `Skipping TRON pre-fund balance snapshot for ${operation.operation_id} due to rate limit: ${(error as Error).message}`,
           );
         }
       }
@@ -1293,6 +1311,11 @@ export class TreasuryOperationsService {
 
   private static isTronChain(chain: string): chain is 'TRON_MAINNET' | 'TRON_NILE' | 'TRON_SHASTA' {
     return chain === 'TRON_MAINNET' || chain === 'TRON_NILE' || chain === 'TRON_SHASTA';
+  }
+
+  private isTronRateLimitError(error: unknown): boolean {
+    const message = (error as Error)?.message ?? '';
+    return message.includes('status code 429') || message.includes('Too Many Requests');
   }
 
   private async buildSolanaConnection(

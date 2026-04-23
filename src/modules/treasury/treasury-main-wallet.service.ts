@@ -32,6 +32,8 @@ import {
 import type { ImportMainWalletDto } from './dto';
 import { TransactionWalletService } from './transaction-wallet.service';
 
+const LIST_BALANCE_CONCURRENCY = 3;
+
 export type SupportedTreasuryChain = TreasuryMainWalletChain;
 
 export interface MainWalletDto {
@@ -77,7 +79,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     const wallets = await this.mainWalletRepository.findByChainForList(chain);
 
     if (wallets.length > 0) {
-      return Promise.all(wallets.map((w) => this.toDto(w)));
+      return mapWithConcurrency(wallets, LIST_BALANCE_CONCURRENCY, (wallet) => this.toDto(wallet));
     }
 
     return this.getSyntheticFromPaymentConfig(chain);
@@ -85,7 +87,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
 
   async listPendingApproval(): Promise<MainWalletDto[]> {
     const wallets = await this.mainWalletRepository.findPendingApprovalList();
-    return Promise.all(wallets.map((w) => this.toDto(w)));
+    return mapWithConcurrency(wallets, LIST_BALANCE_CONCURRENCY, (wallet) => this.toDto(wallet));
   }
 
   async getById(mainWalletId: string): Promise<TreasuryMainWalletRecord> {
@@ -673,4 +675,24 @@ export class TreasuryMainWalletService implements OnModuleInit {
       this.logger.warn(`Failed to publish main wallet event ${event}: ${(err as Error).message}`);
     }
   }
+}
+
+async function mapWithConcurrency<T, U>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<U>,
+): Promise<U[]> {
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) return;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
