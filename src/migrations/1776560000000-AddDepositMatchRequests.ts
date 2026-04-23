@@ -15,7 +15,7 @@ export class AddDepositMatchRequests1776560000000 implements MigrationInterface 
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE \`deposit_match_requests\` (
+      CREATE TABLE IF NOT EXISTS \`deposit_match_requests\` (
         \`match_id\`          char(36)      NOT NULL,
         \`tx_id\`             char(36)      NOT NULL,
         \`requested_user_id\` char(36)      NOT NULL,

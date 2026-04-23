@@ -11,6 +11,64 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 export class AddUnmatchedDepositSupport1776550000000 implements MigrationInterface {
   name = 'AddUnmatchedDepositSupport1776550000000';
 
+  private async ensureIndex(
+    queryRunner: QueryRunner,
+    tableName: string,
+    indexName: string,
+    indexColumns: string[],
+    addIndexClause: string,
+  ): Promise<void> {
+    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
+    const schema = dbRows[0]?.db;
+    if (!schema) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` ${addIndexClause}`);
+      return;
+    }
+
+    const rows: { column_list: string | null }[] = await queryRunner.query(
+      `SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') AS column_list
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?
+       GROUP BY INDEX_NAME`,
+      [schema, tableName, indexName],
+    );
+
+    const expectedColumns = indexColumns.join(',');
+    const existingColumns = rows[0]?.column_list;
+    if (existingColumns === expectedColumns) {
+      return;
+    }
+
+    if (existingColumns) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` DROP INDEX \`${indexName}\``);
+    }
+
+    await queryRunner.query(`ALTER TABLE \`${tableName}\` ${addIndexClause}`);
+  }
+
+  private async dropIndexIfExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    indexName: string,
+  ): Promise<void> {
+    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
+    const schema = dbRows[0]?.db;
+    if (!schema) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` DROP INDEX \`${indexName}\``);
+      return;
+    }
+
+    const rows: unknown[] = await queryRunner.query(
+      `SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+      [schema, tableName, indexName],
+    );
+    if (rows.length === 0) {
+      return;
+    }
+
+    await queryRunner.query(`ALTER TABLE \`${tableName}\` DROP INDEX \`${indexName}\``);
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Make user_id nullable for unmatched deposits.
     await queryRunner.query(`
@@ -25,17 +83,17 @@ export class AddUnmatchedDepositSupport1776550000000 implements MigrationInterfa
     `);
 
     // Index for admin: find all UNMATCHED rows quickly.
-    await queryRunner.query(`
-      ALTER TABLE \`onchain_transactions\`
-        ADD INDEX \`idx_onchain_tx_unmatched\` (\`status\`, \`created_at\`)
-    `);
+    await this.ensureIndex(
+      queryRunner,
+      'onchain_transactions',
+      'idx_onchain_tx_unmatched',
+      ['status', 'created_at'],
+      'ADD INDEX `idx_onchain_tx_unmatched` (`status`, `created_at`)',
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE \`onchain_transactions\`
-        DROP INDEX \`idx_onchain_tx_unmatched\`
-    `);
+    await this.dropIndexIfExists(queryRunner, 'onchain_transactions', 'idx_onchain_tx_unmatched');
 
     // Revert status enum — rows with UNMATCHED would need manual cleanup first in prod.
     await queryRunner.query(`
