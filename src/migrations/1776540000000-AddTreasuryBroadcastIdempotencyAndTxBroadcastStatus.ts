@@ -14,18 +14,68 @@ export class AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000
 {
   name = 'AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000';
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add broadcast_idempotency_key column
-    await queryRunner.query(`
-      ALTER TABLE \`treasury_operations\`
-        ADD COLUMN \`broadcast_idempotency_key\` varchar(255) NULL DEFAULT NULL
-    `);
+  private async addColumnIfNotExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    columnName: string,
+    columnDefinitionSql: string,
+  ): Promise<void> {
+    if (await queryRunner.hasColumn(tableName, columnName)) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` MODIFY COLUMN ${columnDefinitionSql}`);
+      return;
+    }
 
-    // Add updated_at for reconciliation queries
-    await queryRunner.query(`
-      ALTER TABLE \`treasury_operations\`
-        ADD COLUMN \`updated_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
-    `);
+    await queryRunner.query(`ALTER TABLE \`${tableName}\` ADD COLUMN ${columnDefinitionSql}`);
+  }
+
+  private async ensureIndex(
+    queryRunner: QueryRunner,
+    tableName: string,
+    indexName: string,
+    indexColumns: string[],
+    addIndexClause: string,
+  ): Promise<void> {
+    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
+    const schema = dbRows[0]?.db;
+    if (!schema) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` ${addIndexClause}`);
+      return;
+    }
+
+    const rows: { column_list: string | null }[] = await queryRunner.query(
+      `SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') AS column_list
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?
+       GROUP BY INDEX_NAME`,
+      [schema, tableName, indexName],
+    );
+    const expectedColumns = indexColumns.join(',');
+    const existingColumns = rows[0]?.column_list;
+    if (existingColumns === expectedColumns) {
+      return;
+    }
+
+    if (existingColumns) {
+      await queryRunner.query(`ALTER TABLE \`${tableName}\` DROP INDEX \`${indexName}\``);
+    }
+
+    await queryRunner.query(`ALTER TABLE \`${tableName}\` ${addIndexClause}`);
+  }
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await this.addColumnIfNotExists(
+      queryRunner,
+      'treasury_operations',
+      'broadcast_idempotency_key',
+      '`broadcast_idempotency_key` varchar(255) NULL DEFAULT NULL',
+    );
+
+    await this.addColumnIfNotExists(
+      queryRunner,
+      'treasury_operations',
+      'updated_at',
+      '`updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)',
+    );
 
     // Add TX_BROADCAST to status enum — must re-specify all enum values for MySQL.
     await queryRunner.query(`
@@ -33,11 +83,13 @@ export class AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000
         MODIFY COLUMN \`status\` enum('PENDING','PROCESSING','TX_BROADCAST','COMPLETED','FAILED') NOT NULL DEFAULT 'PENDING'
     `);
 
-    // Index for confirm-job reconciliation: fast lookup of stale TX_BROADCAST operations.
-    await queryRunner.query(`
-      ALTER TABLE \`treasury_operations\`
-        ADD INDEX \`idx_treasury_op_tx_broadcast_stale\` (\`status\`, \`updated_at\`)
-    `);
+    await this.ensureIndex(
+      queryRunner,
+      'treasury_operations',
+      'idx_treasury_op_tx_broadcast_stale',
+      ['status', 'updated_at'],
+      'ADD INDEX `idx_treasury_op_tx_broadcast_stale` (`status`, `updated_at`)',
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import type { TransactionContext } from '@/common/types/transaction-context';
+import type { DepositMatchRequestRepositoryPort } from '../../domain/ports/deposit-match-request-repository.port';
 import type {
   DepositMatchAuditEntry,
   DepositMatchRequestStatus,
 } from '../../entities/deposit-match-request.entity';
 import { DepositMatchRequest } from '../../entities/deposit-match-request.entity';
-import type { DepositMatchRequestRepositoryPort } from '../../domain/ports/deposit-match-request-repository.port';
 
 function toEntityManager(ctx: TransactionContext): EntityManager {
   return ctx as unknown as EntityManager;
@@ -89,15 +89,17 @@ export class DepositMatchRequestRepository implements DepositMatchRequestReposit
       audit_log: DepositMatchAuditEntry[];
     },
   ): Promise<void> {
-    await toEntityManager(ctx).getRepository(DepositMatchRequest).update(
-      { match_id: matchId },
-      {
-        status,
-        approver_id: extra.approver_id ?? null,
-        approver_role: extra.approver_role ?? null,
-        resolved_at: extra.resolved_at ?? null,
-        audit_log: extra.audit_log,
-      },
-    );
+    await toEntityManager(ctx)
+      .getRepository(DepositMatchRequest)
+      .update(
+        { match_id: matchId },
+        {
+          status,
+          approver_id: extra.approver_id ?? null,
+          approver_role: extra.approver_role ?? null,
+          resolved_at: extra.resolved_at ?? null,
+          audit_log: extra.audit_log,
+        },
+      );
   }
 }
