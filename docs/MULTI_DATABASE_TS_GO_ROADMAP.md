@@ -8,24 +8,210 @@
 
 ## 0. Tiến Độ Thực Tế Cập Nhật (2026-04-25)
 
-### Đã hoàn thành trong repo backend
+> Trạng thái này phản ánh **repo backend hiện tại** chứ không phải mục tiêu cuối cùng của toàn bộ roadmap. Kết luận ngắn: phần **PostgreSQL-only core source of truth** đã tiến rất xa và gần hoàn tất; phần **multi-database đầy đủ + Kafka/event bus mature + Go services + shadow/canary rollout** vẫn còn ở phía trước.
+
+### 0.1 Tóm tắt tiến độ toàn cục
+
+- **Nếu tính theo mục tiêu bắt buộc ngắn hạn**: backend đã đạt trạng thái **PostgreSQL-only core** và đang ở mức **gần hoàn tất**.
+- **Nếu tính theo toàn bộ roadmap Multi-Database + TypeScript/Go**: roadmap **chưa hoàn thành**; nhiều phase dài hạn mới ở mức chuẩn bị thiết kế hoặc chưa bắt đầu implementation.
+
+Ước lượng thực dụng:
+
+| Phạm vi đánh giá | Tiến độ ước lượng | Ghi chú |
+|---|---:|---|
+| PostgreSQL-only core migration | 85-95% | Runtime, repo chính, lint/type/build/test đã ổn định |
+| Toàn bộ roadmap multi-db + TS/Go | 40-55% | Nửa sau roadmap vẫn còn nhiều hạng mục lớn chưa triển khai |
+
+### 0.2 Bảng trạng thái theo phase
+
+| Phase | Mục tiêu | Trạng thái | Nhận định ngắn |
+|---|---|---|---|
+| Phase 0 | API contract baseline | Partial | Có awareness rất rõ về FE compatibility, nhưng chưa xác nhận full snapshot/coverage cho toàn bộ endpoint critical |
+| Phase 1 | Clean architecture database boundary | Near complete | Phần lớn boundary/repository ports/runtime PostgreSQL đã tách và vận hành được |
+| Phase 2 | PostgreSQL core source of truth replacement | Near complete | Đây là phần tiến xa nhất; runtime đã PostgreSQL-only |
+| Phase 3 | Market read model trên DB phụ | Not started / early design | Chưa có Timescale projection end-to-end trong runtime hiện tại |
+| Phase 4 | Event/outbox contract chuẩn cho TS và Go | In progress | Outbox nền tảng đã có; canonical envelope vừa được bổ sung, nhưng metadata/publisher/Kafka maturity chưa xong |
+| Phase 5 | Go market aggregator | Not started | Chưa có `go-services/market-aggregator` chạy shadow |
+| Phase 6 | Go matching engine shadow mode | Not started | Chưa có shadow parity/canary flow cho matching Go |
+| Phase 7 | Public WS gateway bằng Go | Not started | Chưa tách public market WS khỏi NestJS |
+
+### 0.3 Đã hoàn thành trong repo backend
+
+#### A. PostgreSQL-only runtime core đã được chốt gần xong
 
 - Runtime backend đã chuyển sang hướng **PostgreSQL-only** cho core persistence; build hiện tại không còn phụ thuộc MySQL runtime path.
 - Đã thêm và kích hoạt `pg-placeholder-adapter` để chặn lỗi cú pháp từ placeholder legacy `?` trong giai đoạn chuyển tiếp.
-- Các repository/runtime batch lớn đã được migrate hoặc chuẩn hóa theo PostgreSQL gồm: blockchain, wallets, treasury, notifications, deposits, payment-config, currencies, auth/users, markets, orders, exchange.
-- Đã retire các helper/constants MySQL legacy khỏi runtime: stored-procedure name constants, OUT-var helpers, stored-procedure result util.
-- Lint/type cleanup đã được dọn theo batch; trạng thái verify gần nhất của repo hiện tại là:
-  - `npm run lint -- --max-diagnostics=220` ✅
-  - `npx tsc --noEmit` ✅
-  - `npm run build` ✅
-  - `npm run test -- --runInBand` ✅
-- Docs trọng yếu đã được cập nhật theo trạng thái hiện tại: PostgreSQL + Redis infra, PostgreSQL runtime config, và wording loại bỏ MySQL runtime claims.
+- Các repository/runtime batch lớn đã được migrate hoặc chuẩn hóa theo PostgreSQL gồm:
+  - blockchain
+  - wallets
+  - treasury
+  - notifications
+  - deposits
+  - payment-config
+  - currencies
+  - auth/users
+  - markets
+  - orders
+  - exchange
+- Đã retire các helper/constants MySQL legacy khỏi runtime:
+  - stored-procedure name constants
+  - OUT-var helpers
+  - stored-procedure result util
+- Tài liệu trọng yếu đã được cập nhật theo trạng thái mới: PostgreSQL + Redis infra, PostgreSQL runtime config, và wording loại bỏ MySQL runtime claims.
 
-### Còn tồn tại có chủ đích / lịch sử
+#### B. Verify của repo hiện tại đang tốt
+
+Trạng thái verify gần nhất của repo hiện tại là:
+
+- `npm run lint -- --max-diagnostics=220` ✅
+- `npx tsc --noEmit` ✅
+- `npm run build` ✅
+- `npm run test -- --runInBand` ✅
+
+Điều này cho thấy phần migration bắt buộc không chỉ “đổi code” mà còn đã đạt mức tương đối ổn định về chất lượng kỹ thuật.
+
+#### C. Transaction / outbox / read-model nền tảng đã hiện diện trong runtime
+
+- `src/common/unit-of-work` đã tồn tại và đang là ranh giới transaction quan trọng.
+- `src/common/outbox` đã có transactional outbox pattern trong runtime.
+- Relay hiện tại đã có:
+  - lock phân tán bằng Redis
+  - per-row transaction
+  - chỉ set `published_at` sau khi side-effect sync thành công
+- Read model sync / notification sync đã có ít nhất cho các luồng đang được áp dụng như market pairs và on-chain deposits.
+
+#### D. Cập nhật mới nhất trong nhịp triển khai này: chuẩn hóa outbox/event contract bước đầu
+
+Đã bổ sung thêm bước chuẩn hóa để phục vụ Phase 4:
+
+- Thêm **canonical integration event envelope** trong runtime:
+  - file mới: `src/common/integration-events/canonical-integration-event-envelope.ts`
+- Update `OutboxAppender` để build envelope với metadata chuẩn hóa:
+  - `eventId`
+  - `eventType`
+  - `aggregateType`
+  - `aggregateId`
+  - `occurredAt`
+  - `schemaVersion`
+  - `payload`
+  - `correlationId`
+  - `causationId`
+  - `idempotencyKey`
+  - `partitionKey`
+- Giữ **backward compatibility** với payload cũ của outbox hiện tại:
+  - `OutboxIntegrationSyncService` có thể unwrap envelope mới nhưng vẫn đọc payload cũ
+  - `OnchainDepositReadModelSyncApplierService` hỗ trợ cả envelope mới lẫn legacy payload
+  - `OnchainDepositOutboxNotificationService` hỗ trợ cả envelope mới lẫn legacy payload
+- Mở thêm support read/notification path cho `DepositMatchedV1`.
+- Đã thêm test cho `OutboxAppender` và verify pass.
+
+Các file thay đổi chính trong batch này:
+
+- `src/common/integration-events/canonical-integration-event-envelope.ts`
+- `src/common/integration-events/onchain-deposit-outbox-payload.ts`
+- `src/common/outbox/outbox-appender.service.ts`
+- `src/common/outbox/outbox-appender.spec.ts`
+- `src/common/outbox/outbox-integration-sync.service.ts`
+- `src/common/read-model/onchain-deposit-read-model-sync-applier.service.ts`
+- `src/modules/notifications/onchain-deposit-outbox-notification.service.ts`
+
+### 0.4 Chưa hoàn thành / còn dang dở có chủ đích
+
+#### A. Dấu vết lịch sử migration MySQL vẫn còn trong repo
 
 - Nhiều **migration lịch sử** vẫn chứa DDL/procedure MySQL cũ để bảo toàn historical trace; đây không còn là runtime source of truth hiện tại.
 - Một số helper/spec/migration comments còn tồn tại để mô tả bối cảnh lịch sử migration MySQL -> PostgreSQL; cần dọn tiếp theo batch tài liệu nếu muốn repo “sạch dấu vết” hơn.
-- Roadmap các phase dài hạn (TimescaleDB, ClickHouse, Go services, canary/shadow matching, public WS tách riêng) **chưa triển khai**, mới dừng ở phần bắt buộc: PostgreSQL-only core + cleanup/verifications.
+
+#### B. Phase 0 chưa thể coi là đóng hoàn toàn
+
+- Repo đã có tư duy **contract-first** rất rõ và roadmap đã liệt kê đầy đủ FE impact matrix.
+- Tuy nhiên chưa xác nhận rằng toàn bộ:
+  - OpenAPI export
+  - response snapshot cho nhóm endpoint critical
+  - Socket.IO payload snapshot
+  - CI contract check
+  đã được làm đầy đủ và enforced cho tất cả nhóm endpoint quan trọng.
+
+=> Vì vậy Phase 0 nên đánh dấu là **partial**, chưa phải finished.
+
+#### C. Phase 3 chưa triển khai thực chiến
+
+Chưa thấy trong runtime hiện tại:
+
+- TimescaleDB projection schema hoạt động end-to-end
+- projection worker consume `trade.executed`
+- `MARKET_READ_SOURCE=timescale` chạy tương thích hoàn chỉnh với PostgreSQL source
+- reconciliation PostgreSQL ↔ Timescale cho trade/ticker/ohlcv
+
+=> Đây vẫn là phần việc tương lai.
+
+#### D. Phase 4 mới chỉ tiến một phần
+
+Đã có tiến bộ ở lớp envelope/outbox contract, nhưng vẫn còn thiếu để Phase 4 hoàn chỉnh:
+
+- Mở rộng schema `integration_outbox` cho metadata mature hơn, ví dụ:
+  - `schema_version`
+  - `correlation_id`
+  - `causation_id`
+  - `partition_key`
+  - `kafka_topic`
+  - `kafka_partition`
+  - `kafka_offset`
+  - `kafka_published_at`
+  - `publish_attempts`
+  - `last_publish_error`
+- Chuẩn hóa event contract đầy đủ hơn cho:
+  - orders
+  - trades
+  - wallet ledger / balance changed
+  - ticker updates
+- Thêm publisher abstraction / Kafka publishing path sau commit.
+- Thêm processed-event / idempotency tracking cho consumers nếu đi tiếp Timescale/ClickHouse/Kafka.
+- Hoàn thiện observability / retry / DLQ story.
+
+=> Phase 4 hiện nên coi là **in progress**.
+
+#### E. Các phase Go / multi-db dài hạn chưa bắt đầu implementation thực sự
+
+Chưa thấy các deliverable lớn sau trong repo runtime hiện tại:
+
+- `go-services/market-aggregator`
+- `go-services/matching-engine`
+- shadow compare TS vs Go
+- canary per pair
+- public WS gateway bằng Go
+- tách source market read/ticker/public WS thành rollout hoàn chỉnh
+
+=> Các phase 5-7 về cơ bản vẫn **not started**.
+
+### 0.5 Các việc nên làm tiếp để roadmap tiến thêm rõ ràng
+
+Thứ tự hợp lý tiếp theo sau trạng thái hiện tại:
+
+1. **Hoàn tất Phase 4**
+   - mở rộng `integration_outbox`
+   - chuẩn hóa event names cho order/trade/wallet
+   - thêm publisher abstraction / Kafka-ready metadata
+2. **Làm Phase 3 trước khi làm Go hot-path**
+   - dựng market read model trên DB phụ
+   - reconciliation PostgreSQL ↔ projection
+3. **Sau khi event contract đủ chặt mới bắt đầu Go aggregator**
+   - shadow ticker / parity check
+4. **Matching Go chỉ nên vào sau cùng**
+   - shadow
+   - canary
+   - rollback đã test
+
+### 0.6 Kết luận tiến độ thực tế
+
+Có thể diễn đạt trạng thái hiện tại như sau:
+
+- **Đã gần hoàn tất phần bắt buộc quan trọng nhất**: PostgreSQL-only core source of truth.
+- **Chưa hoàn tất full roadmap**: multi-database read side, Kafka maturity, Go aggregator, Go matching shadow/canary và public WS split vẫn chưa xong.
+- Repo hiện đang ở trạng thái phù hợp để bước sang giai đoạn tiếp theo là:
+  - chuẩn hóa outbox/event contract sâu hơn
+  - xây read-model DB phụ
+  - rồi mới đưa Go vào đường đọc và sau đó mới tới matching.
 
 ## 1. Hiện Trạng Đã Ghi Nhận
 
@@ -171,6 +357,16 @@ Dependency rule:
 
 ### Phase 0 - API Contract Baseline
 
+**Trạng thái hiện tại:** Partial  
+**Tiến độ ước lượng:** 35-50%
+
+**Checklist trạng thái:**
+- [x] Đã có định hướng contract-first rất rõ trong roadmap và FE impact matrix chi tiết.
+- [x] Đã xác định các nhóm endpoint/event critical mà FE đang phụ thuộc mạnh.
+- [ ] Chưa xác nhận export OpenAPI/snapshot contract đầy đủ cho toàn bộ endpoint critical.
+- [ ] Chưa xác nhận snapshot payload đầy đủ cho Socket.IO `/trading` và `/notifications`.
+- [ ] Chưa xác nhận CI contract check đang enforce remove/rename field cho toàn bộ nhóm API quan trọng.
+
 Mục tiêu: khóa lại hành vi API hiện tại để refactor không phá FE.
 
 Deliverables:
@@ -194,6 +390,17 @@ Acceptance criteria:
 
 ### Phase 1 - Clean Architecture Database Boundary, Chưa Đổi Logic
 
+**Trạng thái hiện tại:** Near complete  
+**Tiến độ ước lượng:** 75-90%
+
+**Checklist trạng thái:**
+- [x] PostgreSQL runtime boundary cho phần lớn core repository/service đã được hình thành và vận hành.
+- [x] `src/common/unit-of-work` đang đóng vai trò ranh giới transaction quan trọng.
+- [x] `src/common/outbox` đã tồn tại như integration boundary trong runtime.
+- [x] Nhiều batch repository lớn đã được migrate/chuẩn hóa sang PostgreSQL.
+- [~] Một số phần boundary/health check/contract phân tách theo multi-db dài hạn chưa hoàn chỉnh.
+- [ ] Chưa thấy đầy đủ lớp provider naming/runtime wiring mature cho `MARKET_TS_DB` và `ANALYTICS_DB` ở mức rollout thực chiến.
+
 Mục tiêu: chuẩn bị code để có nhiều DataSource mà không đổi business behavior.
 
 Deliverables:
@@ -212,6 +419,20 @@ Acceptance criteria:
 - Database phụ có thể tắt/bật bằng env mà không ảnh hưởng endpoint hiện tại.
 
 ### Phase 2 - PostgreSQL Core Source Of Truth Replacement
+
+**Trạng thái hiện tại:** Near complete  
+**Tiến độ ước lượng:** 85-95%
+
+**Checklist trạng thái:**
+- [x] Runtime backend đã chuyển sang hướng PostgreSQL-only cho core persistence.
+- [x] Build hiện tại không còn phụ thuộc MySQL runtime path.
+- [x] Đã thêm `pg-placeholder-adapter` để chặn lỗi placeholder legacy trong giai đoạn chuyển tiếp.
+- [x] Các mảng blockchain, wallets, treasury, notifications, deposits, payment-config, currencies, auth/users, markets, orders, exchange đã được migrate/chuẩn hóa lớn theo PostgreSQL.
+- [x] Đã retire các helper/constants MySQL runtime quan trọng.
+- [x] Verify gần nhất đều pass: lint, type-check, build, test.
+- [~] Dấu vết migration/history MySQL vẫn còn trong repo để bảo toàn historical trace.
+- [ ] Chưa thể khẳng định contract tests FE 100% đã được khóa đầy đủ cho mọi endpoint critical.
+- [ ] Chưa xác nhận toàn bộ reconciliation/reporting bắt buộc đã được chuẩn hóa thành acceptance artifact chính thức trong docs/CI.
 
 Mục tiêu: thay toàn bộ MySQL bằng PostgreSQL trong BE, giữ REST/Socket.IO contract và business behavior. Đây là phase bắt buộc trước khi triển khai TimescaleDB/ClickHouse/Go theo kiến trúc multi-db.
 
@@ -234,6 +455,16 @@ Acceptance criteria:
 
 ### Phase 3 - Market Read Model Trên Database Phụ
 
+**Trạng thái hiện tại:** Not started / early design  
+**Tiến độ ước lượng:** 0-15%
+
+**Checklist trạng thái:**
+- [x] Roadmap mục tiêu và feature flag `MARKET_READ_SOURCE=postgres|timescale` đã được xác định rõ.
+- [ ] Chưa có TimescaleDB projection schema chạy end-to-end trong runtime hiện tại.
+- [ ] Chưa có projection worker consume `trade.executed` hoàn chỉnh.
+- [ ] Chưa có runtime path `MARKET_READ_SOURCE=timescale` tương thích hoàn chỉnh với PostgreSQL source.
+- [ ] Chưa có reconciliation PostgreSQL ↔ Timescale cho trade/ticker/ohlcv.
+
 Mục tiêu: giảm tải PostgreSQL source of truth cho chart/ticker/trades mà không đổi REST contract.
 
 Deliverables:
@@ -253,6 +484,22 @@ Acceptance criteria:
 - Có reconciliation job so sánh count/latest trade giữa PostgreSQL và Timescale.
 
 ### Phase 4 - Event/Outbox Contract Chuẩn Cho TS Và Go
+
+**Trạng thái hiện tại:** In progress  
+**Tiến độ ước lượng:** 30-45%
+
+**Checklist trạng thái:**
+- [x] Transactional outbox pattern đã tồn tại trong runtime.
+- [x] Relay hiện tại đã có lock Redis, per-row transaction và chỉ mark `published_at` sau khi sync side-effect thành công.
+- [x] Đã bổ sung canonical integration event envelope.
+- [x] `OutboxAppender` đã build/store canonical envelope với metadata chuẩn hóa bước đầu.
+- [x] Đã giữ backward compatibility cho luồng sync/read-model/notification đang dùng payload legacy.
+- [x] Đã mở thêm support cho `DepositMatchedV1`.
+- [~] Event contract mới chỉ được chuẩn hóa bước đầu, chưa phủ đủ orders/trades/wallet/ticker.
+- [ ] Chưa mở rộng schema `integration_outbox` với bộ metadata mature cho Kafka/publisher/retry observability.
+- [ ] Chưa có publisher abstraction/Kafka publish path hoàn chỉnh sau commit.
+- [ ] Chưa có processed-event/idempotency tracking mature cho consumer side nhiều DB/service.
+- [ ] Chưa hoàn thiện DLQ/observability/retry story cho integration path dài hạn.
 
 Mục tiêu: tạo biên giới integration an toàn trước khi Go tham gia.
 
@@ -284,6 +531,16 @@ Acceptance criteria:
 
 ### Phase 5 - Go Market Aggregator Trước
 
+**Trạng thái hiện tại:** Not started  
+**Tiến độ ước lượng:** 0-5%
+
+**Checklist trạng thái:**
+- [x] Hướng kiến trúc đã xác định rõ: Go market aggregator là bước Go ưu tiên trước matching.
+- [ ] Chưa có `go-services/market-aggregator` trong runtime rollout hiện tại.
+- [ ] Chưa có consume `trade.executed` bằng Go để build ticker/OHLCV thực chiến.
+- [ ] Chưa có shadow compare NestJS ticker vs Go ticker.
+- [ ] Chưa có rollback flow thực tế bằng `TICKER_SOURCE=nestjs` cho Go aggregator rollout.
+
 Mục tiêu: đưa Go vào đường đọc market data, ít rủi ro hơn matching.
 
 Deliverables:
@@ -299,6 +556,16 @@ Acceptance criteria:
 - Rollback bằng `TICKER_SOURCE=nestjs`.
 
 ### Phase 6 - Go Matching Engine Shadow Mode
+
+**Trạng thái hiện tại:** Not started  
+**Tiến độ ước lượng:** 0-5%
+
+**Checklist trạng thái:**
+- [x] Chiến lược shadow -> canary -> primary đã được xác định trong roadmap.
+- [ ] Chưa có `go-services/matching-engine` shadow path trong repo runtime hiện tại.
+- [ ] Chưa có output compare TS matching vs Go matching theo pair/order.
+- [ ] Chưa có canary per pair hoạt động thực tế.
+- [ ] Chưa có reconciliation artifact riêng cho matching Go sau từng canary window.
 
 Mục tiêu: kiểm chứng matching Go mà không ảnh hưởng tiền/user.
 
@@ -317,6 +584,16 @@ Acceptance criteria:
 - Có reconciliation wallet/order/trade sau mỗi canary window.
 
 ### Phase 7 - Public WS Gateway Bằng Go Nếu Cần
+
+**Trạng thái hiện tại:** Not started  
+**Tiến độ ước lượng:** 0-5%
+
+**Checklist trạng thái:**
+- [x] Mục tiêu tách public market WS khỏi NestJS đã được xác định về mặt kiến trúc.
+- [ ] Chưa có Go public WS gateway trong rollout runtime hiện tại.
+- [ ] Chưa có compatibility layer/fallback release plan chi tiết cho FE nếu đổi transport.
+- [ ] Chưa có public payload parity verification riêng cho `TickerData` / `OHLCData`.
+- [ ] Chưa có rollout giữ song song `/trading` cũ và gateway Go trong ít nhất một release thực tế.
 
 Mục tiêu: scale connection/broadcast public market data mà không phá FE.
 

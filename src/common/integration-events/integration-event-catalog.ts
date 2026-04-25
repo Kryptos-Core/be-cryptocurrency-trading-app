@@ -1,9 +1,3 @@
-/**
- * Canonical integration event type strings persisted in `integration_outbox.aggregate_type`
- * (or equivalent) and consumed by relay handlers / projectors.
- *
- * Version payloads at the handler boundary (e.g. `payloadVersion: 1` inside JSON).
- */
 /** Values persisted on `integration_outbox.event_type` today */
 export const OutboxIntegrationEventType = {
   MarketPairCreatedV1: 'MarketPair.Created@v1',
@@ -12,6 +6,13 @@ export const OutboxIntegrationEventType = {
   OnchainDepositSettledV1: 'OnchainDeposit.Settled@v1',
   UnmatchedDepositDetectedV1: 'UnmatchedDeposit.Detected@v1',
   DepositMatchedV1: 'UnmatchedDeposit.Matched@v1',
+  OrderCreatedV1: 'order.created',
+  OrderCancelRequestedV1: 'order.cancel_requested',
+  OrderCancelledV1: 'order.cancelled',
+  OrderRejectedV1: 'order.rejected',
+  TradeExecutedV1: 'trade.executed',
+  WalletBalanceChangedV1: 'wallet.balance_changed',
+  MarketTickerUpdatedV1: 'market.ticker_updated',
 } as const;
 
 export type OutboxIntegrationEventTypeName =

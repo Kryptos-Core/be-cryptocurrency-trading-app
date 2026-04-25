@@ -2,13 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { OnchainDepositOutboxPayloadV1 } from '@/common/integration-events/onchain-deposit-outbox-payload';
+import { isOnchainDepositOutboxPayloadV1 } from '@/common/integration-events/onchain-deposit-outbox-payload';
+import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ReadOnchainDeposit } from '@/entities/read-onchain-deposit.entity';
 
 function parsePayload(row: IntegrationOutbox): OnchainDepositOutboxPayloadV1 | null {
-  const p = row.payload as unknown as OnchainDepositOutboxPayloadV1;
-  if (!p || p.payloadVersion !== 1 || !p.txId || !p.userId) return null;
-  return p;
+  const envelopePayload = unwrapCanonicalIntegrationEventPayload<OnchainDepositOutboxPayloadV1>(
+    row.payload,
+  );
+  if (isOnchainDepositOutboxPayloadV1(envelopePayload)) return envelopePayload;
+
+  const legacy = row.payload as unknown;
+  if (isOnchainDepositOutboxPayloadV1(legacy)) return legacy;
+
+  return null;
 }
 
 @Injectable()
@@ -27,6 +35,7 @@ export class OnchainDepositReadModelSyncApplierService {
         await this.applySubmitted(em, row.id, p);
         return;
       case OutboxIntegrationEventType.OnchainDepositSettledV1:
+      case OutboxIntegrationEventType.DepositMatchedV1:
         await this.applySettled(em, row.id, p);
         return;
       default:

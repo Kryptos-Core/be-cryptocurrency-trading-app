@@ -2,13 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { OnchainDepositOutboxPayloadV1 } from '@/common/integration-events/onchain-deposit-outbox-payload';
+import { isOnchainDepositOutboxPayloadV1 } from '@/common/integration-events/onchain-deposit-outbox-payload';
+import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { NotificationRepository } from './repositories/notification.repository';
 
 function parsePayload(row: IntegrationOutbox): OnchainDepositOutboxPayloadV1 | null {
-  const p = row.payload as unknown as OnchainDepositOutboxPayloadV1;
-  if (!p || p.payloadVersion !== 1 || !p.txId || !p.userId) return null;
-  return p;
+  const envelopePayload = unwrapCanonicalIntegrationEventPayload<OnchainDepositOutboxPayloadV1>(
+    row.payload,
+  );
+  if (isOnchainDepositOutboxPayloadV1(envelopePayload)) return envelopePayload;
+
+  const legacy = row.payload as unknown;
+  if (isOnchainDepositOutboxPayloadV1(legacy)) return legacy;
+
+  return null;
 }
 
 /**
@@ -28,7 +36,9 @@ export class OnchainDepositOutboxNotificationService {
       throw new Error('INVALID_ONCHAIN_DEPOSIT_OUTBOX_PAYLOAD');
     }
 
-    const isSettled = row.event_type === OutboxIntegrationEventType.OnchainDepositSettledV1;
+    const isSettled =
+      row.event_type === OutboxIntegrationEventType.OnchainDepositSettledV1 ||
+      row.event_type === OutboxIntegrationEventType.DepositMatchedV1;
     const title = isSettled ? 'Nạp tiền đã hoàn tất' : 'Nạp tiền đã ghi nhận';
     const body = isSettled
       ? `Giao dịch nạp ${p.chain} đã xác nhận vào ví. Mã: ${p.txId.slice(0, 8)}…`

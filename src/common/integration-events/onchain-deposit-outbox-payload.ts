@@ -17,3 +17,27 @@ export interface OnchainDepositOutboxPayloadV1 {
   creditedAmount?: string;
   conversionRate?: string;
 }
+
+export function isOnchainDepositOutboxPayloadV1(
+  value: unknown,
+): value is OnchainDepositOutboxPayloadV1 {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.payloadVersion === 1 &&
+    typeof candidate.userId === 'string' &&
+    typeof candidate.txId === 'string' &&
+    typeof candidate.chain === 'string' &&
+    typeof candidate.txHash === 'string' &&
+    typeof candidate.status === 'string' &&
+    typeof candidate.amount === 'string' &&
+    typeof candidate.settled === 'boolean' &&
+    typeof candidate.fromAddress === 'string' &&
+    typeof candidate.toAddress === 'string' &&
+    typeof candidate.confirmations === 'number' &&
+    typeof candidate.createdAt === 'string'
+  );
+}

@@ -143,6 +143,22 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  EVENT_PUBLISHER_DRIVER?: string = 'noop';
+
+  @IsString()
+  @IsOptional()
+  KAFKA_BROKERS?: string;
+
+  @IsString()
+  @IsOptional()
+  KAFKA_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  KAFKA_TOPIC_PREFIX?: string;
+
+  @IsString()
+  @IsOptional()
   TICKER_SOURCE?: string = 'nestjs';
 
   @IsString()
@@ -689,6 +705,10 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'CLICKHOUSE_DB',
     'EVENT_OUTBOX_ENABLED',
     'EVENT_SCHEMA_FORMAT',
+    'EVENT_PUBLISHER_DRIVER',
+    'KAFKA_BROKERS',
+    'KAFKA_CLIENT_ID',
+    'KAFKA_TOPIC_PREFIX',
     'TICKER_SOURCE',
     'MATCHING_ENGINE',
     'MATCHING_GO_CANARY_PAIRS',
@@ -929,3 +949,4 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+

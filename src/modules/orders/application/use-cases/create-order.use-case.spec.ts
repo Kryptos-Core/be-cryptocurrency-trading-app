@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { BusinessException, NotFoundException } from '@/common/exceptions';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService } from '@/common/services';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
@@ -13,6 +14,7 @@ describe('CreateOrderUseCase', () => {
     createOrderViaProcedure: jest.fn(),
     findById: jest.fn(),
     findBestLimitSellPrice: jest.fn(),
+    transaction: jest.fn(async (work) => work({})),
   };
   const cacheService = {
     get: jest.fn(),
@@ -29,6 +31,9 @@ describe('CreateOrderUseCase', () => {
   };
   const orderReservePolicy = {
     prepare: jest.fn(),
+  };
+  const outboxAppender = {
+    append: jest.fn(),
   };
 
   let useCase: CreateOrderUseCase;
@@ -47,6 +52,7 @@ describe('CreateOrderUseCase', () => {
           useValue: prepareCreateOrderContextService,
         },
         { provide: OrderReservePolicy, useValue: orderReservePolicy },
+        { provide: OutboxAppender, useValue: outboxAppender },
       ],
     }).compile();
 
@@ -65,7 +71,7 @@ describe('CreateOrderUseCase', () => {
     expect(orderRepository.findByUserIdempotency).not.toHaveBeenCalled();
   });
 
-  it('delegates reserve and validation policies before persistence', async () => {
+  it('delegates reserve and validation policies before persistence and appends outbox event', async () => {
     cacheService.get.mockResolvedValue(null);
     orderRepository.findByUserIdempotency.mockResolvedValue(null);
     prepareCreateOrderContextService.execute.mockResolvedValue({
@@ -98,7 +104,13 @@ describe('CreateOrderUseCase', () => {
       status: 'OPEN',
       price: '100',
       time_in_force: 'GTC',
-      created_at: new Date(),
+      reserved_quote: '100',
+      reserved_base: '0',
+      client_order_id: null,
+      idempotency_key: 'same-key',
+      slippage_tolerance: null,
+      created_at: new Date('2026-04-25T00:00:00.000Z'),
+      updated_at: new Date('2026-04-25T00:00:00.000Z'),
     });
 
     const dto = {
@@ -124,6 +136,16 @@ describe('CreateOrderUseCase', () => {
         feeCurrencyId: 'quote',
         makerFeeRate: '0.001',
         takerFeeRate: '0.002',
+      }),
+    );
+    expect(orderRepository.transaction).toHaveBeenCalledTimes(1);
+    expect(outboxAppender.append).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        aggregateType: 'order',
+        aggregateId: 'o1',
+        eventType: 'order.created',
+        kafkaTopic: 'orders.lifecycle',
       }),
     );
     expect(result.order_id).toBe('o1');
@@ -162,7 +184,13 @@ describe('CreateOrderUseCase', () => {
       status: 'FILLED',
       price: '100',
       time_in_force: 'GTC',
+      reserved_quote: '0',
+      reserved_base: '0',
+      client_order_id: null,
+      idempotency_key: 'filled-key',
+      slippage_tolerance: null,
       created_at: new Date(),
+      updated_at: new Date(),
     });
 
     await useCase.execute({
@@ -178,6 +206,7 @@ describe('CreateOrderUseCase', () => {
     } as any);
 
     expect(orderMatchingGateway.enqueueMatch).not.toHaveBeenCalled();
+    expect(outboxAppender.append).toHaveBeenCalledTimes(1);
   });
 
   it('throws when procedure reports failure', async () => {

@@ -1,5 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import type { OrderLifecycleOutboxPayloadV1 } from '@/common/integration-events/order-lifecycle-outbox-payload';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
@@ -52,6 +55,7 @@ export class CreateOrderUseCase {
     private readonly orderMatchingGateway: OrderMatchingGatewayPort,
     private readonly prepareCreateOrderContextService: PrepareCreateOrderContextService,
     private readonly orderReservePolicy: OrderReservePolicy,
+    private readonly outboxAppender: OutboxAppender,
   ) {}
 
   async execute(command: CreateOrderCommand): Promise<Order> {
@@ -95,8 +99,9 @@ export class CreateOrderUseCase {
       limitPrice = dto.price;
     }
 
+    const orderId = newUuid();
     const result = await this.orderRepository.createOrderViaProcedure({
-      orderId: newUuid(),
+      orderId,
       userId,
       pairId: dto.pairId,
       side: dto.side,
@@ -129,8 +134,45 @@ export class CreateOrderUseCase {
       pair.maker_fee_rate,
       pair.taker_fee_rate,
     );
+
+    await this.appendOrderCreatedEvent(order);
     await this.cacheService.set(cacheKey, this.orderToPlain(order), IDEMPOTENCY_TTL_SEC);
     return order;
+  }
+
+  private async appendOrderCreatedEvent(order: Order): Promise<void> {
+    const payload: OrderLifecycleOutboxPayloadV1 = {
+      orderId: order.order_id,
+      userId: order.user_id,
+      pairId: order.pair_id,
+      side: order.side,
+      type: order.type,
+      status: order.status,
+      amount: order.amount,
+      filledAmount: order.filled_amount ?? '0',
+      price: order.price,
+      timeInForce: order.time_in_force ?? 'GTC',
+      clientOrderId: order.client_order_id ?? null,
+      idempotencyKey: order.idempotency_key,
+      reservedQuote: order.reserved_quote,
+      reservedBase: order.reserved_base,
+      createdAt: order.created_at.toISOString(),
+      updatedAt: order.updated_at.toISOString(),
+    };
+
+    await this.orderRepository.transaction(async (manager) => {
+      await this.outboxAppender.append(manager as never, {
+        aggregateType: 'order',
+        aggregateId: order.order_id,
+        eventType: OutboxIntegrationEventType.OrderCreatedV1,
+        payload: payload as unknown as Record<string, unknown>,
+        dedupeKey: `order-created:${order.order_id}`,
+        correlationId: order.idempotency_key,
+        causationId: order.order_id,
+        partitionKey: order.pair_id,
+        kafkaTopic: 'orders.lifecycle',
+      });
+    });
   }
 
   private async enqueueMatching(
@@ -239,3 +281,5 @@ export class CreateOrderUseCase {
     };
   }
 }
+
+

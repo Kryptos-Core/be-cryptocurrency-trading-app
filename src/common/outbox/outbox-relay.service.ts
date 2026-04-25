@@ -1,10 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 import { DataSource } from 'typeorm';
 import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
+import type { OutboxEventPublisher } from './outbox-event-publisher.port';
+import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
 import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-event-types';
 
 const OUTBOX_RELAY_LOCK_KEY = 'outbox:relay:lock';
@@ -13,7 +15,7 @@ const MAX_ROWS_PER_FLUSH = 50;
 
 /**
  * Drains unpublished integration_outbox rows: sync projection + notifications in-process,
- * then sets published_at only after that pipeline succeeds (per row transaction).
+ * optionally publish to external infrastructure, then sets published_at only after that pipeline succeeds (per row transaction).
  */
 @Injectable()
 export class OutboxRelayService {
@@ -23,6 +25,8 @@ export class OutboxRelayService {
     private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     private readonly integrationSync: OutboxIntegrationSyncService,
+    @Inject(OUTBOX_EVENT_PUBLISHER)
+    private readonly outboxPublisher: OutboxEventPublisher,
   ) {}
 
   /**
@@ -62,11 +66,33 @@ export class OutboxRelayService {
                   }
 
                   const row = rows[0];
+                  row.publish_attempts = (row.publish_attempts ?? 0) + 1;
+                  row.last_publish_error = null;
+
                   try {
                     await this.integrationSync.dispatchRow(em, row);
+                    const publishResult = await this.outboxPublisher.publish({
+                      id: row.id,
+                      eventType: row.event_type,
+                      aggregateType: row.aggregate_type,
+                      aggregateId: row.aggregate_id,
+                      payload: row.payload,
+                      schemaVersion: row.schema_version ?? 1,
+                      correlationId: row.correlation_id,
+                      causationId: row.causation_id,
+                      partitionKey: row.partition_key,
+                      kafkaTopic: row.kafka_topic,
+                    });
+
+                    row.kafka_partition = publishResult?.kafkaPartition ?? row.kafka_partition ?? null;
+                    row.kafka_offset = publishResult?.kafkaOffset ?? row.kafka_offset ?? null;
+                    row.kafka_published_at =
+                      publishResult?.publishedAt ?? row.kafka_published_at ?? new Date();
                   } catch (err) {
+                    row.last_publish_error = (err as Error).message;
+                    await em.save(IntegrationOutbox, row);
                     this.logger.error(
-                      `Outbox sync failed id=${row.id} event_type=${row.event_type}: ${(err as Error).message}`,
+                      `Outbox sync/publish failed id=${row.id} event_type=${row.event_type}: ${(err as Error).message}`,
                       (err as Error).stack,
                     );
                     throw err;

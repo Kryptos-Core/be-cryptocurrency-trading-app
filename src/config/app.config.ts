@@ -45,6 +45,10 @@ export interface AppConfig {
     publicWsSource: string;
     eventOutboxEnabled: boolean;
     eventSchemaFormat: string;
+    eventPublisherDriver: string;
+    kafkaBrokers: string[];
+    kafkaClientId: string;
+    kafkaTopicPrefix: string;
   };
   redis: {
     host: string;
@@ -412,6 +416,13 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       publicWsSource: env.PUBLIC_WS_SOURCE || 'nestjs',
       eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
       eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',
+      eventPublisherDriver: env.EVENT_PUBLISHER_DRIVER || 'noop',
+      kafkaBrokers: (env.KAFKA_BROKERS || '')
+        .split(',')
+        .map((broker) => broker.trim())
+        .filter(Boolean),
+      kafkaClientId: env.KAFKA_CLIENT_ID || 'crypto-trading-backend-outbox',
+      kafkaTopicPrefix: env.KAFKA_TOPIC_PREFIX || '',
     })
     .setRedis(
       env.REDIS_HOST || 'localhost',
@@ -483,3 +494,4 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
+

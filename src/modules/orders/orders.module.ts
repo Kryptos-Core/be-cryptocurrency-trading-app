@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '@/entities/order.entity';
+import { OutboxModule } from '@/common/outbox/outbox.module';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { MatchingModule } from '@/modules/matching/matching.module';
 import { FindAllOrdersAdminQuery } from '@/modules/orders/application/queries/find-all-orders-admin.query';
@@ -23,29 +24,28 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order]), MarketsModule, WalletsModule, MatchingModule],
+  imports: [
+    TypeOrmModule.forFeature([Order]),
+    OutboxModule,
+    MarketsModule,
+    WalletsModule,
+    MatchingModule,
+  ],
   providers: [
-    // --- Infrastructure: port bindings ---
     {
       provide: ORDER_REPOSITORY,
       useClass: OrderRepositoryImpl,
     },
-    // Legacy alias so external modules importing OrderRepository still resolve.
-    // TODO: migrate external consumers to ORDER_REPOSITORY port, then remove.
     {
       provide: OrderRepositoryImpl,
       useExisting: ORDER_REPOSITORY,
     },
-
-    // --- Domain services ---
     OrderValidationService,
     {
       provide: OrderValidationStrategy,
       useExisting: OrderValidationService,
     },
     OrderReservePolicy,
-
-    // --- Application: use cases & queries ---
     PrepareCreateOrderContextService,
     CreateOrderUseCase,
     CancelOrderUseCase,
@@ -56,8 +56,6 @@ import { OrdersService } from './orders.service';
     FindOrdersByUserQuery,
     GetOrderBookQuery,
     ListOpenOrdersForPairQuery,
-
-    // --- Facade ---
     OrdersService,
   ],
   controllers: [OrdersController],
