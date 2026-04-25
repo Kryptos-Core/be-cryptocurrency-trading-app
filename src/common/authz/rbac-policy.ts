@@ -83,3 +83,4 @@ export function hasPermission(
   return requiredPermissions.every((permission) => granted.has(permission));
 }
 
+

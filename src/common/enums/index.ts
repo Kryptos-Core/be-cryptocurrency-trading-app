@@ -64,6 +64,8 @@ export enum Permission {
   USERS_SECURITY_REVIEW = 'users:security_review',
   CURRENCIES_MANAGE = 'currencies:manage',
   MARKETS_MANAGE = 'markets:manage',
+  /** Admin/Ops: inspect market read-model reconciliation, lag, and projection health */
+  MARKET_READ_MODEL_OBSERVE = 'market_read_model:observe',
   EXCHANGE_SYNC = 'exchange:sync',
   ORDERS_PLACE = 'orders:place',
   ORDERS_CANCEL = 'orders:cancel',
@@ -243,4 +245,5 @@ export enum OnchainTxStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
 }
+
 

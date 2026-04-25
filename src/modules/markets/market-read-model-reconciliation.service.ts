@@ -40,6 +40,35 @@ export type ProjectionLagSummary = {
   latestProjectionAt: string | null;
 };
 
+export type TradePairDetail = {
+  pairId: string;
+  coreCount: number;
+  readModelCount: number;
+  drift: number;
+};
+
+export type TickerPairDetail = {
+  pairId: string;
+  coreLastTradeAt: string | null;
+  projectionTimestamp: string | null;
+  stale: boolean;
+  missing: boolean;
+};
+
+export type OhlcvPairDetail = {
+  pairId: string;
+  intervalSec: number;
+  coreCandles: number;
+  readModelCandles: number;
+  drift: number;
+};
+
+export type ProjectionPairDetails = {
+  trades: TradePairDetail[];
+  tickers: TickerPairDetail[];
+  ohlcv: OhlcvPairDetail[];
+};
+
 export type ProjectionHealthSummary = {
   status: 'up' | 'degraded';
   checkedAt: string;
@@ -52,6 +81,7 @@ export type ProjectionHealthSummary = {
     tickers: ProjectionLagSummary;
     ohlcv: ProjectionLagSummary;
   };
+  pairDetails?: ProjectionPairDetails;
 };
 
 @Injectable()
@@ -203,7 +233,9 @@ export class MarketReadModelReconciliationService {
     intervalSecs: number[] = this.getDefaultOhlcvIntervals(),
   ): Promise<OhlcvReconciliationReport[]> {
     const normalizedIntervals = this.normalizeIntervals(intervalSecs);
-    return Promise.all(normalizedIntervals.map((intervalSec) => this.reconcileOhlcv(windowHours, intervalSec)));
+    return Promise.all(
+      normalizedIntervals.map((intervalSec) => this.reconcileOhlcv(windowHours, intervalSec)),
+    );
   }
 
   async getProjectionLagSummary(): Promise<ProjectionHealthSummary['lag']> {
@@ -235,6 +267,7 @@ export class MarketReadModelReconciliationService {
   async getProjectionHealth(
     windowHours = 24,
     ohlcvIntervals: number[] = this.getDefaultOhlcvIntervals(),
+    options?: { includePairDetails?: boolean; pairLimit?: number },
   ): Promise<ProjectionHealthSummary> {
     const normalizedIntervals = this.normalizeIntervals(ohlcvIntervals);
     const [trades, tickers, ohlcv, lag] = await Promise.all([
@@ -262,6 +295,10 @@ export class MarketReadModelReconciliationService {
       lag.tickers.lagSeconds > 300 ||
       lag.ohlcv.lagSeconds > 300;
 
+    const pairDetails = options?.includePairDetails
+      ? await this.getProjectionPairDetails(windowHours, normalizedIntervals, options?.pairLimit ?? 20)
+      : undefined;
+
     return {
       status: degraded ? 'degraded' : 'up',
       checkedAt: new Date().toISOString(),
@@ -270,6 +307,7 @@ export class MarketReadModelReconciliationService {
       tickers,
       ohlcv,
       lag,
+      ...(pairDetails ? { pairDetails } : {}),
     };
   }
 
@@ -338,6 +376,134 @@ export class MarketReadModelReconciliationService {
         error instanceof Error ? error.stack : undefined,
       );
     }
+  }
+
+  private async getProjectionPairDetails(
+    windowHours: number,
+    ohlcvIntervals: number[],
+    pairLimit: number,
+  ): Promise<ProjectionPairDetails> {
+    const [trades, tickers, ohlcv] = await Promise.all([
+      this.getTradePairDetails(windowHours, pairLimit),
+      this.getTickerPairDetails(windowHours, pairLimit),
+      this.getOhlcvPairDetails(windowHours, ohlcvIntervals, pairLimit),
+    ]);
+
+    return { trades, tickers, ohlcv };
+  }
+
+  private async getTradePairDetails(windowHours: number, pairLimit: number): Promise<TradePairDetail[]> {
+    const [coreRows, readRows] = await Promise.all([
+      this.dataSource.query(
+        `SELECT pair_id, COUNT(*)::int AS core_count
+           FROM trades
+          WHERE created_at >= NOW() - ($1::text || ' hours')::interval
+          GROUP BY pair_id`,
+        [String(windowHours)],
+      ) as Promise<Array<{ pair_id: string; core_count: number }>>,
+      this.dataSource.query(
+        `SELECT pair_id, COUNT(*)::int AS read_count
+           FROM read_market_trades
+          WHERE executed_at >= NOW() - ($1::text || ' hours')::interval
+          GROUP BY pair_id`,
+        [String(windowHours)],
+      ) as Promise<Array<{ pair_id: string; read_count: number }>>,
+    ]);
+
+    const readByPair = new Map(readRows.map((row) => [row.pair_id, Number(row.read_count)]));
+    return coreRows
+      .map((row) => ({
+        pairId: row.pair_id,
+        coreCount: Number(row.core_count),
+        readModelCount: readByPair.get(row.pair_id) ?? 0,
+        drift: Number(row.core_count) - (readByPair.get(row.pair_id) ?? 0),
+      }))
+      .sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift) || b.coreCount - a.coreCount)
+      .slice(0, pairLimit);
+  }
+
+  private async getTickerPairDetails(windowHours: number, pairLimit: number): Promise<TickerPairDetail[]> {
+    const coreRows = (await this.dataSource.query(
+      `SELECT pair_id, MAX(created_at) AS last_trade_at
+         FROM trades
+        WHERE created_at >= NOW() - ($1::text || ' hours')::interval
+        GROUP BY pair_id`,
+      [String(windowHours)],
+    )) as Array<{ pair_id: string; last_trade_at: string | Date }>;
+
+    const readRows = await this.dataSource.getRepository(ReadMarketTicker).find();
+    const readByPair = new Map(readRows.map((row) => [row.pair_id, row]));
+
+    return coreRows
+      .map((row) => {
+        const projected = readByPair.get(row.pair_id);
+        const coreLastTradeAt = this.toIsoString(row.last_trade_at);
+        const projectionTimestamp = this.toIsoString(projected?.ticker_timestamp ?? null);
+        const stale =
+          !!coreLastTradeAt &&
+          !!projectionTimestamp &&
+          new Date(projectionTimestamp).getTime() + 60_000 < new Date(coreLastTradeAt).getTime();
+        return {
+          pairId: row.pair_id,
+          coreLastTradeAt,
+          projectionTimestamp,
+          stale,
+          missing: !projected,
+        };
+      })
+      .sort((a, b) => Number(b.missing || b.stale) - Number(a.missing || a.stale))
+      .slice(0, pairLimit);
+  }
+
+  private async getOhlcvPairDetails(
+    windowHours: number,
+    ohlcvIntervals: number[],
+    pairLimit: number,
+  ): Promise<OhlcvPairDetail[]> {
+    const details: OhlcvPairDetail[] = [];
+
+    for (const intervalSec of ohlcvIntervals) {
+      const [coreRows, readRows] = await Promise.all([
+        this.dataSource.query(
+          `WITH core_candles AS (
+             SELECT
+               pair_id,
+               to_timestamp(FLOOR(EXTRACT(EPOCH FROM created_at) / $2) * $2) AS open_time
+             FROM trades
+             WHERE created_at >= NOW() - ($1::text || ' hours')::interval
+           )
+           SELECT pair_id, COUNT(*)::int AS core_candles
+             FROM core_candles
+            GROUP BY pair_id`,
+          [String(windowHours), intervalSec],
+        ) as Promise<Array<{ pair_id: string; core_candles: number }>>,
+        this.dataSource.query(
+          `SELECT pair_id, COUNT(*)::int AS read_candles
+             FROM read_market_ohlcv
+            WHERE interval_sec = $2
+              AND open_time >= NOW() - ($1::text || ' hours')::interval
+            GROUP BY pair_id`,
+          [String(windowHours), intervalSec],
+        ) as Promise<Array<{ pair_id: string; read_candles: number }>>,
+      ]);
+
+      const readByPair = new Map(readRows.map((row) => [row.pair_id, Number(row.read_candles)]));
+      for (const row of coreRows) {
+        const coreCandles = Number(row.core_candles);
+        const readModelCandles = readByPair.get(row.pair_id) ?? 0;
+        details.push({
+          pairId: row.pair_id,
+          intervalSec,
+          coreCandles,
+          readModelCandles,
+          drift: coreCandles - readModelCandles,
+        });
+      }
+    }
+
+    return details
+      .sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift) || a.intervalSec - b.intervalSec)
+      .slice(0, pairLimit);
   }
 
   private async getProjectionLag(
@@ -416,7 +582,7 @@ export class MarketReadModelReconciliationService {
     return `${pairId}:${new Date(openTime).toISOString()}`;
   }
 
-  private toIsoString(value: string | Date | null): string | null {
+  private toIsoString(value: string | Date | null | undefined): string | null {
     if (!value) return null;
     return new Date(value).toISOString();
   }

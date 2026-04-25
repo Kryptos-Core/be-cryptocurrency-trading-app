@@ -1,6 +1,7 @@
 import type { Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
+import { ReadMarketOhlcv } from '@/entities/read-market-ohlcv.entity';
 import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
 import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
 
@@ -85,7 +86,7 @@ const marketTsDbProvider: Provider = {
       database: market.database,
       synchronize: false,
       logging: false,
-      entities: [ReadMarketTrade, ReadMarketTicker],
+      entities: [ReadMarketTrade, ReadMarketTicker, ReadMarketOhlcv],
     });
 
     await ds.initialize();

@@ -540,7 +540,7 @@ export class MarketsController {
     description: 'Create a new trading pair (e.g., BTC/USDT)',
   })
   @ApiBody({ type: CreateMarketPairDto })
-  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
+  @RequirePermissions(Permission.MARKETS_MANAGE)
   @ApiCreatedResponse('Market pair created successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiConflictResponse('Market pair already exists')
@@ -562,7 +562,7 @@ export class MarketsController {
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiBody({ type: UpdateMarketPairDto })
-  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
+  @RequirePermissions(Permission.MARKETS_MANAGE)
   @ApiSuccessResponse('Market pair updated successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiNotFoundResponse('Market pair not found')
@@ -585,7 +585,7 @@ export class MarketsController {
     description: 'Soft delete a market pair by setting is_active to false',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
-  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
+  @RequirePermissions(Permission.MARKETS_MANAGE)
   @ApiSuccessResponse('Market pair deleted successfully', {
     schema: { example: null },
   })
@@ -605,5 +605,8 @@ export class MarketsController {
     return values.length > 0 ? values : undefined;
   }
 }
+
+
+
 
 

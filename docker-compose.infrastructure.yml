@@ -23,6 +23,30 @@ services:
       retries: 10
       interval: 10s
 
+  timescaledb:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: crypto_trading_timescaledb
+    profiles: ['timescale']
+    environment:
+      POSTGRES_USER: ${MARKET_TS_USERNAME:-${CORE_DB_USERNAME:-${DB_USERNAME}}}
+      POSTGRES_PASSWORD: ${MARKET_TS_PASSWORD:-${CORE_DB_PASSWORD:-${DB_PASSWORD}}}
+      POSTGRES_DB: ${MARKET_TS_DB:-${CORE_DB_NAME:-${DB_NAME}}}
+      TIMESCALEDB_TELEMETRY: 'off'
+      TS_TUNE_MEMORY: 512MB
+      TS_TUNE_MAX_CONNS: 100
+      TZ: 'UTC'
+    ports:
+      - "${MARKET_TS_PORT:-5433}:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    networks:
+      - crypto_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MARKET_TS_USERNAME:-${CORE_DB_USERNAME:-${DB_USERNAME}}} -d ${MARKET_TS_DB:-${CORE_DB_NAME:-${DB_NAME}}}"]
+      timeout: 10s
+      retries: 10
+      interval: 10s
+
   redis:
     image: redis:7-alpine
     container_name: crypto_trading_redis
@@ -41,6 +65,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  timescaledb_data:
     driver: local
   redis_data:
     driver: local

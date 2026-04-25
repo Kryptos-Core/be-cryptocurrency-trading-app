@@ -24,6 +24,12 @@ export interface AppConfig {
   };
   marketTs: {
     enabled: boolean;
+    driver: string;
+    timescaleEnabled: boolean;
+    retentionEnabled: boolean;
+    retentionDays: number;
+    compressionEnabled: boolean;
+    compressAfterDays: number;
     host: string;
     port: number;
     username: string;
@@ -162,13 +168,32 @@ export class AppConfigBuilder {
 
   setMarketTs(
     enabled: boolean,
+    driver: string,
+    timescaleEnabled: boolean,
+    retentionEnabled: boolean,
+    retentionDays: number,
+    compressionEnabled: boolean,
+    compressAfterDays: number,
     host: string,
     port: number,
     username: string,
     password: string,
     database: string,
   ): this {
-    this.config.marketTs = { enabled, host, port, username, password, database };
+    this.config.marketTs = {
+      enabled,
+      driver,
+      timescaleEnabled,
+      retentionEnabled,
+      retentionDays,
+      compressionEnabled,
+      compressAfterDays,
+      host,
+      port,
+      username,
+      password,
+      database,
+    };
     return this;
   }
 
@@ -390,8 +415,14 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.CORE_DB_PASSWORD || env.DB_PASSWORD || '',
       env.CORE_DB_NAME || env.DB_NAME || '',
     )
-    .setMarketTs(
+.setMarketTs(
       String(env.MARKET_TS_ENABLED || 'false').toLowerCase() === 'true',
+      env.MARKET_TS_DRIVER || 'postgres',
+      String(env.MARKET_TS_TIMESCALE_ENABLED || 'false').toLowerCase() === 'true',
+      String(env.MARKET_TS_RETENTION_ENABLED || 'false').toLowerCase() === 'true',
+      parseInt(env.MARKET_TS_RETENTION_DAYS || '30', 10),
+      String(env.MARKET_TS_COMPRESSION_ENABLED || 'false').toLowerCase() === 'true',
+      parseInt(env.MARKET_TS_COMPRESS_AFTER_DAYS || '7', 10),
       env.MARKET_TS_HOST || env.CORE_DB_HOST || env.DB_HOST || '127.0.0.1',
       parseInt(env.MARKET_TS_PORT || env.CORE_DB_PORT || env.DB_PORT || '5432', 10),
       env.MARKET_TS_USERNAME || env.CORE_DB_USERNAME || env.DB_USERNAME || '',
@@ -494,4 +525,5 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
+
 

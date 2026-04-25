@@ -431,9 +431,9 @@ Dependency rule:
   - `/markets/:id/ohlcv`
   - `symbol -> ticker/trades` path
 - [x] Đã có reconciliation cho trades, tickers và OHLCV; OHLCV đã phủ nhiều interval (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`).
-- [x] Đã có health/metrics cho projection lag market read-model và admin/on-demand reconciliation endpoint.
+- [x] Đã có health/metrics cho projection lag market read-model, permission riêng cho ops read-model, admin/on-demand reconciliation endpoint và report chi tiết theo pair.
 - [~] `MARKET_TS_DB` đã được wiring ở mức runtime path/read repository, nhưng chưa chứng minh rollout Timescale production-grade đầy đủ.
-- [ ] Chưa có TimescaleDB/hypertable/continuous aggregate end-to-end đúng nghĩa cho OHLCV.
+- [~] Đã có migration scaffold cho Timescale extension/hypertable/continuous aggregate + retention/compression policy ở mức optional/no-op-safe; đã thêm compose/env để bật profile Timescale riêng, nhưng chưa rollout Timescale end-to-end đúng nghĩa cho OHLCV.
 
 Mục tiêu: giảm tải PostgreSQL source of truth cho chart/ticker/trades mà không đổi REST contract.
 
@@ -452,7 +452,7 @@ Acceptance criteria:
 - `MARKET_READ_SOURCE=postgres` và `MARKET_READ_SOURCE=timescale` trả response tương thích.
 - FE chart/market list không cần sửa code.
 - Có reconciliation job/report so sánh trades/tickers/OHLCV giữa PostgreSQL và market read-model DB phụ.
-- Có health payload + Prometheus metrics cho projection lag/read-model drift.
+- Có health payload + Prometheus metrics cho projection lag/read-model drift, admin API xem report on-demand và pair-level detail.
 
 ### Phase 4 - Event/Outbox Contract Chuẩn Cho TS Và Go
 
@@ -989,6 +989,8 @@ Hướng đi phù hợp nhất cho dự án là tiến hóa có kiểm soát:
 7. Đưa Go matching engine vào shadow/canary sau cùng.
 
 Cách này đạt mục tiêu multi-database + TypeScript/Go nhưng vẫn bảo vệ business logic hiện tại và giảm tối đa việc FE phải sửa bất ngờ.
+
+
 
 
 

@@ -95,6 +95,30 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  MARKET_TS_DRIVER?: string = 'postgres';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_TIMESCALE_ENABLED?: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_RETENTION_ENABLED?: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_RETENTION_DAYS?: string = '30';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_COMPRESSION_ENABLED?: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_COMPRESS_AFTER_DAYS?: string = '7';
+
+  @IsString()
+  @IsOptional()
   MARKET_TS_HOST?: string;
 
   @IsPort()
@@ -701,6 +725,12 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'CORE_DB_NAME',
     'MARKET_READ_SOURCE',
     'MARKET_TS_ENABLED',
+    'MARKET_TS_DRIVER',
+    'MARKET_TS_TIMESCALE_ENABLED',
+    'MARKET_TS_RETENTION_ENABLED',
+    'MARKET_TS_RETENTION_DAYS',
+    'MARKET_TS_COMPRESSION_ENABLED',
+    'MARKET_TS_COMPRESS_AFTER_DAYS',
     'MARKET_TS_HOST',
     'MARKET_TS_PORT',
     'MARKET_TS_USERNAME',
@@ -959,5 +989,6 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+
 
 

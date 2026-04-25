@@ -35,6 +35,7 @@
     "docker:infra:up": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d",
     "docker:infra:up:redis": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d redis",
     "docker:infra:up:postgres": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d postgres",
+    "docker:infra:up:timescale": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile timescale up -d timescaledb",
     "docker:infra:down": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development down",
     "docker:infra:logs": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f",
     "treasury:e2e": "ts-node -r tsconfig-paths/register scripts/daily-testnet-deposit-withdraw-e2e.ts",
@@ -150,3 +151,5 @@
     "coverageDirectory": "coverage"
   }
 }
+
+

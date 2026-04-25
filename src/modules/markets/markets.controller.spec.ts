@@ -79,3 +79,4 @@ describe('MarketsController', () => {
     expect(result).toEqual(report);
   });
 });
+

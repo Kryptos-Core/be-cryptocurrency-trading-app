@@ -13,7 +13,13 @@ export class ScaffoldTimescaleReadModel1776630000000 implements MigrationInterfa
     }
 
     await queryRunner.query(`
-      CREATE EXTENSION IF NOT EXISTS timescaledb
+      DO $$
+      BEGIN
+        CREATE EXTENSION IF NOT EXISTS timescaledb;
+      EXCEPTION
+        WHEN OTHERS THEN
+          RAISE NOTICE 'timescaledb extension unavailable, skipping extension install: %', SQLERRM;
+      END $$;
     `);
 
     await queryRunner.query(`
@@ -64,22 +70,38 @@ export class ScaffoldTimescaleReadModel1776630000000 implements MigrationInterfa
     `);
 
     await queryRunner.query(`
-      CREATE MATERIALIZED VIEW IF NOT EXISTS read_market_ohlcv_1m_timescale
-      AS
-      SELECT
-        pair_id,
-        time_bucket(INTERVAL '1 minute', open_time) AS bucket,
-        MAX(close) AS close,
-        MAX(high) AS high,
-        MIN(low) AS low,
-        MIN(open) AS open,
-        SUM(volume) AS volume,
-        SUM(quote_volume) AS quote_volume,
-        SUM(trades_count) AS trades_count
-      FROM read_market_ohlcv
-      WHERE interval_sec = 60
-      GROUP BY pair_id, time_bucket(INTERVAL '1 minute', open_time)
-      WITH NO DATA
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM pg_extension
+          WHERE extname = 'timescaledb'
+        ) THEN
+          EXECUTE $sql$
+            CREATE MATERIALIZED VIEW IF NOT EXISTS read_market_ohlcv_1m_timescale
+            AS
+            SELECT
+              pair_id,
+              time_bucket(INTERVAL '1 minute', open_time) AS bucket,
+              MAX(close) AS close,
+              MAX(high) AS high,
+              MIN(low) AS low,
+              MIN(open) AS open,
+              SUM(volume) AS volume,
+              SUM(quote_volume) AS quote_volume,
+              SUM(trades_count) AS trades_count
+            FROM read_market_ohlcv
+            WHERE interval_sec = 60
+            GROUP BY pair_id, time_bucket(INTERVAL '1 minute', open_time)
+            WITH NO DATA
+          $sql$;
+        END IF;
+      EXCEPTION
+        WHEN undefined_function THEN
+          RAISE NOTICE 'timescaledb time_bucket unavailable, skipping continuous aggregate scaffold';
+        WHEN OTHERS THEN
+          RAISE NOTICE 'timescaledb continuous aggregate scaffold skipped: %', SQLERRM;
+      END $$;
     `);
 
     await queryRunner.query(`
@@ -89,6 +111,11 @@ export class ScaffoldTimescaleReadModel1776630000000 implements MigrationInterfa
           SELECT 1
           FROM pg_extension
           WHERE extname = 'timescaledb'
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM pg_matviews
+          WHERE matviewname = 'read_market_ohlcv_1m_timescale'
         ) THEN
           PERFORM add_continuous_aggregate_policy(
             'read_market_ohlcv_1m_timescale',
@@ -111,8 +138,6 @@ export class ScaffoldTimescaleReadModel1776630000000 implements MigrationInterfa
       return;
     }
 
-    await queryRunner.query(`
-      DROP MATERIALIZED VIEW IF EXISTS read_market_ohlcv_1m_timescale
-    `);
+    await queryRunner.query(`DROP MATERIALIZED VIEW IF EXISTS read_market_ohlcv_1m_timescale`);
   }
 }
