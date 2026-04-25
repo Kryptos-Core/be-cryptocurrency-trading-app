@@ -4,7 +4,7 @@ Tài liệu này mô tả **những gì đã có trong mã nguồn** (outbox rel
 
 ## Tổng quan
 
-- **NestJS + TypeORM (MySQL)** cho persistence; **Redis** cho cache, lock matching, và lock relay outbox.
+- **NestJS + TypeORM + PostgreSQL** cho persistence chính; **Redis** cho cache, distributed lock, pub/sub và outbox relay coordination.
 - **Clean Architecture** đầy đủ: `auth`, `orders` (và các module hybrid đang được tách lớp `application/queries` dần).
 - **Transactional outbox** (`integration_outbox`): ghi cùng transaction với thay đổi nghiệp vụ; **Bull** (`outbox-relay`) + Redis lock gọi `OutboxRelayService.flushOnce`, mỗi dòng xử lý trong transaction riêng và gọi **`OutboxIntegrationSyncService.dispatchRow`** (đồng bộ read model + notification — không fire-and-forget qua `EventBus` cho luồng này).
 - **`@nestjs/cqrs`**: `ApplicationBusModule` + `ApplicationBusService` (command/query bus ứng dụng).

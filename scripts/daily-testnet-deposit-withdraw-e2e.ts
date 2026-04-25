@@ -6,13 +6,24 @@ type ResultItem = {
   detail?: unknown;
 };
 
+type JsonObject = Record<string, unknown>;
+type ApiRequestBody = Record<string, unknown>;
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function asRecord(value: unknown): JsonObject {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonObject) : {};
+}
+
 async function apiRequest(
   baseUrl: string,
   token: string,
   path: string,
   method: 'GET' | 'POST',
-  body?: Record<string, unknown>,
-): Promise<any> {
+  body?: ApiRequestBody,
+): Promise<unknown> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers: {
@@ -23,7 +34,7 @@ async function apiRequest(
   });
 
   const text = await res.text();
-  let payload: any = text;
+  let payload: unknown = text;
   try {
     payload = text ? JSON.parse(text) : {};
   } catch {
@@ -67,15 +78,9 @@ async function main() {
     linkedWalletId = required('E2E_LINKED_WALLET_ID');
     autoAmount = required('E2E_WITHDRAW_AMOUNT_AUTO');
     manualAmount = required('E2E_WITHDRAW_AMOUNT_MANUAL');
-  } catch (error: any) {
-    if (!allowSkip) {
-      throw error;
-    }
-    results.push({
-      step: 'bootstrap',
-      status: 'skipped',
-      detail: error?.message || String(error),
-    });
+  } catch (error: unknown) {
+    if (!allowSkip) throw error;
+    results.push({ step: 'bootstrap', status: 'skipped', detail: errorMessage(error) });
     console.log(JSON.stringify({ reportAt: new Date().toISOString(), results }, null, 2));
     return;
   }
@@ -83,48 +88,29 @@ async function main() {
   let manualTxId: string | null = null;
 
   try {
-    const autoRes = await apiRequest(
-      baseUrl,
-      traderToken,
-      '/api/v1/blockchain/withdraw/request',
-      'POST',
-      {
-        chain,
-        linkedWalletId,
-        amount: autoAmount,
-        idempotencyKey: `daily-auto-${Date.now()}`,
-      },
-    );
-    results.push({ step: 'withdraw_auto_request', status: 'passed', detail: autoRes });
-  } catch (error: any) {
-    results.push({
-      step: 'withdraw_auto_request',
-      status: 'failed',
-      detail: error?.message || String(error),
+    const autoRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/withdraw/request', 'POST', {
+      chain,
+      linkedWalletId,
+      amount: autoAmount,
+      idempotencyKey: `daily-auto-${Date.now()}`,
     });
+    results.push({ step: 'withdraw_auto_request', status: 'passed', detail: autoRes });
+  } catch (error: unknown) {
+    results.push({ step: 'withdraw_auto_request', status: 'failed', detail: errorMessage(error) });
   }
 
   try {
-    const manualRes = await apiRequest(
-      baseUrl,
-      traderToken,
-      '/api/v1/blockchain/withdraw/request',
-      'POST',
-      {
-        chain,
-        linkedWalletId,
-        amount: manualAmount,
-        idempotencyKey: `daily-manual-${Date.now()}`,
-      },
-    );
-    manualTxId = manualRes?.txId || null;
-    results.push({ step: 'withdraw_manual_request', status: 'passed', detail: manualRes });
-  } catch (error: any) {
-    results.push({
-      step: 'withdraw_manual_request',
-      status: 'failed',
-      detail: error?.message || String(error),
+    const manualRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/withdraw/request', 'POST', {
+      chain,
+      linkedWalletId,
+      amount: manualAmount,
+      idempotencyKey: `daily-manual-${Date.now()}`,
     });
+    const manualPayload = asRecord(manualRes);
+    manualTxId = typeof manualPayload.txId === 'string' ? manualPayload.txId : null;
+    results.push({ step: 'withdraw_manual_request', status: 'passed', detail: manualRes });
+  } catch (error: unknown) {
+    results.push({ step: 'withdraw_manual_request', status: 'failed', detail: errorMessage(error) });
   }
 
   if (manualTxId) {
@@ -137,12 +123,8 @@ async function main() {
         { reason: 'Daily treasury E2E approve' },
       );
       results.push({ step: 'withdraw_manual_approve', status: 'passed', detail: approveRes });
-    } catch (error: any) {
-      results.push({
-        step: 'withdraw_manual_approve',
-        status: 'failed',
-        detail: error?.message || String(error),
-      });
+    } catch (error: unknown) {
+      results.push({ step: 'withdraw_manual_approve', status: 'failed', detail: errorMessage(error) });
     }
   } else {
     results.push({
@@ -159,25 +141,16 @@ async function main() {
     let depositTxId: string | null = null;
 
     try {
-      const submitRes = await apiRequest(
-        baseUrl,
-        traderToken,
-        '/api/v1/blockchain/deposit/submit',
-        'POST',
-        {
-          chain,
-          txHash: depositTxHash,
-          amount: depositAmount,
-        },
-      );
-      depositTxId = submitRes?.txId || null;
-      results.push({ step: 'deposit_submit', status: 'passed', detail: submitRes });
-    } catch (error: any) {
-      results.push({
-        step: 'deposit_submit',
-        status: 'failed',
-        detail: error?.message || String(error),
+      const submitRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/deposit/submit', 'POST', {
+        chain,
+        txHash: depositTxHash,
+        amount: depositAmount,
       });
+      const submitPayload = asRecord(submitRes);
+      depositTxId = typeof submitPayload.txId === 'string' ? submitPayload.txId : null;
+      results.push({ step: 'deposit_submit', status: 'passed', detail: submitRes });
+    } catch (error: unknown) {
+      results.push({ step: 'deposit_submit', status: 'failed', detail: errorMessage(error) });
     }
 
     if (depositTxId) {
@@ -189,12 +162,8 @@ async function main() {
           'POST',
         );
         results.push({ step: 'deposit_settle', status: 'passed', detail: settleRes });
-      } catch (error: any) {
-        results.push({
-          step: 'deposit_settle',
-          status: 'failed',
-          detail: error?.message || String(error),
-        });
+      } catch (error: unknown) {
+        results.push({ step: 'deposit_settle', status: 'failed', detail: errorMessage(error) });
       }
     }
   } else {
@@ -206,19 +175,10 @@ async function main() {
   }
 
   try {
-    const txRes = await apiRequest(
-      baseUrl,
-      traderToken,
-      '/api/v1/blockchain/transactions?limit=20',
-      'GET',
-    );
+    const txRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/transactions?limit=20', 'GET');
     results.push({ step: 'transactions_check', status: 'passed', detail: txRes });
-  } catch (error: any) {
-    results.push({
-      step: 'transactions_check',
-      status: 'failed',
-      detail: error?.message || String(error),
-    });
+  } catch (error: unknown) {
+    results.push({ step: 'transactions_check', status: 'failed', detail: errorMessage(error) });
   }
 
   const report = {
@@ -233,13 +193,10 @@ async function main() {
   };
 
   console.log(JSON.stringify(report, null, 2));
-
-  if (report.summary.failed > 0) {
-    process.exitCode = 1;
-  }
+  if (report.summary.failed > 0) process.exitCode = 1;
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

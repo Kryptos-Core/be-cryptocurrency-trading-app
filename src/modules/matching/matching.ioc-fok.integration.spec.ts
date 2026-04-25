@@ -17,7 +17,7 @@ async function waitForOrderProcessed(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const [row] = await dataSource.query('SELECT status FROM orders WHERE order_id = ? LIMIT 1', [
+    const [row] = await dataSource.query('SELECT status FROM orders WHERE order_id = $1 LIMIT 1', [
       orderId,
     ]);
     if (!row) {
@@ -30,7 +30,9 @@ async function waitForOrderProcessed(
   throw new Error(`waitForOrderProcessed timed out for order ${orderId}`);
 }
 
-describe('Matching IOC/FOK Integration', () => {
+const describeIntegration = process.env.RUN_APP_BOOT_INTEGRATION === 'true' ? describe : describe.skip;
+
+describeIntegration('Matching IOC/FOK Integration', () => {
   let dataSource: DataSource;
   let ordersService: OrdersService;
   let app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>>;
@@ -77,15 +79,15 @@ describe('Matching IOC/FOK Integration', () => {
     ) => {
       await dataSource.query(
         `INSERT INTO wallets (wallet_id, user_id, currency_id, available, frozen, updated_at)
-         VALUES (UUID(), ?, ?, ?, ?, NOW(6))`,
-        [userId, currencyId, available, frozen],
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [uuidv7(), userId, currencyId, available, frozen],
       );
     };
 
     try {
       await dataSource.query(
         `INSERT INTO currencies (currency_id, symbol, name, precision_scale, min_withdraw, is_tradable, is_active)
-         VALUES (?, ?, ?, 8, 0, 1, 1), (?, ?, ?, 8, 0, 1, 1)`,
+         VALUES ($1, $2, $3, 8, 0, true, true), ($4, $5, $6, 8, 0, true, true)`,
         [
           ids.baseCurrencyId,
           baseSymbol,
@@ -100,16 +102,16 @@ describe('Matching IOC/FOK Integration', () => {
         `INSERT INTO market_pairs (
            pair_id, base_currency_id, quote_currency_id, symbol,
            price_scale, amount_scale, min_order_amount, maker_fee_rate, taker_fee_rate, is_active
-         ) VALUES (?, ?, ?, ?, 8, 8, 0.0001, 0.001, 0.001, 1)`,
+         ) VALUES ($1, $2, $3, $4, 8, 8, 0.0001, 0.001, 0.001, true)`,
         [ids.pairId, ids.baseCurrencyId, ids.quoteCurrencyId, pairSymbol],
       );
 
       await dataSource.query(
         `INSERT INTO users (user_id, email, password_hash, status, role, created_at)
          VALUES
-         (?, ?, 'x', 'ACTIVE', 'TRADER', NOW(6)),
-         (?, ?, 'x', 'ACTIVE', 'TRADER', NOW(6)),
-         (?, ?, 'x', 'ACTIVE', 'TRADER', NOW(6))`,
+         ($1, $2, 'x', 'ACTIVE', 'TRADER', NOW()),
+         ($3, $4, 'x', 'ACTIVE', 'TRADER', NOW()),
+         ($5, $6, 'x', 'ACTIVE', 'TRADER', NOW())`,
         [
           ids.makerUserId,
           `maker_${tag}@qa.local`,
@@ -174,25 +176,25 @@ describe('Matching IOC/FOK Integration', () => {
 
       const [fokRow] = await dataSource.query(
         `SELECT status, amount, filled_amount
-         FROM orders WHERE order_id = ? LIMIT 1`,
+         FROM orders WHERE order_id = $1 LIMIT 1`,
         [fokOrder.order_id],
       );
 
       const [iocRow] = await dataSource.query(
         `SELECT status, amount, filled_amount
-         FROM orders WHERE order_id = ? LIMIT 1`,
+         FROM orders WHERE order_id = $1 LIMIT 1`,
         [iocOrder.order_id],
       );
 
       const [makerRow] = await dataSource.query(
         `SELECT status, amount, filled_amount
-         FROM orders WHERE order_id = ? LIMIT 1`,
+         FROM orders WHERE order_id = $1 LIMIT 1`,
         [makerOrder.order_id],
       );
 
       const [tradeRow] = await dataSource.query(
         `SELECT trade_id FROM trades
-         WHERE maker_order_id = ? AND taker_order_id = ?
+         WHERE maker_order_id = $1 AND taker_order_id = $2
          ORDER BY created_at DESC LIMIT 1`,
         [makerOrder.order_id, iocOrder.order_id],
       );
@@ -216,7 +218,7 @@ describe('Matching IOC/FOK Integration', () => {
         ? await dataSource.query(
             `SELECT direction, amount, currency_id
              FROM wallet_ledger
-             WHERE ref_type = 'TRADE' AND ref_id = ?
+             WHERE ref_type = 'TRADE' AND ref_id = $1
              ORDER BY created_at ASC`,
             [tradeRow.trade_id],
           )
@@ -224,7 +226,7 @@ describe('Matching IOC/FOK Integration', () => {
 
       expect(ledgerRows.length).toBe(4);
     } finally {
-      await dataSource.query('DELETE FROM wallet_ledger WHERE user_id IN (?, ?, ?)', testUserIds);
+      await dataSource.query('DELETE FROM wallet_ledger WHERE user_id IN ($1, $2, $3)', testUserIds);
 
       if (createdTradeIds.length > 0) {
         await dataSource.query(
@@ -240,16 +242,16 @@ describe('Matching IOC/FOK Integration', () => {
         );
       }
 
-      await dataSource.query('DELETE FROM wallets WHERE user_id IN (?, ?, ?)', testUserIds);
+      await dataSource.query('DELETE FROM wallets WHERE user_id IN ($1, $2, $3)', testUserIds);
 
-      await dataSource.query('DELETE FROM market_pairs WHERE pair_id = ?', [ids.pairId]);
+      await dataSource.query('DELETE FROM market_pairs WHERE pair_id = $1', [ids.pairId]);
 
-      await dataSource.query('DELETE FROM currencies WHERE currency_id IN (?, ?)', [
+      await dataSource.query('DELETE FROM currencies WHERE currency_id IN ($1, $2)', [
         ids.baseCurrencyId,
         ids.quoteCurrencyId,
       ]);
 
-      await dataSource.query('DELETE FROM users WHERE user_id IN (?, ?, ?)', [...testUserIds]);
+      await dataSource.query('DELETE FROM users WHERE user_id IN ($1, $2, $3)', [...testUserIds]);
     }
   });
 });

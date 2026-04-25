@@ -35,6 +35,25 @@ const PRICE_AMOUNT_DECIMALS = 18;
 type MarketsSortBy = 'symbol' | 'base' | 'quote' | 'createdAt';
 type MarketsSortOrder = 'asc' | 'desc';
 
+export type MarketOrderBookResponse = {
+  symbol: string;
+  pairId: string;
+  bids: Array<{ price: string; amount: string; orders: number }>;
+  asks: Array<{ price: string; amount: string; orders: number }>;
+  bidLevels: number;
+  askLevels: number;
+  timestamp: string;
+};
+
+export type MarketRecentTradeResponse = {
+  trade_id: string;
+  pair_id: string;
+  price: string;
+  amount: string;
+  side: 'BUY' | 'SELL';
+  created_at: Date;
+};
+
 /**
  * Markets Service - Business Logic Layer
  * Service Layer Pattern: Business logic tập trung
@@ -483,7 +502,7 @@ export class MarketsService implements OnModuleInit {
     await this.findOne(pairId);
 
     // Soft delete by setting is_active to false
-    await this.marketRepository.update(pairId, { is_active: false } as any);
+    await this.marketRepository.update(pairId, { is_active: false } as Partial<MarketPair>);
 
     // Invalidate cache
     await this.invalidateCache();
@@ -742,7 +761,7 @@ export class MarketsService implements OnModuleInit {
    * Get order book for a market pair
    * Cache-Aside Pattern: Cache order book with short TTL
    */
-  async getOrderBook(pairId: string, limit: number = 20): Promise<any> {
+  async getOrderBook(pairId: string, limit: number = 20): Promise<MarketOrderBookResponse> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}orderbook:${pairId}:${limit}`;
 
     return this.cacheService.getOrSet(
@@ -768,7 +787,7 @@ export class MarketsService implements OnModuleInit {
   /**
    * Get order book by symbol
    */
-  async getOrderBookBySymbol(symbol: string, limit: number = 20): Promise<any> {
+  async getOrderBookBySymbol(symbol: string, limit: number = 20): Promise<MarketOrderBookResponse> {
     const pair = await this.findBySymbol(symbol);
     return this.getOrderBook(pair.pair_id, limit);
   }
@@ -776,7 +795,7 @@ export class MarketsService implements OnModuleInit {
   /**
    * Get recent trades for a market pair
    */
-  async getRecentTrades(pairId: string, limit: number = 50): Promise<any[]> {
+  async getRecentTrades(pairId: string, limit: number = 50): Promise<MarketRecentTradeResponse[]> {
     const cacheKey = `${this.CACHE_KEY_PREFIX}trades:${pairId}:${limit}`;
 
     return this.cacheService.getOrSet(
@@ -789,7 +808,7 @@ export class MarketsService implements OnModuleInit {
           pair_id: trade.pair_id,
           price: trade.price?.toString() || '0',
           amount: trade.amount?.toString() || '0',
-          side: (trade as any).taker_order?.side || 'BUY',
+          side: ((trade as unknown as { taker_order?: { side?: 'BUY' | 'SELL' } }).taker_order?.side ?? 'BUY'),
           created_at: trade.created_at,
         }));
       },
@@ -800,7 +819,7 @@ export class MarketsService implements OnModuleInit {
   /**
    * Get recent trades by symbol
    */
-  async getRecentTradesBySymbol(symbol: string, limit: number = 50): Promise<any[]> {
+  async getRecentTradesBySymbol(symbol: string, limit: number = 50): Promise<MarketRecentTradeResponse[]> {
     const pair = await this.findBySymbol(symbol);
     return this.getRecentTrades(pair.pair_id, limit);
   }

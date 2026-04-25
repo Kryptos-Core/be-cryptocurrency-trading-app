@@ -1,5 +1,5 @@
 /**
- * MySQL ENUM values for `chain` columns — keep in sync with migrations.
+ * DB ENUM values for `chain` columns — keep in sync with migrations.
  */
 export const BLOCKCHAIN_CHAIN_DB_VALUES = [
   'ARBITRUM_MAINNET',

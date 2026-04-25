@@ -27,7 +27,7 @@ export class CancelOrderUseCase {
     if (order.user_id !== userId) {
       throw new ForbiddenException('You can only cancel your own orders');
     }
-    if (!canCancelOrder(order.status as any)) {
+    if (!canCancelOrder(order.status)) {
       throw new BusinessException(
         `Order cannot be cancelled (status: ${order.status})`,
         'INVALID_STATE',

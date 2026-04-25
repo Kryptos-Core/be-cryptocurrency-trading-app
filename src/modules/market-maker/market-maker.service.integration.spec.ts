@@ -4,7 +4,7 @@ import { MarketsService } from '@/modules/markets/markets.service';
 import { OrdersService } from '@/modules/orders/orders.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { MarketMakerService } from './market-maker.service';
-import { MarketMakerConfigRepository } from './repositories';
+import { MARKET_MAKER_CONFIG_REPOSITORY } from './domain/ports';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 describe('MarketMakerService + MmOrderStrategyService Integration', () => {
@@ -48,7 +48,7 @@ describe('MarketMakerService + MmOrderStrategyService Integration', () => {
         MarketMakerService,
         MmOrderStrategyService,
         { provide: CacheService, useValue: cacheServiceMock },
-        { provide: MarketMakerConfigRepository, useValue: configRepoMock },
+        { provide: MARKET_MAKER_CONFIG_REPOSITORY, useValue: configRepoMock },
         { provide: OrdersService, useValue: ordersServiceMock },
         { provide: MarketsService, useValue: marketsServiceMock },
         { provide: SystemConfigService, useValue: systemConfigMock },

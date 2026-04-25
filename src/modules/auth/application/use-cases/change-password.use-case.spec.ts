@@ -4,7 +4,7 @@ import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hashe
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
 import { AUTH_REPOSITORY } from '@/modules/auth/domain/ports';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
-import { UsersRepository } from '@/modules/users/repositories';
+import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 
 describe('ChangePasswordUseCase', () => {
   const usersRepository = {
@@ -29,7 +29,7 @@ describe('ChangePasswordUseCase', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ChangePasswordUseCase,
-        { provide: UsersRepository, useValue: usersRepository },
+        { provide: USERS_REPOSITORY, useValue: usersRepository },
         { provide: AUTH_REPOSITORY, useValue: authRepository },
         { provide: TwoFaService, useValue: twoFaService },
         { provide: PASSWORD_HASHER, useValue: passwordHasher },

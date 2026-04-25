@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CacheService } from '@/common/services';
+import type { Currency } from '@/entities/currency.entity';
 import { CURRENCY_REPOSITORY, type CurrencyRepositoryPort } from '../../domain/ports';
 
 @Injectable()
@@ -14,11 +15,9 @@ export class DeleteCurrencyUseCase {
 
   async execute(currencyId: string): Promise<void> {
     const existing = await this.currencyRepo.findById(currencyId);
-    if (!existing) {
-      return; // idempotent — already deleted
-    }
+    if (!existing) return;
 
-    await this.currencyRepo.update(currencyId, { is_active: false } as any);
+    await this.currencyRepo.update(currencyId, { is_active: false } as Partial<Currency>);
     await this.invalidateCache();
     this.logger.log(`Currency soft-deleted: ${existing.symbol} (ID: ${currencyId})`);
   }

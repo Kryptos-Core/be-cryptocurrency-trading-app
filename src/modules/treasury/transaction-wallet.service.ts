@@ -568,7 +568,7 @@ export class TransactionWalletService {
    * with TreasuryMainWalletService (which injects TransactionWalletService for balance queries).
    */
   async resolveMainWalletPrivateKey(chain: SupportedTreasuryChain): Promise<string> {
-    const wallet = await this.treasuryMainWalletRepo.findActiveDefaultOnChain(chain as any);
+    const wallet = await this.treasuryMainWalletRepo.findActiveDefaultOnChain(chain);
     if (!wallet) {
       throw new BusinessException(
         `No active default main wallet configured for chain ${chain}. ` +

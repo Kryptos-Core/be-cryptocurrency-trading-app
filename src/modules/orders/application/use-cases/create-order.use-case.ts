@@ -18,6 +18,27 @@ import { OrderValidationService } from '@/modules/orders/domain/services/order-v
 const IDEMPOTENCY_CACHE_PREFIX = 'order:idempotency:';
 const IDEMPOTENCY_TTL_SEC = 86400;
 
+export type PlainOrderResponse = {
+  order_id: string;
+  user_id: string;
+  pair_id: string;
+  side: Order['side'];
+  type: Order['type'];
+  price: Order['price'];
+  amount: string;
+  filled_amount: string;
+  avg_price: Order['avg_price'];
+  status: Order['status'];
+  time_in_force: Order['time_in_force'];
+  reserved_quote: string;
+  reserved_base: string;
+  client_order_id: Order['client_order_id'];
+  idempotency_key: string;
+  slippage_tolerance: string | null;
+  created_at: Date;
+  updated_at: Date;
+};
+
 @Injectable()
 export class CreateOrderUseCase {
   private readonly logger = new Logger(CreateOrderUseCase.name);
@@ -169,7 +190,7 @@ export class CreateOrderUseCase {
     }
   }
 
-  private orderToPlain(o: Order): Record<string, any> {
+  private orderToPlain(o: Order): PlainOrderResponse {
     return {
       order_id: o.order_id,
       user_id: o.user_id,
@@ -192,7 +213,7 @@ export class CreateOrderUseCase {
     };
   }
 
-  private mapToOrder(plain: Record<string, any>): Order {
+  private mapToOrder(plain: PlainOrderResponse): Order {
     const order = new Order();
     Object.assign(order, plain);
     return order;

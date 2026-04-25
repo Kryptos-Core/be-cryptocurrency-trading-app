@@ -13,9 +13,7 @@ import { Currency } from './currency.entity';
 
 @Entity('market_pairs')
 @Index('uk_pair_symbol', ['symbol'], { unique: true })
-@Index('uk_pair_base_quote', ['base_currency_id', 'quote_currency_id'], {
-  unique: true,
-})
+@Index('uk_pair_base_quote', ['base_currency_id', 'quote_currency_id'], { unique: true })
 @Index('idx_pair_active', ['is_active'])
 export class MarketPair {
   @PrimaryColumn({ type: 'char', length: 36 })
@@ -53,29 +51,17 @@ export class MarketPair {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(
-    () => Currency,
-    (currency) => currency.base_pairs,
-    {
-      onDelete: 'RESTRICT',
-    },
-  )
+  @ManyToOne(() => Currency, (currency) => currency.base_pairs, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'base_currency_id' })
   base_currency!: Currency;
 
-  @ManyToOne(
-    () => Currency,
-    (currency) => currency.quote_pairs,
-    {
-      onDelete: 'RESTRICT',
-    },
-  )
+  @ManyToOne(() => Currency, (currency) => currency.quote_pairs, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'quote_currency_id' })
   quote_currency!: Currency;
 
   @OneToMany('Order', 'pair')
-  orders!: any[];
+  orders!: unknown[];
 
   @OneToMany('Trade', 'pair')
-  trades!: any[];
+  trades!: unknown[];
 }

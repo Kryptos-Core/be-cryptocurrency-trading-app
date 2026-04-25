@@ -41,7 +41,7 @@ export class DepositMatchRequestRepository implements DepositMatchRequestReposit
   async countByProposerToday(proposerId: string): Promise<number> {
     const [{ cnt }] = await this.dataSource.query(
       `SELECT COUNT(*) AS cnt FROM deposit_match_requests
-       WHERE proposer_id = ? AND proposed_at >= CURDATE()`,
+       WHERE proposer_id = $1 AND proposed_at >= CURRENT_DATE`,
       [proposerId],
     );
     return Number(cnt);
@@ -50,7 +50,7 @@ export class DepositMatchRequestRepository implements DepositMatchRequestReposit
   async countByApproverToday(approverId: string): Promise<number> {
     const [{ cnt }] = await this.dataSource.query(
       `SELECT COUNT(*) AS cnt FROM deposit_match_requests
-       WHERE approver_id = ? AND resolved_at >= CURDATE()`,
+       WHERE approver_id = $1 AND resolved_at >= CURRENT_DATE`,
       [approverId],
     );
     return Number(cnt);

@@ -93,7 +93,7 @@ export class WalletsService {
   reconcileBalance(
     userId: string,
     currencyId: string,
-    manager?: any,
+    manager?: TransactionContext,
   ): Promise<{
     internalBalance: string;
     externalBalance: string;

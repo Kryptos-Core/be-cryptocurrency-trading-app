@@ -12,15 +12,10 @@
  */
 
 import { OnchainTxStatus, UserRole } from '@/common/enums';
-import { BadRequestException, ConflictException } from '@/common/exceptions';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
 import { DepositMatchService } from '../../application/use-cases/deposits/deposit-match.service';
 import { OnchainDepositService } from '../../application/use-cases/deposits/onchain-deposit.service';
-import {
-  DEPOSIT_MATCH_REQUEST_REPOSITORY,
-  ONCHAIN_TRANSACTION_REPOSITORY,
-} from '../../domain/ports';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 

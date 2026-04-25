@@ -274,7 +274,7 @@ export class WalletConnectService implements OnModuleInit {
    * }
    */
   async handleRelayWebhook(
-    payload: Record<string, any>,
+    payload: Record<string, unknown>,
     hmacSignature?: string,
   ): Promise<{ processed: boolean; sessionId?: string }> {
     // Verify HMAC signature nếu có webhook secret
@@ -767,13 +767,13 @@ export class WalletConnectService implements OnModuleInit {
     return `wc:${topic}@2?${params.toString()}&projectId=${this.projectId}`;
   }
 
-  private async handleSessionSettle(topic: string, _payload: any): Promise<void> {
+  private async handleSessionSettle(topic: string, _payload: unknown): Promise<void> {
     // Tìm session theo topic (scan Redis keys) — trong production dùng secondary index
     this.logger.debug(`[WC] session_settle: topic=${topic}`);
     // TODO: Map topic → sessionId để update status
   }
 
-  private async handleSessionRequest(topic: string, _payload: any): Promise<string | undefined> {
+  private async handleSessionRequest(topic: string, _payload: unknown): Promise<string | undefined> {
     this.logger.debug(`[WC] session_request: topic=${topic}`);
     return undefined;
   }

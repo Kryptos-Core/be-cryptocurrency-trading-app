@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import { newUuid } from '@/common/utils/uuid.util';
@@ -122,8 +123,8 @@ export class AdminAdjustBalanceUseCase {
       }
 
       return result;
-    } catch (err: any) {
-      const msg = err?.message ?? String(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       if (
         typeof msg === 'string' &&
         msg.includes('Duplicate entry') &&
@@ -142,7 +143,7 @@ export class AdminAdjustBalanceUseCase {
     walletId: string,
     deltaAvailable: Decimal,
     deltaFrozen: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ) {
     try {
       return await this.walletRepo.applyBalanceDelta(
@@ -151,8 +152,8 @@ export class AdminAdjustBalanceUseCase {
         deltaFrozen.toString(),
         manager,
       );
-    } catch (error: any) {
-      if (error?.message?.includes('Insufficient')) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('Insufficient')) {
         throw new BusinessException('Insufficient balance', 'INSUFFICIENT_BALANCE');
       }
       throw error;

@@ -18,6 +18,11 @@ function toEntityManager(ctx: TransactionContext): EntityManager {
   return ctx as unknown as EntityManager;
 }
 
+function pg(sql: string): string {
+  let index = 0;
+  return sql.replace(/\?/g, () => `$${++index}`);
+}
+
 /**
  * Infrastructure: Onchain Transaction Repository (TypeORM + raw SQL)
  * Implements OnchainTransactionRepositoryPort — contains all persistence logic
@@ -80,8 +85,8 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     return repo.save(entity);
   }
 
-  async updateStatus(txId: string, status: string, extra?: Record<string, any>): Promise<void> {
-    const update: Record<string, any> = {
+  async updateStatus(txId: string, status: string, extra?: Record<string, unknown>): Promise<void> {
+    const update: Record<string, unknown> = {
       status: status as OnchainTransaction['status'],
     };
 
@@ -101,9 +106,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     ctx: TransactionContext,
     txId: string,
     status: string,
-    extra?: Record<string, any>,
+    extra?: Record<string, unknown>,
   ): Promise<void> {
-    const update: Record<string, any> = {
+    const update: Record<string, unknown> = {
       status: status as OnchainTransaction['status'],
     };
 
@@ -139,9 +144,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
 
   async updateCreditInfo(txId: string, creditTxId: string, creditedAt: Date): Promise<void> {
     await this.dataSource.query(
-      `UPDATE onchain_transactions
+      pg(`UPDATE onchain_transactions
        SET credited_currency_id = ?, confirmed_at = ?
-       WHERE tx_id = ?`,
+       WHERE tx_id = ?`),
       [creditTxId, creditedAt, txId],
     );
   }
@@ -159,9 +164,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     conversionRate: string,
   ): Promise<void> {
     await this.dataSource.query(
-      `UPDATE onchain_transactions
+      pg(`UPDATE onchain_transactions
        SET credited_currency_id = ?, credited_amount = ?, conversion_rate = ?
-       WHERE tx_id = ?`,
+       WHERE tx_id = ?`),
       [creditCurrencyId, creditAmount, conversionRate, txId],
     );
   }
@@ -174,9 +179,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     conversionRate: string,
   ): Promise<void> {
     await toEntityManager(ctx).query(
-      `UPDATE onchain_transactions
+      pg(`UPDATE onchain_transactions
        SET credited_currency_id = ?, credited_amount = ?, conversion_rate = ?
-       WHERE tx_id = ?`,
+       WHERE tx_id = ?`),
       [creditCurrencyId, creditAmount, conversionRate, txId],
     );
   }
@@ -189,9 +194,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     confirmedAt: Date | null,
   ): Promise<void> {
     await this.dataSource.query(
-      `UPDATE onchain_transactions
+      pg(`UPDATE onchain_transactions
        SET tx_hash = ?, from_address = ?, status = ?, confirmations = 0, confirmed_at = ?
-       WHERE tx_id = ?`,
+       WHERE tx_id = ?`),
       [txHash, fromAddress, status, confirmedAt, txId],
     );
   }
@@ -199,11 +204,11 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
   async findPendingManualWithdrawals(limit: number): Promise<OnchainTransaction[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const rows = await this.dataSource.query(
-      `SELECT *
+      pg(`SELECT *
        FROM onchain_transactions
        WHERE type = 'WITHDRAWAL' AND status = 'PENDING' AND tx_hash IS NULL
        ORDER BY created_at ASC
-       LIMIT ?`,
+       LIMIT ?`),
       [safeLimit],
     );
     return rows || [];
@@ -216,7 +221,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     status: string,
   ): Promise<void> {
     await toEntityManager(ctx).query(
-      `UPDATE onchain_transactions SET user_id = ?, status = ? WHERE tx_id = ?`,
+      pg(`UPDATE onchain_transactions SET user_id = ?, status = ? WHERE tx_id = ?`),
       [userId, status, txId],
     );
   }
@@ -225,14 +230,14 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
 
   async listByUser(userId: string, limit: number): Promise<OnchainTxRowDto[]> {
     const rows = await this.dataSource.query(
-      `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
+      pg(`SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
               confirmations, created_at, confirmed_at,
               credited_currency_id, credited_amount, conversion_rate
        FROM onchain_transactions
        WHERE user_id = ?
          AND type NOT IN ('FUND', 'SWEEP')
        ORDER BY created_at DESC
-       LIMIT ?`,
+       LIMIT ?`),
       [userId, limit],
     );
 
@@ -241,12 +246,12 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
 
   async getByIdAndUser(userId: string, txId: string): Promise<OnchainTxRowDto | null> {
     const rows = await this.dataSource.query(
-      `SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
+      pg(`SELECT tx_id, chain, type, tx_hash, from_address, to_address, amount, status,
               confirmations, created_at, confirmed_at,
               credited_currency_id, credited_amount, conversion_rate
        FROM onchain_transactions
        WHERE tx_id = ? AND user_id = ?
-       LIMIT 1`,
+       LIMIT 1`),
       [txId, userId],
     );
 
@@ -295,7 +300,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     }
     if (filters.search?.trim()) {
       const s = `%${filters.search.trim()}%`;
-      sql += ` AND (u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR tx.to_address LIKE ? OR tx.tx_id LIKE ? OR tx.tx_hash LIKE ?)`;
+      sql += ` AND (u.email ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR tx.to_address ILIKE ? OR tx.tx_id ILIKE ? OR tx.tx_hash ILIKE ?)`;
       params.push(s, s, s, s, s, s);
     }
 
@@ -308,15 +313,15 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
       ${filters.chain ? ' AND tx.chain = ?' : ''}
       ${filters.dateFrom ? ' AND tx.created_at >= ?' : ''}
       ${filters.dateTo ? ' AND tx.created_at <= ?' : ''}
-      ${filters.search?.trim() ? ' AND (u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR tx.to_address LIKE ? OR tx.tx_id LIKE ? OR tx.tx_hash LIKE ?)' : ''}
+      ${filters.search?.trim() ? ' AND (u.email ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR tx.to_address ILIKE ? OR tx.tx_id ILIKE ? OR tx.tx_hash ILIKE ?)' : ''}
     `;
-    const countRows = await this.dataSource.query(countSql.trim(), params);
+    const countRows = await this.dataSource.query(pg(countSql.trim()), params);
     const total = Number(countRows?.[0]?.total ?? 0);
 
     sql += ` ORDER BY tx.created_at DESC LIMIT ? OFFSET ?`;
     params.push(limit, skip);
 
-    const rows = await this.dataSource.query(sql, params);
+    const rows = await this.dataSource.query(pg(sql), params);
 
     const data = (rows || []).map((r: Record<string, unknown>) => ({
       ...this.mapTxRow(r),
@@ -331,7 +336,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
 
   async getAdminWithdrawalDetail(txId: string): Promise<AdminWithdrawalDetailDto | null> {
     const rows = await this.dataSource.query(
-      `SELECT tx.tx_id, tx.user_id, tx.linked_wallet_id, tx.chain, tx.type, tx.tx_hash,
+      pg(`SELECT tx.tx_id, tx.user_id, tx.linked_wallet_id, tx.chain, tx.type, tx.tx_hash,
               tx.from_address, tx.to_address, tx.amount, tx.status, tx.confirmations,
               tx.created_at, tx.confirmed_at,
               tx.credited_currency_id, tx.credited_amount, tx.conversion_rate,
@@ -339,7 +344,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
        FROM onchain_transactions tx
        LEFT JOIN users u ON tx.user_id = u.user_id
        WHERE tx.tx_id = ? AND tx.type = 'WITHDRAWAL'
-       LIMIT 1`,
+       LIMIT 1`),
       [txId],
     );
 
@@ -349,7 +354,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     let userWalletBalance: string | null = null;
     try {
       const walletRows = await this.dataSource.query(
-        `SELECT available, frozen FROM wallets WHERE user_id = ? LIMIT 1`,
+        pg(`SELECT available, frozen FROM wallets WHERE user_id = ? LIMIT 1`),
         [r.user_id],
       );
       const w = walletRows?.[0];
@@ -431,7 +436,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     }
     if (filters.search?.trim()) {
       const s = `%${filters.search.trim()}%`;
-      sql += ` AND (tx.from_address LIKE ? OR tx.tx_hash LIKE ? OR tx.tx_id LIKE ?)`;
+      sql += ` AND (tx.from_address ILIKE ? OR tx.tx_hash ILIKE ? OR tx.tx_id ILIKE ?)`;
       params.push(s, s, s);
     }
 
@@ -441,7 +446,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
       ${filters.chain ? ' AND tx.chain = ?' : ''}
       ${filters.dateFrom ? ' AND tx.created_at >= ?' : ''}
       ${filters.dateTo ? ' AND tx.created_at <= ?' : ''}
-      ${filters.search?.trim() ? ' AND (tx.from_address LIKE ? OR tx.tx_hash LIKE ? OR tx.tx_id LIKE ?)' : ''}
+      ${filters.search?.trim() ? ' AND (tx.from_address ILIKE ? OR tx.tx_hash ILIKE ? OR tx.tx_id ILIKE ?)' : ''}
     `;
     const countParams: (string | number)[] = [];
     if (filters.chain) countParams.push(filters.chain);
@@ -452,13 +457,13 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
       countParams.push(s, s, s);
     }
 
-    const countRows = await this.dataSource.query(countSql.trim(), countParams);
+    const countRows = await this.dataSource.query(pg(countSql.trim()), countParams);
     const total = Number(countRows?.[0]?.total ?? 0);
 
     sql += ` ORDER BY tx.created_at DESC LIMIT ? OFFSET ?`;
     params.push(limit, skip);
 
-    const rows = await this.dataSource.query(sql, params);
+    const rows = await this.dataSource.query(pg(sql), params);
 
     const data = (rows || []).map((r: Record<string, unknown>) => ({
       ...this.mapTxRow(r),
@@ -474,12 +479,12 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
 
   // ─── Helpers ──────────────────────────────────────────────────────────
 
-  private mapTxRow(r: Record<string, any>): OnchainTxRowDto {
+  private mapTxRow(r: Record<string, unknown>): OnchainTxRowDto {
     return {
       txId: String(r.tx_id ?? ''),
       chain: String(r.chain ?? ''),
       type: String(r.type ?? ''),
-      txHash: r.tx_hash ?? null,
+      txHash: r.tx_hash != null ? String(r.tx_hash) : null,
       fromAddress: String(r.from_address ?? ''),
       toAddress: String(r.to_address ?? ''),
       amount: String(r.amount ?? '0'),
@@ -493,7 +498,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
           : String(r.confirmed_at)
         : null,
       creditedAmount: r.credited_amount != null ? String(r.credited_amount) : null,
-      creditedCurrencyId: r.credited_currency_id ?? null,
+      creditedCurrencyId: r.credited_currency_id != null ? String(r.credited_currency_id) : null,
       conversionRate: r.conversion_rate != null ? String(r.conversion_rate) : null,
     };
   }

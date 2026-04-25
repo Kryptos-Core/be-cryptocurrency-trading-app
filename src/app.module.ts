@@ -1,4 +1,5 @@
 import { BullModule, type BullRootModuleOptions } from '@nestjs/bull';
+import type { NextFunction, Request, Response } from 'express';
 import { Injectable, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -11,6 +12,7 @@ import { CorrelationIdMiddleware } from './common/middleware/correlation-id.midd
 import { OutboxModule } from './common/outbox/outbox.module';
 import { UnitOfWorkModule } from './common/unit-of-work/unit-of-work.module';
 import appConfig from './config/app.config';
+import { DatabaseProvidersModule } from './config/database.module';
 import { validateEnvironment } from './config/env.validation';
 import { nestEnvFilePaths } from './config/load-env-files';
 import { getBullRedisConfig } from './config/redis.config';
@@ -49,7 +51,7 @@ import { TelemetryModule } from './telemetry';
 class BullBoardAuthMiddleware {
   constructor(private readonly jwtService: JwtService) {}
 
-  use(req: any, res: any, next: () => void): void {
+  use(req: Request & { user?: unknown }, res: Response, next: NextFunction): void {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(403).json({ statusCode: 403, message: 'Unauthorized' });
@@ -91,6 +93,7 @@ class BullBoardAuthMiddleware {
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
     }),
+    DatabaseProvidersModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

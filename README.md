@@ -15,7 +15,7 @@ Kiến trúc (outbox relay, read model): [`docs/ARCHITECTURE.md`](docs/ARCHITECT
 ## Yêu cầu
 
 - **Node.js** (khuyến nghị LTS 20+) và npm  
-- **MySQL 8** và **Redis 7** (có thể dùng Docker — xem bước dưới)
+- **PostgreSQL 16** và **Redis 7** (có thể dùng Docker — xem bước dưới)
 
 ## Chạy local
 
@@ -25,9 +25,9 @@ Kiến trúc (outbox relay, read model): [`docs/ARCHITECTURE.md`](docs/ARCHITECT
 - App Nest và CLI (migration, seed) chỉ đọc **`.env.${NODE_ENV}`**. Scripts npm đặt `NODE_ENV` qua `cross-env`; nếu chạy thủ công mà thiếu `NODE_ENV`, mặc định file env là **`.env.development`**.  
 - Không commit file chứa secret thật.
 
-### 2. MySQL + Redis
+### 2. PostgreSQL + Redis
 
-Dùng **cùng file env** với app cho dev (`.env.development` — `DB_*` / `REDIS_*` khớp Compose):
+Dùng **cùng file env** với app cho dev (`.env.development` — `CORE_DB_*` / `REDIS_*` khớp Compose):
 
 ```bash
 npm run docker:infra:up
@@ -89,7 +89,7 @@ Production: `npm run build` rồi `npm run start:prod`.
 
 | Script | Ý nghĩa |
 |--------|----------|
-| `npm run docker:infra:up` / `docker:infra:down` | MySQL + Redis (Compose, `--env-file .env.development`) |
+| `npm run docker:infra:up` / `docker:infra:down` | PostgreSQL + Redis (Compose, `--env-file .env.development`) |
 | `npm run lint:boundaries` | Kiểm tra import xuyên module (theo script + allowlist) |
 | `npm run test` | Jest unit + integration tests |
 | `npm run test:cov` | Jest với coverage report |

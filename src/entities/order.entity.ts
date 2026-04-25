@@ -42,7 +42,7 @@ export class Order {
   type!: 'LIMIT' | 'MARKET';
 
   @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
-  price!: string;
+  price!: string | null;
 
   @Column({ ...DECIMAL_36_18_COLUMN })
   amount!: string;
@@ -51,7 +51,7 @@ export class Order {
   filled_amount!: string;
 
   @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
-  avg_price!: string;
+  avg_price!: string | null;
 
   @Column({
     type: 'enum',
@@ -60,11 +60,7 @@ export class Order {
   })
   status!: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED' | 'REJECTED';
 
-  @Column({
-    type: 'enum',
-    enum: ['GTC', 'IOC', 'FOK'],
-    default: 'GTC',
-  })
+  @Column({ type: 'enum', enum: ['GTC', 'IOC', 'FOK'], default: 'GTC' })
   time_in_force!: 'GTC' | 'IOC' | 'FOK';
 
   @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
@@ -74,7 +70,7 @@ export class Order {
   reserved_base!: string;
 
   @Column({ type: 'varchar', length: 64, nullable: true })
-  client_order_id!: string;
+  client_order_id!: string | null;
 
   @Column({ type: 'varchar', length: 64 })
   idempotency_key!: string;
@@ -88,27 +84,17 @@ export class Order {
   @UpdateDateColumn()
   updated_at!: Date;
 
-  @ManyToOne(
-    () => User,
-    (user) => user.orders,
-    { onDelete: 'CASCADE' },
-  )
+  @ManyToOne(() => User, (user) => user.orders, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @ManyToOne(
-    () => MarketPair,
-    (pair) => pair.orders,
-    {
-      onDelete: 'RESTRICT',
-    },
-  )
+  @ManyToOne(() => MarketPair, (pair) => pair.orders, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'pair_id' })
   pair!: MarketPair;
 
   @OneToMany('Trade', 'taker_order')
-  taker_trades!: any[];
+  taker_trades!: unknown[];
 
   @OneToMany('Trade', 'maker_order')
-  maker_trades!: any[];
+  maker_trades!: unknown[];
 }

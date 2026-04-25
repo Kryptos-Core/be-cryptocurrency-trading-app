@@ -31,7 +31,7 @@ export class Notification {
   created_by!: string;
 
   @Column({ type: 'json', nullable: true })
-  data!: Record<string, any> | null;
+  data!: Record<string, unknown> | null;
 
   @CreateDateColumn({ precision: 3 })
   created_at!: Date;
@@ -39,9 +39,6 @@ export class Notification {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   creator!: User;
 
-  @OneToMany(
-    () => UserNotification,
-    (un) => un.notification,
-  )
+  @OneToMany(() => UserNotification, (un) => un.notification)
   user_notifications!: UserNotification[];
 }

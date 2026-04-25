@@ -95,13 +95,13 @@ export interface OnchainTransactionRepositoryPort {
     data: Partial<BlockchainOnchainTransactionRecord>,
   ): Promise<BlockchainOnchainTransactionRecord>;
 
-  updateStatus(txId: string, status: string, extra?: Record<string, any>): Promise<void>;
+  updateStatus(txId: string, status: string, extra?: Record<string, unknown>): Promise<void>;
 
   updateStatusWithinTransaction(
     ctx: TransactionContext,
     txId: string,
     status: string,
-    extra?: Record<string, any>,
+    extra?: Record<string, unknown>,
   ): Promise<void>;
 
   updateWithTxHash(txId: string, txHash: string, status: string): Promise<void>;

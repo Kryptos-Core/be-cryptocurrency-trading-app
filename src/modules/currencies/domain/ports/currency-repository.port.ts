@@ -25,7 +25,7 @@ export interface CurrencyRepositoryPort {
   findWithPagination(
     page: number,
     limit: number,
-    options?: any,
+    options?: { includeInactive?: boolean },
   ): Promise<{ data: Currency[]; total: number; page: number; limit: number }>;
 
   findWithSearch(params: {

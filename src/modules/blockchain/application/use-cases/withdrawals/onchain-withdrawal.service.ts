@@ -68,7 +68,7 @@ export class OnchainWithdrawalService {
         to_address: linkedWallet.address,
         amount: dto.amount,
         status: OnchainTxStatus.PENDING,
-      } as any);
+      });
 
       if (idempotencyCacheKey) {
         await this.cacheService.set(

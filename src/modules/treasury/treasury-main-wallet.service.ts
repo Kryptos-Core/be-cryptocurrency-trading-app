@@ -476,7 +476,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
     let usdtTrc20Balance: string | null = null;
     try {
       const result = await this.transactionWalletService.getBalanceCached(
-        w.chain as any,
+        w.chain,
         w.address,
       );
       balance = result.balance;
@@ -517,7 +517,7 @@ export class TreasuryMainWalletService implements OnModuleInit {
       let symbol = '';
       let usdtTrc20Balance: string | null = null;
       try {
-        const r = await this.transactionWalletService.getBalanceCached(chain as any, address);
+        const r = await this.transactionWalletService.getBalanceCached(chain, address);
         balance = r.balance;
         symbol = r.symbol;
         usdtTrc20Balance = r.usdtTrc20Balance ?? null;

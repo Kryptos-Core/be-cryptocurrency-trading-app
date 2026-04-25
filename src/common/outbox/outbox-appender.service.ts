@@ -8,7 +8,7 @@ export interface AppendIntegrationOutboxInput {
   aggregateId: string;
   eventType: string;
   payload: Record<string, unknown>;
-  /** When set, duplicate command retries map to the same row (MySQL unique). */
+  /** When set, duplicate command retries map to the same unique row. */
   dedupeKey?: string;
 }
 

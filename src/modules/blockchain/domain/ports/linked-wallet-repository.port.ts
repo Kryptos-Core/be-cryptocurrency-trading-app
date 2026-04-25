@@ -50,7 +50,7 @@ export interface LinkedWalletRepositoryPort {
   updateStatus(linkedWalletId: string, status: string): Promise<void>;
 
   /**
-   * INSERT ... ON DUPLICATE KEY UPDATE - upsert ví với status = VERIFIED.
+   * Upsert ví với status = VERIFIED.
    * Trả về linkId được áp dụng (có thể là id đã tồn tại trên DB).
    */
   upsertVerified(params: {

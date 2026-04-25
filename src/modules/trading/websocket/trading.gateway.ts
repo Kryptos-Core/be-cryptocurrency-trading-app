@@ -425,7 +425,7 @@ export class TradingGateway
     client: Socket,
     code: WebSocketErrorCode,
     message: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
   ) {
     client.emit('error', {
       type: 'error',

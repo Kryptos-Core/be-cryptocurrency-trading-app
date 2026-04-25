@@ -44,18 +44,23 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     const rows = await this.dataSource.query(
       `SELECT link_id, chain, address, label, status, linked_at
        FROM linked_wallets
-       WHERE user_id = ? AND status != 'REVOKED'
+       WHERE user_id = $1 AND status != 'REVOKED'
        ORDER BY created_at DESC`,
       [userId],
     );
 
-    return (rows || []).map((r: any) => ({
+    return (rows || []).map((r: Record<string, unknown>) => ({
       link_id: r.link_id,
       chain: r.chain,
       address: r.address,
       label: r.label ?? null,
       status: r.status,
-      linked_at: r.linked_at ? new Date(r.linked_at) : null,
+      linked_at:
+        r.linked_at instanceof Date
+          ? r.linked_at
+          : typeof r.linked_at === 'string' || typeof r.linked_at === 'number'
+            ? new Date(r.linked_at)
+            : null,
     }));
   }
 
@@ -104,8 +109,8 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
   }
 
   /**
-   * Upsert ví VERIFIED: INSERT ... ON DUPLICATE KEY UPDATE.
-   * Trả về linkId thực sự được lưu vào DB (có thể là id mới hoặc id cũ nếu dup).
+   * Upsert ví VERIFIED bằng PostgreSQL ON CONFLICT.
+   * Trả về link_id thực tế được giữ trong DB.
    */
   async upsertVerified(params: {
     linkId: string;
@@ -116,29 +121,30 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     now: Date;
   }): Promise<string> {
     const { linkId, userId, chain, address, label, now } = params;
-
-    await this.dataSource.query(
+    const rows = await this.dataSource.query(
       `INSERT INTO linked_wallets (link_id, user_id, chain, address, label, status, linked_at, created_at)
-       VALUES (?, ?, ?, ?, ?, 'VERIFIED', ?, ?)
-       ON DUPLICATE KEY UPDATE status = 'VERIFIED', linked_at = ?, label = COALESCE(?, label)`,
-      [linkId, userId, chain, address, label, now, now, now, label],
+       VALUES ($1, $2, $3, $4, $5, 'VERIFIED', $6, $7)
+       ON CONFLICT (user_id, chain, address)
+       DO UPDATE
+         SET status = 'VERIFIED',
+             linked_at = EXCLUDED.linked_at,
+             label = COALESCE(EXCLUDED.label, linked_wallets.label)
+       RETURNING link_id`,
+      [linkId, userId, chain, address, label, now, now],
     );
 
-    // Nếu xảy ra DUPLICATE KEY UPDATE, id hiện tại là link_id đã tồn tại trước đó
-    const existing = await this.dataSource.query(
-      `SELECT link_id FROM linked_wallets WHERE user_id = ? AND chain = ? AND address = ? LIMIT 1`,
-      [userId, chain, address],
-    );
-
-    return existing?.[0]?.link_id ?? linkId;
+    return rows?.[0]?.link_id ?? linkId;
   }
 
   async revokeByLinkIdAndUserId(linkId: string, userId: string): Promise<number> {
-    const result = await this.dataSource.query(
-      `UPDATE linked_wallets SET status = 'REVOKED' WHERE link_id = ? AND user_id = ? AND status = 'VERIFIED'`,
+    const rows = await this.dataSource.query(
+      `UPDATE linked_wallets
+       SET status = 'REVOKED'
+       WHERE link_id = $1 AND user_id = $2 AND status = 'VERIFIED'
+       RETURNING link_id`,
       [linkId, userId],
     );
 
-    return result?.affectedRows ?? result?.[0]?.affectedRows ?? 0;
+    return Array.isArray(rows) ? rows.length : 0;
   }
 }

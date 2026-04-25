@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { WalletReferenceType } from '@/common/enums';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
 import {
@@ -29,7 +30,7 @@ export class ReconcileBalanceUseCase {
     private readonly balanceCalc: BalanceCalculationService,
   ) {}
 
-  async execute(userId: string, currencyId: string, manager?: any): Promise<ReconcileResult> {
+  async execute(userId: string, currencyId: string, manager?: TransactionContext): Promise<ReconcileResult> {
     const wallet = await this.walletRepo.findByUserCurrency(userId, currencyId);
     if (!wallet) {
       throw new BadRequestException(
@@ -66,8 +67,8 @@ export class ReconcileBalanceUseCase {
         },
         manager,
       );
-    } catch (error: any) {
-      const errorMessage = error?.message || String(error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       if (!errorMessage.includes('Duplicate entry')) {
         this.logger.error(`[Reconciliation] Unexpected error: ${errorMessage}`);
         throw error;

@@ -2,7 +2,7 @@ import type { UserRecord } from '@/modules/users';
 
 /**
  * Auth Repository Port — domain contract for authentication persistence.
- * Infrastructure implements this via stored procedures / TypeORM.
+ * Infrastructure implements this via TypeORM / SQL repositories without leaking persistence details into domain.
  */
 export interface AuthRepositoryPort {
   /** Find user by linked wallet (chain + address) */

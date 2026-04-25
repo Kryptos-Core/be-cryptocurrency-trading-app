@@ -17,7 +17,6 @@ import { RedisService } from '@/common/services';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   TREASURY_CONFIRM_JOB,
-  TREASURY_FUND_JOB,
   TREASURY_QUEUE,
 } from '@/modules/treasury/constants';
 import {

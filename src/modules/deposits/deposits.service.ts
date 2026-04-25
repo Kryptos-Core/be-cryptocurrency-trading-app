@@ -24,7 +24,7 @@ import { FIAT_DEPOSIT_REPOSITORY, type FiatDepositRepositoryPort } from './domai
 import { resolvePayosFiatDepositLimits } from './payos-fiat-limits.util';
 
 interface PayOSInstanceEntry {
-  instance: any;
+  instance: PayOS;
   version: number;
   config: PayosGatewayConfig;
 }
@@ -94,7 +94,7 @@ export class DepositsService {
     };
   }
 
-  private async getPayOSInstance(): Promise<{ payOS: any; config: PayosGatewayConfig }> {
+  private async getPayOSInstance(): Promise<{ payOS: PayOS; config: PayosGatewayConfig }> {
     const config = await this.resolvePayOSConfig();
 
     // Use cached SDK instance if config hasn't changed (compare key fields)
@@ -317,17 +317,22 @@ export class DepositsService {
     }
   }
 
-  async handleWebhook(webhookData: any) {
+  async handleWebhook(webhookData: unknown) {
     const { payOS } = await this.getPayOSInstance();
 
     try {
-      const verifiedData = await payOS.webhooks.verify(webhookData);
+      const verifiedData = (await payOS.webhooks.verify(webhookData as Parameters<typeof payOS.webhooks.verify>[0])) as {
+        orderCode?: string | number;
+        code?: string;
+        desc?: string;
+        success?: boolean;
+      };
 
       this.logger.log(
         `Received valid webhook data for Order ${verifiedData.orderCode} with status ${verifiedData.code}`,
       );
 
-      if (verifiedData.code === '00' || verifiedData.desc === 'success' || verifiedData.success) {
+      if (verifiedData.code === '00' || verifiedData.desc === 'success' || verifiedData.success === true) {
         const deposit = await this.fiatDepositRepo.findByOrderCode(Number(verifiedData.orderCode));
         if (!deposit || deposit.status === 'PAID') {
           return { message: 'Order already paid or not found' };
@@ -338,7 +343,7 @@ export class DepositsService {
       }
 
       return { success: true, message: 'Ignored due to code or status.' };
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.error('Webhook signature failed or invalid handler logic', e);
       throw new ConflictException('Invalid webhook payload');
     }

@@ -7,7 +7,7 @@ export class AppException extends Error {
     public readonly code: string,
     public readonly message: string,
     public readonly statusCode: number = 400,
-    public readonly context?: Record<string, any>,
+    public readonly context?: Record<string, unknown>,
   ) {
     super(message);
     Object.setPrototypeOf(this, AppException.prototype);
@@ -19,7 +19,7 @@ export class AppException extends Error {
  * For invalid client requests
  */
 export class BadRequestException extends AppException {
-  constructor(message: string, code: string = 'BAD_REQUEST', context?: Record<string, any>) {
+  constructor(message: string, code: string = 'BAD_REQUEST', context?: Record<string, unknown>) {
     super(code, message, 400, context);
     Object.setPrototypeOf(this, BadRequestException.prototype);
   }
@@ -29,7 +29,7 @@ export class BadRequestException extends AppException {
  * Business Logic Exception
  */
 export class BusinessException extends AppException {
-  constructor(message: string, code: string = 'BUSINESS_ERROR', context?: Record<string, any>) {
+  constructor(message: string, code: string = 'BUSINESS_ERROR', context?: Record<string, unknown>) {
     super(code, message, 400, context);
     Object.setPrototypeOf(this, BusinessException.prototype);
   }
@@ -80,7 +80,7 @@ export class ForbiddenException extends AppException {
  * Validation Exception
  */
 export class ValidationException extends AppException {
-  constructor(message: string, errors?: Record<string, any>) {
+  constructor(message: string, errors?: Record<string, unknown>) {
     super('VALIDATION_ERROR', message, 422, errors);
     Object.setPrototypeOf(this, ValidationException.prototype);
   }
@@ -100,7 +100,7 @@ export class ConflictException extends AppException {
  * Internal Server Exception
  */
 export class InternalServerException extends AppException {
-  constructor(message: string = 'Internal server error', context?: Record<string, any>) {
+  constructor(message: string = 'Internal server error', context?: Record<string, unknown>) {
     super('INTERNAL_SERVER_ERROR', message, 500, context);
     Object.setPrototypeOf(this, InternalServerException.prototype);
   }
@@ -113,7 +113,7 @@ export class ServiceUnavailableException extends AppException {
   constructor(
     message: string,
     code: string = 'SERVICE_UNAVAILABLE',
-    context?: Record<string, any>,
+    context?: Record<string, unknown>,
   ) {
     super(code, message, 503, context);
     Object.setPrototypeOf(this, ServiceUnavailableException.prototype);

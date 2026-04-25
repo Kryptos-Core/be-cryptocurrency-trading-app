@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { USER_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
-import { spFirstRow, spFirstValue } from '@/common/database/stored-procedure-result.util';
 import { UserRole } from '@/common/enums';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
@@ -10,14 +8,37 @@ import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import { OnchainTransaction } from '@/modules/blockchain';
 import type { UserFilterDto } from '@/modules/users/dto/user-filter.dto';
 
+type SortColumn = 'created_at' | 'email' | 'first_name';
+
+type UserSecurityChangeItem = {
+  request_id: string;
+  change_type: string;
+  status: string;
+  requested_at: Date;
+  reviewed_at: Date | null;
+  reviewed_by: string | null;
+  review_note: string | null;
+};
+
+type PendingSecurityChangeRequest = {
+  request_id: string;
+  user_id: string;
+  change_type: string;
+  payload_json: string;
+  requested_at: Date;
+  user_email: string;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+type ReviewedSecurityChangeRequest = {
+  request_id: string;
+  user_id: string;
+  status: string;
+};
+
 /**
- * Users Repository - Data Access Layer
- * Sử dụng Stored Procedures để:
- * - Tăng security (SQL injection protection)
- * - Tăng performance (DB-level optimization)
- * - Tách biệt business logic từ database logic
- *
- * Áp dụng Repository Pattern + Database Procedure Pattern
+ * Users Repository - PostgreSQL-native data access layer.
  */
 @Injectable()
 export class UsersRepository {
@@ -25,40 +46,23 @@ export class UsersRepository {
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Find user by ID using stored procedure (UUID string)
-   */
   async findById(userId: string): Promise<User | null> {
-    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_ID}(?)`, [
-      userId,
-    ]);
-
-    // Stored procedure returns array of results
-    // First element is the actual result set
-    return spFirstRow<User>(result);
+    const rows = await this.dataSource.query('SELECT * FROM users WHERE user_id = $1 LIMIT 1', [userId]);
+    return (rows?.[0] as User | undefined) ?? null;
   }
 
-  /**
-   * Find user by email (used for login)
-   */
   async findByEmail(email: string): Promise<User | null> {
-    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.FIND_BY_EMAIL}(?)`, [
+    const rows = await this.dataSource.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [
       email.toLowerCase(),
     ]);
-
-    return spFirstRow<User>(result);
+    return (rows?.[0] as User | undefined) ?? null;
   }
 
-  /**
-   * Get all users with pagination (legacy, no filters)
-   */
   async findAll(page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> {
-    return this.findAllWithFilters({ page, limit });
+    const result = await this.findAllWithFilters({ page, limit });
+    return { users: result.users, total: result.total };
   }
 
-  /**
-   * Get users with search/filter/sort — uses TypeORM QueryBuilder for dynamic conditions
-   */
   async findAllWithFilters(
     filters: UserFilterDto,
   ): Promise<{ users: User[]; total: number; page: number; limit: number }> {
@@ -66,88 +70,97 @@ export class UsersRepository {
     const limit = filters.limit ?? 20;
     const skip = calcSkip(page, limit);
 
-    const qb = this.dataSource
-      .getRepository(User)
-      .createQueryBuilder('u')
-      .select([
-        'u.user_id',
-        'u.email',
-        'u.first_name',
-        'u.last_name',
-        'u.role',
-        'u.status',
-        'u.avatar_url',
-        'u.two_fa_enabled',
-        'u.identity_verified',
-        'u.email_verified',
-        'u.created_at',
-      ]);
+    const params: Array<string | number> = [];
+    const whereClauses: string[] = [];
 
-    if (filters.search) {
+    if (filters.search?.trim()) {
       const s = `%${filters.search.trim()}%`;
-      qb.andWhere('(u.email LIKE :s OR u.first_name LIKE :s OR u.last_name LIKE :s)', { s });
+      params.push(s);
+      const idx = params.length;
+      whereClauses.push(`(u.email ILIKE $${idx} OR u.first_name ILIKE $${idx} OR u.last_name ILIKE $${idx})`);
     }
 
-    if (filters.email) {
-      qb.andWhere('u.email = :email', { email: filters.email.toLowerCase().trim() });
+    if (filters.email?.trim()) {
+      params.push(filters.email.toLowerCase().trim());
+      whereClauses.push(`u.email = $${params.length}`);
     }
 
     if (filters.role) {
-      qb.andWhere('u.role = :role', { role: filters.role });
+      params.push(filters.role);
+      whereClauses.push(`u.role = $${params.length}`);
     }
 
     if (filters.status) {
-      qb.andWhere('u.status = :status', { status: filters.status });
+      params.push(filters.status);
+      whereClauses.push(`u.status = $${params.length}`);
     }
 
-    const sortColumn = filters.sortBy ?? 'created_at';
-    const sortDir = filters.sortOrder ?? 'DESC';
-    qb.orderBy(`u.${sortColumn}`, sortDir);
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const sortColumn = this.resolveSortColumn(filters.sortBy);
+    const sortDir = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
 
-    const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    const countRows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS total FROM users u ${whereSql}`,
+      params,
+    );
 
-    return { users, total, page, limit };
+    const listParams = [...params, limit, skip];
+    const limitIndex = listParams.length - 1;
+    const offsetIndex = listParams.length;
+    const users = await this.dataSource.query(
+      `SELECT
+          u.user_id,
+          u.email,
+          u.password_hash,
+          u.first_name,
+          u.last_name,
+          u.two_fa_secret,
+          u.status,
+          u.role,
+          u.identity_verified,
+          u.email_verified,
+          u.avatar_url,
+          u.avatar_public_id,
+          u.fcm_token,
+          u.two_fa_enabled,
+          u.created_at
+         FROM users u
+         ${whereSql}
+         ORDER BY u.${sortColumn} ${sortDir}
+         LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
+      listParams,
+    );
+
+    return {
+      users: (users ?? []) as User[],
+      total: Number(countRows?.[0]?.total ?? 0),
+      page,
+      limit,
+    };
   }
 
-  /**
-   * Find all security change requests for a specific user (all statuses, paginated)
-   */
   async findSecurityChangesByUserId(
     userId: string,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{
-    items: Array<{
-      request_id: string;
-      change_type: string;
-      status: string;
-      requested_at: Date;
-      reviewed_at: Date | null;
-      reviewed_by: string | null;
-      review_note: string | null;
-    }>;
-    total: number;
-  }> {
+  ): Promise<{ items: UserSecurityChangeItem[]; total: number }> {
     const skip = calcSkip(page, limit);
     const rows = await this.dataSource.query(
       `SELECT request_id, change_type, status, requested_at, reviewed_at, reviewed_by, review_note
          FROM user_security_change_requests
-         WHERE user_id = ?
-         ORDER BY requested_at DESC
-         LIMIT ? OFFSET ?`,
+        WHERE user_id = $1
+        ORDER BY requested_at DESC
+        LIMIT $2 OFFSET $3`,
       [userId, limit, skip],
     );
     const countResult = await this.dataSource.query(
-      'SELECT COUNT(*) AS total FROM user_security_change_requests WHERE user_id = ?',
+      'SELECT COUNT(*)::int AS total FROM user_security_change_requests WHERE user_id = $1',
       [userId],
     );
-    const total = Number(countResult[0]?.total ?? 0);
-    return { items: rows ?? [], total };
+    const total = Number(countResult?.[0]?.total ?? 0);
+    return { items: (rows ?? []) as UserSecurityChangeItem[], total };
   }
 
-  /**
-   * Find paginated onchain transactions for a specific user (admin view)
-   */
   async findOnchainTransactionsByUser(
     userId: string,
     skip: number,
@@ -164,9 +177,6 @@ export class UsersRepository {
     return { items, total };
   }
 
-  /**
-   * Create new user with optional profile fields
-   */
   async createUser(
     email: string,
     passwordHash: string,
@@ -175,14 +185,26 @@ export class UsersRepository {
     role: UserRole = UserRole.TRADER,
   ): Promise<User> {
     const userId = newUuid();
-    await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`, [
-      userId,
-      email.toLowerCase(),
-      passwordHash,
-      firstName ?? null,
-      lastName ?? null,
-      role,
-    ]);
+    await this.dataSource.query(
+      `INSERT INTO users (
+          user_id,
+          email,
+          password_hash,
+          first_name,
+          last_name,
+          status,
+          role,
+          avatar_url,
+          avatar_public_id,
+          fcm_token,
+          two_fa_enabled,
+          identity_verified,
+          email_verified,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6, NULL, NULL, NULL, 0, 0, 0, NOW())`,
+      [userId, email.toLowerCase(), passwordHash, firstName ?? null, lastName ?? null, role],
+    );
 
     const createdUser = await this.findById(userId);
     if (!createdUser) {
@@ -191,122 +213,123 @@ export class UsersRepository {
     return createdUser;
   }
 
-  /**
-   * Create new trader user (legacy path)
-   */
   async create(email: string, passwordHash: string): Promise<User> {
     return this.createUser(email, passwordHash, null, null, UserRole.TRADER);
   }
 
-  /**
-   * Update user
-   */
   async update(
     userId: string,
     updates: { email?: string; status?: string; role?: UserRole; identityVerified?: boolean },
   ): Promise<void> {
-    const idvArg = updates.identityVerified === undefined ? null : updates.identityVerified ? 1 : 0;
-    await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.UPDATE}(?, ?, ?, ?, ?)`, [
-      userId,
-      updates.email ? updates.email.toLowerCase() : null,
-      updates.status || null,
-      updates.role || null,
-      idvArg,
-    ]);
+    const setClauses: string[] = [];
+    const params: Array<string | number> = [userId];
+
+    if (updates.email !== undefined) {
+      params.push(updates.email ? updates.email.toLowerCase() : null as unknown as string);
+      setClauses.push(`email = $${params.length}`);
+    }
+
+    if (updates.status !== undefined) {
+      params.push(updates.status ?? null);
+      setClauses.push(`status = $${params.length}`);
+    }
+
+    if (updates.role !== undefined) {
+      params.push(updates.role ?? null);
+      setClauses.push(`role = $${params.length}`);
+    }
+
+    if (updates.identityVerified !== undefined) {
+      params.push(updates.identityVerified ? 1 : 0);
+      setClauses.push(`identity_verified = $${params.length}`);
+    }
+
+    if (setClauses.length === 0) {
+      return;
+    }
+
+    await this.dataSource.query(
+      `UPDATE users SET ${setClauses.join(', ')} WHERE user_id = $1`,
+      params,
+    );
 
     this.logger.log(`User updated: ${userId}`);
   }
 
-  /**
-   * Delete user (soft delete - set status to BANNED)
-   */
   async delete(userId: string): Promise<void> {
-    await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.DELETE}(?)`, [userId]);
+    await this.dataSource.query(`UPDATE users SET status = 'BANNED' WHERE user_id = $1`, [userId]);
     this.logger.log(`User deleted (soft): ${userId}`);
   }
 
-  /**
-   * Get user statistics
-   */
-  async getStatistics(): Promise<{
-    total: number;
-    active: number;
-    banned: number;
-    pending: number;
-  }> {
-    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.GET_STATISTICS}()`);
+  async getStatistics(): Promise<{ total: number; active: number; banned: number; pending: number }> {
+    const rows = await this.dataSource.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END)::int AS active,
+        SUM(CASE WHEN status = 'BANNED' THEN 1 ELSE 0 END)::int AS banned,
+        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END)::int AS pending
+      FROM users
+    `);
 
-    const stats = spFirstRow<{
-      total: number;
-      active: number;
-      banned: number;
-      pending: number;
-    }>(result) || {
-      total: 0,
-      active: 0,
-      banned: 0,
-      pending: 0,
+    return {
+      total: Number(rows?.[0]?.total ?? 0),
+      active: Number(rows?.[0]?.active ?? 0),
+      banned: Number(rows?.[0]?.banned ?? 0),
+      pending: Number(rows?.[0]?.pending ?? 0),
     };
-
-    return stats;
   }
 
-  /**
-   * Check if email exists (excluding specific user ID)
-   */
   async emailExists(email: string, excludeUserId?: string): Promise<boolean> {
-    const result = await this.dataSource.query(`CALL ${USER_STORE_PROCEDURE.EMAIL_EXISTS}(?, ?)`, [
-      email.toLowerCase(),
-      excludeUserId || null,
-    ]);
+    const rows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS count
+         FROM users
+        WHERE email = $1
+          AND ($2::text IS NULL OR user_id <> $2)`,
+      [email.toLowerCase(), excludeUserId ?? null],
+    );
 
-    const count = Number(spFirstValue<number>(result, 'count') ?? 0);
-    return count > 0;
+    return Number(rows?.[0]?.count ?? 0) > 0;
   }
 
-  /** Đánh dấu đã xác minh inbox qua OTP (2FA / email liên hệ ví). */
   async setEmailVerified(userId: string, verified: boolean): Promise<void> {
-    await this.dataSource.query('UPDATE users SET email_verified = ? WHERE user_id = ?', [
+    await this.dataSource.query('UPDATE users SET email_verified = $1 WHERE user_id = $2', [
       verified ? 1 : 0,
       userId,
     ]);
   }
 
-  /**
-   * Update only first_name, last_name (profile basic)
-   */
   async updateProfileBasic(
     userId: string,
     firstName: string | null,
     lastName: string | null,
   ): Promise<number> {
-    const result = await this.dataSource.query(
-      `CALL ${USER_STORE_PROCEDURE.UPDATE_PROFILE_BASIC}(?, ?, ?)`,
+    const rows = await this.dataSource.query(
+      `UPDATE users
+          SET first_name = COALESCE(NULLIF(BTRIM($2), ''), first_name),
+              last_name = COALESCE(NULLIF(BTRIM($3), ''), last_name)
+        WHERE user_id = $1
+      RETURNING user_id`,
       [userId, firstName ?? null, lastName ?? null],
     );
-    const affected = spFirstValue<number>(result, 'affected') ?? 0;
-    return Number(affected);
+    return Array.isArray(rows) ? rows.length : 0;
   }
 
-  /**
-   * Update avatar URL and public_id
-   */
   async updateAvatar(
     userId: string,
     avatarUrl: string | null,
     avatarPublicId: string | null,
   ): Promise<number> {
-    const result = await this.dataSource.query(
-      `CALL ${USER_STORE_PROCEDURE.UPDATE_AVATAR}(?, ?, ?)`,
+    const rows = await this.dataSource.query(
+      `UPDATE users
+          SET avatar_url = $2,
+              avatar_public_id = $3
+        WHERE user_id = $1
+      RETURNING user_id`,
       [userId, avatarUrl ?? null, avatarPublicId ?? null],
     );
-    const affected = spFirstValue<number>(result, 'affected') ?? 0;
-    return Number(affected);
+    return Array.isArray(rows) ? rows.length : 0;
   }
 
-  /**
-   * Create a security change request (PENDING)
-   */
   async createSecurityChangeRequest(
     requestId: string,
     userId: string,
@@ -314,56 +337,121 @@ export class UsersRepository {
     payload: Record<string, unknown>,
   ): Promise<string> {
     await this.dataSource.query(
-      `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_CREATE}(?, ?, ?, ?)`,
+      `INSERT INTO user_security_change_requests (
+          request_id,
+          user_id,
+          change_type,
+          payload_json,
+          status,
+          requested_at,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4::jsonb, 'PENDING', NOW(), NOW())`,
       [requestId, userId, changeType, JSON.stringify(payload)],
     );
     return requestId;
   }
 
-  /**
-   * Find all PENDING security change requests (for reviewers)
-   */
-  async findPendingSecurityChangeRequests(): Promise<
-    Array<{
-      request_id: string;
-      user_id: string;
-      change_type: string;
-      payload_json: string;
-      requested_at: Date;
-      user_email: string;
-      first_name: string | null;
-      last_name: string | null;
-    }>
-  > {
-    const result = await this.dataSource.query(
-      `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_FIND_PENDING}()`,
+  async findPendingSecurityChangeRequests(): Promise<PendingSecurityChangeRequest[]> {
+    const rows = await this.dataSource.query(
+      `SELECT
+          r.request_id,
+          r.user_id,
+          r.change_type,
+          r.payload_json::text AS payload_json,
+          r.requested_at,
+          u.email AS user_email,
+          u.first_name,
+          u.last_name
+         FROM user_security_change_requests r
+         INNER JOIN users u ON u.user_id = r.user_id
+        WHERE r.status = 'PENDING'
+        ORDER BY r.requested_at ASC`,
     );
-    return result[0] ?? [];
+    return (rows ?? []) as PendingSecurityChangeRequest[];
   }
 
-  /**
-   * Review (approve/reject) a security change request
-   */
   async reviewSecurityChangeRequest(
     requestId: string,
     reviewedBy: string,
     approve: boolean,
     reviewNote: string | null,
-  ): Promise<{ request_id: string; user_id: string; status: string } | null> {
-    const result = await this.dataSource.query(
-      `CALL ${USER_STORE_PROCEDURE.SECURITY_CHANGE_REQUEST_REVIEW}(?, ?, ?, ?)`,
-      [requestId, reviewedBy, approve ? 1 : 0, reviewNote ?? null],
-    );
-    return spFirstRow<{ request_id: string; user_id: string; status: string }>(result);
+  ): Promise<ReviewedSecurityChangeRequest | null> {
+    return this.dataSource.transaction(async (manager) => {
+      const requestRows = await manager.query(
+        `SELECT request_id, user_id, change_type, payload_json::text AS payload_json, status
+           FROM user_security_change_requests
+          WHERE request_id = $1 AND status = 'PENDING'
+          LIMIT 1
+          FOR UPDATE`,
+        [requestId],
+      );
+
+      const request = (requestRows?.[0] as {
+        request_id: string;
+        user_id: string;
+        change_type: string;
+        payload_json: string;
+        status: string;
+      } | undefined) ?? null;
+
+      if (!request) {
+        return null;
+      }
+
+      if (approve) {
+        const payload = JSON.parse(request.payload_json) as Record<string, unknown>;
+
+        if (request.change_type === 'EMAIL_CHANGE') {
+          const nextEmail = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+          if (nextEmail) {
+            await manager.query('UPDATE users SET email = $2 WHERE user_id = $1', [
+              request.user_id,
+              nextEmail,
+            ]);
+          }
+        } else if (request.change_type === 'PASSWORD_CHANGE') {
+          const nextPasswordHash =
+            typeof payload.password_hash === 'string' ? payload.password_hash.trim() : '';
+          if (nextPasswordHash) {
+            await manager.query('UPDATE users SET password_hash = $2 WHERE user_id = $1', [
+              request.user_id,
+              nextPasswordHash,
+            ]);
+          }
+        }
+      }
+
+      const resultRows = await manager.query(
+        `UPDATE user_security_change_requests
+            SET status = $2,
+                reviewed_at = NOW(),
+                reviewed_by = $3,
+                review_note = NULLIF(BTRIM($4), '')
+          WHERE request_id = $1
+        RETURNING request_id, user_id, status`,
+        [requestId, approve ? 'APPROVED' : 'REJECTED', reviewedBy, reviewNote ?? null],
+      );
+
+      return (resultRows?.[0] as ReviewedSecurityChangeRequest | undefined) ?? null;
+    });
   }
 
-  /**
-   * Save / clear FCM device token for push notifications
-   */
   async saveFcmToken(userId: string, fcmToken: string | null): Promise<void> {
-    await this.dataSource.query('UPDATE users SET fcm_token = ? WHERE user_id = ?', [
+    await this.dataSource.query('UPDATE users SET fcm_token = $1 WHERE user_id = $2', [
       fcmToken,
       userId,
     ]);
+  }
+
+  private resolveSortColumn(sortBy?: SortColumn): SortColumn {
+    switch (sortBy) {
+      case 'email':
+        return 'email';
+      case 'first_name':
+        return 'first_name';
+      default:
+        return 'created_at';
+    }
   }
 }

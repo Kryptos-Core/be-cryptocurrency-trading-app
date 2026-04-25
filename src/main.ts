@@ -8,6 +8,7 @@ import {
   ResponseInterceptor,
   TelemetryContextInterceptor,
 } from './common/interceptors';
+import { enablePostgresQuestionMarkAdapter } from './common/database/pg-placeholder-adapter';
 import { setupSwagger } from './config/swagger.config';
 
 const logger = new Logger('Bootstrap');
@@ -43,6 +44,7 @@ function setupProcessErrorHandlers(): void {
 
 async function bootstrap() {
   setupProcessErrorHandlers();
+  enablePostgresQuestionMarkAdapter();
 
   const app = await NestFactory.create(AppModule);
 

@@ -44,7 +44,7 @@ async function main() {
   ) => {
     await dataSource.query(
       `INSERT INTO wallets (wallet_id, user_id, currency_id, available, frozen, updated_at)
-       VALUES (UUID(), ?, ?, ?, ?, NOW(6))`,
+       VALUES ($1, $2, $3, $4, NOW())`,
       [userId, currencyId, available, frozen],
     );
   };
@@ -53,7 +53,7 @@ async function main() {
     // 1) Setup isolated test data
     await dataSource.query(
       `INSERT INTO currencies (currency_id, symbol, name, precision_scale, min_withdraw, is_tradable, is_active)
-       VALUES (?, ?, ?, 8, 0, 1, 1), (?, ?, ?, 8, 0, 1, 1)`,
+       VALUES ($1, $2, $3, 8, 0, true, true), ($4, $5, $6, 8, 0, true, true)`,
       [
         ids.baseCurrencyId,
         baseSymbol,
@@ -68,16 +68,16 @@ async function main() {
       `INSERT INTO market_pairs (
          pair_id, base_currency_id, quote_currency_id, symbol,
          price_scale, amount_scale, min_order_amount, maker_fee_rate, taker_fee_rate, is_active
-       ) VALUES (?, ?, ?, ?, 8, 8, 0.0001, 0.001, 0.001, 1)`,
+       ) VALUES ($1, $2, $3, $4, 8, 8, 0.0001, 0.001, 0.001, true)`,
       [ids.pairId, ids.baseCurrencyId, ids.quoteCurrencyId, pairSymbol],
     );
 
     await dataSource.query(
       `INSERT INTO users (user_id, email, password_hash, status, role, created_at)
        VALUES
-       (?, ?, 'x', 'ACTIVE', 'TRADER', NOW(6)),
-       (?, ?, 'x', 'ACTIVE', 'TRADER', NOW(6)),
-       (?, ?, 'x', 'ACTIVE', 'TRADER', NOW(6))`,
+       ($1, $2, 'x', 'ACTIVE', 'TRADER', NOW()),
+       ($3, $4, 'x', 'ACTIVE', 'TRADER', NOW()),
+       ($5, $6, 'x', 'ACTIVE', 'TRADER', NOW())`,
       [
         ids.makerUserId,
         `maker_${tag}@qa.local`,
@@ -128,7 +128,7 @@ async function main() {
 
     const fokStatusRows = await dataSource.query(
       `SELECT status, amount, filled_amount, reserved_quote
-       FROM orders WHERE order_id = ? LIMIT 1`,
+       FROM orders WHERE order_id = $1 LIMIT 1`,
       [fokOrder.order_id],
     );
     const fokRow = fokStatusRows[0];
@@ -149,13 +149,13 @@ async function main() {
 
     const iocStatusRows = await dataSource.query(
       `SELECT status, amount, filled_amount, reserved_quote
-       FROM orders WHERE order_id = ? LIMIT 1`,
+       FROM orders WHERE order_id = $1 LIMIT 1`,
       [iocOrder.order_id],
     );
     const iocRow = iocStatusRows[0];
 
     const makerAfterRows = await dataSource.query(
-      `SELECT status, amount, filled_amount FROM orders WHERE order_id = ? LIMIT 1`,
+      `SELECT status, amount, filled_amount FROM orders WHERE order_id = $1 LIMIT 1`,
       [makerOrder.order_id],
     );
     const makerAfter = makerAfterRows[0];
@@ -163,7 +163,7 @@ async function main() {
     // 5) Ledger check: trade from IOC should produce 4 TRADE ledger rows
     const tradeRows = await dataSource.query(
       `SELECT trade_id FROM trades
-       WHERE maker_order_id = ? AND taker_order_id = ?
+       WHERE maker_order_id = $1 AND taker_order_id = $2
        ORDER BY created_at DESC LIMIT 1`,
       [makerOrder.order_id, iocOrder.order_id],
     );
@@ -177,7 +177,7 @@ async function main() {
       ? await dataSource.query(
           `SELECT direction, amount, currency_id
            FROM wallet_ledger
-           WHERE ref_type = 'TRADE' AND ref_id = ?
+           WHERE ref_type = 'TRADE' AND ref_id = $1
            ORDER BY created_at ASC`,
           [tradeId],
         )
@@ -225,7 +225,7 @@ async function main() {
     }
   } finally {
     // Cleanup test data
-    await dataSource.query('DELETE FROM wallet_ledger WHERE user_id IN (?, ?, ?)', testUserIds);
+    await dataSource.query('DELETE FROM wallet_ledger WHERE user_id IN ($1, $2, $3)', testUserIds);
 
     if (createdTradeIds.length > 0) {
       await dataSource.query(
@@ -241,16 +241,16 @@ async function main() {
       );
     }
 
-    await dataSource.query('DELETE FROM wallets WHERE user_id IN (?, ?, ?)', testUserIds);
+    await dataSource.query('DELETE FROM wallets WHERE user_id IN ($1, $2, $3)', testUserIds);
 
-    await dataSource.query('DELETE FROM market_pairs WHERE pair_id = ?', [ids.pairId]);
+    await dataSource.query('DELETE FROM market_pairs WHERE pair_id = $1', [ids.pairId]);
 
-    await dataSource.query('DELETE FROM currencies WHERE currency_id IN (?, ?)', [
+    await dataSource.query('DELETE FROM currencies WHERE currency_id IN ($1, $2)', [
       ids.baseCurrencyId,
       ids.quoteCurrencyId,
     ]);
 
-    await dataSource.query('DELETE FROM users WHERE user_id IN (?, ?, ?)', [...testUserIds]);
+    await dataSource.query('DELETE FROM users WHERE user_id IN ($1, $2, $3)', [...testUserIds]);
 
     await app.close();
   }

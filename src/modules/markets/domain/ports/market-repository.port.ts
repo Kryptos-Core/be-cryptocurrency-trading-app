@@ -4,6 +4,25 @@ import type { Trade } from '@/entities/trade.entity';
 import type { MarketPairRecord } from '@/modules/markets/contracts';
 import type { IMarketTickerData } from '../../interfaces/market-ticker.interface';
 
+
+export type MarketRepositoryOrderBookLevel = {
+  price: string;
+  amount: string;
+  orders: number;
+};
+
+export type MarketRepositoryFilterOptions = {
+  includeInactive?: boolean;
+  search?: string;
+  baseSymbol?: string;
+  quoteSymbol?: string;
+  quoteSymbols?: string[];
+  sortBy?: 'symbol' | 'base' | 'quote' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+  fuzzySearch?: boolean;
+};
+
+
 export interface MarketRepositoryPort {
   findOne(options: {
     where: { pair_id?: string; symbol?: string };
@@ -18,7 +37,7 @@ export interface MarketRepositoryPort {
   findWithPagination(
     page: number,
     limit: number,
-    options?: Record<string, unknown>,
+    options?: MarketRepositoryFilterOptions,
   ): Promise<{ data: MarketPairRecord[]; total: number; page: number; limit: number }>;
   findActive(): Promise<MarketPairRecord[]>;
   pairExists(
@@ -40,7 +59,10 @@ export interface MarketRepositoryPort {
     entity: Partial<MarketPair>,
   ): Promise<MarketPair>;
   delete(id: string | number): Promise<void>;
-  getOrderBook(pairId: string, limit?: number): Promise<{ bids: unknown[]; asks: unknown[] }>;
+  getOrderBook(
+    pairId: string,
+    limit?: number,
+  ): Promise<{ bids: MarketRepositoryOrderBookLevel[]; asks: MarketRepositoryOrderBookLevel[] }>;
   getTicker(pairId: string): Promise<IMarketTickerData>;
   getRecentTrades(pairId: string, limit?: number): Promise<Trade[]>;
 }

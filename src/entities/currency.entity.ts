@@ -27,42 +27,30 @@ export class Currency {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
-  @OneToMany(
-    () => MarketPair,
-    (pair) => pair.base_currency,
-  )
+  @OneToMany(() => MarketPair, (pair) => pair.base_currency)
   base_pairs!: MarketPair[];
 
-  @OneToMany(
-    () => MarketPair,
-    (pair) => pair.quote_currency,
-  )
+  @OneToMany(() => MarketPair, (pair) => pair.quote_currency)
   quote_pairs!: MarketPair[];
 
   @OneToMany('Wallet', 'currency')
-  wallets!: any[];
+  wallets!: unknown[];
 
   @OneToMany('WalletLedger', 'currency')
-  wallet_ledgers!: any[];
+  wallet_ledgers!: unknown[];
 
-  @OneToMany(
-    () => CurrencyNetwork,
-    (network) => network.currency,
-  )
+  @OneToMany(() => CurrencyNetwork, (network) => network.currency)
   networks!: CurrencyNetwork[];
 
   @OneToMany('Deposit', 'currency')
-  deposits!: any[];
+  deposits!: unknown[];
 
   @OneToMany('Withdrawal', 'currency')
-  withdrawals!: any[];
+  withdrawals!: unknown[];
 
   @OneToMany('Trade', 'fee_currency')
-  trades!: any[];
+  trades!: unknown[];
 
-  // ------------------------------------------------------------------------
-  // Thêm các thuộc tính ảo (Virtual properties) để map thêm Market Data trả về API
-  // ------------------------------------------------------------------------
   lastPrice?: string;
   priceChangePercent24h?: string;
   volume24h?: string;

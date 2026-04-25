@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type {
   DataSource,
   DeepPartial,
+  EntityManager,
   EntityTarget,
   FindManyOptions,
   FindOneOptions,
@@ -9,15 +10,11 @@ import type {
   ObjectLiteral,
   Repository,
 } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { calcSkip } from '@/common/utils/pagination.util';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import type { IRepository } from './interfaces/irepository.interface';
 
-/**
- * Base Repository
- * Repository Pattern: Data access abstraction
- * Template Method Pattern: Base operations template
- * Generic Programming: Type-safe repositories
- */
 @Injectable()
 export abstract class BaseRepository<T extends ObjectLiteral> implements IRepository<T> {
   protected readonly logger: Logger;
@@ -32,63 +29,27 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     this.logger = new Logger(this.constructor.name);
   }
 
-  /**
-   * Get repository with lazy initialization
-   * This ensures the repository is only initialized when actually needed,
-   * after TypeORM has fully initialized the DataSource with all entities
-   */
   protected get repository(): Repository<T> {
-    if (!this._repository) {
-      this._repository = this.dataSource.getRepository(this.entity);
-    }
+    if (!this._repository) this._repository = this.dataSource.getRepository(this.entity);
     return this._repository;
   }
 
-  /**
-   * Get primary key property name from entity metadata
-   * Returns the first primary column property name
-   */
   protected getPrimaryKeyName(): string {
     const metadata = this.dataSource.getMetadata(this.entity);
     const primaryColumns = metadata.primaryColumns;
-    if (primaryColumns.length === 0) {
-      throw new Error(`Entity ${metadata.name} has no primary key`);
-    }
-    // Return the first primary column property name
+    if (primaryColumns.length === 0) throw new Error(`Entity ${metadata.name} has no primary key`);
     return primaryColumns[0].propertyName;
   }
 
-  /**
-   * Find entity by ID
-   * Template Method: Base implementation
-   * Automatically uses the correct primary key field name
-   */
   async findById(id: number | string): Promise<T | null> {
     const primaryKeyName = this.getPrimaryKeyName();
     const whereClause = { [primaryKeyName]: id } as unknown as FindOptionsWhere<T>;
-    return await this.repository.findOne({
-      where: whereClause,
-    } as FindOneOptions<T>);
+    return await this.repository.findOne({ where: whereClause } as FindOneOptions<T>);
   }
 
-  /**
-   * Find one entity by options
-   */
-  async findOne(options: FindOneOptions<T>): Promise<T | null> {
-    return await this.repository.findOne(options);
-  }
+  async findOne(options: FindOneOptions<T>): Promise<T | null> { return await this.repository.findOne(options); }
+  async find(options?: FindManyOptions<T>): Promise<T[]> { return await this.repository.find(options); }
 
-  /**
-   * Find entities by options
-   */
-  async find(options?: FindManyOptions<T>): Promise<T[]> {
-    return await this.repository.find(options);
-  }
-
-  /**
-   * Find entities with pagination
-   * Template Method: Pagination logic
-   */
   async findWithPagination(
     page: number = 1,
     limit: number = 10,
@@ -96,142 +57,62 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
   ): Promise<{ data: T[]; total: number; page: number; limit: number }> {
     const skip = calcSkip(page, limit);
     const take = limit;
-
-    const [data, total] = await this.repository.findAndCount({
-      ...options,
-      skip,
-      take,
-    });
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-    };
+    const [data, total] = await this.repository.findAndCount({ ...options, skip, take });
+    return { data, total, page, limit };
   }
 
-  /**
-   * Count entities
-   */
-  async count(options?: FindManyOptions<T>): Promise<number> {
-    return await this.repository.count(options);
-  }
+  async count(options?: FindManyOptions<T>): Promise<number> { return await this.repository.count(options); }
 
-  /**
-   * Check if entity exists
-   */
   async exists(options: FindOptionsWhere<T>): Promise<boolean> {
-    const count = await this.repository.count({ where: options });
-    return count > 0;
+    return (await this.repository.count({ where: options })) > 0;
   }
 
-  /**
-   * Create new entity
-   * Template Method: Base create implementation
-   */
   async create(entity: DeepPartial<T>): Promise<T> {
-    const newEntity = this.repository.create(entity);
-    return await this.repository.save(newEntity);
+    return await this.repository.save(this.repository.create(entity));
   }
 
-  /**
-   * Create multiple entities
-   */
   async createMany(entities: DeepPartial<T>[]): Promise<T[]> {
-    const newEntities = this.repository.create(entities);
-    return await this.repository.save(newEntities);
+    return await this.repository.save(this.repository.create(entities));
   }
 
-  /**
-   * Update entity by ID
-   * Template Method: Base update implementation
-   * Automatically uses the correct primary key field name
-   */
   async update(id: number | string, entity: DeepPartial<T>): Promise<T> {
     const primaryKeyName = this.getPrimaryKeyName();
-    const whereClause = { [primaryKeyName]: id } as any;
-    await this.repository.update(whereClause, entity as any);
+    const whereClause = { [primaryKeyName]: id } as unknown as FindOptionsWhere<T>;
+    await this.repository.update(whereClause, entity as QueryDeepPartialEntity<T>);
     const updated = await this.findById(id);
-    if (!updated) {
-      throw new Error(`Entity with ID ${id} not found after update`);
-    }
+    if (!updated) throw new Error(`Entity with ID ${id} not found after update`);
     return updated;
   }
 
-  /**
-   * Update entities by criteria
-   */
   async updateMany(criteria: FindOptionsWhere<T>, entity: DeepPartial<T>): Promise<number> {
-    const result = await this.repository.update(criteria, entity as any);
+    const result = await this.repository.update(criteria, entity as QueryDeepPartialEntity<T>);
     return result.affected || 0;
   }
 
-  /**
-   * Delete entity by ID
-   * Template Method: Can be overridden for soft delete behavior
-   * Automatically uses the correct primary key field name
-   */
   async delete(id: number | string): Promise<void> {
     const primaryKeyName = this.getPrimaryKeyName();
-    const whereClause = { [primaryKeyName]: id } as any;
+    const whereClause = { [primaryKeyName]: id } as unknown as FindOptionsWhere<T>;
     const result = await this.repository.delete(whereClause);
-    if (result.affected === 0) {
-      throw new Error(`Entity with ID ${id} not found`);
-    }
+    if (result.affected === 0) throw new Error(`Entity with ID ${id} not found`);
   }
 
-  /**
-   * Delete entities by criteria
-   */
   async deleteMany(criteria: FindOptionsWhere<T>): Promise<number> {
     const result = await this.repository.delete(criteria);
     return result.affected || 0;
   }
 
-  /**
-   * Save entity (create or update)
-   */
-  async save(entity: DeepPartial<T>): Promise<T> {
-    return await this.repository.save(entity);
+  async save(entity: DeepPartial<T>): Promise<T> { return await this.repository.save(entity); }
+  async saveMany(entities: DeepPartial<T>[]): Promise<T[]> { return await this.repository.save(entities); }
+  getRepository(): Repository<T> { return this.repository; }
+  getDataSource(): DataSource { return this.dataSource; }
+
+  async query<TResult = unknown>(sql: string, parameters?: unknown[]): Promise<TResult> {
+    return (await this.dataSource.query(sql, parameters)) as TResult;
   }
 
-  /**
-   * Save multiple entities
-   */
-  async saveMany(entities: DeepPartial<T>[]): Promise<T[]> {
-    return await this.repository.save(entities);
-  }
-
-  /**
-   * Get TypeORM Repository instance
-   * Useful for complex queries
-   */
-  getRepository(): Repository<T> {
-    return this.repository;
-  }
-
-  /**
-   * Get DataSource instance
-   * Useful for raw queries and transactions
-   */
-  getDataSource(): DataSource {
-    return this.dataSource;
-  }
-
-  /**
-   * Execute raw query
-   * Useful for stored procedures or complex queries
-   */
-  async query(sql: string, parameters?: any[]): Promise<any> {
-    return await this.dataSource.query(sql, parameters);
-  }
-
-  /**
-   * Execute transaction
-   * Template Method: Transaction wrapper
-   */
-  async transaction<R>(fn: (manager: any) => Promise<R>): Promise<R> {
-    return await this.dataSource.transaction(fn);
+  async transaction<R>(fn: (ctx: TransactionContext) => Promise<R>): Promise<R> {
+    return await this.dataSource.transaction((manager: EntityManager) =>
+      fn(manager as unknown as TransactionContext),
+    );
   }
 }

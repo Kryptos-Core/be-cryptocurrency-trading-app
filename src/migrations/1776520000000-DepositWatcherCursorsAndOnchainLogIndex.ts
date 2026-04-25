@@ -22,18 +22,13 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
     indexName: string,
     createIndexSql: string,
   ): Promise<void> {
-    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
-    const schema = dbRows[0]?.db;
-    if (!schema) {
+    const hasIndex = (queryRunner as QueryRunner & { hasIndex?: (table: string, index: string) => Promise<boolean> })
+      .hasIndex;
+    if (typeof hasIndex === 'function') {
+      if (await hasIndex.call(queryRunner, tableName, indexName)) {
+        return;
+      }
       await queryRunner.query(createIndexSql);
-      return;
-    }
-
-    const rows: unknown[] = await queryRunner.query(
-      `SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
-      [schema, tableName, indexName],
-    );
-    if (rows.length > 0) {
       return;
     }
 
@@ -45,18 +40,13 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
     tableName: string,
     indexName: string,
   ): Promise<void> {
-    const dbRows: { db: string | null }[] = await queryRunner.query(`SELECT DATABASE() AS db`);
-    const schema = dbRows[0]?.db;
-    if (!schema) {
+    const hasIndex = (queryRunner as QueryRunner & { hasIndex?: (table: string, index: string) => Promise<boolean> })
+      .hasIndex;
+    if (typeof hasIndex === 'function') {
+      if (!(await hasIndex.call(queryRunner, tableName, indexName))) {
+        return;
+      }
       await queryRunner.query(`ALTER TABLE ${tableName} DROP INDEX ${indexName}`);
-      return;
-    }
-
-    const rows: unknown[] = await queryRunner.query(
-      `SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
-      [schema, tableName, indexName],
-    );
-    if (rows.length === 0) {
       return;
     }
 

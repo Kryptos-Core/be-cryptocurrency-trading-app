@@ -30,7 +30,7 @@ export class OrderBookService {
    */
   private readonly loadedPairs = new Set<string>();
 
-  /** MySQL CHAR(n) pads with spaces; callers may pass an untrimmed API id — one canonical key per pair. */
+  /** Normalize pair ids defensively so API / DB / queue inputs always map to one canonical in-memory order book key. */
   private normalizePairId(pairId: string): string {
     return (pairId ?? '').trim();
   }

@@ -45,11 +45,18 @@ export function buildPaymentConfigFormOptions(
     accum[pmType].push(row.code);
   }
 
+  const tronNetworks = mainnetOnly
+    ? accum.TRON
+    : accum.TRON.filter((code) => {
+        const preferred = (tronDefaultNetwork ?? 'TRON_NILE').trim().toUpperCase();
+        return code === preferred;
+      });
+
   const networksByType: Record<string, string[]> = {
     PAYOS: ['MAINNET'],
     ETH: accum.ETH,
     BSC: accum.BSC,
-    TRON: accum.TRON,
+    TRON: tronNetworks,
     SOL: accum.SOL,
   };
 

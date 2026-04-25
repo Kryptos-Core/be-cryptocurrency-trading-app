@@ -231,8 +231,8 @@ export class OnchainDepositService {
         },
         joinTransaction,
       );
-    } catch (error: any) {
-      if (error?.code === 'DUPLICATE_LEDGER_ENTRY') {
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'DUPLICATE_LEDGER_ENTRY') {
         return { settled: false, alreadySettled: true };
       }
       throw error;
@@ -427,9 +427,9 @@ export class OnchainDepositService {
           log_index: resolved.logIndex,
           from_address: resolved.from,
           to_address: resolved.to,
-          amount: onchainAmount.toString() as any,
+          amount: onchainAmount.toString(),
           confirmations: resolved.confirmations,
-          status: status as any,
+          status,
           confirmed_at: status === OnchainTxStatus.COMPLETED ? new Date() : undefined,
         });
 

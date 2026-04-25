@@ -20,7 +20,7 @@ export class GetTransactionWalletQuery {
     chain: BlockchainChainDbValue,
     address: string,
   ): Promise<TreasuryOnChainBalances> {
-    return this.service.getBalanceCached(chain as any, address);
+    return this.service.getBalanceCached(chain, address);
   }
 
   async getWalletById(walletId: string): Promise<TransactionWalletRecord> {
@@ -29,9 +29,7 @@ export class GetTransactionWalletQuery {
 
   async getWalletDetail(
     walletId: string,
-  ): Promise<
-    TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }
-  > {
+  ): Promise<TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
     return this.service.getWalletDetail(walletId);
   }
 
@@ -39,15 +37,15 @@ export class GetTransactionWalletQuery {
     chain: BlockchainChainDbValue,
     address: string,
   ): Promise<TreasuryOnChainBalances> {
-    return this.service.getBalanceByAddress(chain as any, address);
+    return this.service.getBalanceByAddress(chain, address);
   }
 
   async getMainWalletAddress(chain: BlockchainChainDbValue): Promise<string> {
-    return this.service.getMainWalletAddress(chain as any);
+    return this.service.getMainWalletAddress(chain);
   }
 
   async resolveMainWalletPrivateKey(chain: BlockchainChainDbValue): Promise<string> {
-    return this.service.resolveMainWalletPrivateKey(chain as any);
+    return this.service.resolveMainWalletPrivateKey(chain);
   }
 
   async listWalletsForDepositConfiguration(): Promise<TransactionWalletRecord[]> {
@@ -57,7 +55,7 @@ export class GetTransactionWalletQuery {
   async getDefaultUserDepositWallet(
     chain: BlockchainChainDbValue,
   ): Promise<TransactionWalletRecord | null> {
-    return this.service.getDefaultUserDepositWallet(chain as any);
+    return this.service.getDefaultUserDepositWallet(chain);
   }
 
   async getWithdrawalSourceWallet(chain: string): Promise<TransactionWalletRecord | null> {

@@ -9,11 +9,17 @@ import {
 import type { Request, Response } from 'express';
 import { AppException } from '../exceptions';
 
-/**
- * Global Exception Filter
- * Handle all exceptions using a consistent format
- * Application: Separation of Concerns
- */
+interface ErrorResponseBody {
+  statusCode: number;
+  timestamp: string;
+  path: string;
+  message?: string | string[];
+  code?: string;
+  error?: string;
+  context?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -24,7 +30,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let body: any = {
+    let body: ErrorResponseBody = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
@@ -32,7 +38,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     if (exception instanceof AppException) {
-      // Custom Application Exception
       status = exception.statusCode;
       body = {
         statusCode: exception.statusCode,
@@ -43,7 +48,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ...(exception.context && { context: exception.context }),
       };
     } else if (exception instanceof HttpException) {
-      // NestJS Built-in Exception
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
       body = {
@@ -51,11 +55,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         timestamp: new Date().toISOString(),
         path: request.url,
         ...(typeof exceptionResponse === 'object'
-          ? exceptionResponse
+          ? (exceptionResponse as Record<string, unknown>)
           : { message: exceptionResponse }),
       };
     } else if (exception instanceof Error) {
-      // Unhandled Error
       this.logger.error(`Unhandled Exception: ${exception.message}`, exception.stack);
       body = {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

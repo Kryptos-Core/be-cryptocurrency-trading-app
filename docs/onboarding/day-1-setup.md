@@ -18,9 +18,9 @@ cd be-cryptocurrency-trading-app
 
 # Tạo .env từ template development
 cp .env.development.example .env.development
-# Điền DB_*, REDIS_*, JWT_*, ... — hỏi Tech Lead
+# Điền CORE_DB_*, REDIS_*, JWT_*, ... — hỏi Tech Lead
 
-# Khởi động infrastructure (MySQL + Redis)
+# Khởi động infrastructure (PostgreSQL + Redis)
 docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d
 
 # Kiểm tra containers
@@ -77,7 +77,7 @@ src/
 │ ├── auth/ # ✓ Clean Architecture: domain/, application/, infrastructure/
 │ ├── orders/ # ✓ Clean Architecture + CQRS (use-cases, queries, commands)
 │ ├── matching/ # ⚠ SENSITIVE — đọc VIBE_CODE.md trước khi sửa
-│ ├── wallets/ # Hybrid: BaseRepository + stored procedures
+│ ├── wallets/ # Hybrid: BaseRepository + transactional PostgreSQL repositories
 │ ├── users/ # Hybrid
 │ └── ...
 ├── common/

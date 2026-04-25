@@ -8,12 +8,12 @@ import { CacheService } from '../../common/services';
 import { MarketsService } from '../markets/markets.service';
 import { OrdersService } from '../orders/orders.service';
 import { MarketMakerService } from './market-maker.service';
-import { MarketMakerConfigRepository } from './repositories';
+import { MARKET_MAKER_CONFIG_REPOSITORY } from './domain/ports';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 describe('MarketMakerService', () => {
   let service: MarketMakerService;
-  let configRepository: jest.Mocked<MarketMakerConfigRepository>;
+  let configRepository: any;
   let cacheService: jest.Mocked<CacheService>;
   let ordersService: jest.Mocked<OrdersService>;
   let strategyService: jest.Mocked<MmOrderStrategyService>;
@@ -36,7 +36,7 @@ describe('MarketMakerService', () => {
       providers: [
         MarketMakerService,
         {
-          provide: MarketMakerConfigRepository,
+          provide: MARKET_MAKER_CONFIG_REPOSITORY,
           useValue: {
             findByUser: jest.fn(),
             findByUserPair: jest.fn(),
@@ -79,7 +79,7 @@ describe('MarketMakerService', () => {
     }).compile();
 
     service = module.get(MarketMakerService);
-    configRepository = module.get(MarketMakerConfigRepository);
+    configRepository = module.get(MARKET_MAKER_CONFIG_REPOSITORY);
     cacheService = module.get(CacheService);
     ordersService = module.get(OrdersService);
     strategyService = module.get(MmOrderStrategyService);

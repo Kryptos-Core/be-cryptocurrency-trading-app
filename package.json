@@ -34,6 +34,7 @@
     "db:reset": "npm run db:seed",
     "docker:infra:up": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d",
     "docker:infra:up:redis": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d redis",
+    "docker:infra:up:postgres": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d postgres",
     "docker:infra:down": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development down",
     "docker:infra:logs": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f",
     "treasury:e2e": "ts-node -r tsconfig-paths/register scripts/daily-testnet-deposit-withdraw-e2e.ts",
@@ -88,7 +89,6 @@
     "ethers": "^6.16.0",
     "firebase-admin": "^13.7.0",
     "ioredis": "^5.9.1",
-    "mysql2": "^3.6.5",
     "nodemailer": "^8.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -103,7 +103,8 @@
     "tweetnacl": "^1.0.3",
     "typeorm": "^0.3.17",
     "uuidv7": "^1.1.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.12",

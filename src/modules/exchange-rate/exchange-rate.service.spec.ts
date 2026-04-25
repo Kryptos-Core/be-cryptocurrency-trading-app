@@ -1,9 +1,8 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { RedisService } from '@/common/services/redis.service';
-import { ExchangeRateAuditLog } from '@/entities/exchange-rate-audit-log.entity';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { EXCHANGE_RATE_AUDIT_REPOSITORY } from './domain/ports';
+import { CURRENCY_REPOSITORY } from '@/modules/currencies/domain/ports';
 import { DepositsService } from '@/modules/deposits/deposits.service';
 import { EXCHANGE_RATE_ALERTS_CHANNEL } from '@/modules/exchange-rate/constants';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
@@ -20,7 +19,7 @@ describe('ExchangeRateService', () => {
   let paymentConfigService: jest.Mocked<PaymentConfigService>;
   let usersService: jest.Mocked<UsersService>;
   let redisService: jest.Mocked<RedisService>;
-  let auditRepo: { save: jest.Mock; find: jest.Mock };
+  let auditRepo: { save: jest.Mock; find: jest.Mock; findLatest: jest.Mock };
 
   beforeEach(async () => {
     coinGeckoProvider = {
@@ -61,7 +60,7 @@ describe('ExchangeRateService', () => {
       publish: jest.fn(),
     } as unknown as jest.Mocked<RedisService>;
 
-    auditRepo = { save: jest.fn(), find: jest.fn() } as any;
+    auditRepo = { save: jest.fn(), find: jest.fn(), findLatest: jest.fn().mockResolvedValue([]) } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,8 +71,8 @@ describe('ExchangeRateService', () => {
         { provide: DepositsService, useValue: depositsService },
         { provide: PaymentConfigService, useValue: paymentConfigService },
         { provide: UsersService, useValue: usersService },
-        { provide: CurrencyRepository, useValue: { findActive: jest.fn() } },
-        { provide: getRepositoryToken(ExchangeRateAuditLog), useValue: auditRepo },
+        { provide: CURRENCY_REPOSITORY, useValue: { findActive: jest.fn() } },
+        { provide: EXCHANGE_RATE_AUDIT_REPOSITORY, useValue: auditRepo },
       ],
     }).compile();
 
@@ -286,7 +285,7 @@ describe('ExchangeRateService', () => {
       updatedAt: '2026-04-14T10:00:00.000Z',
       source: 'coingecko',
     });
-    (auditRepo.find as jest.Mock).mockResolvedValue([
+    (auditRepo.findLatest as jest.Mock).mockResolvedValue([
       {
         changed_by: 'user-1',
         created_at: new Date('2026-04-14T10:00:00.000Z'),

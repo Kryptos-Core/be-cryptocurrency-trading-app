@@ -351,7 +351,7 @@ export class CurrenciesService {
     await this.findOne(currencyId);
 
     // Soft delete by setting is_active to false
-    await this.currencyRepository.update(currencyId, { is_active: false } as any);
+    await this.currencyRepository.update(currencyId, { is_active: false } as Partial<Currency>);
 
     // Invalidate cache
     await this.invalidateCache();

@@ -29,18 +29,12 @@ export class CurrencyNetwork {
   @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })
   withdraw_fee!: string;
 
-  @ManyToOne(
-    () => Currency,
-    (currency) => currency.networks,
-    {
-      onDelete: 'CASCADE',
-    },
-  )
+  @ManyToOne(() => Currency, (currency) => currency.networks, { onDelete: 'CASCADE' })
   currency!: Currency;
 
   @OneToMany('Deposit', 'network')
-  deposits!: any[];
+  deposits!: unknown[];
 
   @OneToMany('Withdrawal', 'network')
-  withdrawals!: any[];
+  withdrawals!: unknown[];
 }

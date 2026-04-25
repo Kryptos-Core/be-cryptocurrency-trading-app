@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import type { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationsService } from './notifications.service';
-import { NotificationRepository } from './repositories/notification.repository';
+import { NOTIFICATION_REPOSITORY } from './domain/ports';
 import {
   type INotificationStrategy,
   NOTIFICATION_STRATEGIES,
@@ -10,7 +10,7 @@ import {
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let notificationRepo: jest.Mocked<
-    Pick<NotificationRepository, 'createForUser' | 'getFcmTokenByUserId'>
+    Record<'createForUser' | 'getFcmTokenByUserId', jest.Mock>
   >;
   let strategy: jest.Mocked<INotificationStrategy>;
 
@@ -35,7 +35,7 @@ describe('NotificationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
-        { provide: NotificationRepository, useValue: notificationRepo },
+        { provide: NOTIFICATION_REPOSITORY, useValue: notificationRepo },
         { provide: NOTIFICATION_STRATEGIES, useValue: [strategy] },
       ],
     }).compile();

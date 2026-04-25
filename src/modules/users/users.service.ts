@@ -22,7 +22,7 @@ import type {
 /**
  * Users Service - Business Logic Layer
  * Chỉ chứa business logic
- * Gọi UsersRepository để access database thông qua stored procedures
+ * Gọi UsersRepository để truy cập persistence thông qua repository abstraction
  *
  * Áp dụng:
  * - Single Responsibility Principle: Chỉ xử lý user business logic
@@ -172,7 +172,7 @@ export class UsersService {
     // Verify user exists
     await this.findOne(userId);
 
-    // Delete (soft delete via procedure)
+    // Delete (soft delete qua repository)
     await this.usersRepository.delete(userId);
   }
 

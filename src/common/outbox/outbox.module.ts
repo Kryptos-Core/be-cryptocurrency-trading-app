@@ -1,5 +1,6 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketPairReadModelProjectionHandler } from '@/common/read-model/market-pair-read-model.handler';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
@@ -19,7 +20,20 @@ import { OutboxRelayService } from './outbox-relay.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([IntegrationOutbox, ReadMarketPair, ReadOnchainDeposit]),
-    BullModule.registerQueue({ name: OUTBOX_RELAY_QUEUE }),
+    BullModule.registerQueueAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const enabled =
+          String(config.get<string>('EVENT_OUTBOX_ENABLED') ?? 'true').toLowerCase() !== 'false';
+        return {
+          name: OUTBOX_RELAY_QUEUE,
+          defaultJobOptions: {
+            removeOnComplete: enabled ? 50 : 1,
+          },
+        };
+      },
+    }),
     RedisModule,
     NotificationsModule,
   ],

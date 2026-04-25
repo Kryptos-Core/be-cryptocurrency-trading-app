@@ -25,7 +25,7 @@ import {
 } from '@/modules/matching/infrastructure/queue/matching-queue.service';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
-import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
+import { ORDER_MATCHING_GATEWAY, ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { OrderReservePolicy } from '@/modules/orders/domain/services/order-reserve-policy.service';
 import { OrderValidationService } from '@/modules/orders/domain/services/order-validation.service';
 import { WALLET_REPOSITORY } from '@/modules/wallets/domain/ports';
@@ -92,6 +92,7 @@ describe('Orders -> Matching queue integration', () => {
         MetricsTradeVisitor,
         CircuitBreakerService,
         { provide: ORDER_REPOSITORY, useValue: orderRepository },
+        { provide: ORDER_MATCHING_GATEWAY, useExisting: MatchingQueueService },
         { provide: MARKET_REPOSITORY, useValue: marketRepository },
         { provide: WALLET_REPOSITORY, useValue: walletRepository },
         { provide: MATCHING_REPOSITORY, useValue: matchingRepository },

@@ -1,10 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject, Optional } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
+import type { HealthIndicatorResult } from '@nestjs/terminus';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { Public } from '@/common/decorators';
 import { RedisService } from '@/common/services/redis.service';
+import { ANALYTICS_DB, MARKET_TS_DB } from '@/config';
 
 /**
  * Health check endpoint — returns component health for DB and infrastructure.
@@ -20,6 +22,8 @@ export class HealthController {
     private readonly db: TypeOrmHealthIndicator,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
+    @Optional() @Inject(MARKET_TS_DB) private readonly marketTsDb: DataSource | null = null,
+    @Optional() @Inject(ANALYTICS_DB) private readonly analyticsDb: Record<string, unknown> | null = null,
   ) {}
 
   @Public()
@@ -43,8 +47,8 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'All dependencies healthy' })
   @ApiResponse({ status: 503, description: 'One or more dependencies unhealthy' })
   readiness() {
-    return this.health.check([
-      () => this.db.pingCheck('database', { connection: this.dataSource }),
+    const checks: Array<() => Promise<HealthIndicatorResult>> = [
+      async () => this.db.pingCheck('database', { connection: this.dataSource }),
       async () => {
         const pong = await this.redisService.getClient().ping();
         if (pong !== 'PONG') {
@@ -52,6 +56,16 @@ export class HealthController {
         }
         return { redis: { status: 'up' as const } };
       },
-    ]);
+    ];
+
+    if (this.marketTsDb) {
+      checks.push(async () => this.db.pingCheck('market_ts_db', { connection: this.marketTsDb }));
+    }
+
+    if (this.analyticsDb) {
+      checks.push(async () => ({ analytics_db: { status: 'up' as const } }));
+    }
+
+    return this.health.check(checks);
   }
 }

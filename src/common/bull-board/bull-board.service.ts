@@ -27,15 +27,21 @@ export class BullBoardService implements OnApplicationBootstrap {
   ) {}
 
   onApplicationBootstrap(): void {
-    const app = this.httpAdapterHost.httpAdapter.getInstance<Express>();
+    const httpAdapter = this.httpAdapterHost.httpAdapter;
+    if (!httpAdapter) {
+      this.logger.warn('Bull Board skipped: no HTTP adapter available in application context');
+      return;
+    }
+
+    const app = httpAdapter.getInstance<Express>();
     this.serverAdapter.setBasePath(BullBoardService.PATH);
 
     createBullBoard({
       queues: [
-        new BullAdapter(this.matchingQueue as any) as any,
-        new BullAdapter(this.treasuryQueue as any) as any,
-        new BullAdapter(this.paymentConfigQueue as any) as any,
-        new BullAdapter(this.depositWatcherQueue as any) as any,
+        new BullAdapter(this.matchingQueue as unknown as never) as unknown as never,
+        new BullAdapter(this.treasuryQueue as unknown as never) as unknown as never,
+        new BullAdapter(this.paymentConfigQueue as unknown as never) as unknown as never,
+        new BullAdapter(this.depositWatcherQueue as unknown as never) as unknown as never,
       ],
       serverAdapter: this.serverAdapter,
     });

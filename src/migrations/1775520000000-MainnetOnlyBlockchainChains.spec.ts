@@ -1,4 +1,9 @@
 import type { QueryRunner } from 'typeorm';
+
+/**
+ * Legacy-compat migration spec: verifies historical cleanup SQL emitted by the old migration.
+ * This spec documents backward-compat expectations only; it does not represent current runtime persistence strategy.
+ */
 import { MainnetOnlyBlockchainChains1775520000000 } from './1775520000000-MainnetOnlyBlockchainChains';
 
 function createQueryRunnerMock(hasSystemConfigs = false, hasLogIndex = false): QueryRunner {

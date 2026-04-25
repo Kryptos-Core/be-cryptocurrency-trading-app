@@ -5,7 +5,7 @@ describe('BLOCKCHAIN_CHAIN_DB_VALUES', () => {
     expect(BLOCKCHAIN_CHAIN_DB_VALUES).toContain('ETH_SEPOLIA');
   });
 
-  it('matches the MySQL chain enum used after ExpandMultichainEvmAndTon migration', () => {
+  it('matches the database chain enum used after ExpandMultichainEvmAndTon migration', () => {
     expect([...BLOCKCHAIN_CHAIN_DB_VALUES].sort()).toEqual(
       [
         'ARBITRUM_MAINNET',

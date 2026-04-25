@@ -1,7 +1,7 @@
 import { TronWeb } from 'tronweb';
 
 /** Minimal TronWeb instance for hex ↔ base58 conversion only (no RPC calls). */
-const tronWebAddress = new TronWeb({ fullHost: 'https://api.trongrid.io' } as any);
+const tronWebAddress = new TronWeb({ fullHost: 'https://api.trongrid.io' } as never);
 
 /**
  * Normalize a Tron contract address from API (base58, 41-prefixed hex, or 20-byte hex) to base58.

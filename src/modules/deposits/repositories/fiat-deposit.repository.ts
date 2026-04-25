@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
-import { FIAT_DEPOSIT_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
 import { FiatDeposit } from '@/entities/fiat-deposit.entity';
+
+type DepositRow = Record<string, unknown>;
 
 @Injectable()
 export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
@@ -18,11 +19,16 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
     checkoutUrl: string,
     manager?: EntityManager,
   ): Promise<FiatDeposit> {
-    const result = await (manager ?? this.dataSource).query(
-      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?)`,
+    const rows = await (manager ?? this.dataSource).query(
+      `INSERT INTO fiat_deposits (
+         deposit_id, user_id, amount, status, order_code, checkout_url, created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, 'PENDING', $4, $5, NOW(), NOW()
+       )
+       RETURNING deposit_id, user_id, amount, status, order_code, checkout_url, created_at, updated_at`,
       [depositId, userId, amount, orderCode, checkoutUrl],
     );
-    const row = result?.[0]?.[0];
+    const row = rows?.[0];
     if (!row) throw new Error('Failed to create fiat deposit');
     return this.mapRow(row);
   }
@@ -32,31 +38,39 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
     status: 'PENDING' | 'PAID' | 'CANCELLED',
     manager?: EntityManager,
   ): Promise<FiatDeposit> {
-    const result = await (manager ?? this.dataSource).query(
-      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.UPDATE_STATUS}(?, ?)`,
+    const rows = await (manager ?? this.dataSource).query(
+      `UPDATE fiat_deposits
+       SET status = $2,
+           updated_at = NOW()
+       WHERE order_code = $1
+       RETURNING deposit_id, user_id, amount, status, order_code, checkout_url, created_at, updated_at`,
       [orderCode, status],
     );
-    const row = result?.[0]?.[0];
+    const row = rows?.[0];
     if (!row) throw new Error('Failed to update fiat deposit status or not found');
     return this.mapRow(row);
   }
 
   async findByOrderCode(orderCode: number): Promise<FiatDeposit | null> {
-    const result = await this.dataSource.query(
-      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.FIND_BY_ORDER_CODE}(?)`,
+    const rows = await this.dataSource.query(
+      `SELECT deposit_id, user_id, amount, status, order_code, checkout_url, created_at, updated_at
+       FROM fiat_deposits
+       WHERE order_code = $1
+       LIMIT 1`,
       [orderCode],
     );
-    const row = result?.[0]?.[0];
-    if (!row) return null;
-    return this.mapRow(row);
+    return rows?.[0] ? this.mapRow(rows[0]) : null;
   }
 
   async findByUser(userId: string): Promise<FiatDeposit[]> {
     const rows = await this.dataSource.query(
-      `CALL ${FIAT_DEPOSIT_STORE_PROCEDURE.FIND_BY_USER}(?)`,
+      `SELECT deposit_id, user_id, amount, status, order_code, checkout_url, created_at, updated_at
+       FROM fiat_deposits
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
       [userId],
     );
-    return (rows?.[0] || []).map(this.mapRow);
+    return (rows ?? []).map((row: DepositRow) => this.mapRow(row));
   }
 
   async findAllForAdmin(params: {
@@ -75,16 +89,16 @@ export class FiatDepositRepository extends BaseRepository<FiatDeposit> {
     return { items, total };
   }
 
-  private mapRow(row: any): FiatDeposit {
+  private mapRow(row: DepositRow): FiatDeposit {
     const deposit = new FiatDeposit();
-    deposit.deposit_id = row.deposit_id;
-    deposit.user_id = row.user_id;
-    deposit.amount = row.amount;
-    deposit.status = row.status;
-    deposit.order_code = Number(row.order_code);
-    deposit.checkout_url = row.checkout_url;
-    deposit.created_at = row.created_at;
-    deposit.updated_at = row.updated_at;
+    deposit.deposit_id = String(row.deposit_id ?? '');
+    deposit.user_id = String(row.user_id ?? '');
+    deposit.amount = String(row.amount ?? '0');
+    deposit.status = row.status as FiatDeposit['status'];
+    deposit.order_code = Number(row.order_code ?? 0);
+    deposit.checkout_url = row.checkout_url != null ? String(row.checkout_url) : null;
+    deposit.created_at = row.created_at as Date;
+    deposit.updated_at = row.updated_at as Date;
     return deposit;
   }
 }

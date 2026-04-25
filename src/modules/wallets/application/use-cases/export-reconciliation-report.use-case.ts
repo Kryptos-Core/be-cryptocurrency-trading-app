@@ -53,12 +53,12 @@ export class ExportReconciliationReportUseCase {
           externalBalance: result.externalBalance,
           discrepancy: result.discrepancy,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         items.push({
           userId: pair.userId,
           currencyId: pair.currencyId,
           status: 'FAILED',
-          error: error?.message || String(error),
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -79,7 +79,7 @@ export class ExportReconciliationReportUseCase {
     const outputFile = path.join(outputDir, `${reportDate}.json`);
     await fs.mkdir(outputDir, { recursive: true });
 
-    let history: any[] = [];
+    let history: unknown[] = [];
     try {
       const existing = await fs.readFile(outputFile, 'utf8');
       const parsed = JSON.parse(existing);

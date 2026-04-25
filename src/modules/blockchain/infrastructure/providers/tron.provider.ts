@@ -40,7 +40,7 @@ export interface TronProviderBindings {
 @Injectable()
 export class TronProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(TronProvider.name);
-  private tronWeb: any;
+  private tronWeb: TronWeb;
 
   constructor(
     private readonly configService: ConfigService,
@@ -85,7 +85,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     return this.treasuryMainWalletService.resolveMainWalletPrivateKey(this.bindings.treasuryChain);
   }
 
-  private async buildTronWebWithKey(privateKey: string): Promise<any> {
+  private async buildTronWebWithKey(privateKey: string): Promise<TronWeb> {
     const fullHost =
       (await this.systemConfigService.get<string>(this.bindings.rpcRuntimeKey)) ??
       this.defaultBootstrapHost();
@@ -123,8 +123,8 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
       const receipt = await this.tronWeb.trx.getTransactionInfo(txHash);
       const confirmed = receipt?.blockNumber != null;
 
-      const transfer = extractTronNativeTransferMeta(this.tronWeb, tx);
-      const fallbackFrom = extractTronFirstContractOwnerBase58(this.tronWeb, tx);
+      const transfer = extractTronNativeTransferMeta(this.tronWeb as never, tx);
+      const fallbackFrom = extractTronFirstContractOwnerBase58(this.tronWeb as never, tx);
       const from = transfer?.from ?? fallbackFrom;
       const to = transfer?.to ?? '';
       const value = transfer?.value ?? '0';
@@ -177,7 +177,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
       if (isTronTreasuryChain(treasuryChain)) {
         const usdt = TRON_USDT_CONTRACT[treasuryChain];
         const legs = extractTronUsdtTrc20TransfersToRecipient(
-          this.tronWeb,
+          this.tronWeb as never,
           tx,
           usdt,
           expected,
@@ -199,7 +199,7 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
         });
       }
 
-      const native = extractTronNativeTransferMeta(this.tronWeb, tx);
+      const native = extractTronNativeTransferMeta(this.tronWeb as never, tx);
       if (native && native.to === expected) {
         out.push({
           chain,
@@ -230,7 +230,8 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
     const privateKey = await this.resolveHotWalletKey();
     const tw = await this.buildTronWebWithKey(privateKey);
     this.logger.log(`Sending ${amount} TRX to ${to}...`);
-    const tx = await tw.trx.sendTransaction(to, tw.toSun(amount));
+    const sunAmount = Math.floor(Number(amount) * 1_000_000);
+    const tx = await tw.trx.sendTransaction(to, sunAmount);
     const id = tx.txid ?? tx.transaction?.txID;
     if (!id) throw new Error('Tron sendTransaction returned no tx id');
     this.logger.log(`TRON transaction sent: ${id}`);
@@ -240,6 +241,6 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
   async getHotWalletAddress(): Promise<string> {
     const privateKey = await this.resolveHotWalletKey();
     const tw = await this.buildTronWebWithKey(privateKey);
-    return tw.defaultAddress.base58;
+    return String(tw.defaultAddress.base58 || '');
   }
 }

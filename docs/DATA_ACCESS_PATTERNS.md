@@ -11,7 +11,7 @@ Tài liệu này mô tả **khi nào** dùng `BaseRepository`, **repository tùy
 | Lựa chọn | Khi nào dùng | Ví dụ trong codebase |
 |----------|----------------|------------------------|
 | **Extend `BaseRepository<T>`** | CRUD / `QueryBuilder` đơn giản trên **một entity**, cần tái sử dụng `findById`, `transaction`, `query`, phân trang | `CurrencyRepository`, `WalletRepository`, `OrderRepository` |
-| **Repository tùy biến (không extend Base)** | Chủ yếu gọi **stored procedure** (`CALL sp_*`) hoặc SQL đặc thù; ít dùng `repository.save` trực tiếp | `UsersRepository`, `AuthRepositoryImpl`, `MatchingRepository` |
+| **Repository tùy biến (không extend Base)** | Dùng SQL/PostgreSQL đặc thù hoặc transaction nhiều bước; ít dùng `repository.save` trực tiếp | `UsersRepository`, `AuthRepositoryImpl`, `MatchingRepository` |
 | **Repository class + `DataSource` / `getRepository`** | Đã tách lớp data access nhưng logic không map gọn vào `BaseRepository` (multi-entity transaction, QB phức tạp) | `TreasuryOperationRepository`, `TreasuryTransactionWalletRepository` |
 | **Service + `DataSource` trực tiếp** | Chỉ nên là **tạm thời** hoặc **legacy**; chuẩn dài hạn là đưa xuống repository | Ưu tiên refactor về repository (ví dụ `TreasuryMainWalletRepository`, `ManagedWalletsDataRepository`) |
 
@@ -57,7 +57,7 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 | Module / bounded context | Ghi chú ngắn |
 |--------------------------|--------------|
-| **Orders / Matching** | SP cho khớp lệnh / sổ lệnh; TS gọi qua repository + helper OUT param ([mysql-procedure-out-vars](../src/common/database/mysql-procedure-out-vars.ts)) |
+| **Orders / Matching** | Repository PostgreSQL-native cho khớp lệnh / sổ lệnh; không còn phụ thuộc helper OUT param kiểu MySQL |
 | **Users / Auth** | Chủ yếu SP + chỗ filter list dùng QueryBuilder (`UsersRepository`); Auth dùng **Clean Architecture** (`domain/ports/`, `application/use-cases/`) |
 | **Markets / Currencies / Wallets** | SP + `BaseRepository` tùy endpoint |
 | **Treasury main wallet** | ORM qua `TreasuryMainWalletRepository`; service không `getRepository` |
@@ -84,11 +84,11 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 ---
 
-## Database Procedure Pattern
+## Database Query Pattern
 
-- **Stored procedures** được định nghĩa trong **migrations** (`src/migrations`).
-- **Repository** (hoặc lớp data access tương đương) gọi `dataSource.query('CALL sp_name(?, ?)', [params])`. Với OUT qua biến session MySQL (`@p_*`), dùng `selectMysqlUserVars` từ `src/common/database/mysql-procedure-out-vars.ts` để đọc thống nhất.
+- **Repository** (hoặc lớp data access tương đương) ưu tiên SQL/QueryBuilder tương thích PostgreSQL, không phụ thuộc `CALL sp_*` hay session variable kiểu MySQL.
 - **Service** không ghép chuỗi SQL động cho logic nghiệp vụ; tham số luôn bind qua placeholder.
+- Với legacy placeholder `?`, adapter PostgreSQL tại `src/common/database/pg-placeholder-adapter.ts` chỉ đóng vai trò transitional safety net trong lúc dọn nốt code cũ.
 
 ---
 
@@ -107,9 +107,9 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 ---
 
-## Kiểm chứng contract SP (integration)
+## Kiểm chứng contract query/integration
 
-- Spec ví dụ: `src/modules/matching/matching.ioc-fok.integration.spec.ts` — cần **MySQL đã chạy migration + procedure**, biến môi trường giống app. Dùng để bắt lệch contract TS ↔ SQL sau khi đổi SP.
+- Spec ví dụ: `src/modules/matching/matching.ioc-fok.integration.spec.ts` — khi bật chạy full app bootstrap sẽ kiểm tra contract NestJS ↔ PostgreSQL/infrastructure thực tế.
 
 ---
 

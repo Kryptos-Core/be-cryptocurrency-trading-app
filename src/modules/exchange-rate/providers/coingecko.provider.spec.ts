@@ -1,12 +1,12 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { RedisService } from '@/common/services/redis.service';
-import { CurrencyRepository } from '@/modules/currencies/repositories';
+import { CURRENCY_REPOSITORY } from '@/modules/currencies/domain/ports';
 import { CoinGeckoProvider } from './coingecko.provider';
 
 describe('CoinGeckoProvider', () => {
   let provider: CoinGeckoProvider;
   let redisService: jest.Mocked<RedisService>;
-  let currencyRepository: jest.Mocked<CurrencyRepository>;
+  let currencyRepository: { findActive: jest.Mock };
 
   beforeEach(async () => {
     redisService = {
@@ -16,13 +16,13 @@ describe('CoinGeckoProvider', () => {
 
     currencyRepository = {
       findActive: jest.fn(),
-    } as unknown as jest.Mocked<CurrencyRepository>;
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CoinGeckoProvider,
         { provide: RedisService, useValue: redisService },
-        { provide: CurrencyRepository, useValue: currencyRepository },
+        { provide: CURRENCY_REPOSITORY, useValue: currencyRepository },
       ],
     }).compile();
 

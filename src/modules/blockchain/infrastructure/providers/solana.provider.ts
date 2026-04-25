@@ -29,6 +29,12 @@ import type {
 } from '../../interfaces';
 import { buildNotFoundTxStatus } from '../../utils/build-not-found-tx.util';
 
+
+type SolanaMessageLike = {
+  staticAccountKeys?: Array<{ toBase58?: () => string }>;
+  accountKeys?: Array<{ toBase58?: () => string }>;
+};
+
 export interface SolanaProviderBindings {
   network: BlockchainNetwork;
   rpcRuntimeKey: string;
@@ -161,11 +167,8 @@ export class SolanaProvider implements IBlockchainProvider, OnModuleInit {
 
       const meta = tx.meta;
       const failed = meta?.err !== null;
-      const message = tx.transaction.message;
-      const accountKeys =
-        'staticAccountKeys' in message
-          ? (message as any).staticAccountKeys
-          : (message as any).accountKeys;
+      const message = tx.transaction.message as SolanaMessageLike;
+      const accountKeys = message.staticAccountKeys ?? message.accountKeys;
 
       return {
         txHash,

@@ -1,5 +1,5 @@
 /**
- * Delete all rows from every BASE TABLE in the configured MySQL schema.
+ * Delete all rows from every BASE TABLE in the configured PostgreSQL schema.
  * Includes `migrations` — TypeORM migration history is cleared; run `npm run migration:run` after if needed.
  *
  * Usage: npm run db:clean
@@ -7,7 +7,6 @@
  * Safety: blocked when NODE_ENV=production unless ALLOW_DB_CLEAN=true
  */
 
-import * as path from 'node:path';
 import { DataSource } from 'typeorm';
 import { loadEnvFilesForCli } from '@/config/load-env-files';
 import { typeormEntityGlobPaths, typeormMigrationFilePaths } from '@/config/typeorm-entity-glob-paths';
@@ -22,18 +21,18 @@ async function run() {
     process.exit(1);
   }
 
-  const database = process.env.DB_NAME;
+  const database = process.env.CORE_DB_NAME || process.env.DB_NAME;
   if (!database) {
-    console.error('DB_NAME is not set (.env.<NODE_ENV>, e.g. .env.development)');
+    console.error('CORE_DB_NAME|DB_NAME is not set (.env.<NODE_ENV>, e.g. .env.development)');
     process.exit(1);
   }
 
   const dataSource = new DataSource({
-    type: 'mysql',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
+    type: 'postgres',
+    host: process.env.CORE_DB_HOST || process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.CORE_DB_PORT || process.env.DB_PORT || '5432', 10),
+    username: process.env.CORE_DB_USERNAME || process.env.DB_USERNAME,
+    password: process.env.CORE_DB_PASSWORD || process.env.DB_PASSWORD,
     database,
     entities: typeormEntityGlobPaths(__dirname),
     migrations: typeormMigrationFilePaths(__dirname),
@@ -46,12 +45,11 @@ async function run() {
 
   try {
     const rows = (await q.query(
-      `SELECT TABLE_NAME AS name
-       FROM information_schema.TABLES
-       WHERE TABLE_SCHEMA = ?
-         AND TABLE_TYPE = 'BASE TABLE'
-       ORDER BY TABLE_NAME`,
-      [database],
+      `SELECT table_name AS name
+       FROM information_schema.tables
+       WHERE table_schema = 'public'
+         AND table_type = 'BASE TABLE'
+       ORDER BY table_name`,
     )) as Array<{ name: string }>;
 
     const toTruncate = rows.map((r) => r.name);
@@ -63,15 +61,9 @@ async function run() {
 
     console.log(`🗑️  Clearing all ${toTruncate.length} table(s) in "${database}"...`);
 
-    await q.query('SET FOREIGN_KEY_CHECKS = 0');
-    try {
-      for (const table of toTruncate) {
-        const escapedTable = table.replace(/`/g, '``');
-        await q.query(`DELETE FROM \`${escapedTable}\``);
-        await q.query(`ALTER TABLE \`${escapedTable}\` AUTO_INCREMENT = 1`);
-      }
-    } finally {
-      await q.query('SET FOREIGN_KEY_CHECKS = 1');
+    for (const table of toTruncate) {
+      const escapedTable = table.replace(/"/g, '""');
+      await q.query(`TRUNCATE TABLE "${escapedTable}" RESTART IDENTITY CASCADE`);
     }
 
     console.log('✅ All table data cleared (including migrations).');

@@ -14,11 +14,37 @@ export interface AppConfig {
     url: string;
   };
   database: {
+    source: string;
+    type: string;
     host: string;
     port: number;
     username: string;
     password: string;
     database: string;
+  };
+  marketTs: {
+    enabled: boolean;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    database: string;
+  };
+  analytics: {
+    enabled: boolean;
+    clickhouseUrl: string;
+    clickhouseUser: string;
+    clickhousePassword: string;
+    clickhouseDatabase: string;
+  };
+  featureFlags: {
+    marketReadSource: string;
+    tickerSource: string;
+    matchingEngine: string;
+    matchingGoCanaryPairs: string[];
+    publicWsSource: string;
+    eventOutboxEnabled: boolean;
+    eventSchemaFormat: string;
   };
   redis: {
     host: string;
@@ -118,13 +144,49 @@ export class AppConfigBuilder {
   }
 
   setDatabase(
+    source: string,
+    type: string,
     host: string,
     port: number,
     username: string,
     password: string,
     database: string,
   ): this {
-    this.config.database = { host, port, username, password, database };
+    this.config.database = { source, type, host, port, username, password, database };
+    return this;
+  }
+
+  setMarketTs(
+    enabled: boolean,
+    host: string,
+    port: number,
+    username: string,
+    password: string,
+    database: string,
+  ): this {
+    this.config.marketTs = { enabled, host, port, username, password, database };
+    return this;
+  }
+
+  setAnalytics(
+    enabled: boolean,
+    clickhouseUrl: string,
+    clickhouseUser: string,
+    clickhousePassword: string,
+    clickhouseDatabase: string,
+  ): this {
+    this.config.analytics = {
+      enabled,
+      clickhouseUrl,
+      clickhouseUser,
+      clickhousePassword,
+      clickhouseDatabase,
+    };
+    return this;
+  }
+
+  setFeatureFlags(flags: AppConfig['featureFlags']): this {
+    this.config.featureFlags = flags;
     return this;
   }
 
@@ -274,6 +336,15 @@ export class AppConfigBuilder {
     if (!this.config.redis) {
       throw new Error('Redis configuration is required');
     }
+    if (!this.config.marketTs) {
+      throw new Error('Market TS configuration is required');
+    }
+    if (!this.config.analytics) {
+      throw new Error('Analytics configuration is required');
+    }
+    if (!this.config.featureFlags) {
+      throw new Error('Feature flags configuration is required');
+    }
     if (!this.config.jwt) {
       throw new Error('JWT configuration is required');
     }
@@ -307,12 +378,41 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       appUrl,
     )
     .setDatabase(
-      env.DB_HOST,
-      parseInt(env.DB_PORT, 10),
-      env.DB_USERNAME,
-      env.DB_PASSWORD,
-      env.DB_NAME,
+      env.CORE_DB_SOURCE || 'postgres',
+      env.CORE_DB_TYPE || 'postgres',
+      env.CORE_DB_HOST || env.DB_HOST || '127.0.0.1',
+      parseInt(env.CORE_DB_PORT || env.DB_PORT || '5432', 10),
+      env.CORE_DB_USERNAME || env.DB_USERNAME || '',
+      env.CORE_DB_PASSWORD || env.DB_PASSWORD || '',
+      env.CORE_DB_NAME || env.DB_NAME || '',
     )
+    .setMarketTs(
+      String(env.MARKET_TS_ENABLED || 'false').toLowerCase() === 'true',
+      env.MARKET_TS_HOST || env.CORE_DB_HOST || env.DB_HOST || '127.0.0.1',
+      parseInt(env.MARKET_TS_PORT || env.CORE_DB_PORT || env.DB_PORT || '5432', 10),
+      env.MARKET_TS_USERNAME || env.CORE_DB_USERNAME || env.DB_USERNAME || '',
+      env.MARKET_TS_PASSWORD || env.CORE_DB_PASSWORD || env.DB_PASSWORD || '',
+      env.MARKET_TS_DB || env.CORE_DB_NAME || env.DB_NAME || '',
+    )
+    .setAnalytics(
+      String(env.ANALYTICS_ENABLED || 'false').toLowerCase() === 'true',
+      env.CLICKHOUSE_URL || 'http://127.0.0.1:8123',
+      env.CLICKHOUSE_USER || 'default',
+      env.CLICKHOUSE_PASSWORD || '',
+      env.CLICKHOUSE_DB || 'default',
+    )
+    .setFeatureFlags({
+      marketReadSource: env.MARKET_READ_SOURCE || 'postgres',
+      tickerSource: env.TICKER_SOURCE || 'nestjs',
+      matchingEngine: env.MATCHING_ENGINE || 'ts',
+      matchingGoCanaryPairs: (env.MATCHING_GO_CANARY_PAIRS || '')
+        .split(',')
+        .map((pair) => pair.trim())
+        .filter(Boolean),
+      publicWsSource: env.PUBLIC_WS_SOURCE || 'nestjs',
+      eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
+      eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',
+    })
     .setRedis(
       env.REDIS_HOST || 'localhost',
       env.REDIS_PORT || 6379,

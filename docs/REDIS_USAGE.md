@@ -13,7 +13,7 @@ REDIS_DB=0
 
 Giá trị mẫu đầy đủ nằm trong [`.env.development.example`](../.env.development.example) (và các file `.env.*.example` khác) ở root backend.
 
-## Chạy Redis (và MySQL) bằng Docker
+## Chạy Redis (và PostgreSQL) bằng Docker
 
 Từ thư mục `be-cryptocurrency-trading-app`, dev mặc định dùng `.env.development`:
 

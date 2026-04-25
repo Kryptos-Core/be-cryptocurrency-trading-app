@@ -110,8 +110,8 @@ export class ApplyTransactionUseCase {
       }
 
       return result;
-    } catch (err: any) {
-      const msg = err?.message ?? String(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       if (
         typeof msg === 'string' &&
         msg.includes('Duplicate entry') &&
@@ -130,7 +130,7 @@ export class ApplyTransactionUseCase {
     userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepo.getOrCreateForUpdate(userId, currencyId, manager);
@@ -161,7 +161,7 @@ export class ApplyTransactionUseCase {
     userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepo.getOrCreateForUpdate(userId, currencyId, manager);
@@ -197,7 +197,7 @@ export class ApplyTransactionUseCase {
     userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepo.getOrCreateForUpdate(userId, currencyId, manager);
@@ -227,7 +227,7 @@ export class ApplyTransactionUseCase {
     userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ): Promise<WalletBalanceDto> {
     const currencyId = String(dto.currencyId);
     const wallet = await this.walletRepo.getOrCreateForUpdate(userId, currencyId, manager);
@@ -257,7 +257,7 @@ export class ApplyTransactionUseCase {
     userId: string,
     dto: WalletTransactionDto,
     amount: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ): Promise<WalletBalanceDto> {
     const targetId = String(dto.targetUserId ?? '');
     if (!targetId) {
@@ -341,7 +341,7 @@ export class ApplyTransactionUseCase {
     walletId: string,
     deltaAvailable: Decimal,
     deltaFrozen: Decimal,
-    manager: any,
+    manager: TransactionContext,
   ) {
     try {
       return await this.walletRepo.applyBalanceDelta(
@@ -350,8 +350,8 @@ export class ApplyTransactionUseCase {
         deltaFrozen.toString(),
         manager,
       );
-    } catch (error: any) {
-      if (error?.message?.includes('Insufficient')) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('Insufficient')) {
         throw new BusinessException('Insufficient balance', 'INSUFFICIENT_BALANCE');
       }
       throw error;

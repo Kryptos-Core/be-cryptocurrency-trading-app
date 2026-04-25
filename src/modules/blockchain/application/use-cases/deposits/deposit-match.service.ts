@@ -218,14 +218,14 @@ export class DepositMatchService {
     try {
       const result = await this.depositService.settleDepositByTxId(userId, match.tx_id);
       settled = result.settled;
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logger.warn(
         JSON.stringify({
           domain: 'treasury',
           event: 'deposit.match.settle_deferred',
           matchId,
           txId: match.tx_id,
-          reason: err?.message,
+          reason: err instanceof Error ? err.message : String(err),
           at: new Date().toISOString(),
         }),
       );

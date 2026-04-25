@@ -9,6 +9,19 @@ import type {
   IExchangeProvider,
 } from '../interfaces/exchange.interface';
 
+
+type BinanceOrderApiResponse = {
+  orderId?: string | number;
+  symbol?: string;
+  status?: string;
+  side?: string;
+  type?: string;
+  price?: string | number;
+  origQty?: string | number;
+  executedQty?: string | number;
+  updateTime?: string | number | Date;
+};
+
 /**
  * Binance Exchange Service
  * Implements real Binance Futures API (Testnet/Mainnet)
@@ -78,8 +91,8 @@ export class BinanceExchangeService implements IExchangeProvider {
   private async makeRequest(
     endpoint: string,
     method: 'GET' | 'POST' | 'DELETE' = 'GET',
-    params: Record<string, any> = {},
-  ): Promise<any> {
+    params: Record<string, string | number> = {},
+  ): Promise<unknown> {
     const now = Date.now();
     if (!this.lastTimeSync || now - this.lastTimeSync > 5 * 60 * 1000) {
       await this.syncServerTime();
@@ -102,10 +115,12 @@ export class BinanceExchangeService implements IExchangeProvider {
   async getBalance(asset: string): Promise<ExchangeBalanceDto> {
     this.logger.debug(`Getting balance for ${asset}`);
 
-    const response = await this.makeRequest('/api/v3/account', 'GET');
+    const response = (await this.makeRequest('/api/v3/account', 'GET')) as {
+      balances?: Array<{ asset?: string; free?: string | number; locked?: string | number }>;
+    };
 
-    const balances = response?.balances || [];
-    const assetBalance = balances.find((b: any) => b.asset === asset);
+    const balances = response.balances ?? [];
+    const assetBalance = balances.find((b) => b.asset === asset);
 
     if (!assetBalance) {
       return {
@@ -132,7 +147,7 @@ export class BinanceExchangeService implements IExchangeProvider {
   async createOrder(params: ExchangeOrderParams): Promise<ExchangeOrderResponse> {
     this.logger.debug(`Creating order:`, params);
 
-    const orderParams: Record<string, any> = {
+    const orderParams: Record<string, string> = {
       symbol: params.symbol,
       side: params.side,
       type: params.type,
@@ -147,19 +162,42 @@ export class BinanceExchangeService implements IExchangeProvider {
       orderParams.timeInForce = params.timeInForce;
     }
 
-    const response = await this.makeRequest('/fapi/v1/order', 'POST', orderParams);
+    const response = (await this.makeRequest(
+      '/fapi/v1/order',
+      'POST',
+      orderParams,
+    )) as BinanceOrderApiResponse;
 
     return {
-      orderId: response.orderId.toString(),
-      symbol: response.symbol,
-      status: response.status,
-      side: response.side,
-      type: response.type,
+      orderId: String(response.orderId ?? ''),
+      symbol: String(response.symbol ?? params.symbol),
+      status: this.mapOrderStatus(response.status),
+      side: this.mapOrderSide(response.side, params.side),
+      type: String(response.type ?? params.type),
       price: new Decimal(response.price || 0),
       quantity: new Decimal(response.origQty || 0),
       executedQty: new Decimal(response.executedQty || 0),
-      timestamp: new Date(response.updateTime),
+      timestamp: new Date(response.updateTime ?? Date.now()),
     };
+  }
+
+
+
+  private mapOrderStatus(value: string | undefined): ExchangeOrderResponse['status'] {
+    switch (value) {
+      case 'NEW':
+      case 'FILLED':
+      case 'PARTIALLY_FILLED':
+      case 'CANCELED':
+      case 'REJECTED':
+        return value;
+      default:
+        return 'NEW';
+    }
+  }
+
+  private mapOrderSide(value: string | undefined, fallback: ExchangeOrderResponse['side']): ExchangeOrderResponse['side'] {
+    return value === 'SELL' ? 'SELL' : value === 'BUY' ? 'BUY' : fallback;
   }
 
   async cancelOrder(orderId: string, symbol: string): Promise<void> {
@@ -174,21 +212,21 @@ export class BinanceExchangeService implements IExchangeProvider {
   async getOrderStatus(orderId: string, symbol: string): Promise<ExchangeOrderResponse> {
     this.logger.debug(`Getting order status ${orderId}`);
 
-    const response = await this.makeRequest('/fapi/v1/order', 'GET', {
+    const response = (await this.makeRequest('/fapi/v1/order', 'GET', {
       symbol,
       orderId,
-    });
+    })) as BinanceOrderApiResponse;
 
     return {
-      orderId: response.orderId.toString(),
-      symbol: response.symbol,
-      status: response.status,
-      side: response.side,
-      type: response.type,
+      orderId: String(response.orderId ?? orderId),
+      symbol: String(response.symbol ?? symbol),
+      status: this.mapOrderStatus(response.status),
+      side: this.mapOrderSide(response.side, 'BUY'),
+      type: String(response.type ?? ''),
       price: new Decimal(response.price || 0),
       quantity: new Decimal(response.origQty || 0),
       executedQty: new Decimal(response.executedQty || 0),
-      timestamp: new Date(response.updateTime),
+      timestamp: new Date(response.updateTime ?? Date.now()),
     };
   }
 

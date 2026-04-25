@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
@@ -73,22 +72,32 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
   const debugSqlFlag = (configService.get<string>('TYPEORM_DEBUG_SQL') ?? '').trim().toLowerCase();
   const debugSql = !isProduction && ['true', '1', 'yes', 'on'].includes(debugSqlFlag);
 
+  const host = configService.get<string>('CORE_DB_HOST') ?? configService.get<string>('DB_HOST');
+  const port =
+    configService.get<number>('CORE_DB_PORT') ?? configService.get<number>('DB_PORT') ?? 5432;
+  const username =
+    configService.get<string>('CORE_DB_USERNAME') ?? configService.get<string>('DB_USERNAME');
+  const password =
+    configService.get<string>('CORE_DB_PASSWORD') ?? configService.get<string>('DB_PASSWORD');
+  const database =
+    configService.get<string>('CORE_DB_NAME') ?? configService.get<string>('DB_NAME');
+
   return {
-    type: 'mysql',
-    host: configService.get<string>('DB_HOST'),
-    port: configService.get<number>('DB_PORT'),
-    username: configService.get<string>('DB_USERNAME'),
-    password: configService.get<string>('DB_PASSWORD'),
-    database: configService.get<string>('DB_NAME'),
+    type: 'postgres',
+    host,
+    port,
+    username,
+    password,
+    database,
     entities: ALL_ENTITIES,
     migrations: typeormMigrationFilePaths(__dirname),
     migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
     synchronize: false,
     logging: debugSql ? (['query', 'error'] as const) : false,
-    connectTimeout: 30000,
     extra: {
-      connectionLimit: 10,
-      connectTimeout: 30000,
+      max: 10,
+      statement_timeout: 30000,
+      idle_in_transaction_session_timeout: 30000,
     },
   };
 };

@@ -15,7 +15,7 @@ export class CurrencyLookupAdapter implements CurrencyLookupPort {
   async getSymbol(currencyId: string): Promise<string> {
     try {
       const rows = await this.dataSource.query(
-        'SELECT symbol FROM currencies WHERE currency_id = ? LIMIT 1',
+        'SELECT symbol FROM currencies WHERE currency_id = $1 LIMIT 1',
         [currencyId],
       );
       return rows?.[0]?.symbol ?? '';

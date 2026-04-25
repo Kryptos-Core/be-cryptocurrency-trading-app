@@ -22,5 +22,5 @@ export class CreateNotificationDto {
   @ApiPropertyOptional({ description: 'Extra JSON payload', example: { url: '/markets' } })
   @IsObject()
   @IsOptional()
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }

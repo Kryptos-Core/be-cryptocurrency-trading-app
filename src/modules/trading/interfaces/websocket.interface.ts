@@ -13,7 +13,7 @@ export const MARKET_EVENTS = {
 } as const;
 
 // ============ Message Base ============
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
   type: WebSocketMessageType;
   data?: T;
   timestamp?: number;
@@ -116,7 +116,7 @@ export interface OHLCMessage {
 export interface WebSocketError {
   code: WebSocketErrorCode;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export type WebSocketErrorCode =

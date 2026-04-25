@@ -38,24 +38,124 @@ export class EnvironmentVariables {
 
   // Database Configuration
   @IsString()
-  @IsNotEmpty()
-  DB_HOST!: string;
+  @IsOptional()
+  DB_HOST?: string;
 
   @IsPort()
-  @IsNotEmpty()
-  DB_PORT!: string;
+  @IsOptional()
+  DB_PORT?: string;
 
   @IsString()
-  @IsNotEmpty()
-  DB_USERNAME!: string;
+  @IsOptional()
+  DB_USERNAME?: string;
 
   @IsString()
-  @IsNotEmpty()
-  DB_PASSWORD!: string;
+  @IsOptional()
+  DB_PASSWORD?: string;
 
   @IsString()
-  @IsNotEmpty()
-  DB_NAME!: string;
+  @IsOptional()
+  DB_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  CORE_DB_SOURCE?: string = 'postgres';
+
+  @IsString()
+  @IsOptional()
+  CORE_DB_TYPE?: string = 'postgres';
+
+  @IsString()
+  @IsOptional()
+  CORE_DB_HOST?: string;
+
+  @IsPort()
+  @IsOptional()
+  CORE_DB_PORT?: string;
+
+  @IsString()
+  @IsOptional()
+  CORE_DB_USERNAME?: string;
+
+  @IsString()
+  @IsOptional()
+  CORE_DB_PASSWORD?: string;
+
+  @IsString()
+  @IsOptional()
+  CORE_DB_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_READ_SOURCE?: string = 'postgres';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_ENABLED?: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_HOST?: string;
+
+  @IsPort()
+  @IsOptional()
+  MARKET_TS_PORT?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_USERNAME?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_PASSWORD?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_TS_DB?: string;
+
+  @IsString()
+  @IsOptional()
+  ANALYTICS_ENABLED?: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  CLICKHOUSE_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  CLICKHOUSE_USER?: string;
+
+  @IsString()
+  @IsOptional()
+  CLICKHOUSE_PASSWORD?: string;
+
+  @IsString()
+  @IsOptional()
+  CLICKHOUSE_DB?: string;
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ENABLED?: string = 'true';
+
+  @IsString()
+  @IsOptional()
+  EVENT_SCHEMA_FORMAT?: string = 'json';
+
+  @IsString()
+  @IsOptional()
+  TICKER_SOURCE?: string = 'nestjs';
+
+  @IsString()
+  @IsOptional()
+  MATCHING_ENGINE?: string = 'ts';
+
+  @IsString()
+  @IsOptional()
+  MATCHING_GO_CANARY_PAIRS?: string;
+
+  @IsString()
+  @IsOptional()
+  PUBLIC_WS_SOURCE?: string = 'nestjs';
 
   /**
    * When true/1/yes/on: log SQL queries via TypeORM. Ignored when NODE_ENV=production.
@@ -568,6 +668,31 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'DB_USERNAME',
     'DB_PASSWORD',
     'DB_NAME',
+    'CORE_DB_SOURCE',
+    'CORE_DB_TYPE',
+    'CORE_DB_HOST',
+    'CORE_DB_PORT',
+    'CORE_DB_USERNAME',
+    'CORE_DB_PASSWORD',
+    'CORE_DB_NAME',
+    'MARKET_READ_SOURCE',
+    'MARKET_TS_ENABLED',
+    'MARKET_TS_HOST',
+    'MARKET_TS_PORT',
+    'MARKET_TS_USERNAME',
+    'MARKET_TS_PASSWORD',
+    'MARKET_TS_DB',
+    'ANALYTICS_ENABLED',
+    'CLICKHOUSE_URL',
+    'CLICKHOUSE_USER',
+    'CLICKHOUSE_PASSWORD',
+    'CLICKHOUSE_DB',
+    'EVENT_OUTBOX_ENABLED',
+    'EVENT_SCHEMA_FORMAT',
+    'TICKER_SOURCE',
+    'MATCHING_ENGINE',
+    'MATCHING_GO_CANARY_PAIRS',
+    'PUBLIC_WS_SOURCE',
     'TYPEORM_DEBUG_SQL',
     'MM_DEFAULT_SPREAD_BPS',
     'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',
@@ -578,6 +703,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'REDIS_DB',
     'MATCHING_BOOK_FULL_REFRESH',
     'READ_MARKETS_FROM_PROJECTION',
+    'READ_MODEL_ONCHAIN_DEPOSITS',
     'JWT_SECRET',
     'JWT_EXPIRATION',
     'JWT_REFRESH_SECRET',
@@ -716,10 +842,44 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
   // PayOS: optional at startup — active credentials may live in payment_method_configs (UI).
   // DepositsService falls back to PAYOS_* from .env when no active DB config exists.
 
+  applyCoreDbFallbacks(validatedConfig);
+  assertCoreDbConfigOrThrow(validatedConfig);
+
   applyOnchainSandboxRpcDefaults(validatedConfig);
   assertOnchainSandboxRpcOrThrow(validatedConfig);
 
   return validatedConfig;
+}
+
+
+/** Map legacy DB_* env to CORE_DB_* when CORE_DB_* is omitted. */
+export function applyCoreDbFallbacks(config: EnvironmentVariables): void {
+  if (!config.CORE_DB_HOST && config.DB_HOST) config.CORE_DB_HOST = config.DB_HOST;
+  if (!config.CORE_DB_PORT && config.DB_PORT) config.CORE_DB_PORT = config.DB_PORT;
+  if (!config.CORE_DB_USERNAME && config.DB_USERNAME) config.CORE_DB_USERNAME = config.DB_USERNAME;
+  if (!config.CORE_DB_PASSWORD && config.DB_PASSWORD) config.CORE_DB_PASSWORD = config.DB_PASSWORD;
+  if (!config.CORE_DB_NAME && config.DB_NAME) config.CORE_DB_NAME = config.DB_NAME;
+}
+
+/** Require core DB connectivity settings after fallback mapping. */
+export function assertCoreDbConfigOrThrow(config: EnvironmentVariables): void {
+  const missing: string[] = [];
+  if (!config.CORE_DB_HOST?.trim()) missing.push('CORE_DB_HOST');
+  if (!config.CORE_DB_PORT?.trim()) missing.push('CORE_DB_PORT');
+  if (!config.CORE_DB_USERNAME?.trim()) missing.push('CORE_DB_USERNAME');
+  if (!config.CORE_DB_PASSWORD?.trim()) missing.push('CORE_DB_PASSWORD');
+  if (!config.CORE_DB_NAME?.trim()) missing.push('CORE_DB_NAME');
+
+  if (missing.length > 0) {
+    throw new Error(`Environment validation failed: missing core DB vars: ${missing.join(', ')}`);
+  }
+
+  // Keep DB_* aligned for legacy call sites that still read DB_* directly.
+  if (!config.DB_HOST) config.DB_HOST = config.CORE_DB_HOST;
+  if (!config.DB_PORT) config.DB_PORT = config.CORE_DB_PORT;
+  if (!config.DB_USERNAME) config.DB_USERNAME = config.CORE_DB_USERNAME;
+  if (!config.DB_PASSWORD) config.DB_PASSWORD = config.CORE_DB_PASSWORD;
+  if (!config.DB_NAME) config.DB_NAME = config.CORE_DB_NAME;
 }
 
 /** Public testnet RPC fallbacks — aligned with createAppConfig blockchain extras. */

@@ -1,12 +1,12 @@
 /**
  * Seed script: clear user-related data + users, then seed users only.
  * Real currencies and market pairs are bootstrapped automatically from Binance by backend startup.
+ * Uses CORE_DB_* (with DB_* fallback) and PostgreSQL DataSource.
  *
  * Usage: npm run db:seed   or   npm run db:reset
  */
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { UserRole } from '@/common/enums';
@@ -20,14 +20,26 @@ loadEnvFilesForCli();
 
 const SALT_ROUNDS = 10;
 
+function resolveCoreDb() {
+  return {
+    host: process.env.CORE_DB_HOST || process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.CORE_DB_PORT || process.env.DB_PORT || '5432', 10),
+    username: process.env.CORE_DB_USERNAME || process.env.DB_USERNAME,
+    password: process.env.CORE_DB_PASSWORD || process.env.DB_PASSWORD,
+    database: process.env.CORE_DB_NAME || process.env.DB_NAME,
+  };
+}
+
 async function run() {
+  const coreDb = resolveCoreDb();
+
   const dataSource = new DataSource({
-    type: 'mysql',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    type: 'postgres',
+    host: coreDb.host,
+    port: coreDb.port,
+    username: coreDb.username,
+    password: coreDb.password,
+    database: coreDb.database,
     entities: typeormEntityGlobPaths(__dirname),
     migrations: typeormMigrationFilePaths(__dirname),
     synchronize: false,
@@ -41,17 +53,15 @@ async function run() {
     console.log(
       '🗑️  Clearing user-related data (wallet_ledger, wallets, orders, trades, price_alerts, deposits, withdrawals, user_sessions, users)...',
     );
-    await q.query('SET FOREIGN_KEY_CHECKS = 0');
-    await q.query('DELETE FROM wallet_ledger');
-    await q.query('DELETE FROM wallets');
-    await q.query('DELETE FROM orders');
-    await q.query('DELETE FROM trades');
-    await q.query('DELETE FROM price_alerts');
-    await q.query('DELETE FROM deposits');
-    await q.query('DELETE FROM withdrawals');
-    await q.query('DELETE FROM user_sessions');
-    await q.query('DELETE FROM users');
-    await q.query('SET FOREIGN_KEY_CHECKS = 1');
+    await q.query('TRUNCATE TABLE wallet_ledger RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE wallets RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE orders RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE trades RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE price_alerts RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE deposits RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE withdrawals RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE user_sessions RESTART IDENTITY CASCADE');
+    await q.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
     console.log('✅ Cleared.');
 
     const usersPath = resolveSeedUsersJsonPath({ cwd: process.cwd() });

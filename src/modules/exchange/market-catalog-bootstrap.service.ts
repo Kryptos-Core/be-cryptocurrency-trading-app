@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   CURRENCY_REPOSITORY,
   type CurrencyRepositoryPort,
@@ -21,9 +22,15 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
     @Inject(CURRENCY_REPOSITORY)
     private readonly currencyRepository: CurrencyRepositoryPort,
     private readonly exchangeInfoSyncService: ExchangeInfoSyncService,
+    private readonly configService: ConfigService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (this.shouldSkipBootstrap()) {
+      this.logger.log('Skipping market catalog bootstrap in current environment');
+      return;
+    }
+
     if (this.bootstrapStarted) {
       return;
     }
@@ -37,6 +44,17 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
     if (activeMarketCount === 0 || activeCurrencyCount === 0) {
       await this.initializeCatalogFromBinance();
     }
+  }
+
+
+  private shouldSkipBootstrap(): boolean {
+    const nodeEnv = String(this.configService.get<string>('NODE_ENV') ?? '').trim().toLowerCase();
+    if (nodeEnv === 'test') return true;
+
+    const rawFlag = String(this.configService.get<string>('DISABLE_STARTUP_CATALOG_BOOTSTRAP') ?? '')
+      .trim()
+      .toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(rawFlag);
   }
 
   private async getActiveMarketCount(): Promise<number> {

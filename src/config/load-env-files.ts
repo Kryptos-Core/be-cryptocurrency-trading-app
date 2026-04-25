@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { existsSync } from 'node:fs';
 import * as dotenv from 'dotenv';
 
 /**
@@ -25,8 +26,16 @@ export function loadEnvFilesForCli(cwd: string = process.cwd()): void {
 
 /**
  * Paths for Nest `ConfigModule.forRoot({ envFilePath })` — one file per environment.
+ * In test, allow fallback to `.env.development` when `.env.test` is absent.
  */
 export function nestEnvFilePaths(cwd: string = process.cwd()): string[] {
   const nodeEnv = nodeEnvForEnvFile();
-  return [path.join(cwd, `.env.${nodeEnv}`)];
+  const primary = path.join(cwd, `.env.${nodeEnv}`);
+
+  if (nodeEnv === 'test') {
+    const fallback = path.join(cwd, '.env.development');
+    return existsSync(fallback) ? [primary, fallback] : [primary];
+  }
+
+  return [primary];
 }

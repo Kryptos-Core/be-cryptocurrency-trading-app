@@ -2,6 +2,28 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Order } from '@/entities/order.entity';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 
+export type AdminOrderRow = {
+  order_id: string;
+  user_id: string;
+  pair_id: string;
+  side: Order['side'];
+  type: Order['type'];
+  price: Order['price'];
+  amount: string;
+  filled_amount: string;
+  avg_price: Order['avg_price'];
+  status: Order['status'];
+  time_in_force: Order['time_in_force'];
+  reserved_quote: string;
+  reserved_base: string;
+  client_order_id: Order['client_order_id'];
+  idempotency_key: string;
+  slippage_tolerance: string | null;
+  created_at: Date;
+  updated_at: Date;
+  pair_symbol?: string;
+};
+
 @Injectable()
 export class FindAllOrdersAdminQuery {
   constructor(
@@ -32,7 +54,7 @@ export class FindAllOrdersAdminQuery {
     };
   }
 
-  private toAdminPlain(o: Order): Record<string, any> {
+  private toAdminPlain(o: Order): AdminOrderRow {
     return {
       order_id: o.order_id,
       user_id: o.user_id,

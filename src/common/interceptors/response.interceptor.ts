@@ -7,52 +7,48 @@ import {
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-/**
- * Response Interceptor - Transform response according to standard
- * Applicable: Decorator Pattern & Cross-Cutting Concern
- */
-export interface IApiResponse<T = any> {
+export interface IApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
   timestamp: string;
 }
 
+type ResponseEnvelope = {
+  data?: unknown;
+  message?: string;
+  total?: unknown;
+  [key: string]: unknown;
+};
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPaginatedEnvelope(value: unknown): value is ResponseEnvelope & { data: unknown[]; total: unknown } {
+  return isObjectRecord(value) && Array.isArray(value.data) && value.total !== undefined && value.total !== null;
+}
+
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
-      map((data) => {
-        /**
-         * Paginated handlers return `{ data: T[], total, page, limit }`.
-         * Using only `data.data` would drop `total` and break clients that read pagination from the envelope.
-         */
-        const isPaginatedEnvelope = (d: any): boolean =>
-          d &&
-          typeof d === 'object' &&
-          !Array.isArray(d) &&
-          Array.isArray(d.data) &&
-          d.total !== undefined &&
-          d.total !== null;
-
+      map((data: unknown) => {
+        const envelope = isObjectRecord(data) ? data : undefined;
         const payload = isPaginatedEnvelope(data)
           ? data
-          : data?.data !== undefined
-            ? data.data
+          : envelope?.data !== undefined
+            ? envelope.data
             : data;
 
         const response: IApiResponse = {
           success: true,
-          message: data?.message || 'Success',
+          message: typeof envelope?.message === 'string' ? envelope.message : 'Success',
           data: payload,
           timestamp: new Date().toISOString(),
         };
 
-        // Remove messages if unnecessary.
-        if (!data?.message) {
-          delete response.message;
-        }
-
+        if (typeof envelope?.message !== 'string') delete response.message;
         return response;
       }),
     );

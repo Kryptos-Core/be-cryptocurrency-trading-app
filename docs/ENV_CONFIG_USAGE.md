@@ -23,11 +23,11 @@ Sau đó điền thông tin và chạy ứng dụng (đảm bảo `NODE_ENV` kh�
 
 | Biến | Mô tả |
 |---|---|
-| DB_HOST | Host MySQL |
-| DB_PORT | Port MySQL |
-| DB_USERNAME | Tên người dùng MySQL |
-| DB_PASSWORD | Mật khẩu MySQL |
-| DB_NAME | Tên cơ sở dữ liệu |
+| DB_HOST | Host database alias legacy; hiện được map tới PostgreSQL nếu CORE_DB_* chưa khai báo |
+| DB_PORT | Port database alias legacy; hiện dùng cho PostgreSQL fallback |
+| DB_USERNAME | Username database alias legacy; hiện dùng cho PostgreSQL fallback |
+| DB_PASSWORD | Password database alias legacy; hiện dùng cho PostgreSQL fallback |
+| DB_NAME | Tên cơ sở dữ liệu fallback nếu chưa khai báo CORE_DB_NAME |
 | JWT_SECRET | Mã bí mật JWT |
 | REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB | Kết nối Redis (cache, lock khớp lệnh, pub/sub, lock relay outbox) — xem [REDIS_USAGE.md](REDIS_USAGE.md) |
 
@@ -84,7 +84,7 @@ Sau đó điền thông tin và chạy ứng dụng (đảm bảo `NODE_ENV` kh�
 | ALLOW_UI_TEST_SIGNATURE | `true` trên production để cho phép sửa `BLOCKCHAIN_ALLOW_TEST_SIGNATURE` qua API/UI (rất rủi ro) |
 | `WALLETCONNECT_PROJECT_ID`, `REOWN_PROJECT_ID`, `WALLETCONNECT_RELAY_URL`, `WALLETCONNECT_WEBHOOK_SECRET` | WalletConnect / Reown — desktop SignClient + liên kết ví; bảng đầy đủ và luồng: **[WALLETCONNECT.md](WALLETCONNECT.md)** |
 
-**Cấu hình runtime (UI):** Các biến ví dụ `WALLET_SYNC_INTERVAL`, `TRON_MAINNET_FULL_HOST`, `SOLANA_MAINNET_URL`, `ETH_MAINNET_RPC_URL`, `BSC_MAINNET_RPC_URL`, `BLOCKCHAIN_WITHDRAW_*`, `PLATFORM_CASH_CURRENCY_SYMBOL`, `BLOCKCHAIN_DEPOSIT_*_TO_USDT_RATE`, … được seed vào bảng `system_configs` khi khởi động (nếu thiếu) và có thể chỉnh qua **GET/PATCH `/api/v1/system-configs/runtime`** (JWT + `FINANCE_MANAGER`/`ADMIN` + `PAYMENT_CONFIGS_MANAGE`). Giá trị đọc thực tế: **Redis cache → MySQL → fallback `.env`**. Tab **Platform** trên màn **Payment Configuration** (Flutter) gọi các endpoint này.
+**Cấu hình runtime (UI):** Các biến ví dụ `WALLET_SYNC_INTERVAL`, `TRON_MAINNET_FULL_HOST`, `SOLANA_MAINNET_URL`, `ETH_MAINNET_RPC_URL`, `BSC_MAINNET_RPC_URL`, `BLOCKCHAIN_WITHDRAW_*`, `PLATFORM_CASH_CURRENCY_SYMBOL`, `BLOCKCHAIN_DEPOSIT_*_TO_USDT_RATE`, … được seed vào bảng `system_configs` khi khởi động (nếu thiếu) và có thể chỉnh qua **GET/PATCH `/api/v1/system-configs/runtime`** (JWT + `FINANCE_MANAGER`/`ADMIN` + `PAYMENT_CONFIGS_MANAGE`). Giá trị đọc thực tế: **Redis cache → PostgreSQL (`system_configs`) → fallback `.env`**. Tab **Platform** trên màn **Payment Configuration** (Flutter) gọi các endpoint này.
 
 ### PayOS
 

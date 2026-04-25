@@ -36,7 +36,7 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: (configService.get('JWT_EXPIRATION') || '24h') as any,
+          expiresIn: String(configService.get('JWT_EXPIRATION') || '24h'),
         },
       }),
     }),

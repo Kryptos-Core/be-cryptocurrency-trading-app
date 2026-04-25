@@ -130,7 +130,7 @@ export class WalletConnectController {
       'Không cần Authentication, nhưng verify HMAC-SHA256 từ header X-WC-Signature.',
   })
   async handleRelayWebhook(
-    @Body() payload: Record<string, any>,
+    @Body() payload: Record<string, unknown>,
     @Headers('x-wc-signature') wcSignature?: string,
     @Headers('x-relay-signature') relaySignature?: string,
   ) {

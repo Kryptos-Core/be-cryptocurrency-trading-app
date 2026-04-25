@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
-import { NOTIFICATION_STORE_PROCEDURE } from '@/common/constants/stored-procedure-names';
 import { BaseRepository } from '@/common/repositories';
+import { newUuid } from '@/common/utils/uuid.util';
 import { Notification } from '@/entities/notification.entity';
 
 export interface NotificationRow {
@@ -15,14 +15,12 @@ export interface NotificationRow {
   body: string;
   type: string;
   created_by: string;
-  data: Record<string, any> | null;
+  data: Record<string, unknown> | null;
   notification_created_at: Date;
 }
 
-/**
- * Notification Repository
- * Repository Pattern + Database Procedure Pattern: all reads/writes via sp_notification_*.
- */
+type QueryRow = Record<string, unknown>;
+
 @Injectable()
 export class NotificationRepository extends BaseRepository<Notification> {
   constructor(dataSource: DataSource) {
@@ -35,10 +33,12 @@ export class NotificationRepository extends BaseRepository<Notification> {
     body: string;
     type: string;
     createdBy: string;
-    data: Record<string, any> | null;
+    data: Record<string, unknown> | null;
   }): Promise<Notification | null> {
-    const result = await this.dataSource.query(
-      `CALL ${NOTIFICATION_STORE_PROCEDURE.CREATE}(?, ?, ?, ?, ?, ?)`,
+    const rows = await this.dataSource.query(
+      `INSERT INTO notifications (notification_id, title, body, type, created_by, data, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
+       RETURNING notification_id, title, body, type, created_by, data, created_at`,
       [
         params.notificationId,
         params.title,
@@ -48,34 +48,67 @@ export class NotificationRepository extends BaseRepository<Notification> {
         params.data ? JSON.stringify(params.data) : null,
       ],
     );
-    return result?.[0]?.[0] ?? null;
+    return (rows?.[0] as Notification | undefined) ?? null;
   }
 
   async findByUser(userId: string, limit: number, offset: number): Promise<NotificationRow[]> {
-    const result = await this.dataSource.query(
-      `CALL ${NOTIFICATION_STORE_PROCEDURE.FIND_BY_USER}(?, ?, ?)`,
+    const rows = await this.dataSource.query(
+      `SELECT un.id, un.user_id, un.notification_id,
+              CASE WHEN un.is_read THEN 1 ELSE 0 END AS is_read,
+              un.read_at, un.created_at,
+              n.title, n.body, n.type, n.created_by, n.data,
+              n.created_at AS notification_created_at
+       FROM user_notifications un
+       INNER JOIN notifications n ON n.notification_id = un.notification_id
+       WHERE un.user_id = $1
+       ORDER BY un.created_at DESC
+       LIMIT $2 OFFSET $3`,
       [userId, limit, offset],
     );
-    return result?.[0] ?? [];
+    return (rows ?? []).map((row: QueryRow) => ({
+      id: String(row.id ?? ''),
+      user_id: String(row.user_id ?? ''),
+      notification_id: String(row.notification_id ?? ''),
+      is_read: Number(row.is_read ?? 0),
+      read_at: (row.read_at as Date | null | undefined) ?? null,
+      created_at: row.created_at as Date,
+      title: String(row.title ?? ''),
+      body: String(row.body ?? ''),
+      type: String(row.type ?? ''),
+      created_by: String(row.created_by ?? ''),
+      data: (row.data as Record<string, unknown> | null | undefined) ?? null,
+      notification_created_at: row.notification_created_at as Date,
+    }));
   }
 
   async countUnread(userId: string): Promise<number> {
-    const result = await this.dataSource.query(
-      `CALL ${NOTIFICATION_STORE_PROCEDURE.COUNT_UNREAD}(?)`,
+    const rows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS unread_count
+       FROM user_notifications
+       WHERE user_id = $1 AND is_read = false`,
       [userId],
     );
-    return Number(result?.[0]?.[0]?.unread_count ?? 0);
+    return Number(rows?.[0]?.unread_count ?? 0);
   }
 
   async markRead(notificationId: string, userId: string): Promise<void> {
-    await this.dataSource.query(`CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_READ}(?, ?)`, [
-      notificationId,
-      userId,
-    ]);
+    await this.dataSource.query(
+      `UPDATE user_notifications
+       SET is_read = true,
+           read_at = COALESCE(read_at, NOW())
+       WHERE notification_id = $1 AND user_id = $2`,
+      [notificationId, userId],
+    );
   }
 
   async markAllRead(userId: string): Promise<void> {
-    await this.dataSource.query(`CALL ${NOTIFICATION_STORE_PROCEDURE.MARK_ALL_READ}(?)`, [userId]);
+    await this.dataSource.query(
+      `UPDATE user_notifications
+       SET is_read = true,
+           read_at = COALESCE(read_at, NOW())
+       WHERE user_id = $1 AND is_read = false`,
+      [userId],
+    );
   }
 
   async findAllFcmTokens(): Promise<string[]> {
@@ -87,7 +120,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
 
   async getFcmTokenByUserId(userId: string): Promise<string | null> {
     const result = await this.dataSource.query(
-      `SELECT fcm_token FROM users WHERE user_id = ? AND fcm_token IS NOT NULL AND status = 'ACTIVE' LIMIT 1`,
+      `SELECT fcm_token FROM users WHERE user_id = $1 AND fcm_token IS NOT NULL AND status = 'ACTIVE' LIMIT 1`,
       [userId],
     );
     const token = (result as { fcm_token: string }[])?.[0]?.fcm_token;
@@ -103,29 +136,12 @@ export class NotificationRepository extends BaseRepository<Notification> {
     targetUserId: string;
     data: Record<string, unknown> | null;
   }): Promise<void> {
-    await this.dataSource.query(
-      `INSERT INTO notifications (notification_id, title, body, type, created_by, data)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        params.notificationId,
-        params.title,
-        params.body,
-        params.type,
-        params.createdBy,
-        params.data ? JSON.stringify(params.data) : null,
-      ],
-    );
-    await this.dataSource.query(
-      `INSERT INTO user_notifications (id, user_id, notification_id)
-         VALUES (UUID(), ?, ?)`,
-      [params.targetUserId, params.notificationId],
-    );
+    await this.dataSource.transaction(async (em) => {
+      await this.insertNotification(em, params);
+      await this.insertUserNotification(em, params.notificationId, params.targetUserId);
+    });
   }
 
-  /**
-   * Same as createForUser but uses the caller's EntityManager (same DB transaction as outbox relay).
-   * Idempotent: duplicate PRIMARY KEY on notifications.notification_id is ignored (MySQL errno 1062).
-   */
   async createForUserWithManagerIdempotent(
     em: EntityManager,
     params: {
@@ -138,37 +154,48 @@ export class NotificationRepository extends BaseRepository<Notification> {
       data: Record<string, unknown> | null;
     },
   ): Promise<void> {
-    try {
-      await em.query(
-        `INSERT INTO notifications (notification_id, title, body, type, created_by, data)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          params.notificationId,
-          params.title,
-          params.body,
-          params.type,
-          params.createdBy,
-          params.data ? JSON.stringify(params.data) : null,
-        ],
-      );
-    } catch (e: any) {
-      if (e?.errno === 1062 || e?.code === 'ER_DUP_ENTRY') {
-        return;
-      }
-      throw e;
-    }
+    await this.insertNotification(em, params, true);
+    await this.insertUserNotification(em, params.notificationId, params.targetUserId, true);
+  }
 
-    try {
-      await em.query(
-        `INSERT INTO user_notifications (id, user_id, notification_id)
-         VALUES (UUID(), ?, ?)`,
-        [params.targetUserId, params.notificationId],
-      );
-    } catch (e: any) {
-      if (e?.errno === 1062 || e?.code === 'ER_DUP_ENTRY') {
-        return;
-      }
-      throw e;
-    }
+  private async insertNotification(
+    em: EntityManager,
+    params: {
+      notificationId: string;
+      title: string;
+      body: string;
+      type: string;
+      createdBy: string;
+      data: Record<string, unknown> | null;
+    },
+    idempotent: boolean = false,
+  ): Promise<void> {
+    const conflict = idempotent ? ' ON CONFLICT (notification_id) DO NOTHING' : '';
+    await em.query(
+      `INSERT INTO notifications (notification_id, title, body, type, created_by, data, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())${conflict}`,
+      [
+        params.notificationId,
+        params.title,
+        params.body,
+        params.type,
+        params.createdBy,
+        params.data ? JSON.stringify(params.data) : null,
+      ],
+    );
+  }
+
+  private async insertUserNotification(
+    em: EntityManager,
+    notificationId: string,
+    targetUserId: string,
+    idempotent: boolean = false,
+  ): Promise<void> {
+    const conflict = idempotent ? ' ON CONFLICT DO NOTHING' : '';
+    await em.query(
+      `INSERT INTO user_notifications (id, user_id, notification_id, is_read, created_at)
+       VALUES ($1, $2, $3, false, NOW())${conflict}`,
+      [newUuid(), targetUserId, notificationId],
+    );
   }
 }

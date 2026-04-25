@@ -45,7 +45,7 @@ export class OrderBookProjection {
       }
     }
 
-    const values = [...orders.values()].filter((o) => o.remaining !== '0');
+    const values = [...orders.values()].filter((o) => toBaseUnits(o.remaining, DEFAULT_SCALE) > 0n);
     return {
       pairId,
       bids: values.filter((o) => o.side === 'BUY').sort((a, b) => this.compareOrders(a, b, 'BUY')),
@@ -70,16 +70,25 @@ export class OrderBookProjection {
   }
 
   private applyTrade(orders: Map<string, ProjectedOrder>, event: TradeExecutedEvent): void {
-    const maker = orders.get(event.makerOrderId);
-    if (!maker) return;
+    this.applyFillToOrder(orders, event.makerOrderId, event.amount);
+    this.applyFillToOrder(orders, event.takerOrderId, event.amount);
+  }
 
-    const makerRemaining = this.subtract(maker.remaining, event.amount);
-    if (makerRemaining === '0') {
-      orders.delete(event.makerOrderId);
+  private applyFillToOrder(
+    orders: Map<string, ProjectedOrder>,
+    orderId: string,
+    amount: string,
+  ): void {
+    const order = orders.get(orderId);
+    if (!order) return;
+
+    const remaining = this.subtract(order.remaining, amount);
+    if (remaining === '0') {
+      orders.delete(orderId);
       return;
     }
 
-    orders.set(event.makerOrderId, { ...maker, remaining: makerRemaining });
+    orders.set(orderId, { ...order, remaining });
   }
 
   private subtract(left: string, right: string): string {

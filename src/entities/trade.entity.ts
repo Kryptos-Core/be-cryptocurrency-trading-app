@@ -7,10 +7,7 @@ import {
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
-import {
-  DECIMAL_36_18_COLUMN,
-  DECIMAL_36_18_DEFAULT_0_COLUMN,
-} from '@/common/constants/column-types';
+import { DECIMAL_36_18_COLUMN, DECIMAL_36_18_DEFAULT_0_COLUMN } from '@/common/constants/column-types';
 import { Currency } from './currency.entity';
 import { MarketPair } from './market-pair.entity';
 import { Order } from './order.entity';
@@ -54,34 +51,16 @@ export class Trade {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(
-    () => MarketPair,
-    (pair) => pair.trades,
-    {
-      onDelete: 'RESTRICT',
-    },
-  )
+  @ManyToOne(() => MarketPair, (pair) => pair.trades, { onDelete: 'RESTRICT' })
   pair!: MarketPair;
 
-  @ManyToOne(
-    () => Order,
-    (order) => order.taker_trades,
-    {
-      onDelete: 'CASCADE',
-    },
-  )
+  @ManyToOne(() => Order, (order) => order.taker_trades, { onDelete: 'CASCADE' })
   taker_order!: Order;
 
-  @ManyToOne(
-    () => Order,
-    (order) => order.maker_trades,
-    {
-      onDelete: 'CASCADE',
-    },
-  )
+  @ManyToOne(() => Order, (order) => order.maker_trades, { onDelete: 'CASCADE' })
   maker_order!: Order;
 
   @ManyToOne('Currency')
   @ForeignKey(() => Currency)
-  fee_currency!: any;
+  fee_currency!: Currency;
 }

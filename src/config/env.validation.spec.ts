@@ -6,16 +6,42 @@ function minimalValidConfig(overrides: Record<string, unknown> = {}): Record<str
   return {
     NODE_ENV: Environment.Production,
     DB_HOST: 'localhost',
-    DB_PORT: '3306',
+    DB_PORT: '5432',
     DB_USERNAME: 'user',
     DB_PASSWORD: 'pass',
     DB_NAME: 'crypto',
+    CORE_DB_SOURCE: 'postgres',
+    CORE_DB_TYPE: 'postgres',
+    CORE_DB_HOST: 'localhost',
+    CORE_DB_PORT: '5432',
+    CORE_DB_USERNAME: 'user',
+    CORE_DB_PASSWORD: 'pass',
+    CORE_DB_NAME: 'crypto',
     JWT_SECRET: 'test-jwt-secret-at-least-32-chars-long',
     ...overrides,
   };
 }
 
 describe('validateEnvironment', () => {
+
+  it('maps legacy DB_* into CORE_DB_* when CORE_DB_* is omitted', () => {
+    const v = validateEnvironment({
+      NODE_ENV: Environment.Development,
+      DB_HOST: '127.0.0.1',
+      DB_PORT: '5432',
+      DB_USERNAME: 'legacy_user',
+      DB_PASSWORD: 'legacy_pass',
+      DB_NAME: 'legacy_db',
+      JWT_SECRET: 'test-jwt-secret-at-least-32-chars-long',
+    });
+
+    expect(v.CORE_DB_HOST).toBe('127.0.0.1');
+    expect(v.CORE_DB_PORT).toBe('5432');
+    expect(v.CORE_DB_USERNAME).toBe('legacy_user');
+    expect(v.CORE_DB_PASSWORD).toBe('legacy_pass');
+    expect(v.CORE_DB_NAME).toBe('legacy_db');
+  });
+
   it('does not require PayOS env vars in production (DB/UI may supply PayOS)', () => {
     expect(() => validateEnvironment(minimalValidConfig())).not.toThrow();
   });

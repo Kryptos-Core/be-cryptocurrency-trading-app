@@ -18,7 +18,7 @@ Nếu sử dụng futures testnet trong nhánh riêng của bạn, hãy cập nh
 
 ## 2. Hạ tầng & khởi động backend
 
-MySQL và Redis (khuyến nghị):
+PostgreSQL và Redis (khuyến nghị):
 
 ```bash
 cp .env.development.example .env.development

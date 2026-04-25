@@ -1,17 +1,5 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
-
-async function runProcedureSql(queryRunner: QueryRunner, sql: string): Promise<void> {
-  const conn =
-    queryRunner.connection.driver.options.type === 'mariadb'
-      ? (queryRunner as any).connection.master
-      : (queryRunner as any).connection;
-  const raw = conn?.queryRunner?.connection ?? conn?.connection ?? conn;
-  if (raw?.query) {
-    await raw.query(sql);
-    return;
-  }
-  await queryRunner.query(sql);
-}
+import { runProcedureSql } from './helpers/raw-procedure-connection.util';
 
 /**
  * Migration: Create Admin Wallet Adjustments
