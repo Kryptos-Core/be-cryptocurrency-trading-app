@@ -49,19 +49,33 @@ async function run() {
   await dataSource.initialize();
   const q = dataSource.createQueryRunner();
 
+  const truncateIfExists = async (tableName: string): Promise<void> => {
+    const rows = (await q.query(`SELECT to_regclass($1) AS table_name`, [tableName])) as Array<{
+      table_name: string | null;
+    }>;
+    if (rows[0]?.table_name) {
+      await q.query(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE`);
+    }
+  };
+
   try {
     console.log(
-      '🗑️  Clearing user-related data (wallet_ledger, wallets, orders, trades, price_alerts, deposits, withdrawals, user_sessions, users)...',
+      '🗑️  Clearing user-related data (wallet_ledger, wallets, orders, trades, deposits, withdrawals, users, plus optional legacy tables)...',
     );
-    await q.query('TRUNCATE TABLE wallet_ledger RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE wallets RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE orders RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE trades RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE price_alerts RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE deposits RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE withdrawals RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE user_sessions RESTART IDENTITY CASCADE');
-    await q.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
+
+    // Required tables in the current Postgres baseline.
+    await truncateIfExists('wallet_ledger');
+    await truncateIfExists('wallets');
+    await truncateIfExists('orders');
+    await truncateIfExists('trades');
+    await truncateIfExists('deposits');
+    await truncateIfExists('withdrawals');
+    await truncateIfExists('users');
+
+    // Optional legacy tables kept for backward-compatible local reset scripts.
+    await truncateIfExists('price_alerts');
+    await truncateIfExists('user_sessions');
+
     console.log('✅ Cleared.');
 
     const usersPath = resolveSeedUsersJsonPath({ cwd: process.cwd() });
@@ -75,7 +89,7 @@ async function run() {
 
       await q.query(
         `INSERT INTO users (user_id, email, password_hash, first_name, last_name, status, role)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           userId,
           u.email,
