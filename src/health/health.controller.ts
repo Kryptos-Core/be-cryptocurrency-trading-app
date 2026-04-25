@@ -5,15 +5,10 @@ import type { HealthIndicatorResult } from '@nestjs/terminus';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { Public } from '@/common/decorators';
+import { OutboxAdminService } from '@/common/outbox/outbox-admin.service';
 import { RedisService } from '@/common/services/redis.service';
 import { ANALYTICS_DB, MARKET_TS_DB } from '@/config';
 
-/**
- * Health check endpoint — returns component health for DB and infrastructure.
- *
- * GET /api/v1/health         — liveness (always 200 if process is up)
- * GET /api/v1/health/ready   — readiness (DB + dependent services up)
- */
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
@@ -24,6 +19,7 @@ export class HealthController {
     private readonly redisService: RedisService,
     @Optional() @Inject(MARKET_TS_DB) private readonly marketTsDb: DataSource | null = null,
     @Optional() @Inject(ANALYTICS_DB) private readonly analyticsDb: Record<string, unknown> | null = null,
+    private readonly outboxAdminService: OutboxAdminService,
   ) {}
 
   @Public()
@@ -56,6 +52,15 @@ export class HealthController {
         }
         return { redis: { status: 'up' as const } };
       },
+      async () => {
+        const outbox = await this.outboxAdminService.getRelayHealth();
+        return {
+          outbox_relay: {
+            status: 'up' as const,
+            ...outbox,
+          },
+        };
+      },
     ];
 
     if (this.marketTsDb) {
@@ -69,3 +74,4 @@ export class HealthController {
     return this.health.check(checks);
   }
 }
+

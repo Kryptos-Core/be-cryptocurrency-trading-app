@@ -7,7 +7,9 @@ import {
   unwrapCanonicalIntegrationEventPayload,
 } from '@/common/integration-events/canonical-integration-event-envelope';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
+import { MarketTickerReadModelSyncApplierService } from '@/common/read-model/market-ticker-read-model-sync-applier.service';
 import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/onchain-deposit-read-model-sync-applier.service';
+import { TradeReadModelSyncApplierService } from '@/common/read-model/trade-read-model-sync-applier.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { OnchainDepositOutboxNotificationService } from '@/modules/notifications/onchain-deposit-outbox-notification.service';
 import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
@@ -16,6 +18,8 @@ const CONSUMERS = {
   marketPairReadModel: 'market-pair-read-model-sync',
   onchainDepositReadModel: 'onchain-deposit-read-model-sync',
   onchainDepositNotification: 'onchain-deposit-notification-sync',
+  tradeReadModel: 'trade-read-model-sync',
+  marketTickerReadModel: 'market-ticker-read-model-sync',
 } as const;
 
 @Injectable()
@@ -25,14 +29,12 @@ export class OutboxIntegrationSyncService {
   constructor(
     private readonly marketPairApplier: MarketPairReadModelSyncApplierService,
     private readonly onchainDepositReadApplier: OnchainDepositReadModelSyncApplierService,
+    private readonly tradeReadModelApplier: TradeReadModelSyncApplierService,
+    private readonly marketTickerReadModelApplier: MarketTickerReadModelSyncApplierService,
     private readonly onchainDepositNotifications: OnchainDepositOutboxNotificationService,
     private readonly processedEvents: ProcessedIntegrationEventsService,
   ) {}
 
-  /**
-   * Runs all synchronous side-effects for one outbox row inside the caller's transaction.
-   * Throws on failure so the relay does not mark published_at.
-   */
   async dispatchRow(em: EntityManager, row: IntegrationOutbox): Promise<void> {
     switch (row.event_type) {
       case OutboxIntegrationEventType.MarketPairCreatedV1:
@@ -72,13 +74,35 @@ export class OutboxIntegrationSyncService {
         );
         return;
       }
+      case OutboxIntegrationEventType.TradeExecutedV1: {
+        await this.processedEvents.runOnce(
+          em,
+          CONSUMERS.tradeReadModel,
+          row.id,
+          row.event_type,
+          async () => {
+            await this.tradeReadModelApplier.applyFromOutboxRow(em, row);
+          },
+        );
+        return;
+      }
+      case OutboxIntegrationEventType.MarketTickerUpdatedV1: {
+        await this.processedEvents.runOnce(
+          em,
+          CONSUMERS.marketTickerReadModel,
+          row.id,
+          row.event_type,
+          async () => {
+            await this.marketTickerReadModelApplier.applyFromOutboxRow(em, row);
+          },
+        );
+        return;
+      }
       case OutboxIntegrationEventType.OrderCreatedV1:
       case OutboxIntegrationEventType.OrderCancelRequestedV1:
       case OutboxIntegrationEventType.OrderCancelledV1:
       case OutboxIntegrationEventType.OrderRejectedV1:
-      case OutboxIntegrationEventType.TradeExecutedV1:
       case OutboxIntegrationEventType.WalletBalanceChangedV1:
-      case OutboxIntegrationEventType.MarketTickerUpdatedV1:
         return;
       default:
         this.logger.error(`dispatchRow: unsupported event_type=${row.event_type} id=${row.id}`);

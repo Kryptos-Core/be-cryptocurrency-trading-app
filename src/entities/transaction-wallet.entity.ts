@@ -41,7 +41,7 @@ export class TransactionWallet {
   @Column({ type: 'boolean', default: false })
   is_default_user_deposit!: boolean;
 
-  @Column({ type: 'datetime', nullable: true, precision: 6 })
+  @Column({ type: 'timestamp', nullable: true, precision: 6 })
   default_set_at!: Date | null;
 
   @CreateDateColumn()

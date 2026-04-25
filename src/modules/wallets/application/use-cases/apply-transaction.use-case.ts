@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Decimal from 'decimal.js';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import type { WalletBalanceChangedOutboxPayloadV1 } from '@/common/integration-events/wallet-balance-changed-outbox-payload';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import type { TransactionContext } from '@/common/types/transaction-context';
@@ -28,6 +31,7 @@ export class ApplyTransactionUseCase {
     @Inject(WALLET_EVENT_PUBLISHER) private readonly eventPublisher: WalletEventPublisherPort,
     @Inject(CURRENCY_LOOKUP) private readonly currencyLookup: CurrencyLookupPort,
     private readonly balanceCalc: BalanceCalculationService,
+    private readonly outboxAppender: OutboxAppender,
   ) {}
 
   async execute(
@@ -78,6 +82,14 @@ export class ApplyTransactionUseCase {
         frozen: result.frozen,
         total: this.balanceCalc.calculateTotal(result.available, result.frozen),
       });
+      await this.appendWalletBalanceChangedEvent(
+        joinTransaction ?? ({} as TransactionContext),
+        userId,
+        currencyId,
+        symbol,
+        result.available,
+        result.frozen,
+      );
 
       if (dto.action === WalletTransactionAction.TRANSFER && dto.targetUserId) {
         const _targetBalance = this.balanceCalc.buildBalanceSnapshot(
@@ -86,7 +98,6 @@ export class ApplyTransactionUseCase {
           '0',
           '0',
         );
-        // Re-fetch target balance for accurate event
         const targetWallet = await this.walletRepo.findByUserCurrency(
           String(dto.targetUserId),
           currencyId,
@@ -124,6 +135,35 @@ export class ApplyTransactionUseCase {
       }
       throw err;
     }
+  }
+
+  private async appendWalletBalanceChangedEvent(
+    manager: TransactionContext,
+    userId: string,
+    currencyId: string,
+    symbol: string,
+    available: string,
+    frozen: string,
+  ): Promise<void> {
+    const total = this.balanceCalc.calculateTotal(available, frozen);
+    const payload: WalletBalanceChangedOutboxPayloadV1 = {
+      userId,
+      currencyId,
+      symbol,
+      available,
+      frozen,
+      total,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.outboxAppender.append(manager as never, {
+      aggregateType: 'wallet',
+      aggregateId: `${userId}:${currencyId}`,
+      eventType: OutboxIntegrationEventType.WalletBalanceChangedV1,
+      payload: payload as unknown as Record<string, unknown>,
+      partitionKey: currencyId,
+      kafkaTopic: 'wallet.balance',
+    });
   }
 
   private async credit(
@@ -267,7 +307,6 @@ export class ApplyTransactionUseCase {
       throw new BadRequestException('Cannot transfer to the same user', 'INVALID_TARGET');
     }
 
-    // Deterministic lock order to prevent deadlocks
     const [firstUserId, secondUserId] =
       userId.localeCompare(targetId) < 0 ? [userId, targetId] : [targetId, userId];
 

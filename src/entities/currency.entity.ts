@@ -15,7 +15,7 @@ export class Currency {
   @Column({ type: 'varchar', length: 64 })
   name!: string;
 
-  @Column({ type: 'tinyint', default: 8 })
+  @Column({ type: 'smallint', default: 8 })
   precision_scale!: number;
 
   @Column({ ...DECIMAL_36_18_DEFAULT_0_COLUMN })

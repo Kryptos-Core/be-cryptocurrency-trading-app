@@ -26,8 +26,8 @@ export class User {
   @Column({ type: 'varchar', length: 100, nullable: true })
   last_name!: string;
 
-  @Column({ type: 'varbinary', nullable: true })
-  two_fa_secret!: Buffer;
+  @Column({ type: 'bytea', nullable: true })
+  two_fa_secret!: Buffer | null;
 
   @Column({
     type: 'enum',
@@ -44,11 +44,11 @@ export class User {
   role!: 'TRADER' | 'ADMIN' | 'RISK_OFFICER' | 'SUPPORT_AGENT' | 'MARKET_MAKER' | 'FINANCE_MANAGER';
 
   /** Đã xác minh định danh (CCCD/Passport) — tách khỏi role. */
-  @Column({ type: 'tinyint', width: 1, default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   identity_verified!: number;
 
   /** Đã xác minh email qua OTP (2FA hoặc luồng email liên hệ ví). Khác KYC. */
-  @Column({ type: 'tinyint', width: 1, default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   email_verified!: number;
 
   @Column({ type: 'varchar', length: 512, nullable: true })
@@ -60,7 +60,7 @@ export class User {
   @Column({ type: 'varchar', length: 512, nullable: true })
   fcm_token!: string | null;
 
-  @Column({ type: 'tinyint', width: 1, default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   two_fa_enabled!: number;
 
   @CreateDateColumn()
@@ -99,3 +99,4 @@ export class User {
   )
   treasury_operations!: TreasuryOperation[];
 }
+

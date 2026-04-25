@@ -116,6 +116,20 @@ export class CreateOrderUseCase {
     });
 
     if (result.error_code) {
+      await this.appendOrderRejectedEvent({
+        orderId,
+        userId,
+        pairId: dto.pairId,
+        side: dto.side,
+        type: dto.type,
+        price: limitPrice,
+        amount: dto.amount,
+        timeInForce: dto.timeInForce ?? 'GTC',
+        clientOrderId: dto.clientOrderId ?? null,
+        idempotencyKey: dto.idempotencyKey,
+        reservedQuote: prepared.marketBuyReservedQuote ?? '0',
+        reservedBase: dto.side === 'SELL' ? dto.amount : '0',
+      });
       this.throwFromProcedureError(result.error_code, result.error_message ?? undefined);
     }
 
@@ -170,6 +184,55 @@ export class CreateOrderUseCase {
         correlationId: order.idempotency_key,
         causationId: order.order_id,
         partitionKey: order.pair_id,
+        kafkaTopic: 'orders.lifecycle',
+      });
+    });
+  }
+
+  private async appendOrderRejectedEvent(input: {
+    orderId: string;
+    userId: string;
+    pairId: string;
+    side: 'BUY' | 'SELL';
+    type: 'LIMIT' | 'MARKET';
+    price: string | null;
+    amount: string;
+    timeInForce: string;
+    clientOrderId: string | null;
+    idempotencyKey: string;
+    reservedQuote: string;
+    reservedBase: string;
+  }): Promise<void> {
+    const now = new Date().toISOString();
+    const payload: OrderLifecycleOutboxPayloadV1 = {
+      orderId: input.orderId,
+      userId: input.userId,
+      pairId: input.pairId,
+      side: input.side,
+      type: input.type,
+      status: 'REJECTED',
+      amount: input.amount,
+      filledAmount: '0',
+      price: input.price,
+      timeInForce: input.timeInForce,
+      clientOrderId: input.clientOrderId,
+      idempotencyKey: input.idempotencyKey,
+      reservedQuote: input.reservedQuote,
+      reservedBase: input.reservedBase,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.orderRepository.transaction(async (manager) => {
+      await this.outboxAppender.append(manager as never, {
+        aggregateType: 'order',
+        aggregateId: input.orderId,
+        eventType: OutboxIntegrationEventType.OrderRejectedV1,
+        payload: payload as unknown as Record<string, unknown>,
+        dedupeKey: `order-rejected:${input.userId}:${input.idempotencyKey}`,
+        correlationId: input.idempotencyKey,
+        causationId: input.orderId,
+        partitionKey: input.pairId,
         kafkaTopic: 'orders.lifecycle',
       });
     });
@@ -281,5 +344,3 @@ export class CreateOrderUseCase {
     };
   }
 }
-
-

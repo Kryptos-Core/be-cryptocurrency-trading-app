@@ -1,9 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { trace } from '@opentelemetry/api';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
+import { MetricsService } from '@/telemetry/metrics.service';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import type { OutboxEventPublisher } from './outbox-event-publisher.port';
 import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
@@ -13,26 +15,31 @@ const OUTBOX_RELAY_LOCK_KEY = 'outbox:relay:lock';
 const OUTBOX_RELAY_LOCK_TTL_SECONDS = 45;
 const MAX_ROWS_PER_FLUSH = 50;
 
-/**
- * Drains unpublished integration_outbox rows: sync projection + notifications in-process,
- * optionally publish to external infrastructure, then sets published_at only after that pipeline succeeds (per row transaction).
- */
 @Injectable()
 export class OutboxRelayService {
   private readonly logger = new Logger(OutboxRelayService.name);
+  private readonly maxAttempts: number;
+  private readonly retryBaseMs: number;
 
   constructor(
     private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     private readonly integrationSync: OutboxIntegrationSyncService,
+    private readonly configService: ConfigService,
     @Inject(OUTBOX_EVENT_PUBLISHER)
     private readonly outboxPublisher: OutboxEventPublisher,
-  ) {}
+    private readonly metricsService: MetricsService,
+  ) {
+    this.maxAttempts = Math.max(
+      1,
+      Number(this.configService.get<string>('EVENT_OUTBOX_MAX_ATTEMPTS') ?? '5'),
+    );
+    this.retryBaseMs = Math.max(
+      100,
+      Number(this.configService.get<string>('EVENT_OUTBOX_RETRY_BASE_MS') ?? '1000'),
+    );
+  }
 
-  /**
-   * Single relay pass — Bull processor; Redis lock ensures at most one effective drain at a time.
-   * Each eligible row is processed in its own DB transaction so partial progress commits (A published, B still pending).
-   */
   async flushOnce(): Promise<{ published: number }> {
     const tracer = trace.getTracer('be-cryptocurrency-trading-app');
     let published = 0;
@@ -49,11 +56,14 @@ export class OutboxRelayService {
             for (let i = 0; i < MAX_ROWS_PER_FLUSH; i++) {
               try {
                 const step = await this.dataSource.transaction(async (em) => {
+                  const now = new Date();
                   const rows = await em
                     .createQueryBuilder(IntegrationOutbox, 'o')
                     .setLock('pessimistic_write')
                     .setOnLocked('skip_locked')
                     .where('o.published_at IS NULL')
+                    .andWhere('o.dead_lettered_at IS NULL')
+                    .andWhere('(o.next_retry_at IS NULL OR o.next_retry_at <= :now)', { now })
                     .andWhere('o.event_type IN (:...types)', {
                       types: [...OUTBOX_RELAY_SUPPORTED_EVENT_TYPES],
                     })
@@ -88,8 +98,25 @@ export class OutboxRelayService {
                     row.kafka_offset = publishResult?.kafkaOffset ?? row.kafka_offset ?? null;
                     row.kafka_published_at =
                       publishResult?.publishedAt ?? row.kafka_published_at ?? new Date();
+                    row.next_retry_at = null;
+                    row.dead_lettered_at = null;
+                    this.metricsService.incrementOutboxRelayPublished(row.event_type);
+                    this.logger.debug(
+                      `Outbox relayed id=${row.id} event_type=${row.event_type} attempts=${row.publish_attempts}`,
+                    );
                   } catch (err) {
                     row.last_publish_error = (err as Error).message;
+                    this.metricsService.incrementOutboxRelayFailure(row.event_type);
+                    if (row.publish_attempts >= this.maxAttempts) {
+                      row.dead_lettered_at = new Date();
+                      row.next_retry_at = null;
+                      this.metricsService.incrementOutboxRelayDeadLettered(row.event_type);
+                    } else {
+                      row.next_retry_at = new Date(
+                        Date.now() + this.computeRetryDelayMs(row.publish_attempts),
+                      );
+                      this.metricsService.incrementOutboxRelayRetryScheduled(row.event_type);
+                    }
                     await em.save(IntegrationOutbox, row);
                     this.logger.error(
                       `Outbox sync/publish failed id=${row.id} event_type=${row.event_type}: ${(err as Error).message}`,
@@ -123,6 +150,34 @@ export class OutboxRelayService {
       },
       this.logger,
     );
+    await this.updateOperationalMetrics();
     return { published };
   }
+
+  private async updateOperationalMetrics(): Promise<void> {
+    const repository = this.dataSource.getRepository(IntegrationOutbox);
+    const [unpublishedRows, deadLetterRows, retryScheduledRows] = await Promise.all([
+      repository.count({ where: { published_at: IsNull() } }),
+      repository
+        .createQueryBuilder('o')
+        .where('o.published_at IS NULL')
+        .andWhere('o.dead_lettered_at IS NOT NULL')
+        .getCount(),
+      repository
+        .createQueryBuilder('o')
+        .where('o.published_at IS NULL')
+        .andWhere('o.dead_lettered_at IS NULL')
+        .andWhere('o.next_retry_at IS NOT NULL')
+        .getCount(),
+    ]);
+
+    this.metricsService.setOutboxBacklog('all', unpublishedRows);
+    this.metricsService.setOutboxDeadLetterRows(deadLetterRows);
+    this.metricsService.setOutboxRetryScheduledRows(retryScheduledRows);
+  }
+
+  private computeRetryDelayMs(attempt: number): number {
+    return this.retryBaseMs * attempt;
+  }
 }
+

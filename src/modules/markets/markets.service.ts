@@ -24,6 +24,7 @@ import { MARKET_REPOSITORY, type MarketRepositoryPort } from './domain/ports';
 import type { CreateMarketPairDto, MarketTickerDto, UpdateMarketPairDto } from './dto';
 import type { IMarketTickerData } from './interfaces/market-ticker.interface';
 import { resolveOhlcvInterval } from './ohlcv-interval.util';
+import { MarketReadModelRepository } from './repositories';
 
 /** Default string for missing/zero price (repository contract). */
 const TICKER_ZERO = '0';
@@ -77,6 +78,7 @@ export class MarketsService implements OnModuleInit {
     private readonly ohlcvProvider: BinanceOHLCVProvider,
     private readonly unitOfWork: UnitOfWork,
     private readonly outboxAppender: OutboxAppender,
+    private readonly marketReadModelRepository: MarketReadModelRepository,
     @Optional()
     @Inject(forwardRef(() => OrderBookService))
     private readonly orderBookService?: OrderBookService,
@@ -522,6 +524,12 @@ export class MarketsService implements OnModuleInit {
       cacheKey,
       async () => {
         const pair = await this.findOne(pairId);
+        if (this.marketReadModelRepository.shouldUseReadModel()) {
+          const projected = await this.marketReadModelRepository.getTicker(pairId);
+          if (projected) {
+            return projected;
+          }
+        }
         let tickerData = await this.marketRepository.getTicker(pairId);
         tickerData = await this.applyOHLCVFallbackIfNeeded(pairId, pair.symbol, tickerData);
         return this.buildTickerResponse(pair, tickerData);
@@ -695,6 +703,12 @@ export class MarketsService implements OnModuleInit {
     return this.cacheService.getOrSet(
       cacheKey,
       async () => {
+        if (this.marketReadModelRepository.shouldUseReadModel()) {
+          const projected = await this.marketReadModelRepository.getAllTickers();
+          if (projected.length > 0) {
+            return projected;
+          }
+        }
         const activePairs = await this.findActive();
         return this.getTickersForPairs(activePairs);
       },
@@ -801,6 +815,12 @@ export class MarketsService implements OnModuleInit {
     return this.cacheService.getOrSet(
       cacheKey,
       async () => {
+        if (this.marketReadModelRepository.shouldUseReadModel()) {
+          const projected = await this.marketReadModelRepository.getRecentTrades(pairId, limit);
+          if (projected.length > 0) {
+            return projected;
+          }
+        }
         const trades = await this.marketRepository.getRecentTrades(pairId, limit);
 
         return trades.map((trade) => ({
@@ -956,3 +976,5 @@ export class MarketsService implements OnModuleInit {
     return seconds;
   }
 }
+
+

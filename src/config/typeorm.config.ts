@@ -1,8 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-// Explicit entity imports — required when webpack bundles everything into dist/main.js
-// because filesystem globs resolve to empty arrays in bundled environments.
 import { AdminWalletAdjustment } from '../entities/admin-wallet-adjustment.entity';
 import { AppSetting } from '../entities/app-setting.entity';
 import { Currency } from '../entities/currency.entity';
@@ -19,6 +17,7 @@ import { Notification } from '../entities/notification.entity';
 import { Order } from '../entities/order.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
 import { ReadMarketPair } from '../entities/read-market-pair.entity';
+import { ReadMarketTrade } from '../entities/read-market-trade.entity';
 import { ReadOnchainDeposit } from '../entities/read-onchain-deposit.entity';
 import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
@@ -49,6 +48,7 @@ const ALL_ENTITIES = [
   MarketMakerConfig,
   MarketPair,
   ReadMarketPair,
+  ReadMarketTrade,
   ReadOnchainDeposit,
   OnchainTransaction,
   Order,

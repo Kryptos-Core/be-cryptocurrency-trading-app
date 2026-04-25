@@ -33,6 +33,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.ORDERS_READ,
     /** Khôi phục khớp lệnh thủ công theo cặp khi cần */
     Permission.MATCHING_RECONCILE,
+    /** Vận hành/replay integration outbox khi projection hoặc publisher lỗi */
+    Permission.OUTBOX_MANAGE,
   ],
   [UserRole.FINANCE_MANAGER]: [
     Permission.WALLETS_READ,
@@ -61,6 +63,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.RISK_REVIEW,
     Permission.SUPPORT_CASES,
     Permission.NOTIFICATIONS_BROADCAST,
+    Permission.OUTBOX_MANAGE,
     Permission.PAYMENT_CONFIGS_MANAGE,
     Permission.WITHDRAWALS_APPROVE,
   ],

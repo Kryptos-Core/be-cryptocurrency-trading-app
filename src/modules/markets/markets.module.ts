@@ -19,8 +19,9 @@ import {
 } from './application/use-cases';
 import { MARKET_REPOSITORY } from './domain/ports';
 import { MarketsController } from './markets.controller';
+import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
 import { MarketsService } from './markets.service';
-import { MarketRepository } from './repositories';
+import { MarketReadModelRepository, MarketRepository } from './repositories';
 
 @Module({
   imports: [
@@ -31,6 +32,8 @@ import { MarketRepository } from './repositories';
     forwardRef(() => MatchingModule),
   ],
   providers: [
+    MarketReadModelRepository,
+    MarketReadModelReconciliationService,
     MarketRepository,
     {
       provide: MARKET_REPOSITORY,
@@ -51,3 +54,4 @@ import { MarketRepository } from './repositories';
   exports: [MarketsService, MARKET_REPOSITORY, MarketRepository],
 })
 export class MarketsModule {}
+

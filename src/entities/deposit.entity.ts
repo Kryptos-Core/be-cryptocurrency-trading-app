@@ -50,7 +50,7 @@ export class Deposit {
   @CreateDateColumn()
   detected_at!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   credited_at!: Date;
 
   @ManyToOne(

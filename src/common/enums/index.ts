@@ -82,6 +82,8 @@ export enum Permission {
   RISK_REVIEW = 'risk:review',
   SUPPORT_CASES = 'support:cases',
   NOTIFICATIONS_BROADCAST = 'notifications:broadcast',
+  /** Admin/Ops: inspect, replay, and requeue integration outbox dead-letter rows */
+  OUTBOX_MANAGE = 'outbox:manage',
   /** Manage payment gateway configs: PayOS credentials, blockchain hot wallet keys, network settings */
   PAYMENT_CONFIGS_MANAGE = 'payment_configs:manage',
   /** Approve or reject withdrawal requests (manual review queue) */

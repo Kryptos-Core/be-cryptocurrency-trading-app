@@ -21,6 +21,6 @@ export class ReadMarketPair {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
-  @UpdateDateColumn({ type: 'datetime', precision: 6 })
+  @UpdateDateColumn({ type: 'timestamp', precision: 6 })
   updated_at!: Date;
 }

@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import type { TransactionContext } from '@/common/types/transaction-context';
@@ -12,13 +13,10 @@ import { BalanceCalculationService } from '@/modules/wallets/domain/services/bal
 import type { WalletTransactionDto } from '@/modules/wallets/dto/wallet-transaction.dto';
 import { ApplyTransactionUseCase } from './apply-transaction.use-case';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function makeWallet(available: string, frozen: string) {
   return { wallet_id: 'wid-1', available, frozen };
 }
 
-/** Builds a minimal WalletTransactionDto. */
 function dto(overrides: Partial<WalletTransactionDto> = {}): WalletTransactionDto {
   return {
     currencyId: 'cid-1',
@@ -29,8 +27,6 @@ function dto(overrides: Partial<WalletTransactionDto> = {}): WalletTransactionDt
     ...overrides,
   } as WalletTransactionDto;
 }
-
-// ── Test suite ────────────────────────────────────────────────────────────────
 
 describe('ApplyTransactionUseCase', () => {
   let useCase: ApplyTransactionUseCase;
@@ -44,6 +40,7 @@ describe('ApplyTransactionUseCase', () => {
   let ledgerRepo: jest.Mocked<{ createEntry: jest.Mock; createDoubleEntry: jest.Mock }>;
   let eventPublisher: jest.Mocked<{ publishBalanceChange: jest.Mock }>;
   let currencyLookup: jest.Mocked<{ getSymbol: jest.Mock }>;
+  let outboxAppender: jest.Mocked<{ append: jest.Mock }>;
 
   beforeEach(async () => {
     walletRepo = {
@@ -53,7 +50,6 @@ describe('ApplyTransactionUseCase', () => {
       transaction: jest.fn(),
     };
 
-    // Make transaction() transparently execute its callback
     walletRepo.transaction.mockImplementation((fn: (ctx: object) => Promise<unknown>) => fn({}));
 
     ledgerRepo = {
@@ -69,6 +65,10 @@ describe('ApplyTransactionUseCase', () => {
       getSymbol: jest.fn().mockResolvedValue('BTC'),
     };
 
+    outboxAppender = {
+      append: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         ApplyTransactionUseCase,
@@ -77,16 +77,15 @@ describe('ApplyTransactionUseCase', () => {
         { provide: WALLET_LEDGER_REPOSITORY, useValue: ledgerRepo },
         { provide: WALLET_EVENT_PUBLISHER, useValue: eventPublisher },
         { provide: CURRENCY_LOOKUP, useValue: currencyLookup },
+        { provide: OutboxAppender, useValue: outboxAppender },
       ],
     }).compile();
 
     useCase = module.get(ApplyTransactionUseCase);
   });
 
-  // ── CREDIT ────────────────────────────────────────────────────────────────
-
   describe('CREDIT', () => {
-    it('credits available balance and publishes event', async () => {
+    it('credits available balance, publishes realtime event and appends outbox event', async () => {
       walletRepo.getOrCreateForUpdate.mockResolvedValue(makeWallet('200', '0'));
       walletRepo.applyBalanceDelta.mockResolvedValue(makeWallet('300', '0'));
 
@@ -95,18 +94,22 @@ describe('ApplyTransactionUseCase', () => {
         dto({ action: WalletTransactionAction.CREDIT }),
       );
 
-      expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith(
-        'wid-1',
-        '100', // +deltaAvailable
-        '0', // no frozen delta
-        {},
-      );
+      expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith('wid-1', '100', '0', {});
       expect(ledgerRepo.createEntry).toHaveBeenCalledWith(
         expect.objectContaining({ direction: 'CREDIT', amount: '100' }),
         {},
       );
       expect(eventPublisher.publishBalanceChange).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'uid-1', available: '300', frozen: '0', total: '300' }),
+      );
+      expect(outboxAppender.append).toHaveBeenCalledWith(
+        {},
+        expect.objectContaining({
+          aggregateType: 'wallet',
+          aggregateId: 'uid-1:cid-1',
+          eventType: 'wallet.balance_changed',
+          kafkaTopic: 'wallet.balance',
+        }),
       );
       expect(result).toEqual({
         userId: 'uid-1',
@@ -126,10 +129,12 @@ describe('ApplyTransactionUseCase', () => {
 
       expect(walletRepo.transaction).not.toHaveBeenCalled();
       expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith('wid-1', '100', '0', joinCtx);
+      expect(outboxAppender.append).toHaveBeenCalledWith(
+        joinCtx,
+        expect.objectContaining({ eventType: 'wallet.balance_changed' }),
+      );
     });
   });
-
-  // ── DEBIT ─────────────────────────────────────────────────────────────────
 
   describe('DEBIT', () => {
     it('debits available balance and publishes event', async () => {
@@ -143,6 +148,7 @@ describe('ApplyTransactionUseCase', () => {
         expect.objectContaining({ direction: 'DEBIT', amount: '100' }),
         {},
       );
+      expect(outboxAppender.append).toHaveBeenCalledTimes(1);
     });
 
     it('throws BusinessException when balance is insufficient', async () => {
@@ -155,8 +161,6 @@ describe('ApplyTransactionUseCase', () => {
     });
   });
 
-  // ── FREEZE ────────────────────────────────────────────────────────────────
-
   describe('FREEZE', () => {
     it('moves available → frozen via double entry', async () => {
       walletRepo.getOrCreateForUpdate.mockResolvedValue(makeWallet('200', '0'));
@@ -164,13 +168,11 @@ describe('ApplyTransactionUseCase', () => {
 
       await useCase.execute('uid-1', dto({ action: WalletTransactionAction.FREEZE }));
 
-      // delta: available -= 100, frozen += 100
       expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith('wid-1', '-100', '100', {});
       expect(ledgerRepo.createDoubleEntry).toHaveBeenCalled();
+      expect(outboxAppender.append).toHaveBeenCalledTimes(1);
     });
   });
-
-  // ── UNFREEZE ──────────────────────────────────────────────────────────────
 
   describe('UNFREEZE', () => {
     it('moves frozen → available via double entry', async () => {
@@ -179,23 +181,21 @@ describe('ApplyTransactionUseCase', () => {
 
       await useCase.execute('uid-1', dto({ action: WalletTransactionAction.UNFREEZE }));
 
-      // delta: available += 100, frozen -= 100
       expect(walletRepo.applyBalanceDelta).toHaveBeenCalledWith('wid-1', '100', '-100', {});
       expect(ledgerRepo.createDoubleEntry).toHaveBeenCalled();
+      expect(outboxAppender.append).toHaveBeenCalledTimes(1);
     });
   });
 
-  // ── TRANSFER ──────────────────────────────────────────────────────────────
-
   describe('TRANSFER', () => {
-    it('transfers between two different users and publishes two events', async () => {
+    it('transfers between two different users and publishes two realtime events', async () => {
       walletRepo.getOrCreateForUpdate
-        .mockResolvedValueOnce(makeWallet('500', '0')) // first lock (uid-1 < uid-2)
-        .mockResolvedValueOnce(makeWallet('0', '0')); // second lock
+        .mockResolvedValueOnce(makeWallet('500', '0'))
+        .mockResolvedValueOnce(makeWallet('0', '0'));
 
       walletRepo.applyBalanceDelta
-        .mockResolvedValueOnce(makeWallet('400', '0')) // source debit
-        .mockResolvedValueOnce(makeWallet('100', '0')); // target credit
+        .mockResolvedValueOnce(makeWallet('400', '0'))
+        .mockResolvedValueOnce(makeWallet('100', '0'));
 
       walletRepo.findByUserCurrency.mockResolvedValue(makeWallet('100', '0'));
 
@@ -207,6 +207,7 @@ describe('ApplyTransactionUseCase', () => {
       expect(walletRepo.applyBalanceDelta).toHaveBeenCalledTimes(2);
       expect(ledgerRepo.createDoubleEntry).toHaveBeenCalledTimes(2);
       expect(eventPublisher.publishBalanceChange).toHaveBeenCalledTimes(2);
+      expect(outboxAppender.append).toHaveBeenCalledTimes(1);
     });
 
     it('throws BadRequestException when targetUserId is missing', async () => {
@@ -224,8 +225,6 @@ describe('ApplyTransactionUseCase', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
-
-  // ── Validation ────────────────────────────────────────────────────────────
 
   describe('amount validation', () => {
     it('throws BadRequestException for zero amount', async () => {
@@ -246,8 +245,6 @@ describe('ApplyTransactionUseCase', () => {
       );
     });
   });
-
-  // ── Idempotency ───────────────────────────────────────────────────────────
 
   describe('duplicate ledger detection', () => {
     it('throws ConflictException on duplicate ledger entry', async () => {

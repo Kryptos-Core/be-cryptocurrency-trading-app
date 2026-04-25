@@ -4,17 +4,24 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketPairReadModelProjectionHandler } from '@/common/read-model/market-pair-read-model.handler';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
+import { MarketTickerReadModelSyncApplierService } from '@/common/read-model/market-ticker-read-model-sync-applier.service';
 import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/onchain-deposit-read-model-sync-applier.service';
+import { TradeReadModelSyncApplierService } from '@/common/read-model/trade-read-model-sync-applier.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ProcessedIntegrationEvent } from '@/entities/processed-integration-event.entity';
 import { ReadMarketPair } from '@/entities/read-market-pair.entity';
+import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
+import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
 import { ReadOnchainDeposit } from '@/entities/read-onchain-deposit.entity';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { RedisModule } from '@/modules/redis/redis.module';
+import { TelemetryModule } from '@/telemetry';
 import {
   KafkaOutboxEventPublisher,
   KafkaOutboxEventPublisherDriver,
 } from './kafka-outbox-event-publisher.service';
+import { OutboxAdminController } from './outbox-admin.controller';
+import { OutboxAdminService } from './outbox-admin.service';
 import {
   DEFAULT_OUTBOX_EVENT_PUBLISHER_DRIVER,
   OUTBOX_EVENT_PUBLISHER,
@@ -38,6 +45,8 @@ import { OutboxRelayService } from './outbox-relay.service';
       IntegrationOutbox,
       ProcessedIntegrationEvent,
       ReadMarketPair,
+      ReadMarketTrade,
+      ReadMarketTicker,
       ReadOnchainDeposit,
     ]),
     BullModule.registerQueueAsync({
@@ -55,6 +64,7 @@ import { OutboxRelayService } from './outbox-relay.service';
       },
     }),
     RedisModule,
+    TelemetryModule,
     NotificationsModule,
   ],
   providers: [
@@ -62,6 +72,9 @@ import { OutboxRelayService } from './outbox-relay.service';
     ProcessedIntegrationEventsService,
     MarketPairReadModelSyncApplierService,
     OnchainDepositReadModelSyncApplierService,
+    TradeReadModelSyncApplierService,
+    MarketTickerReadModelSyncApplierService,
+    OutboxAdminService,
     OutboxIntegrationSyncService,
     OutboxRelayService,
     OutboxRelayProcessor,
@@ -99,6 +112,7 @@ import { OutboxRelayService } from './outbox-relay.service';
       },
     },
   ],
-  exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER],
+  controllers: [OutboxAdminController],
+  exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService],
 })
 export class OutboxModule {}

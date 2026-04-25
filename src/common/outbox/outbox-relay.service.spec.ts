@@ -1,8 +1,10 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import { RedisService } from '@/common/services/redis.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
+import { MetricsService } from '@/telemetry/metrics.service';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
 import { OutboxRelayService } from './outbox-relay.service';
@@ -24,9 +26,9 @@ function makeRow(id: string, eventType: string): IntegrationOutbox {
     quoteCurrencyId: 'q',
     isActive: true,
   };
-  row.published_at = null as any;
+  row.published_at = null as never;
   row.occurred_at = new Date();
-  row.dedupe_key = null as any;
+  row.dedupe_key = null as never;
   row.schema_version = 1;
   row.correlation_id = 'corr-1';
   row.causation_id = null;
@@ -37,6 +39,8 @@ function makeRow(id: string, eventType: string): IntegrationOutbox {
   row.kafka_published_at = null;
   row.publish_attempts = 0;
   row.last_publish_error = null;
+  row.next_retry_at = null;
+  row.dead_lettered_at = null;
   return row;
 }
 
@@ -45,11 +49,30 @@ describe('OutboxRelayService', () => {
   let outboxPublisher: { publish: jest.Mock };
   let savedRows: IntegrationOutbox[];
   let queryCall: number;
+  let metricsService: {
+    incrementOutboxRelayPublished: jest.Mock;
+    incrementOutboxRelayFailure: jest.Mock;
+    incrementOutboxRelayRetryScheduled: jest.Mock;
+    incrementOutboxRelayDeadLettered: jest.Mock;
+    setOutboxBacklog: jest.Mock;
+    setOutboxDeadLetterRows: jest.Mock;
+    setOutboxRetryScheduledRows: jest.Mock;
+  };
 
   const buildDataSource = (rowsSequence: IntegrationOutbox[][]) => {
     queryCall = 0;
     savedRows = [];
+    const backlogRepository = {
+      count: jest.fn().mockResolvedValue(0),
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      })),
+    };
+
     return {
+      getRepository: jest.fn(() => backlogRepository),
       transaction: jest.fn(async (fn: (em: unknown) => Promise<number>) => {
         const seq = rowsSequence[queryCall] ?? [];
         queryCall++;
@@ -59,9 +82,13 @@ describe('OutboxRelayService', () => {
               setOnLocked: () => ({
                 where: () => ({
                   andWhere: () => ({
-                    orderBy: () => ({
-                      take: () => ({
-                        getMany: async () => seq,
+                    andWhere: () => ({
+                      andWhere: () => ({
+                        orderBy: () => ({
+                          take: () => ({
+                            getMany: async () => seq,
+                          }),
+                        }),
                       }),
                     }),
                   }),
@@ -90,7 +117,29 @@ describe('OutboxRelayService', () => {
         publishedAt: new Date('2026-04-25T00:00:00.000Z'),
       }),
     };
+    metricsService = {
+      incrementOutboxRelayPublished: jest.fn(),
+      incrementOutboxRelayFailure: jest.fn(),
+      incrementOutboxRelayRetryScheduled: jest.fn(),
+      incrementOutboxRelayDeadLettered: jest.fn(),
+      setOutboxBacklog: jest.fn(),
+      setOutboxDeadLetterRows: jest.fn(),
+      setOutboxRetryScheduledRows: jest.fn(),
+    };
   });
+
+  const configService = {
+    get: jest.fn((key: string) => {
+      switch (key) {
+        case 'EVENT_OUTBOX_MAX_ATTEMPTS':
+          return '3';
+        case 'EVENT_OUTBOX_RETRY_BASE_MS':
+          return '1000';
+        default:
+          return undefined;
+      }
+    }),
+  };
 
   it('marks published_at only after sync and publish succeed', async () => {
     const rowA = makeRow(
@@ -105,7 +154,9 @@ describe('OutboxRelayService', () => {
         { provide: DataSource, useValue: ds },
         { provide: RedisService, useValue: {} },
         { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
       ],
     }).compile();
 
@@ -122,10 +173,14 @@ describe('OutboxRelayService', () => {
     expect(savedRows[0].kafka_offset).toBe('42');
     expect(savedRows[0].kafka_published_at).toEqual(new Date('2026-04-25T00:00:00.000Z'));
     expect(savedRows[0].last_publish_error).toBeNull();
+    expect(savedRows[0].next_retry_at).toBeNull();
+    expect(savedRows[0].dead_lettered_at).toBeNull();
     expect(savedRows[0].published_at).not.toBeNull();
+    expect(metricsService.incrementOutboxRelayPublished).toHaveBeenCalledWith(rowA.event_type);
+    expect(metricsService.setOutboxBacklog).toHaveBeenCalledWith('all', expect.any(Number));
   });
 
-  it('stores publish attempt/error and stops when publisher fails', async () => {
+  it('stores retry schedule when publisher fails before max attempts', async () => {
     const rowA = makeRow(
       'bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb',
       OutboxIntegrationEventType.MarketPairUpdatedV1,
@@ -139,7 +194,9 @@ describe('OutboxRelayService', () => {
         { provide: DataSource, useValue: ds },
         { provide: RedisService, useValue: {} },
         { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
       ],
     }).compile();
 
@@ -147,12 +204,47 @@ describe('OutboxRelayService', () => {
     const { published } = await relay.flushOnce();
 
     expect(published).toBe(0);
-    expect(integrationSync.dispatchRow).toHaveBeenCalledTimes(1);
-    expect(outboxPublisher.publish).toHaveBeenCalledTimes(1);
     expect(savedRows).toHaveLength(1);
     expect(savedRows[0].publish_attempts).toBe(1);
     expect(savedRows[0].last_publish_error).toBe('publisher boom');
+    expect(savedRows[0].next_retry_at).toBeInstanceOf(Date);
+    expect(savedRows[0].dead_lettered_at).toBeNull();
     expect(savedRows[0].published_at).toBeNull();
+    expect(metricsService.incrementOutboxRelayFailure).toHaveBeenCalledWith(rowA.event_type);
+    expect(metricsService.incrementOutboxRelayRetryScheduled).toHaveBeenCalledWith(rowA.event_type);
+  });
+
+  it('dead-letters row when max attempts is reached', async () => {
+    const rowA = makeRow(
+      'cccccccc-cccc-7ccc-8ccc-cccccccccccc',
+      OutboxIntegrationEventType.MarketPairUpdatedV1,
+    );
+    rowA.publish_attempts = 2;
+    const ds = buildDataSource([[rowA]]);
+    outboxPublisher.publish.mockRejectedValueOnce(new Error('still broken'));
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OutboxRelayService,
+        { provide: DataSource, useValue: ds },
+        { provide: RedisService, useValue: {} },
+        { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configService },
+        { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
+      ],
+    }).compile();
+
+    const relay = moduleRef.get(OutboxRelayService);
+    const { published } = await relay.flushOnce();
+
+    expect(published).toBe(0);
+    expect(savedRows).toHaveLength(1);
+    expect(savedRows[0].publish_attempts).toBe(3);
+    expect(savedRows[0].dead_lettered_at).toBeInstanceOf(Date);
+    expect(savedRows[0].next_retry_at).toBeNull();
+    expect(savedRows[0].published_at).toBeNull();
+    expect(metricsService.incrementOutboxRelayDeadLettered).toHaveBeenCalledWith(rowA.event_type);
   });
 
   it('stops when no more eligible rows', async () => {
@@ -163,7 +255,9 @@ describe('OutboxRelayService', () => {
         { provide: DataSource, useValue: ds },
         { provide: RedisService, useValue: {} },
         { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
       ],
     }).compile();
 

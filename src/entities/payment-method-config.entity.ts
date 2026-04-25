@@ -51,11 +51,11 @@ export class PaymentMethodConfig {
   grace_period_minutes!: number;
 
   /** Set when status transitions to TRANSITIONING */
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   transition_started_at!: Date | null;
 
   /** Set when status transitions to ACTIVE */
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   activated_at!: Date | null;
 
   /** Lower number = higher priority when multiple active configs of same type */

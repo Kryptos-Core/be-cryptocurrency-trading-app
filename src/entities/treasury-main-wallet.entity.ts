@@ -54,17 +54,17 @@ export class TreasuryMainWallet {
   @Column({ type: 'char', length: 36, nullable: true })
   approved_by!: string | null;
 
-  @Column({ type: 'datetime', nullable: true, precision: 6 })
+  @Column({ type: 'timestamp', nullable: true, precision: 6 })
   approved_at!: Date | null;
 
   @Column({ type: 'char', length: 36, nullable: true })
   rejected_by!: string | null;
 
-  @Column({ type: 'datetime', nullable: true, precision: 6 })
+  @Column({ type: 'timestamp', nullable: true, precision: 6 })
   rejected_at!: Date | null;
 
   // ── Auto-rotation tracking ─────────────────────────────────────────────
-  @Column({ type: 'datetime', nullable: true, precision: 6 })
+  @Column({ type: 'timestamp', nullable: true, precision: 6 })
   last_rotated_at!: Date | null;
 
   /** Per-wallet override interval in days. NULL = follow global rotation policy. */

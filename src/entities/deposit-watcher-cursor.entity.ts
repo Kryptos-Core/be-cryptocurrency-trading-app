@@ -13,6 +13,6 @@ export class DepositWatcherCursor {
   @Column({ type: 'varchar', length: 32, default: 'TIMESTAMP_MS' })
   cursor_kind!: 'TIMESTAMP_MS' | 'BLOCK_NUMBER';
 
-  @UpdateDateColumn({ type: 'datetime', precision: 6 })
+  @UpdateDateColumn({ type: 'timestamp', precision: 6 })
   updated_at!: Date;
 }

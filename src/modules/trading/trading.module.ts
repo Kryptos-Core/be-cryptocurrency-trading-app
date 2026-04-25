@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { OutboxModule } from '@/common/outbox/outbox.module';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { GetWorkspaceStateQuery } from './application/queries/get-workspace-state.query';
 import { BinancePriceFeedService } from './services/binance-price-feed.service';
@@ -12,6 +13,7 @@ import { TradingGateway } from './websocket/trading.gateway';
 
 @Module({
   imports: [
+    OutboxModule,
     MarketsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

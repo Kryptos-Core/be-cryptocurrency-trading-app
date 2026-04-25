@@ -151,6 +151,50 @@ describe('CreateOrderUseCase', () => {
     expect(result.order_id).toBe('o1');
   });
 
+  it('appends order.rejected event before throwing when procedure reports failure', async () => {
+    cacheService.get.mockResolvedValue(null);
+    orderRepository.findByUserIdempotency.mockResolvedValue(null);
+    prepareCreateOrderContextService.execute.mockResolvedValue({
+      pair: { quote_currency_id: 'quote' },
+      availableQuote: '1000',
+      availableBase: '10',
+    });
+    orderReservePolicy.prepare.mockReturnValue({
+      validationContext: { amount: '1' },
+      slippageTolerance: null,
+      marketBuyReservedQuote: null,
+    });
+    orderRepository.createOrderViaProcedure.mockResolvedValue({
+      order_id: null,
+      error_code: 'INSUFFICIENT_BALANCE',
+      error_message: 'Insufficient quote balance',
+    });
+
+    await expect(
+      useCase.execute({
+        userId: 'u1',
+        dto: {
+          pairId: 'p1',
+          side: 'BUY',
+          type: 'LIMIT',
+          price: '100',
+          amount: '1',
+          idempotencyKey: 'same-key',
+        },
+      } as any),
+    ).rejects.toBeInstanceOf(BusinessException);
+
+    expect(orderRepository.transaction).toHaveBeenCalledTimes(1);
+    expect(outboxAppender.append).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        aggregateType: 'order',
+        eventType: 'order.rejected',
+        kafkaTopic: 'orders.lifecycle',
+      }),
+    );
+  });
+
   it('does not enqueue matching when created order is already filled', async () => {
     cacheService.get.mockResolvedValue(null);
     orderRepository.findByUserIdempotency.mockResolvedValue(null);
@@ -207,40 +251,6 @@ describe('CreateOrderUseCase', () => {
 
     expect(orderMatchingGateway.enqueueMatch).not.toHaveBeenCalled();
     expect(outboxAppender.append).toHaveBeenCalledTimes(1);
-  });
-
-  it('throws when procedure reports failure', async () => {
-    cacheService.get.mockResolvedValue(null);
-    orderRepository.findByUserIdempotency.mockResolvedValue(null);
-    prepareCreateOrderContextService.execute.mockResolvedValue({
-      pair: { quote_currency_id: 'quote' },
-      availableQuote: '1000',
-      availableBase: '10',
-    });
-    orderReservePolicy.prepare.mockReturnValue({
-      validationContext: { amount: '1' },
-      slippageTolerance: null,
-      marketBuyReservedQuote: null,
-    });
-    orderRepository.createOrderViaProcedure.mockResolvedValue({
-      order_id: null,
-      error_code: 'INSUFFICIENT_BALANCE',
-      error_message: 'Insufficient quote balance',
-    });
-
-    await expect(
-      useCase.execute({
-        userId: 'u1',
-        dto: {
-          pairId: 'p1',
-          side: 'BUY',
-          type: 'LIMIT',
-          price: '100',
-          amount: '1',
-          idempotencyKey: 'same-key',
-        },
-      } as any),
-    ).rejects.toBeInstanceOf(BusinessException);
   });
 
   it('throws when created order cannot be loaded', async () => {

@@ -53,7 +53,7 @@ export class ManagedWallet {
   @Column({ type: 'boolean', default: false })
   is_default_deposit!: boolean;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   default_set_at!: Date | null;
 
   @Column({ type: 'boolean', default: true })

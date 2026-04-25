@@ -147,6 +147,14 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  EVENT_OUTBOX_MAX_ATTEMPTS?: string = '5';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_RETRY_BASE_MS?: string = '1000';
+
+  @IsString()
+  @IsOptional()
   KAFKA_BROKERS?: string;
 
   @IsString()
@@ -706,6 +714,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'EVENT_OUTBOX_ENABLED',
     'EVENT_SCHEMA_FORMAT',
     'EVENT_PUBLISHER_DRIVER',
+    'EVENT_OUTBOX_MAX_ATTEMPTS',
+    'EVENT_OUTBOX_RETRY_BASE_MS',
     'KAFKA_BROKERS',
     'KAFKA_CLIENT_ID',
     'KAFKA_TOPIC_PREFIX',
@@ -949,4 +959,5 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+
 

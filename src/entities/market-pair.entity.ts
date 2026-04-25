@@ -30,10 +30,10 @@ export class MarketPair {
   @Column({ type: 'varchar', length: 32, unique: true })
   symbol!: string;
 
-  @Column({ type: 'tinyint', default: 2 })
+  @Column({ type: 'smallint', default: 2 })
   price_scale!: number;
 
-  @Column({ type: 'tinyint', default: 6 })
+  @Column({ type: 'smallint', default: 6 })
   amount_scale!: number;
 
   @Column({ type: 'decimal', precision: 36, scale: 18, default: 0.0001 })

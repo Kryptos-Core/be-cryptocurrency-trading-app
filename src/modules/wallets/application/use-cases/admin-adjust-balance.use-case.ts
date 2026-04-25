@@ -3,6 +3,9 @@ import Decimal from 'decimal.js';
 import type { TransactionContext } from '@/common/types/transaction-context';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import type { WalletBalanceChangedOutboxPayloadV1 } from '@/common/integration-events/wallet-balance-changed-outbox-payload';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { newUuid } from '@/common/utils/uuid.util';
 import {
   ADMIN_ADJUSTMENT_REPOSITORY,
@@ -37,6 +40,7 @@ export class AdminAdjustBalanceUseCase {
     @Inject(WALLET_EVENT_PUBLISHER) private readonly eventPublisher: WalletEventPublisherPort,
     @Inject(CURRENCY_LOOKUP) private readonly currencyLookup: CurrencyLookupPort,
     private readonly balanceCalc: BalanceCalculationService,
+    private readonly outboxAppender: OutboxAppender,
   ) {}
 
   async execute(
@@ -120,6 +124,14 @@ export class AdminAdjustBalanceUseCase {
           frozen: balanceSnapshot.frozen,
           total: this.balanceCalc.calculateTotal(balanceSnapshot.available, balanceSnapshot.frozen),
         });
+        await this.appendWalletBalanceChangedEvent(
+          dto.userId,
+          dto.currencyId,
+          symbol,
+          balanceSnapshot.available,
+          balanceSnapshot.frozen,
+          adjustmentId,
+        );
       }
 
       return result;
@@ -137,6 +149,39 @@ export class AdminAdjustBalanceUseCase {
       }
       throw err;
     }
+  }
+
+  private async appendWalletBalanceChangedEvent(
+    userId: string,
+    currencyId: string,
+    symbol: string,
+    available: string,
+    frozen: string,
+    adjustmentId: string,
+  ): Promise<void> {
+    const total = this.balanceCalc.calculateTotal(available, frozen);
+    const payload: WalletBalanceChangedOutboxPayloadV1 = {
+      userId,
+      currencyId,
+      symbol,
+      available,
+      frozen,
+      total,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.walletRepo.transaction(async (manager) => {
+      await this.outboxAppender.append(manager as never, {
+        aggregateType: 'wallet',
+        aggregateId: `${userId}:${currencyId}`,
+        eventType: OutboxIntegrationEventType.WalletBalanceChangedV1,
+        payload: payload as unknown as Record<string, unknown>,
+        dedupeKey: `wallet-balance-adjust:${adjustmentId}`,
+        causationId: adjustmentId,
+        partitionKey: currencyId,
+        kafkaTopic: 'wallet.balance',
+      });
+    });
   }
 
   private async applyDelta(

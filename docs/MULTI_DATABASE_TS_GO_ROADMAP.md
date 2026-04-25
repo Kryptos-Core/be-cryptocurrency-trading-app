@@ -29,8 +29,8 @@
 | Phase 0 | API contract baseline | Partial | Có awareness rất rõ về FE compatibility, nhưng chưa xác nhận full snapshot/coverage cho toàn bộ endpoint critical |
 | Phase 1 | Clean architecture database boundary | Near complete | Phần lớn boundary/repository ports/runtime PostgreSQL đã tách và vận hành được |
 | Phase 2 | PostgreSQL core source of truth replacement | Near complete | Đây là phần tiến xa nhất; runtime đã PostgreSQL-only |
-| Phase 3 | Market read model trên DB phụ | Not started / early design | Chưa có Timescale projection end-to-end trong runtime hiện tại |
-| Phase 4 | Event/outbox contract chuẩn cho TS và Go | In progress | Outbox nền tảng đã có; canonical envelope vừa được bổ sung, nhưng metadata/publisher/Kafka maturity chưa xong |
+| Phase 3 | Market read model trên DB phụ | In progress | Đã có nền read-model trades/ticker + reconciliation + feature-flag read path; chưa hoàn tất Timescale end-to-end |
+| Phase 4 | Event/outbox contract chuẩn cho TS và Go | In progress / near complete | Contract/outbox foundation, DLQ replay, metrics/health và publisher scaffold đã khá đầy đủ; còn thiếu hardening dài hạn |
 | Phase 5 | Go market aggregator | Not started | Chưa có `go-services/market-aggregator` chạy shadow |
 | Phase 6 | Go matching engine shadow mode | Not started | Chưa có shadow parity/canary flow cho matching Go |
 | Phase 7 | Public WS gateway bằng Go | Not started | Chưa tách public market WS khỏi NestJS |
@@ -80,13 +80,13 @@ Trạng thái verify gần nhất của repo hiện tại là:
   - chỉ set `published_at` sau khi side-effect sync thành công
 - Read model sync / notification sync đã có ít nhất cho các luồng đang được áp dụng như market pairs và on-chain deposits.
 
-#### D. Cập nhật mới nhất trong nhịp triển khai này: chuẩn hóa outbox/event contract bước đầu
+#### D. Cập nhật mới nhất trong nhịp triển khai này: Phase 4 đã tiến thêm rõ rệt
 
-Đã bổ sung thêm bước chuẩn hóa để phục vụ Phase 4:
+Đã bổ sung thêm nhiều bước chuẩn hóa thực tế để phục vụ Phase 4:
 
 - Thêm **canonical integration event envelope** trong runtime:
-  - file mới: `src/common/integration-events/canonical-integration-event-envelope.ts`
-- Update `OutboxAppender` để build envelope với metadata chuẩn hóa:
+  - file: `src/common/integration-events/canonical-integration-event-envelope.ts`
+- Update `OutboxAppender` để build/store envelope với metadata chuẩn hóa:
   - `eventId`
   - `eventType`
   - `aggregateType`
@@ -98,22 +98,76 @@ Trạng thái verify gần nhất của repo hiện tại là:
   - `causationId`
   - `idempotencyKey`
   - `partitionKey`
+- Đã mở rộng entity/schema `integration_outbox` theo hướng Kafka-ready hơn với các field:
+  - `schema_version`
+  - `correlation_id`
+  - `causation_id`
+  - `partition_key`
+  - `kafka_topic`
+  - `kafka_partition`
+  - `kafka_offset`
+  - `kafka_published_at`
+  - `publish_attempts`
+  - `last_publish_error`
+- Đã thêm **publisher abstraction** và chọn driver theo env:
+  - `noop`
+  - `kafka`
+- Đã scaffold `KafkaOutboxEventPublisher` và giữ `NoopOutboxEventPublisher` làm mặc định để không phá runtime hiện tại.
+- Đã thêm `processed_integration_events` + consumer idempotency service cho read-model/notification sync hiện tại.
 - Giữ **backward compatibility** với payload cũ của outbox hiện tại:
   - `OutboxIntegrationSyncService` có thể unwrap envelope mới nhưng vẫn đọc payload cũ
   - `OnchainDepositReadModelSyncApplierService` hỗ trợ cả envelope mới lẫn legacy payload
   - `OnchainDepositOutboxNotificationService` hỗ trợ cả envelope mới lẫn legacy payload
+- Đã mở rộng event contracts thực chiến và nối được vào các flow hiện có:
+  - `order.created`
+  - `order.cancel_requested`
+  - `order.cancelled`
+  - `order.rejected`
+  - `trade.executed`
+  - `wallet.balance_changed`
 - Mở thêm support read/notification path cho `DepositMatchedV1`.
-- Đã thêm test cho `OutboxAppender` và verify pass.
+- Tất cả các batch gần nhất đều đã verify pass ở mức test/type/lint.
 
-Các file thay đổi chính trong batch này:
+Các file thay đổi chính trong các batch này gồm:
 
 - `src/common/integration-events/canonical-integration-event-envelope.ts`
+- `src/common/integration-events/integration-event-catalog.ts`
 - `src/common/integration-events/onchain-deposit-outbox-payload.ts`
+- `src/common/integration-events/order-lifecycle-outbox-payload.ts`
+- `src/common/integration-events/trade-executed-outbox-payload.ts`
+- `src/common/integration-events/wallet-balance-changed-outbox-payload.ts`
 - `src/common/outbox/outbox-appender.service.ts`
 - `src/common/outbox/outbox-appender.spec.ts`
 - `src/common/outbox/outbox-integration-sync.service.ts`
+- `src/common/outbox/outbox-integration-sync.service.spec.ts`
+- `src/common/outbox/outbox-event-publisher.port.ts`
+- `src/common/outbox/noop-outbox-event-publisher.service.ts`
+- `src/common/outbox/kafka-outbox-event-publisher.service.ts`
+- `src/common/outbox/processed-integration-events.service.ts`
+- `src/common/outbox/processed-integration-events.service.spec.ts`
+- `src/common/outbox/outbox-relay.service.ts`
+- `src/common/outbox/outbox-relay.service.spec.ts`
+- `src/common/outbox/outbox-relay-supported-event-types.ts`
+- `src/common/outbox/outbox.module.ts`
 - `src/common/read-model/onchain-deposit-read-model-sync-applier.service.ts`
 - `src/modules/notifications/onchain-deposit-outbox-notification.service.ts`
+- `src/modules/orders/application/use-cases/create-order.use-case.ts`
+- `src/modules/orders/application/use-cases/create-order.use-case.spec.ts`
+- `src/modules/orders/application/use-cases/cancel-order.use-case.ts`
+- `src/modules/orders/application/use-cases/cancel-order.use-case.spec.ts`
+- `src/modules/orders/orders.module.ts`
+- `src/modules/wallets/application/use-cases/apply-transaction.use-case.ts`
+- `src/modules/wallets/application/use-cases/apply-transaction.use-case.spec.ts`
+- `src/modules/wallets/application/use-cases/admin-adjust-balance.use-case.ts`
+- `src/modules/wallets/application/use-cases/admin-adjust-balance.use-case.spec.ts`
+- `src/modules/wallets/wallets.module.ts`
+- `src/modules/matching/infrastructure/persistence/matching.repository.ts`
+- `src/modules/matching/infrastructure/persistence/matching.repository.spec.ts`
+- `src/modules/matching/matching.module.ts`
+- `src/entities/integration-outbox.entity.ts`
+- `src/entities/processed-integration-event.entity.ts`
+- `src/migrations/1776570000000-ExpandIntegrationOutboxPublisherMetadata.ts`
+- `src/migrations/1776580000000-CreateProcessedIntegrationEvents.ts`
 
 ### 0.4 Chưa hoàn thành / còn dang dở có chủ đích
 
@@ -134,42 +188,53 @@ Các file thay đổi chính trong batch này:
 
 => Vì vậy Phase 0 nên đánh dấu là **partial**, chưa phải finished.
 
-#### C. Phase 3 chưa triển khai thực chiến
+#### C. Phase 3 đã bắt đầu implementation nhưng chưa hoàn tất rollout thực chiến
 
-Chưa thấy trong runtime hiện tại:
+Đã có trong runtime hiện tại:
 
-- TimescaleDB projection schema hoạt động end-to-end
-- projection worker consume `trade.executed`
-- `MARKET_READ_SOURCE=timescale` chạy tương thích hoàn chỉnh với PostgreSQL source
-- reconciliation PostgreSQL ↔ Timescale cho trade/ticker/ohlcv
+- entity/migration cho `read_market_trades` và `read_market_tickers`
+- projection appliers cho `trade.executed` và `market.ticker_updated`
+- `OutboxIntegrationSyncService` đã consume hai event này vào read-model
+- repository đọc read-model + feature flag `MARKET_READ_SOURCE=postgres|timescale`
+- read path đã nối cho:
+  - `GET /markets/:id/trades`
+  - `GET /markets/:id/ticker`
+  - `GET /markets/tickers/all`
+- reconciliation service bước đầu để so sánh `trades` core với `read_market_trades`
 
-=> Đây vẫn là phần việc tương lai.
+Chưa thấy / chưa hoàn chỉnh trong runtime hiện tại:
 
-#### D. Phase 4 mới chỉ tiến một phần
+- TimescaleDB hypertable/materialization/continuous aggregate đúng nghĩa
+- read path cho OHLCV từ DB phụ
+- reconciliation PostgreSQL ↔ projection cho ticker/OHLCV
+- rollout chứng minh đầy đủ trên môi trường thực với backlog/projection lag dashboard
 
-Đã có tiến bộ ở lớp envelope/outbox contract, nhưng vẫn còn thiếu để Phase 4 hoàn chỉnh:
+=> Phase 3 hiện nên coi là **in progress**, đã có foundation và read path đầu tiên, nhưng chưa hoàn tất rollout multi-db market read side.
 
-- Mở rộng schema `integration_outbox` cho metadata mature hơn, ví dụ:
-  - `schema_version`
-  - `correlation_id`
-  - `causation_id`
-  - `partition_key`
-  - `kafka_topic`
-  - `kafka_partition`
-  - `kafka_offset`
-  - `kafka_published_at`
-  - `publish_attempts`
-  - `last_publish_error`
-- Chuẩn hóa event contract đầy đủ hơn cho:
-  - orders
-  - trades
-  - wallet ledger / balance changed
-  - ticker updates
-- Thêm publisher abstraction / Kafka publishing path sau commit.
-- Thêm processed-event / idempotency tracking cho consumers nếu đi tiếp Timescale/ClickHouse/Kafka.
-- Hoàn thiện observability / retry / DLQ story.
+#### D. Phase 4 đã gần hoàn tất phần contract + outbox foundation
 
-=> Phase 4 hiện nên coi là **in progress**.
+Đã có trong runtime hiện tại:
+
+- canonical integration event envelope
+- schema `integration_outbox` mở rộng với metadata publisher/Kafka-ready
+- publisher abstraction + driver `noop|kafka`
+- processed-event / idempotency tracking
+- retry + dead-letter metadata
+- admin replay/requeue cho dead-letter rows
+- relay metrics/logging/health
+- local sync path cho:
+  - market pairs
+  - onchain deposits
+  - trade read-model
+  - market ticker projection
+
+Phần còn thiếu để coi là Phase 4 hoàn chỉnh tuyệt đối:
+
+- Kafka publish path production-hardened hơn (topic governance, delivery guarantees, DLQ mature)
+- observability sâu hơn cho lag / throughput / replay audit
+- chuẩn hóa transaction boundary triệt để cho mọi emit path nhạy cảm
+
+=> Phase 4 hiện vẫn là **in progress**, nhưng có thể coi là **near complete** cho phần contract/outbox foundation.
 
 #### E. Các phase Go / multi-db dài hạn chưa bắt đầu implementation thực sự
 
@@ -188,14 +253,14 @@ Chưa thấy các deliverable lớn sau trong repo runtime hiện tại:
 
 Thứ tự hợp lý tiếp theo sau trạng thái hiện tại:
 
-1. **Hoàn tất Phase 4**
-   - mở rộng `integration_outbox`
-   - chuẩn hóa event names cho order/trade/wallet
-   - thêm publisher abstraction / Kafka-ready metadata
-2. **Làm Phase 3 trước khi làm Go hot-path**
-   - dựng market read model trên DB phụ
-   - reconciliation PostgreSQL ↔ projection
-3. **Sau khi event contract đủ chặt mới bắt đầu Go aggregator**
+1. **Tiếp tục hoàn tất Phase 3**
+   - đưa read-model sang MARKET_TS_DB/Timescale rollout thật
+   - mở rộng projection cho ticker/ohlcv
+   - bổ sung reconciliation cho ticker/OHLCV
+2. **Khóa nốt phần còn lại của Phase 4**
+   - hardening Kafka/DLQ/observability
+   - review transaction boundary cho các emit path còn lại
+3. **Sau khi Phase 3 ổn định mới bắt đầu Go aggregator**
    - shadow ticker / parity check
 4. **Matching Go chỉ nên vào sau cùng**
    - shadow
@@ -455,15 +520,16 @@ Acceptance criteria:
 
 ### Phase 3 - Market Read Model Trên Database Phụ
 
-**Trạng thái hiện tại:** Not started / early design  
-**Tiến độ ước lượng:** 0-15%
+**Trạng thái hiện tại:** In progress  
+**Tiến độ ước lượng:** 25-40%
 
 **Checklist trạng thái:**
 - [x] Roadmap mục tiêu và feature flag `MARKET_READ_SOURCE=postgres|timescale` đã được xác định rõ.
-- [ ] Chưa có TimescaleDB projection schema chạy end-to-end trong runtime hiện tại.
-- [ ] Chưa có projection worker consume `trade.executed` hoàn chỉnh.
-- [ ] Chưa có runtime path `MARKET_READ_SOURCE=timescale` tương thích hoàn chỉnh với PostgreSQL source.
-- [ ] Chưa có reconciliation PostgreSQL ↔ Timescale cho trade/ticker/ohlcv.
+- [x] Đã có projection schema nền cho `read_market_trades` và `read_market_tickers`.
+- [x] Đã có projection worker path consume `trade.executed` hoàn chỉnh qua outbox sync.
+- [x] Đã có runtime read path đầu tiên dùng `MARKET_READ_SOURCE=timescale` với fallback an toàn về PostgreSQL source.
+- [~] Đã có reconciliation bước đầu cho trades core ↔ read_model; chưa phủ ticker/ohlcv.
+- [ ] Chưa có TimescaleDB/hypertable/continuous aggregate end-to-end đúng nghĩa cho OHLCV.
 
 Mục tiêu: giảm tải PostgreSQL source of truth cho chart/ticker/trades mà không đổi REST contract.
 
@@ -486,7 +552,7 @@ Acceptance criteria:
 ### Phase 4 - Event/Outbox Contract Chuẩn Cho TS Và Go
 
 **Trạng thái hiện tại:** In progress  
-**Tiến độ ước lượng:** 30-45%
+**Tiến độ ước lượng:** 55-70%
 
 **Checklist trạng thái:**
 - [x] Transactional outbox pattern đã tồn tại trong runtime.
@@ -495,10 +561,10 @@ Acceptance criteria:
 - [x] `OutboxAppender` đã build/store canonical envelope với metadata chuẩn hóa bước đầu.
 - [x] Đã giữ backward compatibility cho luồng sync/read-model/notification đang dùng payload legacy.
 - [x] Đã mở thêm support cho `DepositMatchedV1`.
-- [~] Event contract mới chỉ được chuẩn hóa bước đầu, chưa phủ đủ orders/trades/wallet/ticker.
-- [ ] Chưa mở rộng schema `integration_outbox` với bộ metadata mature cho Kafka/publisher/retry observability.
-- [ ] Chưa có publisher abstraction/Kafka publish path hoàn chỉnh sau commit.
-- [ ] Chưa có processed-event/idempotency tracking mature cho consumer side nhiều DB/service.
+- [~] Event contract đã phủ thêm orders/trades/wallet; phần ticker update vẫn chưa hoàn chỉnh end-to-end.
+- [x] Đã mở rộng schema `integration_outbox` với metadata chính cho publisher/Kafka-ready flow.
+- [x] Đã có publisher abstraction + driver selection `noop|kafka` + Kafka publisher scaffold.
+- [x] Đã có `processed_integration_events` + consumer idempotency cho read-model/notification sync hiện tại.
 - [ ] Chưa hoàn thiện DLQ/observability/retry story cho integration path dài hạn.
 
 Mục tiêu: tạo biên giới integration an toàn trước khi Go tham gia.
@@ -521,6 +587,7 @@ Deliverables:
 ```
 
 - Event names tối thiểu: `order.created`, `order.cancel_requested`, `order.cancelled`, `order.rejected`, `trade.executed`, `wallet.balance_changed`, `market.ticker_updated`.
+  - Trạng thái hiện tại: đã nối thực tế `order.created`, `order.cancel_requested`, `order.cancelled`, `order.rejected`, `trade.executed`, `wallet.balance_changed`, `market.ticker_updated`.
 - Idempotency rule: consumer lưu processed `eventId` hoặc natural key (`trade_id`, `order_id`); projection insert dùng upsert/do-nothing.
 - Ban đầu dùng JSON schema để dễ debug; Protobuf chỉ thêm khi Go service ổn định và cần performance.
 
@@ -1017,3 +1084,5 @@ Hướng đi phù hợp nhất cho dự án là tiến hóa có kiểm soát:
 7. Đưa Go matching engine vào shadow/canary sau cùng.
 
 Cách này đạt mục tiêu multi-database + TypeScript/Go nhưng vẫn bảo vệ business logic hiện tại và giảm tối đa việc FE phải sửa bất ngờ.
+
+

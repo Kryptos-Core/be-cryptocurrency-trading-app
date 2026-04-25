@@ -17,6 +17,6 @@ export class ProcessedIntegrationEvent {
   @Column({ type: 'varchar', length: 128 })
   event_type!: string;
 
-  @CreateDateColumn({ type: 'datetime', precision: 6 })
+  @CreateDateColumn({ type: 'timestamp', precision: 6 })
   processed_at!: Date;
 }

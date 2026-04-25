@@ -49,15 +49,15 @@ export class ReadOnchainDeposit {
   @Column({ ...DECIMAL_36_18_NULLABLE_COLUMN })
   conversion_rate!: string | null;
 
-  @Column({ type: 'datetime', precision: 6 })
+  @Column({ type: 'timestamp', precision: 6 })
   created_at!: Date;
 
-  @Column({ type: 'datetime', precision: 6, nullable: true })
+  @Column({ type: 'timestamp', precision: 6, nullable: true })
   confirmed_at!: Date | null;
 
   @Column({ type: 'char', length: 36 })
   last_outbox_id!: string;
 
-  @UpdateDateColumn({ type: 'datetime', precision: 6 })
+  @UpdateDateColumn({ type: 'timestamp', precision: 6 })
   updated_at!: Date;
 }

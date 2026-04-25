@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import type { TradeExecutedOutboxPayloadV1 } from '@/common/integration-events/trade-executed-outbox-payload';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { newUuid } from '@/common/utils/uuid.util';
 import type { MatchingRepositoryPort, TradeExecuteResult } from '../../domain/ports';
 import type { OrderBookOrder } from '../../interfaces';
@@ -40,7 +43,10 @@ function numeric(value: string | number | null | undefined): number {
 export class MatchingRepository implements MatchingRepositoryPort {
   private readonly logger = new Logger(MatchingRepository.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly outboxAppender: OutboxAppender,
+  ) {}
 
   async getOpenOrdersForPair(pairId: string, side: 'BUY' | 'SELL'): Promise<OrderBookOrder[]> {
     const rows = await this.dataSource.query(
@@ -177,20 +183,61 @@ export class MatchingRepository implements MatchingRepositoryPort {
         const fromAvailable = quoteDelta - fromFrozen;
 
         await this.applyWalletDelta(manager, makerBaseWallet.wallet_id, 0, -amount);
-        await this.applyWalletDelta(manager, makerQuoteWallet.wallet_id, quoteDelta - numeric(params.makerFee), 0);
-        await this.applyWalletDelta(manager, takerQuoteWallet.wallet_id, -fromAvailable, -fromFrozen);
-        await this.applyWalletDelta(manager, takerBaseWallet.wallet_id, amount - numeric(params.takerFee), 0);
+        await this.applyWalletDelta(
+          manager,
+          makerQuoteWallet.wallet_id,
+          quoteDelta - numeric(params.makerFee),
+          0,
+        );
+        await this.applyWalletDelta(
+          manager,
+          takerQuoteWallet.wallet_id,
+          -fromAvailable,
+          -fromFrozen,
+        );
+        await this.applyWalletDelta(
+          manager,
+          takerBaseWallet.wallet_id,
+          amount - numeric(params.takerFee),
+          0,
+        );
       } else {
         await this.applyWalletDelta(manager, makerQuoteWallet.wallet_id, 0, -quoteDelta);
-        await this.applyWalletDelta(manager, makerBaseWallet.wallet_id, amount - numeric(params.makerFee), 0);
+        await this.applyWalletDelta(
+          manager,
+          makerBaseWallet.wallet_id,
+          amount - numeric(params.makerFee),
+          0,
+        );
         await this.applyWalletDelta(manager, takerBaseWallet.wallet_id, 0, -amount);
-        await this.applyWalletDelta(manager, takerQuoteWallet.wallet_id, quoteDelta - numeric(params.takerFee), 0);
+        await this.applyWalletDelta(
+          manager,
+          takerQuoteWallet.wallet_id,
+          quoteDelta - numeric(params.takerFee),
+          0,
+        );
       }
 
-      const makerBaseAfter = await this.getWalletBalanceAfter(manager, maker.user_id, pair.base_currency_id);
-      const makerQuoteAfter = await this.getWalletBalanceAfter(manager, maker.user_id, pair.quote_currency_id);
-      const takerBaseAfter = await this.getWalletBalanceAfter(manager, taker.user_id, pair.base_currency_id);
-      const takerQuoteAfter = await this.getWalletBalanceAfter(manager, taker.user_id, pair.quote_currency_id);
+      const makerBaseAfter = await this.getWalletBalanceAfter(
+        manager,
+        maker.user_id,
+        pair.base_currency_id,
+      );
+      const makerQuoteAfter = await this.getWalletBalanceAfter(
+        manager,
+        maker.user_id,
+        pair.quote_currency_id,
+      );
+      const takerBaseAfter = await this.getWalletBalanceAfter(
+        manager,
+        taker.user_id,
+        pair.base_currency_id,
+      );
+      const takerQuoteAfter = await this.getWalletBalanceAfter(
+        manager,
+        taker.user_id,
+        pair.quote_currency_id,
+      );
 
       if (!makerBaseAfter || !makerQuoteAfter || !takerBaseAfter || !takerQuoteAfter) {
         return {
@@ -201,16 +248,112 @@ export class MatchingRepository implements MatchingRepositoryPort {
       }
 
       if (maker.side === 'SELL') {
-        await this.insertLedger(manager, maker.user_id, pair.base_currency_id, makerBaseAfter.wallet_id, tradeId, 'DEBIT', params.amount, makerBaseAfter.balance_after);
-        await this.insertLedger(manager, maker.user_id, pair.quote_currency_id, makerQuoteAfter.wallet_id, tradeId, 'CREDIT', String(quoteDelta - numeric(params.makerFee)), makerQuoteAfter.balance_after);
-        await this.insertLedger(manager, taker.user_id, pair.quote_currency_id, takerQuoteAfter.wallet_id, tradeId, 'DEBIT', String(quoteDelta), takerQuoteAfter.balance_after);
-        await this.insertLedger(manager, taker.user_id, pair.base_currency_id, takerBaseAfter.wallet_id, tradeId, 'CREDIT', String(amount - numeric(params.takerFee)), takerBaseAfter.balance_after);
+        await this.insertLedger(
+          manager,
+          maker.user_id,
+          pair.base_currency_id,
+          makerBaseAfter.wallet_id,
+          tradeId,
+          'DEBIT',
+          params.amount,
+          makerBaseAfter.balance_after,
+        );
+        await this.insertLedger(
+          manager,
+          maker.user_id,
+          pair.quote_currency_id,
+          makerQuoteAfter.wallet_id,
+          tradeId,
+          'CREDIT',
+          String(quoteDelta - numeric(params.makerFee)),
+          makerQuoteAfter.balance_after,
+        );
+        await this.insertLedger(
+          manager,
+          taker.user_id,
+          pair.quote_currency_id,
+          takerQuoteAfter.wallet_id,
+          tradeId,
+          'DEBIT',
+          String(quoteDelta),
+          takerQuoteAfter.balance_after,
+        );
+        await this.insertLedger(
+          manager,
+          taker.user_id,
+          pair.base_currency_id,
+          takerBaseAfter.wallet_id,
+          tradeId,
+          'CREDIT',
+          String(amount - numeric(params.takerFee)),
+          takerBaseAfter.balance_after,
+        );
       } else {
-        await this.insertLedger(manager, maker.user_id, pair.quote_currency_id, makerQuoteAfter.wallet_id, tradeId, 'DEBIT', String(quoteDelta), makerQuoteAfter.balance_after);
-        await this.insertLedger(manager, maker.user_id, pair.base_currency_id, makerBaseAfter.wallet_id, tradeId, 'CREDIT', String(amount - numeric(params.makerFee)), makerBaseAfter.balance_after);
-        await this.insertLedger(manager, taker.user_id, pair.base_currency_id, takerBaseAfter.wallet_id, tradeId, 'DEBIT', params.amount, takerBaseAfter.balance_after);
-        await this.insertLedger(manager, taker.user_id, pair.quote_currency_id, takerQuoteAfter.wallet_id, tradeId, 'CREDIT', String(quoteDelta - numeric(params.takerFee)), takerQuoteAfter.balance_after);
+        await this.insertLedger(
+          manager,
+          maker.user_id,
+          pair.quote_currency_id,
+          makerQuoteAfter.wallet_id,
+          tradeId,
+          'DEBIT',
+          String(quoteDelta),
+          makerQuoteAfter.balance_after,
+        );
+        await this.insertLedger(
+          manager,
+          maker.user_id,
+          pair.base_currency_id,
+          makerBaseAfter.wallet_id,
+          tradeId,
+          'CREDIT',
+          String(amount - numeric(params.makerFee)),
+          makerBaseAfter.balance_after,
+        );
+        await this.insertLedger(
+          manager,
+          taker.user_id,
+          pair.base_currency_id,
+          takerBaseAfter.wallet_id,
+          tradeId,
+          'DEBIT',
+          params.amount,
+          takerBaseAfter.balance_after,
+        );
+        await this.insertLedger(
+          manager,
+          taker.user_id,
+          pair.quote_currency_id,
+          takerQuoteAfter.wallet_id,
+          tradeId,
+          'CREDIT',
+          String(quoteDelta - numeric(params.takerFee)),
+          takerQuoteAfter.balance_after,
+        );
       }
+
+      const tradePayload: TradeExecutedOutboxPayloadV1 = {
+        tradeId,
+        pairId: params.pairId,
+        makerOrderId: params.makerOrderId,
+        takerOrderId: params.takerOrderId,
+        price: params.price,
+        amount: params.amount,
+        makerFee: params.makerFee,
+        takerFee: params.takerFee,
+        feeCurrencyId: params.feeCurrencyId,
+        executedAt: new Date().toISOString(),
+      };
+
+      await this.outboxAppender.append(manager, {
+        aggregateType: 'trade',
+        aggregateId: tradeId,
+        eventType: OutboxIntegrationEventType.TradeExecutedV1,
+        payload: tradePayload as unknown as Record<string, unknown>,
+        dedupeKey: `trade-executed:${tradeId}`,
+        causationId: params.takerOrderId,
+        partitionKey: params.pairId,
+        kafkaTopic: 'trades.executed',
+      });
 
       return {
         trade_id: tradeId,
@@ -232,8 +375,10 @@ export class MatchingRepository implements MatchingRepositoryPort {
         return false;
       }
 
-      const releaseAmount = order.side === 'BUY' ? numeric(order.reserved_quote) : numeric(order.reserved_base);
-      const releaseCurrencyId = order.side === 'BUY' ? pair.quote_currency_id : pair.base_currency_id;
+      const releaseAmount =
+        order.side === 'BUY' ? numeric(order.reserved_quote) : numeric(order.reserved_base);
+      const releaseCurrencyId =
+        order.side === 'BUY' ? pair.quote_currency_id : pair.base_currency_id;
       const wallet = await this.getOrCreateWalletForUpdate(manager, order.user_id, releaseCurrencyId);
 
       if (releaseAmount > 0) {
@@ -332,7 +477,14 @@ export class MatchingRepository implements MatchingRepositoryPort {
            reserved_base = CASE WHEN side = 'SELL' THEN GREATEST(0, reserved_base - $1::numeric) ELSE reserved_base END,
            updated_at = NOW()
        WHERE order_id = $6`,
-      [fillAmount, String(prevFilled), fillPrice, String(remainingBefore), String(quoteDelta), order.order_id],
+      [
+        fillAmount,
+        String(prevFilled),
+        fillPrice,
+        String(remainingBefore),
+        String(quoteDelta),
+        order.order_id,
+      ],
     );
   }
 

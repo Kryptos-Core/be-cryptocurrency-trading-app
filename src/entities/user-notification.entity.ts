@@ -15,10 +15,10 @@ export class UserNotification {
   @Column({ type: 'char', length: 36 })
   notification_id!: string;
 
-  @Column({ type: 'tinyint', width: 1, default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   is_read!: number;
 
-  @Column({ type: 'datetime', precision: 3, nullable: true })
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
   read_at!: Date | null;
 
   @CreateDateColumn({ precision: 3 })

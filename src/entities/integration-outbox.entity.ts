@@ -3,6 +3,7 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm'
 @Entity('integration_outbox')
 @Index('idx_integration_outbox_unpublished', ['published_at', 'occurred_at'])
 @Index('idx_integration_outbox_topic_unpublished', ['kafka_topic', 'published_at', 'occurred_at'])
+@Index('idx_integration_outbox_retry', ['published_at', 'dead_lettered_at', 'next_retry_at'])
 export class IntegrationOutbox {
   @PrimaryColumn({ type: 'char', length: 36 })
   id!: string;
@@ -19,10 +20,10 @@ export class IntegrationOutbox {
   @Column({ type: 'json' })
   payload!: Record<string, unknown>;
 
-  @CreateDateColumn({ type: 'datetime', precision: 6, name: 'occurred_at' })
+  @CreateDateColumn({ type: 'timestamp', precision: 6, name: 'occurred_at' })
   occurred_at!: Date;
 
-  @Column({ type: 'datetime', precision: 6, nullable: true })
+  @Column({ type: 'timestamp', precision: 6, nullable: true })
   published_at!: Date | null;
 
   @Column({ type: 'varchar', length: 191, nullable: true, unique: true })
@@ -49,7 +50,7 @@ export class IntegrationOutbox {
   @Column({ type: 'bigint', nullable: true })
   kafka_offset!: string | null;
 
-  @Column({ type: 'datetime', precision: 6, nullable: true })
+  @Column({ type: 'timestamp', precision: 6, nullable: true })
   kafka_published_at!: Date | null;
 
   @Column({ type: 'int', default: 0 })
@@ -57,4 +58,10 @@ export class IntegrationOutbox {
 
   @Column({ type: 'text', nullable: true })
   last_publish_error!: string | null;
+
+  @Column({ type: 'timestamp', precision: 6, nullable: true })
+  next_retry_at!: Date | null;
+
+  @Column({ type: 'timestamp', precision: 6, nullable: true })
+  dead_lettered_at!: Date | null;
 }

@@ -1,6 +1,8 @@
 import type { Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
+import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
+import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
 
 export const CORE_DB = 'CORE_DB';
 export const MARKET_TS_DB = 'MARKET_TS_DB';
@@ -83,6 +85,7 @@ const marketTsDbProvider: Provider = {
       database: market.database,
       synchronize: false,
       logging: false,
+      entities: [ReadMarketTrade, ReadMarketTicker],
     });
 
     await ds.initialize();

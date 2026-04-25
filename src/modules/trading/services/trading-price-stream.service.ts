@@ -1,6 +1,10 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import type { MarketTickerUpdatedOutboxPayloadV1 } from '@/common/integration-events/market-ticker-updated-outbox-payload';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { RedisService } from '@/common/services';
+import { UnitOfWork } from '@/common/unit-of-work/unit-of-work';
 import {
   type CandleInterval,
   type CandleUpdateEvent,
@@ -15,12 +19,6 @@ const RATE_LIMIT_LOG_MS = 60_000;
 const PUBLISH_RETRY_COUNT = 3;
 const PUBLISH_RETRY_DELAY_MS = 100;
 
-/**
- * Trading Price Stream Service
- * Manages real-time price data streaming; uses Redis Pub/Sub for scalability.
- * OHLCV is no longer persisted to DB: chart/ticker data is fetched on-demand via
- * Price Oracle (Binance time-range APIs).
- */
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TradingPriceStreamService.name);
@@ -39,30 +37,24 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
   private candleCache: Map<string, OHLCMessage> = new Map();
   private candleKeyByPairInterval: Map<string, string> = new Map();
-  /** When a (pair_id, interval) has recent Binance kline, skip overwriting with aggregated ticker. TTL 90s. */
   private lastBinanceCandleAt: Map<string, number> = new Map();
   private static readonly BINANCE_CANDLE_PRIORITY_MS = 90_000;
 
   constructor(
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly unitOfWork: UnitOfWork,
+    private readonly outboxAppender: OutboxAppender,
   ) {}
 
   async onModuleInit() {
     await this.initializeRedisSubscriber();
   }
 
-  /**
-   * Initialize Redis Pub/Sub subscriber
-   */
   private async initializeRedisSubscriber() {
-    // Get subscriber client from RedisService
     const subscriber = this.redisService.getSubscriber();
-
-    // Subscribe to trading channels
     await subscriber.subscribe('trading:price_update', 'trading:candle_update');
 
-    // Listen for messages
     subscriber.on('message', (channel: string, message: string) => {
       try {
         const data = JSON.parse(message) as RedisPubSubMessage;
@@ -89,18 +81,11 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  /**
-   * Handle price update from Redis — emit to EventEmitter2 Observer bus.
-   */
   private handlePriceUpdate(event: PriceUpdateEvent) {
     this.aggregateCandle(event);
     this.eventEmitter.emit(MARKET_EVENTS.PRICE_UPDATED, event.ticker);
   }
 
-  /**
-   * Handle candle update from Redis — emit to EventEmitter2 Observer bus.
-   * Distinguishes between an in-progress candle update and a closed candle.
-   */
   private handleCandleUpdate(event: CandleUpdateEvent) {
     if (event.source === 'binance_kline' && event.candle) {
       const key = `${event.candle.pair_id}:${event.candle.interval}`;
@@ -228,10 +213,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     return { ok: false, error: msg };
   }
 
-  /**
-   * Publish price update to Redis (with retry).
-   * Called by other services (e.g., BinancePriceFeedService).
-   */
   async publishPriceUpdate(ticker: TickerMessage) {
     const message: RedisPubSubMessage = {
       event: 'price_update',
@@ -251,6 +232,7 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     if (ok) {
       this.lastSuccessfulPriceUpdateAt = Date.now();
       this.lastPublishError = null;
+      await this.appendTickerUpdatedEvent(ticker);
     } else {
       this.lastPublishError = error ?? 'Unknown';
       if (this.shouldLog('publish_price')) {
@@ -259,9 +241,43 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     }
   }
 
-  /**
-   * Health state for price feed (e.g. monitoring / admin).
-   */
+  private async appendTickerUpdatedEvent(ticker: TickerMessage): Promise<void> {
+    const payload: MarketTickerUpdatedOutboxPayloadV1 = {
+      pairId: ticker.pair_id,
+      symbol: ticker.symbol,
+      lastPrice: ticker.last_price,
+      bid: ticker.bid,
+      ask: ticker.ask,
+      volume24h: ticker.volume_24h,
+      volume24hUsd: ticker.volume_24h_usd,
+      change24h: ticker.change_24h,
+      changePercent24h: ticker.change_percent_24h,
+      high24h: ticker.high_24h,
+      low24h: ticker.low_24h,
+      open24h: ticker.open_24h,
+      timestamp: ticker.timestamp,
+    };
+
+    try {
+      await this.unitOfWork.run(async (ctx) => {
+        await this.outboxAppender.append(ctx as never, {
+          aggregateType: 'marketTicker',
+          aggregateId: ticker.pair_id,
+          eventType: OutboxIntegrationEventType.MarketTickerUpdatedV1,
+          payload: payload as unknown as Record<string, unknown>,
+          partitionKey: ticker.pair_id,
+          kafkaTopic: 'market.ticker',
+        });
+      });
+    } catch (error) {
+      if (this.shouldLog('ticker_outbox_append')) {
+        this.logger.warn(
+          `Failed to append market.ticker_updated outbox event: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
   getPriceFeedHealth(): {
     lastSuccessfulUpdateAt: number | null;
     lastError: string | null;
@@ -272,10 +288,6 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
     };
   }
 
-  /**
-   * Publish candle update to Redis (real-time only; no DB persist). Uses retry.
-   * source: 'binance_kline' so downstream can prefer it over aggregated ticker.
-   */
   async publishCandleUpdate(
     candle: OHLCMessage,
     options?: { source?: 'binance_kline' | 'aggregated' },
