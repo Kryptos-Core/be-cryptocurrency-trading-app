@@ -4,7 +4,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { OutboxModule } from '@/common/outbox/outbox.module';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { GetWorkspaceStateQuery } from './application/queries/get-workspace-state.query';
+import { TradingOpsController } from './trading-ops.controller';
 import { BinancePriceFeedService } from './services/binance-price-feed.service';
+import { GoAggregatorPriceFeedService } from './services/go-aggregator-price-feed.service';
+import { PublicWsPayloadParityService } from './services/public-ws-payload-parity.service';
 import { DashboardBroadcastService } from './services/dashboard-broadcast.service';
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
 import { TradingSubscriptionService } from './services/trading-subscription.service';
@@ -24,11 +27,14 @@ import { TradingGateway } from './websocket/trading.gateway';
       }),
     }),
   ],
+  controllers: [TradingOpsController],
   providers: [
     TradingGateway,
     TradingSubscriptionService,
     TradingPriceStreamService,
     BinancePriceFeedService,
+    GoAggregatorPriceFeedService,
+    PublicWsPayloadParityService,
     DashboardBroadcastService,
     WorkspaceService,
     GetWorkspaceStateQuery,

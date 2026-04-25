@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bull';
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { forwardRef, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketOhlcvReadModelSyncApplierService } from '@/common/read-model/market-ohlcv-read-model-sync-applier.service';
 import { MarketPairReadModelProjectionHandler } from '@/common/read-model/market-pair-read-model.handler';
@@ -52,23 +52,10 @@ import { OutboxRelayService } from './outbox-relay.service';
       ReadMarketOhlcv,
       ReadOnchainDeposit,
     ]),
-    BullModule.registerQueueAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const enabled =
-          String(config.get<string>('EVENT_OUTBOX_ENABLED') ?? 'true').toLowerCase() !== 'false';
-        return {
-          name: OUTBOX_RELAY_QUEUE,
-          defaultJobOptions: {
-            removeOnComplete: enabled ? 50 : 1,
-          },
-        };
-      },
-    }),
+    BullModule.registerQueue({ name: OUTBOX_RELAY_QUEUE }),
     RedisModule,
     TelemetryModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   providers: [
     OutboxAppender,
@@ -120,3 +107,4 @@ import { OutboxRelayService } from './outbox-relay.service';
   exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService],
 })
 export class OutboxModule {}
+

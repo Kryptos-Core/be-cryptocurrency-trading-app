@@ -16,8 +16,11 @@ import { MarketPair } from '../entities/market-pair.entity';
 import { Notification } from '../entities/notification.entity';
 import { Order } from '../entities/order.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
+import { ProcessedIntegrationEvent } from '../entities/processed-integration-event.entity';
 import { ReadMarketPair } from '../entities/read-market-pair.entity';
 import { ReadMarketTrade } from '../entities/read-market-trade.entity';
+import { ReadMarketOhlcv } from '../entities/read-market-ohlcv.entity';
+import { ReadMarketTicker } from '../entities/read-market-ticker.entity';
 import { ReadOnchainDeposit } from '../entities/read-onchain-deposit.entity';
 import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
@@ -31,6 +34,7 @@ import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
 import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
 import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
+import { DepositMatchRequest } from '../modules/blockchain/entities/deposit-match-request.entity';
 import { typeormMigrationFilePaths } from './typeorm-entity-glob-paths';
 
 const ALL_ENTITIES = [
@@ -42,15 +46,19 @@ const ALL_ENTITIES = [
   DepositWatcherCursor,
   ExchangeRateAuditLog,
   IntegrationOutbox,
+  ProcessedIntegrationEvent,
   FiatDeposit,
   LinkedWallet,
   ManagedWallet,
   MarketMakerConfig,
   MarketPair,
   ReadMarketPair,
+  ReadMarketOhlcv,
+  ReadMarketTicker,
   ReadMarketTrade,
   ReadOnchainDeposit,
   OnchainTransaction,
+  DepositMatchRequest,
   Order,
   Trade,
   User,

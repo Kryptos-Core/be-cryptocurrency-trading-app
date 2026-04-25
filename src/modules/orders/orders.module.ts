@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '@/entities/order.entity';
 import { OutboxModule } from '@/common/outbox/outbox.module';
@@ -20,16 +20,18 @@ import { OrderValidationService } from '@/modules/orders/domain/services/order-v
 import { OrderRepositoryImpl } from '@/modules/orders/infrastructure/persistence/order.repository.impl';
 import { OrderValidationStrategy } from '@/modules/orders/strategies';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { TelemetryModule } from '@/telemetry';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order]),
-    OutboxModule,
-    MarketsModule,
-    WalletsModule,
-    MatchingModule,
+    forwardRef(() => OutboxModule),
+    forwardRef(() => MarketsModule),
+    forwardRef(() => WalletsModule),
+    forwardRef(() => MatchingModule),
+    TelemetryModule,
   ],
   providers: [
     {
@@ -62,3 +64,4 @@ import { OrdersService } from './orders.service';
   exports: [OrdersService, ORDER_REPOSITORY],
 })
 export class OrdersModule {}
+

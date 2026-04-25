@@ -1,5 +1,5 @@
 import { BullModule } from '@nestjs/bull';
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule } from '@/common/outbox/outbox.module';
 import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
@@ -29,7 +29,7 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
 @Module({
   imports: [
     TypeOrmModule.forFeature([TradeAuditLog]),
-    OutboxModule,
+    forwardRef(() => OutboxModule),
     BullModule.registerQueue({ name: MATCHING_QUEUE }),
   ],
   providers: [
@@ -70,3 +70,4 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
   ],
 })
 export class MatchingModule {}
+

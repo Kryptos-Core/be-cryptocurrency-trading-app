@@ -244,6 +244,41 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Market maker default order amount',
     description: 'Default order_amount string for new MM config (per pair).',
   },
+  {
+    key: 'MARKET_READ_SOURCE',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Market read source',
+    description: 'Select read source for market APIs: postgres|timescale.',
+  },
+  {
+    key: 'TICKER_SOURCE',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Ticker source',
+    description: 'Select ticker publisher source: nestjs|go_aggregator.',
+  },
+  {
+    key: 'MATCHING_ENGINE',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Matching engine mode',
+    description: 'Matching mode: ts|go_shadow|go_canary|go.',
+  },
+  {
+    key: 'MATCHING_GO_CANARY_PAIRS',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Go matching canary pairs',
+    description: 'Comma-separated pair_id allowlist for go_canary shadow/canary routing.',
+  },
+  {
+    key: 'PUBLIC_WS_SOURCE',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Public WS source',
+    description: 'Public market websocket source: nestjs|go.',
+  },
 ];
 
 function buildEvmRpcSeeds(baseKeys: Set<string>): RuntimeSettingSeed[] {

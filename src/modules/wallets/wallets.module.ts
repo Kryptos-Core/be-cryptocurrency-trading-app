@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule } from '@/common/outbox/outbox.module';
 import { AdminWalletAdjustment } from '@/entities/admin-wallet-adjustment.entity';
@@ -44,7 +44,7 @@ import { WalletsService } from './wallets.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Wallet, WalletLedger, AdminWalletAdjustment]),
-    OutboxModule,
+    forwardRef(() => OutboxModule),
     CurrenciesModule,
     ExchangeModule,
   ],

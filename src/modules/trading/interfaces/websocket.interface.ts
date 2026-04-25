@@ -152,7 +152,7 @@ export interface CandleUpdateEvent {
   pair_id: string;
   timestamp: number;
   candle: OHLCMessage;
-  source?: 'binance_kline' | 'aggregated';
+  source?: 'binance_kline' | 'aggregated' | 'go_aggregator';
 }
 
 // ============ Redis Pub/Sub ============

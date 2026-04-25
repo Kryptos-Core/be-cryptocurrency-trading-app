@@ -87,7 +87,7 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
   }
 
   private handleCandleUpdate(event: CandleUpdateEvent) {
-    if (event.source === 'binance_kline' && event.candle) {
+    if ((event.source === 'binance_kline' || event.source === 'go_aggregator') && event.candle) {
       const key = `${event.candle.pair_id}:${event.candle.interval}`;
       this.lastBinanceCandleAt.set(key, Date.now());
     }
@@ -290,7 +290,7 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
 
   async publishCandleUpdate(
     candle: OHLCMessage,
-    options?: { source?: 'binance_kline' | 'aggregated' },
+    options?: { source?: 'binance_kline' | 'aggregated' | 'go_aggregator' },
   ) {
     const message: RedisPubSubMessage = {
       event: 'candle_update',

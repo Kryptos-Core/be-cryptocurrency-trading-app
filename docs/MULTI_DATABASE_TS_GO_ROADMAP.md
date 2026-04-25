@@ -510,8 +510,8 @@ Acceptance criteria:
 - [x] Hướng kiến trúc đã xác định rõ: Go market aggregator là bước Go ưu tiên trước matching.
 - [x] Đã có scaffold `go-services/market-aggregator` để chuẩn bị wiring CI/deploy.
 - [~] Đã có skeleton service và config contract; chưa consume `trade.executed` thực chiến.
-- [ ] Chưa có shadow compare NestJS ticker vs Go ticker.
-- [ ] Chưa có rollback flow thực tế bằng `TICKER_SOURCE=nestjs` cho Go aggregator rollout.
+- [x] Đã có shadow compare NestJS emit payload vs Go ingress payload qua admin parity endpoint (`GET /trading/admin/public-ws-parity`).
+- [~] Rollback flow bằng `TICKER_SOURCE=nestjs` đã được chuẩn hóa thêm qua runtime setting keys; vẫn cần diễn tập production rollout end-to-end.
 
 Mục tiêu: đưa Go vào đường đọc market data, ít rủi ro hơn matching.
 
@@ -563,9 +563,9 @@ Acceptance criteria:
 **Checklist trạng thái:**
 - [x] Mục tiêu tách public market WS khỏi NestJS đã được xác định về mặt kiến trúc.
 - [x] Đã có scaffold `go-services/public-ws-gateway` để chuẩn bị rollout.
-- [ ] Chưa có compatibility layer/fallback release plan chi tiết cho FE nếu đổi transport.
-- [ ] Chưa có public payload parity verification riêng cho `TickerData` / `OHLCData`.
-- [ ] Chưa có rollout giữ song song `/trading` cũ và gateway Go trong ít nhất một release thực tế.
+- [~] Đã có compatibility layer ở NestJS side: khi `TICKER_SOURCE=go_aggregator`, backend ingest Redis từ Go và vẫn emit nguyên contract `/trading`; cần hoàn thiện runbook cutover transport phía FE nếu rời Socket.IO.
+- [x] Đã có public payload parity verification (`/trading/admin/public-ws-parity`) cho contract `TickerData` / `OHLCData`.
+- [~] Đã chuẩn hóa runtime toggle `PUBLIC_WS_SOURCE` ở lớp setting; chưa có rollout song song production trong ít nhất một release.
 
 Mục tiêu: scale connection/broadcast public market data mà không phá FE.
 
