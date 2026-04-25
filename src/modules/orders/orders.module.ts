@@ -22,6 +22,7 @@ import { OrderValidationStrategy } from '@/modules/orders/strategies';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { TelemetryModule } from '@/telemetry';
 import { OrdersController } from './orders.controller';
+import { OrdersMatchingShadowMetricsCollectorService } from './orders-matching-shadow-metrics-collector.service';
 import { OrdersService } from './orders.service';
 
 @Module({
@@ -59,6 +60,7 @@ import { OrdersService } from './orders.service';
     GetOrderBookQuery,
     ListOpenOrdersForPairQuery,
     OrdersService,
+    OrdersMatchingShadowMetricsCollectorService,
   ],
   controllers: [OrdersController],
   exports: [OrdersService, ORDER_REPOSITORY],

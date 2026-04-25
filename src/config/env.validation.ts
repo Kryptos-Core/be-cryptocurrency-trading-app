@@ -205,6 +205,26 @@ export class EnvironmentVariables {
   @IsOptional()
   PUBLIC_WS_SOURCE?: string = 'nestjs';
 
+  @IsString()
+  @IsOptional()
+  GO_AGGREGATOR_TICKER_CHANNEL?: string = 'trading:external:ticker';
+
+  @IsString()
+  @IsOptional()
+  GO_AGGREGATOR_OHLC_CHANNEL?: string = 'trading:external:ohlc';
+
+  @IsString()
+  @IsOptional()
+  MATCHING_SHADOW_MONITOR_PAIRS?: string;
+
+  @IsString()
+  @IsOptional()
+  MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT?: string = '99.9';
+
+  @IsString()
+  @IsOptional()
+  MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS?: string = '0';
+
   /**
    * When true/1/yes/on: log SQL queries via TypeORM. Ignored when NODE_ENV=production.
    */
@@ -753,6 +773,11 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'MATCHING_ENGINE',
     'MATCHING_GO_CANARY_PAIRS',
     'PUBLIC_WS_SOURCE',
+    'GO_AGGREGATOR_TICKER_CHANNEL',
+    'GO_AGGREGATOR_OHLC_CHANNEL',
+    'MATCHING_SHADOW_MONITOR_PAIRS',
+    'MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT',
+    'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS',
     'TYPEORM_DEBUG_SQL',
     'MM_DEFAULT_SPREAD_BPS',
     'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',

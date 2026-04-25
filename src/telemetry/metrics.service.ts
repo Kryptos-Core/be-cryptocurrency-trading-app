@@ -64,6 +64,12 @@ export class MetricsService {
 
     @InjectMetric('matching_shadow_match_rate_percent')
     private readonly matchingShadowMatchRatePercent: Gauge,
+
+    @InjectMetric('public_ws_parity_compared_pairs')
+    private readonly publicWsParityComparedPairs: Gauge,
+
+    @InjectMetric('public_ws_parity_drift_pairs')
+    private readonly publicWsParityDriftPairs: Gauge,
   ) {}
 
   recordHttpRequest(method: string, route: string, statusCode: number, durationMs: number): void {
@@ -150,5 +156,13 @@ export class MetricsService {
 
   setMatchingShadowMatchRatePercent(pairId: string, value: number): void {
     this.matchingShadowMatchRatePercent.set({ pair_id: pairId }, value);
+  }
+
+  setPublicWsParityComparedPairs(source: string, value: number): void {
+    this.publicWsParityComparedPairs.set({ source }, value);
+  }
+
+  setPublicWsParityDriftPairs(source: string, value: number): void {
+    this.publicWsParityDriftPairs.set({ source }, value);
   }
 }

@@ -9,6 +9,7 @@ import { OutboxAdminService } from '@/common/outbox/outbox-admin.service';
 import { RedisService } from '@/common/services/redis.service';
 import { ANALYTICS_DB, MARKET_TS_DB } from '@/config';
 import { MarketReadModelReconciliationService } from '@/modules/markets/market-read-model-reconciliation.service';
+import { PublicWsPayloadParityService } from '@/modules/trading/services/public-ws-payload-parity.service';
 
 @ApiTags('health')
 @Controller('health')
@@ -23,6 +24,8 @@ export class HealthController {
     private readonly outboxAdminService: OutboxAdminService,
     @Optional()
     private readonly marketReadModelReconciliationService?: MarketReadModelReconciliationService,
+    @Optional()
+    private readonly publicWsPayloadParityService?: PublicWsPayloadParityService,
   ) {}
 
   @Public()
@@ -81,6 +84,25 @@ export class HealthController {
             projection_status: projectionStatus,
             degraded: projectionStatus !== 'up',
             ...details,
+          },
+        };
+      });
+    }
+
+    const publicWsPayloadParityService = this.publicWsPayloadParityService;
+    if (publicWsPayloadParityService) {
+      checks.push(async () => {
+        const report = publicWsPayloadParityService.getReport();
+        const contractValid = report.ticker.contractValid && report.ohlc.contractValid;
+        const degraded = !contractValid || report.goAggregatorParity.driftPairs > 0;
+
+        return {
+          market_public_ws: {
+            status: 'up' as const,
+            source: report.source,
+            degraded,
+            contract_valid: contractValid,
+            parity: report.goAggregatorParity,
           },
         };
       });

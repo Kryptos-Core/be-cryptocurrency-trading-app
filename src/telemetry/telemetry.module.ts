@@ -110,6 +110,16 @@ import { MetricsService } from './metrics.service';
       help: 'Estimated parity rate percentage for shadow matching per pair',
       labelNames: ['pair_id'],
     }),
+    makeGaugeProvider({
+      name: 'public_ws_parity_compared_pairs',
+      help: 'Number of pair samples compared between external ticker ingress and emitted /trading payloads',
+      labelNames: ['source'],
+    }),
+    makeGaugeProvider({
+      name: 'public_ws_parity_drift_pairs',
+      help: 'Number of pair samples with drift between external ingress and emitted /trading payloads',
+      labelNames: ['source'],
+    }),
     makeHistogramProvider({
       name: 'blockchain_rpc_duration_seconds',
       help: 'Duration of blockchain RPC calls in seconds',

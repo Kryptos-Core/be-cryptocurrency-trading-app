@@ -3,10 +3,11 @@ import { TerminusModule } from '@nestjs/terminus';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule } from '@/common/outbox/outbox.module';
 import { MarketsModule } from '@/modules/markets/markets.module';
+import { TradingModule } from '@/modules/trading/trading.module';
 import { HealthController } from './health.controller';
 
 @Module({
-  imports: [TerminusModule, TypeOrmModule, OutboxModule, MarketsModule],
+  imports: [TerminusModule, TypeOrmModule, OutboxModule, MarketsModule, TradingModule],
   controllers: [HealthController],
 })
 export class HealthModule {}

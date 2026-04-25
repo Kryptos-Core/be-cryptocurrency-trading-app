@@ -46,6 +46,11 @@ describe('createAppConfig', () => {
       MATCHING_GO_CANARY_PAIRS: 'BTC_USDT, ETH_USDT',
       EVENT_OUTBOX_ENABLED: 'false',
       PUBLIC_WS_SOURCE: 'go',
+      GO_AGGREGATOR_TICKER_CHANNEL: 'trading:go:ticker',
+      GO_AGGREGATOR_OHLC_CHANNEL: 'trading:go:ohlc',
+      MATCHING_SHADOW_MONITOR_PAIRS: 'pair-1,pair-2',
+      MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT: '97.5',
+      MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS: '2',
       MATCHING_ENGINE: 'go_shadow',
       TICKER_SOURCE: 'go_aggregator',
       MARKET_READ_SOURCE: 'timescale',
@@ -60,6 +65,11 @@ describe('createAppConfig', () => {
     expect(config.featureFlags.tickerSource).toBe('go_aggregator');
     expect(config.featureFlags.matchingEngine).toBe('go_shadow');
     expect(config.featureFlags.publicWsSource).toBe('go');
+    expect(config.featureFlags.goAggregatorTickerChannel).toBe('trading:go:ticker');
+    expect(config.featureFlags.goAggregatorOhlcChannel).toBe('trading:go:ohlc');
+    expect(config.featureFlags.matchingShadowMonitorPairs).toEqual(['pair-1', 'pair-2']);
+    expect(config.featureFlags.matchingShadowAlertMinMatchRatePercent).toBe(97.5);
+    expect(config.featureFlags.matchingShadowAlertMaxUnmatchedRuns).toBe(2);
     expect(config.featureFlags.eventOutboxEnabled).toBe(false);
     expect(config.featureFlags.matchingGoCanaryPairs).toEqual(['BTC_USDT', 'ETH_USDT']);
   });

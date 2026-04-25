@@ -49,6 +49,11 @@ export interface AppConfig {
     matchingEngine: string;
     matchingGoCanaryPairs: string[];
     publicWsSource: string;
+    goAggregatorTickerChannel: string;
+    goAggregatorOhlcChannel: string;
+    matchingShadowMonitorPairs: string[];
+    matchingShadowAlertMinMatchRatePercent: number;
+    matchingShadowAlertMaxUnmatchedRuns: number;
     eventOutboxEnabled: boolean;
     eventSchemaFormat: string;
     eventPublisherDriver: string;
@@ -445,6 +450,19 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
         .map((pair) => pair.trim())
         .filter(Boolean),
       publicWsSource: env.PUBLIC_WS_SOURCE || 'nestjs',
+      goAggregatorTickerChannel:
+        env.GO_AGGREGATOR_TICKER_CHANNEL || 'trading:external:ticker',
+      goAggregatorOhlcChannel: env.GO_AGGREGATOR_OHLC_CHANNEL || 'trading:external:ohlc',
+      matchingShadowMonitorPairs: (env.MATCHING_SHADOW_MONITOR_PAIRS || '')
+        .split(',')
+        .map((pair) => pair.trim())
+        .filter(Boolean),
+      matchingShadowAlertMinMatchRatePercent: Number(
+        env.MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT || '99.9',
+      ),
+      matchingShadowAlertMaxUnmatchedRuns: Number(
+        env.MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS || '0',
+      ),
       eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
       eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',
       eventPublisherDriver: env.EVENT_PUBLISHER_DRIVER || 'noop',

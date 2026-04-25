@@ -10,6 +10,7 @@ import { GoAggregatorPriceFeedService } from './services/go-aggregator-price-fee
 import { PublicWsPayloadParityService } from './services/public-ws-payload-parity.service';
 import { DashboardBroadcastService } from './services/dashboard-broadcast.service';
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
+import { TradingPublicWsMetricsCollectorService } from './services/trading-public-ws-metrics-collector.service';
 import { TradingSubscriptionService } from './services/trading-subscription.service';
 import { WorkspaceService } from './services/workspace.service';
 import { TradingGateway } from './websocket/trading.gateway';
@@ -35,6 +36,7 @@ import { TradingGateway } from './websocket/trading.gateway';
     BinancePriceFeedService,
     GoAggregatorPriceFeedService,
     PublicWsPayloadParityService,
+    TradingPublicWsMetricsCollectorService,
     DashboardBroadcastService,
     WorkspaceService,
     GetWorkspaceStateQuery,

@@ -8,6 +8,8 @@ Giữ nguyên FE contract `/trading` (Socket.IO) trong quá trình chuyển dầ
 
 - `TICKER_SOURCE=nestjs|go_aggregator`
 - `PUBLIC_WS_SOURCE=nestjs|go`
+- `GO_AGGREGATOR_TICKER_CHANNEL` (default `trading:external:ticker`)
+- `GO_AGGREGATOR_OHLC_CHANNEL` (default `trading:external:ohlc`)
 
 ## Compatibility contract
 

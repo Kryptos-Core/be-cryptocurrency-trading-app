@@ -275,6 +275,26 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS', '20');
       case 'MM_DEFAULT_ORDER_AMOUNT':
         return envOr('MM_DEFAULT_ORDER_AMOUNT', '0.001');
+      case 'MARKET_READ_SOURCE':
+        return envOr('MARKET_READ_SOURCE', 'postgres');
+      case 'TICKER_SOURCE':
+        return envOr('TICKER_SOURCE', 'nestjs');
+      case 'MATCHING_ENGINE':
+        return envOr('MATCHING_ENGINE', 'ts');
+      case 'MATCHING_GO_CANARY_PAIRS':
+        return envOr('MATCHING_GO_CANARY_PAIRS', '');
+      case 'PUBLIC_WS_SOURCE':
+        return envOr('PUBLIC_WS_SOURCE', 'nestjs');
+      case 'GO_AGGREGATOR_TICKER_CHANNEL':
+        return envOr('GO_AGGREGATOR_TICKER_CHANNEL', 'trading:external:ticker');
+      case 'GO_AGGREGATOR_OHLC_CHANNEL':
+        return envOr('GO_AGGREGATOR_OHLC_CHANNEL', 'trading:external:ohlc');
+      case 'MATCHING_SHADOW_MONITOR_PAIRS':
+        return envOr('MATCHING_SHADOW_MONITOR_PAIRS', envOr('MATCHING_GO_CANARY_PAIRS', ''));
+      case 'MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT':
+        return envOr('MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT', '99.9');
+      case 'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS':
+        return envOr('MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS', '0');
       default: {
         const rpcDef = EVM_CHAIN_DEFINITIONS.find((d) => d.rpcConfigKey === key);
         if (rpcDef) {

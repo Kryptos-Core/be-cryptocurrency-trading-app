@@ -279,6 +279,41 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Public WS source',
     description: 'Public market websocket source: nestjs|go.',
   },
+  {
+    key: 'GO_AGGREGATOR_TICKER_CHANNEL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Go aggregator ticker channel',
+    description: 'Redis pub/sub channel used for external Go ticker ingress.',
+  },
+  {
+    key: 'GO_AGGREGATOR_OHLC_CHANNEL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Go aggregator OHLC channel',
+    description: 'Redis pub/sub channel used for external Go OHLC ingress.',
+  },
+  {
+    key: 'MATCHING_SHADOW_MONITOR_PAIRS',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Matching shadow monitor pairs',
+    description: 'Comma-separated pair_id list to collect scheduled shadow parity metrics.',
+  },
+  {
+    key: 'MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.CORE,
+    name: 'Matching shadow min match rate alert',
+    description: 'Raise ops warning when shadow parity drops below this percent.',
+  },
+  {
+    key: 'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Matching shadow max unmatched runs alert',
+    description: 'Raise ops warning when unmatched shadow runs exceed this threshold.',
+  },
 ];
 
 function buildEvmRpcSeeds(baseKeys: Set<string>): RuntimeSettingSeed[] {
