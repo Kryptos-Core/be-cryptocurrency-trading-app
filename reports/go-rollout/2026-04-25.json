@@ -1,0 +1,40 @@
+[
+  {
+    "reportAt": "2026-04-25T21:54:46.882Z",
+    "actorUserId": "tester",
+    "report": {
+      "checkedAt": "2026-04-25T21:54:46.882Z",
+      "windowHours": 24,
+      "flags": {
+        "tickerSource": "nestjs",
+        "matchingEngine": "ts",
+        "publicWsSource": "nestjs",
+        "canaryPairs": [],
+        "monitorPairs": []
+      },
+      "thresholds": {
+        "minMatchRatePercent": 99.9,
+        "maxUnmatchedRuns": 0,
+        "maxPublicWsDriftPairs": 0
+      },
+      "marketReadModel": {
+        "status": "up",
+        "lag": {
+          "trades": 0,
+          "tickers": 0,
+          "ohlcv": 0
+        }
+      },
+      "publicWs": {
+        "contractValid": true,
+        "comparedPairs": 0,
+        "driftPairs": 0
+      },
+      "matchingShadow": {
+        "pairResults": []
+      },
+      "ready": true,
+      "blockers": []
+    }
+  }
+]

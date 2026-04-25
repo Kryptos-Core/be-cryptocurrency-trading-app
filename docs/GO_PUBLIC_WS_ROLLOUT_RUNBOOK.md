@@ -42,3 +42,28 @@ Trong mọi chế độ rollout, payload phải giữ nguyên:
 
 - Private `/notifications` không đổi, vẫn do NestJS phục vụ.
 - Endpoint parity dùng cho ops verification trước khi mở rộng canary.
+
+
+## Readiness evidence
+
+Trước khi mở rộng canary/rollout, lấy readiness report tổng hợp:
+
+- `GET /api/v1/trading/admin/go-rollout-readiness`
+- `POST /api/v1/trading/admin/go-rollout-readiness/snapshot`
+- `GET /api/v1/trading/admin/go-rollout-readiness/snapshots?limit=20`
+- `GET /api/v1/trading/admin/go-rollout-readiness/snapshots/latest`
+
+Snapshot sẽ được lưu ở `reports/go-rollout/YYYY-MM-DD.json` để phục vụ audit acceptance.
+
+
+## Runtime knobs (ops)
+
+Các key nên cấu hình trước khi rollout/canary:
+
+- `GO_AGGREGATOR_TICKER_CHANNEL`
+- `GO_AGGREGATOR_OHLC_CHANNEL`
+- `MATCHING_SHADOW_MONITOR_PAIRS`
+- `MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT`
+- `MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS`
+- `GO_ROLLOUT_WINDOW_HOURS`
+- `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS`

@@ -537,7 +537,7 @@ Acceptance criteria:
 - [x] Đã có scaffold `go-services/matching-engine` và runtime shadow job placeholder.
 - [x] Đã có `shadow_matching_runs` artifact table + parity comparator endpoint (ops) để theo dõi drift theo pair/window.
 - [~] Canary per pair đã có routing nền qua `MATCHING_ENGINE=go_canary` + `MATCHING_GO_CANARY_PAIRS`; chưa có Go matching executor thực chiến.
-- [~] Đã có reconciliation artifact (unmatched order list + parity metrics) cho shadow/canary window và collector schedule + alert threshold; vẫn cần dashboard UI production-grade.
+- [~] Đã có reconciliation artifact (unmatched order list + parity metrics), collector schedule + alert threshold, và readiness snapshot endpoint; vẫn cần dashboard UI production-grade.
 
 Mục tiêu: kiểm chứng matching Go mà không ảnh hưởng tiền/user.
 
@@ -565,7 +565,7 @@ Acceptance criteria:
 - [x] Đã có scaffold `go-services/public-ws-gateway` để chuẩn bị rollout.
 - [~] Đã có compatibility layer ở NestJS side: khi `TICKER_SOURCE=go_aggregator`, backend ingest Redis từ Go và vẫn emit nguyên contract `/trading`; cần hoàn thiện runbook cutover transport phía FE nếu rời Socket.IO.
 - [x] Đã có public payload parity verification (`/trading/admin/public-ws-parity`) cho contract `TickerData` / `OHLCData`.
-- [~] Đã chuẩn hóa runtime toggle `PUBLIC_WS_SOURCE`, thêm health/parity checks cho payload contract và drift; chưa có rollout song song production trong ít nhất một release.
+- [~] Đã chuẩn hóa runtime toggle `PUBLIC_WS_SOURCE`, thêm health/parity checks, go rollout readiness snapshot + history endpoint, và readiness signal (`go_rollout`) trong `/health/ready`; chưa có rollout song song production trong ít nhất một release.
 
 Mục tiêu: scale connection/broadcast public market data mà không phá FE.
 

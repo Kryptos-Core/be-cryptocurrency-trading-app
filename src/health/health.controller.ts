@@ -9,6 +9,7 @@ import { OutboxAdminService } from '@/common/outbox/outbox-admin.service';
 import { RedisService } from '@/common/services/redis.service';
 import { ANALYTICS_DB, MARKET_TS_DB } from '@/config';
 import { MarketReadModelReconciliationService } from '@/modules/markets/market-read-model-reconciliation.service';
+import { GoRolloutReadinessService } from '@/modules/trading/services/go-rollout-readiness.service';
 import { PublicWsPayloadParityService } from '@/modules/trading/services/public-ws-payload-parity.service';
 
 @ApiTags('health')
@@ -26,6 +27,8 @@ export class HealthController {
     private readonly marketReadModelReconciliationService?: MarketReadModelReconciliationService,
     @Optional()
     private readonly publicWsPayloadParityService?: PublicWsPayloadParityService,
+    @Optional()
+    private readonly goRolloutReadinessService?: GoRolloutReadinessService,
   ) {}
 
   @Public()
@@ -103,6 +106,23 @@ export class HealthController {
             degraded,
             contract_valid: contractValid,
             parity: report.goAggregatorParity,
+          },
+        };
+      });
+    }
+
+    const goRolloutReadinessService = this.goRolloutReadinessService;
+    if (goRolloutReadinessService) {
+      checks.push(async () => {
+        const report = await goRolloutReadinessService.getReadiness();
+
+        return {
+          go_rollout: {
+            status: 'up' as const,
+            degraded: !report.ready,
+            ready: report.ready,
+            blockers: report.blockers,
+            window_hours: report.windowHours,
           },
         };
       });

@@ -225,6 +225,14 @@ export class EnvironmentVariables {
   @IsOptional()
   MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS?: string = '0';
 
+  @IsString()
+  @IsOptional()
+  GO_ROLLOUT_WINDOW_HOURS?: string = '24';
+
+  @IsString()
+  @IsOptional()
+  GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS?: string = '0';
+
   /**
    * When true/1/yes/on: log SQL queries via TypeORM. Ignored when NODE_ENV=production.
    */
@@ -778,6 +786,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'MATCHING_SHADOW_MONITOR_PAIRS',
     'MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT',
     'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS',
+    'GO_ROLLOUT_WINDOW_HOURS',
+    'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS',
     'TYPEORM_DEBUG_SQL',
     'MM_DEFAULT_SPREAD_BPS',
     'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',

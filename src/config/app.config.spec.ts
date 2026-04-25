@@ -51,6 +51,8 @@ describe('createAppConfig', () => {
       MATCHING_SHADOW_MONITOR_PAIRS: 'pair-1,pair-2',
       MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT: '97.5',
       MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS: '2',
+      GO_ROLLOUT_WINDOW_HOURS: '12',
+      GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS: '1',
       MATCHING_ENGINE: 'go_shadow',
       TICKER_SOURCE: 'go_aggregator',
       MARKET_READ_SOURCE: 'timescale',
@@ -70,6 +72,8 @@ describe('createAppConfig', () => {
     expect(config.featureFlags.matchingShadowMonitorPairs).toEqual(['pair-1', 'pair-2']);
     expect(config.featureFlags.matchingShadowAlertMinMatchRatePercent).toBe(97.5);
     expect(config.featureFlags.matchingShadowAlertMaxUnmatchedRuns).toBe(2);
+    expect(config.featureFlags.goRolloutWindowHours).toBe(12);
+    expect(config.featureFlags.goRolloutMaxPublicWsDriftPairs).toBe(1);
     expect(config.featureFlags.eventOutboxEnabled).toBe(false);
     expect(config.featureFlags.matchingGoCanaryPairs).toEqual(['BTC_USDT', 'ETH_USDT']);
   });

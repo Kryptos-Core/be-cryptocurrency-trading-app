@@ -314,6 +314,20 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Matching shadow max unmatched runs alert',
     description: 'Raise ops warning when unmatched shadow runs exceed this threshold.',
   },
+  {
+    key: 'GO_ROLLOUT_WINDOW_HOURS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Go rollout readiness window (hours)',
+    description: 'Window size in hours used by go rollout readiness checks.',
+  },
+  {
+    key: 'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Go rollout max public WS drift pairs',
+    description: 'Maximum allowed drift pair count before rollout readiness fails.',
+  },
 ];
 
 function buildEvmRpcSeeds(baseKeys: Set<string>): RuntimeSettingSeed[] {

@@ -308,5 +308,129 @@
         "error": "Wallet not found for user uid-1 and currency cid-1"
       }
     ]
+  },
+  {
+    "reportAt": "2026-04-25T21:36:31.869Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-25T21:36:31.874Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
+  },
+  {
+    "reportAt": "2026-04-25T21:41:46.532Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-25T21:41:46.539Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
+  },
+  {
+    "reportAt": "2026-04-25T21:52:06.363Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-25T21:52:06.371Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
+  },
+  {
+    "reportAt": "2026-04-25T21:55:24.995Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-25T21:55:25.001Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
   }
 ]

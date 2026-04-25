@@ -7,6 +7,7 @@ import { GetWorkspaceStateQuery } from './application/queries/get-workspace-stat
 import { TradingOpsController } from './trading-ops.controller';
 import { BinancePriceFeedService } from './services/binance-price-feed.service';
 import { GoAggregatorPriceFeedService } from './services/go-aggregator-price-feed.service';
+import { GoRolloutReadinessService } from './services/go-rollout-readiness.service';
 import { PublicWsPayloadParityService } from './services/public-ws-payload-parity.service';
 import { DashboardBroadcastService } from './services/dashboard-broadcast.service';
 import { TradingPriceStreamService } from './services/trading-price-stream.service';
@@ -36,6 +37,7 @@ import { TradingGateway } from './websocket/trading.gateway';
     BinancePriceFeedService,
     GoAggregatorPriceFeedService,
     PublicWsPayloadParityService,
+    GoRolloutReadinessService,
     TradingPublicWsMetricsCollectorService,
     DashboardBroadcastService,
     WorkspaceService,

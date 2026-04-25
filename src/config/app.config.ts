@@ -54,6 +54,8 @@ export interface AppConfig {
     matchingShadowMonitorPairs: string[];
     matchingShadowAlertMinMatchRatePercent: number;
     matchingShadowAlertMaxUnmatchedRuns: number;
+    goRolloutWindowHours: number;
+    goRolloutMaxPublicWsDriftPairs: number;
     eventOutboxEnabled: boolean;
     eventSchemaFormat: string;
     eventPublisherDriver: string;
@@ -462,6 +464,10 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       ),
       matchingShadowAlertMaxUnmatchedRuns: Number(
         env.MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS || '0',
+      ),
+      goRolloutWindowHours: Number(env.GO_ROLLOUT_WINDOW_HOURS || '24'),
+      goRolloutMaxPublicWsDriftPairs: Number(
+        env.GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS || '0',
       ),
       eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
       eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',

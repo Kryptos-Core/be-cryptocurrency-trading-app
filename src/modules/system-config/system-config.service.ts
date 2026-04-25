@@ -295,6 +295,10 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT', '99.9');
       case 'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS':
         return envOr('MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS', '0');
+      case 'GO_ROLLOUT_WINDOW_HOURS':
+        return envOr('GO_ROLLOUT_WINDOW_HOURS', '24');
+      case 'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS':
+        return envOr('GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS', '0');
       default: {
         const rpcDef = EVM_CHAIN_DEFINITIONS.find((d) => d.rpcConfigKey === key);
         if (rpcDef) {
