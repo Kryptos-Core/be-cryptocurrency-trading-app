@@ -2,12 +2,12 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Convert all tables to UUID v7 (CHAR(36)) for primary and foreign keys.
- * Drops all stored procedures that reference these tables, then drops and recreates tables.
+ * Drops all legacy MySQL legacy MySQL stored procedures that reference these tables, then drops and recreates tables.
  * Run migration 1768227700000-RecreateProceduresUuidV7 after this to recreate procedures.
  */
 export class ConvertAllIdsToUuidV71768227600000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ---- 1. Drop all stored procedures ----
+    // ---- 1. Drop all legacy MySQL legacy MySQL stored procedures ----
     const procedures = [
       'sp_order_count_by_user',
       'sp_order_find_by_user',

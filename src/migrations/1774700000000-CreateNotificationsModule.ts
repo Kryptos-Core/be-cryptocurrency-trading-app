@@ -8,7 +8,7 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * - notifications table
  * - user_notifications table
  * - fcm_token column on users table
- * - 5 stored procedures for notification CRUD
+ * - 5 legacy MySQL legacy MySQL stored procedures for notification CRUD
  */
 export class CreateNotificationsModule1774700000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

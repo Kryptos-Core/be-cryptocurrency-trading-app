@@ -1,11 +1,11 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Fix market stored procedure signatures to match MarketRepository:
+ * Fix market legacy MySQL stored procedure signatures to match MarketRepository:
  * - sp_market_find_all: 3 params (p_skip, p_limit, p_include_inactive)
  * - sp_market_count: 2 params (IN p_include_inactive, OUT p_total)
  * Use when DB has older/different versions (e.g. 5/4 params).
- * Database Procedure Pattern: contract between Repository and Stored Procedure.
+ * Legacy database-procedure pattern: contract between Repository and Stored Procedure.
  */
 export class FixSpMarketFindAllSignature1768228100000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

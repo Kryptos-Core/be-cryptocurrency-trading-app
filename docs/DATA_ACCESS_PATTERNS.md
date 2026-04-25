@@ -1,4 +1,4 @@
-# Quyết định tầng Data Access (Repository + ORM + Stored Procedure)
+# Quyết định tầng Data Access (Repository + ORM + Raw SQL)
 
 Tài liệu này mô tả **khi nào** dùng `BaseRepository`, **repository tùy biến**, hoặc **Service inject `DataSource` trực tiếp** trong backend NestJS + TypeORM. Mục tiêu: tách **business orchestration** (Service) khỏi **persistence** (Repository), đồng thời giữ **KISS** — không ép một pattern cho mọi file.
 
@@ -46,7 +46,7 @@ async createEntry(entry: LedgerEntryInput, ctx?: TransactionContext): Promise<Wa
 
 Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ SP ghi + QB đọc admin) phải có **lý do trong PR** hoặc **ADR** — xem [ARCHITECTURE.md](./ARCHITECTURE.md) (tổng quan kiến trúc + outbox/read model).
 
-| Loại thao tác | Stored procedure | ORM (`find` / `save`) | QueryBuilder | Raw (ngoài `CALL`) |
+| Loại thao tác | Legacy migration SQL | ORM (`find` / `save`) | QueryBuilder | Raw SQL |
 |---------------|------------------|------------------------|--------------|---------------------|
 | **Ghi nghiệp vụ nhiều bước / invariant** | Ưu tiên | Tránh (trừ transaction đơn giản một bảng) | Hiếm | Hiếm |
 | **Đọc theo khóa / một dòng** | Tùy module | Thường dùng | Khi cần projection | Migration / seed |
@@ -57,7 +57,7 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 | Module / bounded context | Ghi chú ngắn |
 |--------------------------|--------------|
-| **Orders / Matching** | Repository PostgreSQL-native cho khớp lệnh / sổ lệnh; không còn phụ thuộc helper OUT param kiểu MySQL |
+| **Orders / Matching** | Repository PostgreSQL-native cho khớp lệnh / sổ lệnh; không còn phụ thuộc OUT param/session variable kiểu MySQL |
 | **Users / Auth** | Chủ yếu SP + chỗ filter list dùng QueryBuilder (`UsersRepository`); Auth dùng **Clean Architecture** (`domain/ports/`, `application/use-cases/`) |
 | **Markets / Currencies / Wallets** | SP + `BaseRepository` tùy endpoint |
 | **Treasury main wallet** | ORM qua `TreasuryMainWalletRepository`; service không `getRepository` |
@@ -86,7 +86,7 @@ Chọn **một** lớp chính cho mỗi thao tác; khi cần hai lớp (ví dụ
 
 ## Database Query Pattern
 
-- **Repository** (hoặc lớp data access tương đương) ưu tiên SQL/QueryBuilder tương thích PostgreSQL, không phụ thuộc `CALL sp_*` hay session variable kiểu MySQL.
+- **Repository** (hoặc lớp data access tương đương) ưu tiên SQL/QueryBuilder/PostgreSQL-native transaction flow; không phụ thuộc `CALL sp_*` hay session variable kiểu MySQL trong runtime hiện tại.
 - **Service** không ghép chuỗi SQL động cho logic nghiệp vụ; tham số luôn bind qua placeholder.
 - Với legacy placeholder `?`, adapter PostgreSQL tại `src/common/database/pg-placeholder-adapter.ts` chỉ đóng vai trò transitional safety net trong lúc dọn nốt code cũ.
 

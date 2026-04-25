@@ -1,8 +1,8 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Create Stored Procedures for Users Operations
- * Sử dụng procedures thay vì raw ORM queries
+ * Create legacy MySQL legacy MySQL legacy MySQL stored procedures for Users Operations
+ * Lịch sử: dùng procedures thay vì raw ORM queries
  * Lợi ích:
  * - Security: Tránh SQL injection
  * - Performance: Query được optimize ở DB

@@ -4,7 +4,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Fix sp_wallet_get_or_create_for_update: remove internal START TRANSACTION/COMMIT
  * so the procedure runs inside the caller's transaction (TypeORM transaction).
  * When called from WalletsService.applyTransaction(), the procedure must not
- * start its own transaction or MySQL/connection behavior causes "Failed to get or create wallet".
+ * start its own transaction or legacy MySQL/connection behavior causes "Failed to get or create wallet".
  */
 export class FixWalletGetOrCreateProcedure1768226950000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

@@ -1,15 +1,15 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Migration: Create Stored Procedures for Wallets
+ * Migration: Create legacy MySQL legacy MySQL legacy MySQL stored procedures for Wallets
  *
- * Stored Procedures được tạo để:
+ * Legacy MySQL legacy MySQL legacy MySQL stored procedures được tạo để:
  * - Tăng security (SQL injection protection)
  * - Tăng performance (DB-level transaction management)
  * - Quản lý balance atomically với pessimistic locking
  * - Double-entry accounting cho wallet ledger
  *
- * Design Pattern: Database Procedure Pattern + Unit of Work Pattern
+ * Design Pattern: Legacy database-procedure pattern + Unit of Work Pattern
  */
 export class CreateWalletsProcedures1768226600000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

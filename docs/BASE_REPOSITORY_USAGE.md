@@ -47,4 +47,4 @@ export class CurrencyRepository extends BaseRepository<Currency> {
 
 - BaseRepository tự động xác định khóa chính (primary key) từ metadata của entity.
 - Sử dụng `transaction(...)` khi cập nhật nhiều bảng trong cùng một luồng nghiệp vụ.
-- `query(...)` được dùng cho các stored procedure và các câu lệnh SQL không thuận tiện khi sử dụng QueryBuilder.
+- `query(...)` được dùng cho raw SQL đặc thù, truy vấn tối ưu hóa, hoặc compatibility code/migration lịch sử; runtime mới ưu tiên repository PostgreSQL-native.

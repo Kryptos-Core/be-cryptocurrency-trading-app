@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Retire Ethereum Sepolia: rewrite rows to BSC Chapel, drop Sepolia from MySQL ENUMs,
+ * Retire Ethereum Sepolia: rewrite rows to BSC Chapel, drop Sepolia from legacy MySQL ENUMs,
  * and remove Sepolia-related runtime config keys.
  */
 const chainEnumWithoutSepolia = `'TRON_NILE','TRON_SHASTA','TRON_MAINNET','SOLANA_DEVNET','SOLANA_MAINNET','ETH_MAINNET','BSC_CHAPEL','BSC_MAINNET'`;

@@ -6,9 +6,9 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * does not split the body by semicolons (avoids ER_PARSE_ERROR on multi-statement procedures).
  */
 /**
- * Migration: Create Stored Procedures for Orders
+ * Migration: Create legacy MySQL legacy MySQL legacy MySQL stored procedures for Orders
  *
- * Database Procedure Pattern: order CRUD and order book via stored procedures.
+ * Legacy database-procedure pattern: order CRUD and order book via legacy MySQL legacy MySQL stored procedures.
  * Idempotency and order creation/cancellation are handled at DB layer where needed.
  */
 export class CreateOrdersProcedures1768227100000 implements MigrationInterface {

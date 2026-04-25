@@ -2,7 +2,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 import { runProcedureSql } from './helpers/raw-procedure-connection.util';
 
 /**
- * Recreate Orders stored procedures for UUID v7 (CHAR(36) for order_id, user_id, pair_id).
+ * Recreate Orders legacy MySQL legacy MySQL stored procedures for UUID v7 (CHAR(36) for order_id, user_id, pair_id).
  * Run after ConvertAllIdsToUuidV7 (which drops these procedures).
  */
 export class RecreateOrdersProceduresUuidV71768228000000 implements MigrationInterface {

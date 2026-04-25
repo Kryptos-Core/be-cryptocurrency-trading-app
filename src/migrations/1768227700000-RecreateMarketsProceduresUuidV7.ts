@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Recreate market stored procedures for UUID v7 schema.
+ * Recreate market legacy MySQL legacy MySQL stored procedures for UUID v7 schema.
  * All ID parameters use CHAR(36). Run after 1768227600000-ConvertAllIdsToUuidV7.
  */
 export class RecreateMarketsProceduresUuidV71768227700000 implements MigrationInterface {

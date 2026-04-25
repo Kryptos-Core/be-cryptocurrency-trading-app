@@ -6,6 +6,27 @@
 
 ---
 
+## 0. Tiến Độ Thực Tế Cập Nhật (2026-04-25)
+
+### Đã hoàn thành trong repo backend
+
+- Runtime backend đã chuyển sang hướng **PostgreSQL-only** cho core persistence; build hiện tại không còn phụ thuộc MySQL runtime path.
+- Đã thêm và kích hoạt `pg-placeholder-adapter` để chặn lỗi cú pháp từ placeholder legacy `?` trong giai đoạn chuyển tiếp.
+- Các repository/runtime batch lớn đã được migrate hoặc chuẩn hóa theo PostgreSQL gồm: blockchain, wallets, treasury, notifications, deposits, payment-config, currencies, auth/users, markets, orders, exchange.
+- Đã retire các helper/constants MySQL legacy khỏi runtime: stored-procedure name constants, OUT-var helpers, stored-procedure result util.
+- Lint/type cleanup đã được dọn theo batch; trạng thái verify gần nhất của repo hiện tại là:
+  - `npm run lint -- --max-diagnostics=220` ✅
+  - `npx tsc --noEmit` ✅
+  - `npm run build` ✅
+  - `npm run test -- --runInBand` ✅
+- Docs trọng yếu đã được cập nhật theo trạng thái hiện tại: PostgreSQL + Redis infra, PostgreSQL runtime config, và wording loại bỏ MySQL runtime claims.
+
+### Còn tồn tại có chủ đích / lịch sử
+
+- Nhiều **migration lịch sử** vẫn chứa DDL/procedure MySQL cũ để bảo toàn historical trace; đây không còn là runtime source of truth hiện tại.
+- Một số helper/spec/migration comments còn tồn tại để mô tả bối cảnh lịch sử migration MySQL -> PostgreSQL; cần dọn tiếp theo batch tài liệu nếu muốn repo “sạch dấu vết” hơn.
+- Roadmap các phase dài hạn (TimescaleDB, ClickHouse, Go services, canary/shadow matching, public WS tách riêng) **chưa triển khai**, mới dừng ở phần bắt buộc: PostgreSQL-only core + cleanup/verifications.
+
 ## 1. Hiện Trạng Đã Ghi Nhận
 
 ### 1.1 Backend hiện tại

@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Recreate user and wallet stored procedures for UUID v7 schema.
+ * Recreate user and wallet legacy MySQL legacy MySQL stored procedures for UUID v7 schema.
  * All ID parameters use CHAR(36). Run after 1768227700000-RecreateMarketsProceduresUuidV7.
  */
 export class RecreateUsersAndWalletsProceduresUuidV71768227800000 implements MigrationInterface {

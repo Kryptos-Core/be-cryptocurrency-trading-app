@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Migration: Drop OHLCV table and related stored procedures.
+ * Migration: Drop OHLCV table and related legacy MySQL legacy MySQL stored procedures.
  * OHLCV data is now provided on-demand by Price Oracle (Binance); no DB persist.
  */
 export class DropOHLCVTable1768227400000 implements MigrationInterface {

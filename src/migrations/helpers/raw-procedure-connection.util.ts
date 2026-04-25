@@ -1,5 +1,7 @@
 import type { QueryRunner } from 'typeorm';
 
+/** Historical helper used only by legacy MySQL procedure migrations kept for repository history. */
+
 type QueryCapable = {
   query: (sql: string) => Promise<unknown>;
 };

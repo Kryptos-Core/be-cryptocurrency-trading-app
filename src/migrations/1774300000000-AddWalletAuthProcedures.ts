@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Wallet Auth: stored procedures for find user by linked wallet and create wallet-only user.
+ * Wallet Auth: legacy MySQL legacy MySQL stored procedures for find user by linked wallet and create wallet-only user.
  */
 export class AddWalletAuthProcedures1774300000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

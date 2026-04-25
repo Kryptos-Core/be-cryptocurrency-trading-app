@@ -2,7 +2,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Fix sp_order_book: ORDER BY must not use columns outside GROUP BY.
- * MySQL ONLY_FULL_GROUP_BY: "Expression #2 of ORDER BY clause (created_at) is not in GROUP BY".
+ * Legacy MySQL ONLY_FULL_GROUP_BY: "Expression #2 of ORDER BY clause (created_at) is not in GROUP BY".
  * Order book is aggregated by price; ordering by created_at is invalid after GROUP BY price.
  * - SELL (asks): best ask first = price ASC.
  * - BUY (bids): best bid first = price DESC.

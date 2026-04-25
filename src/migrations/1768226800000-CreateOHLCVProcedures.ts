@@ -1,9 +1,9 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Migration: Create Stored Procedures for OHLCV
+ * Migration: Create legacy MySQL legacy MySQL legacy MySQL stored procedures for OHLCV
  *
- * Database Procedure Pattern: Data access via stored procedure
+ * Legacy database-procedure pattern: Data access via legacy MySQL stored procedure
  * - sp_ohlcv_get_by_pair_interval: read by pair + interval (TradingView historical)
  * - sp_ohlcv_upsert: insert or update one candle (persist realtime stream to DB)
  */

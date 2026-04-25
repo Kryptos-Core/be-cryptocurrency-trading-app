@@ -1,8 +1,8 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Add stored procedures for market list with search and filter.
- * Repository Pattern + Database Procedure Pattern: search/filter logic in DB layer.
+ * Add legacy MySQL legacy MySQL stored procedures for market list with search and filter.
+ * Repository Pattern + Legacy database-procedure pattern: search/filter logic in DB layer.
  * - sp_market_find_all_filtered: paginated list with optional search (symbol LIKE) and base/quote filters
  * - sp_market_count_filtered: total count with same filters
  */
