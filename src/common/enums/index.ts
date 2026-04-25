@@ -78,6 +78,8 @@ export enum Permission {
   ORDERS_MANAGE = 'orders:manage',
   /** Ops: POST reconcile matching for a pair (manual recovery, admin/risk). */
   MATCHING_RECONCILE = 'matching:reconcile',
+  /** Ops: inspect go-shadow parity and drift artifacts. */
+  MATCHING_SHADOW_OBSERVE = 'matching:shadow_observe',
   ORDERS_BATCH_PLACE = 'orders:batch_place',
   MARKET_MAKER_CONFIG = 'market_maker:config',
   MARKET_MAKER_DASHBOARD = 'market_maker:dashboard',

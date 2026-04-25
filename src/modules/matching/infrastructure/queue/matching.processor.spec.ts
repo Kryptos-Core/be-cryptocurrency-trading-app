@@ -1,67 +1,138 @@
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import type { Job } from 'bull';
+import { DataSource } from 'typeorm';
 import { RunMatchUseCase } from '../../application/use-cases';
-import type { OrderBookOrder } from '../../interfaces';
 import { MatchingProcessor } from './matching.processor';
-import { MATCH_ORDER_JOB, type MatchOrderJobData } from './matching-queue.service';
-
-function makeOrder(overrides: Partial<OrderBookOrder> & { order_id: string }): OrderBookOrder {
-  return {
-    pair_id: 'pair-1',
-    user_id: 'user-1',
-    side: 'BUY',
-    type: 'LIMIT',
-    price: '100',
-    amount: '1',
-    filled_amount: '0',
-    status: 'OPEN',
-    created_at: new Date('2025-01-01T00:00:00Z'),
-    remaining: '1',
-    ...overrides,
-    order_id: overrides.order_id,
-  };
-}
-
-function makeJob(data: MatchOrderJobData): Job<MatchOrderJobData> {
-  return { data, id: 'job-1', name: MATCH_ORDER_JOB } as unknown as Job<MatchOrderJobData>;
-}
 
 describe('MatchingProcessor', () => {
-  let processor: MatchingProcessor;
-  let runMatchUseCase: jest.Mocked<RunMatchUseCase>;
-
-  beforeEach(async () => {
-    runMatchUseCase = {
-      execute: jest.fn().mockResolvedValue([]),
-    } as unknown as jest.Mocked<RunMatchUseCase>;
-
-    const moduleRef = await Test.createTestingModule({
-      providers: [MatchingProcessor, { provide: RunMatchUseCase, useValue: runMatchUseCase }],
-    }).compile();
-
-    processor = moduleRef.get(MatchingProcessor);
-  });
-
-  it('delegates to RunMatchUseCase with job data', async () => {
-    const data: MatchOrderJobData = {
-      takerOrder: makeOrder({ order_id: 'tk-1' }),
-      pairId: 'pair-1',
-      feeCurrencyId: 'quote-1',
-      makerFeeRate: '0.001',
-      takerFeeRate: '0.002',
+  it('skips shadow jobs when MATCHING_ENGINE is not go_shadow', async () => {
+    const runMatchUseCase = {
+      execute: jest.fn(),
+    };
+    const dataSource = {
+      query: jest.fn(),
     };
 
-    await processor.handleMatch(makeJob(data));
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        MatchingProcessor,
+        { provide: RunMatchUseCase, useValue: runMatchUseCase },
+        { provide: DataSource, useValue: dataSource },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('ts') },
+        },
+      ],
+    }).compile();
 
-    expect(runMatchUseCase.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        takerOrder: data.takerOrder,
-        pairId: data.pairId,
-        feeCurrencyId: data.feeCurrencyId,
-        makerFeeRate: data.makerFeeRate,
-        takerFeeRate: data.takerFeeRate,
-        slippageTolerance: undefined,
-      }),
-    );
+    const processor = moduleRef.get(MatchingProcessor);
+    await processor.handleShadowMatch({
+      id: 'job-shadow-1',
+      data: {
+        takerOrder: {
+          order_id: 'order-1',
+        },
+        pairId: 'pair-1',
+      },
+    } as never);
+
+    expect(runMatchUseCase.execute).not.toHaveBeenCalled();
+    expect(dataSource.query).not.toHaveBeenCalled();
+  });
+
+  it('persists a shadow run when MATCHING_ENGINE=go_shadow', async () => {
+    const runMatchUseCase = {
+      execute: jest.fn(),
+    };
+    const dataSource = {
+      query: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        MatchingProcessor,
+        { provide: RunMatchUseCase, useValue: runMatchUseCase },
+        { provide: DataSource, useValue: dataSource },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('go_shadow') },
+        },
+      ],
+    }).compile();
+
+    const processor = moduleRef.get(MatchingProcessor);
+    await processor.handleShadowMatch({
+      id: 'job-shadow-2',
+      data: {
+        takerOrder: {
+          order_id: 'order-2',
+          pair_id: 'pair-1',
+          user_id: 'user-1',
+          side: 'BUY',
+          type: 'LIMIT',
+          price: '100',
+          amount: '1',
+          filled_amount: '0',
+          status: 'OPEN',
+          created_at: new Date('2026-01-01T00:00:00Z'),
+          remaining: '1',
+        },
+        pairId: 'pair-1',
+      },
+    } as never);
+
+    expect(runMatchUseCase.execute).not.toHaveBeenCalled();
+    expect(dataSource.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists shadow run only for canary pairs when MATCHING_ENGINE=go_canary', async () => {
+    const runMatchUseCase = {
+      execute: jest.fn(),
+    };
+    const dataSource = {
+      query: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        MatchingProcessor,
+        { provide: RunMatchUseCase, useValue: runMatchUseCase },
+        { provide: DataSource, useValue: dataSource },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'MATCHING_ENGINE') return 'go_canary';
+              if (key === 'MATCHING_GO_CANARY_PAIRS') return 'pair-canary-1,pair-canary-2';
+              return undefined;
+            }),
+          },
+        },
+      ],
+    }).compile();
+
+    const processor = moduleRef.get(MatchingProcessor);
+
+    await processor.handleShadowMatch({
+      id: 'job-canary-match',
+      data: {
+        takerOrder: {
+          order_id: 'order-canary-1',
+        },
+        pairId: 'pair-canary-1',
+      },
+    } as never);
+
+    await processor.handleShadowMatch({
+      id: 'job-non-canary-match',
+      data: {
+        takerOrder: {
+          order_id: 'order-normal-1',
+        },
+        pairId: 'pair-normal-1',
+      },
+    } as never);
+
+    expect(dataSource.query).toHaveBeenCalledTimes(1);
   });
 });

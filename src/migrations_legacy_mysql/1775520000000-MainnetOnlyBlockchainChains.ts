@@ -9,7 +9,13 @@ const finalChainEnum = `'TRON_MAINNET','SOLANA_MAINNET','ETH_SEPOLIA','ETH_MAINN
  */
 export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterface {
   private isPostgres(queryRunner: QueryRunner): boolean {
-    return queryRunner.connection.options.type === 'postgres';
+    const connectionType =
+      (queryRunner as unknown as { connection?: { options?: { type?: string } } }).connection
+        ?.options?.type ??
+      (queryRunner as unknown as { dataSource?: { options?: { type?: string } } }).dataSource
+        ?.options?.type;
+
+    return connectionType === 'postgres';
   }
 
   private buildKeyJoinCondition(

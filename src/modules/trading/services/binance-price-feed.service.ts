@@ -46,6 +46,7 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
 
   /** Demand-based kline symbols: pair_id -> symbol. Populated via EventEmitter2 OHLC events. */
   private readonly activeKlineSymbols = new Map<string, string>(); // pair_id -> symbol
+  private readonly tickerSource: string;
 
   constructor(
     readonly _configService: ConfigService,
@@ -57,6 +58,9 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
     private readonly marketRepository: MarketRepositoryPort,
   ) {
     this.priceFeedClient = new BinanceWebSocketPriceFeedClient();
+    this.tickerSource = (this._configService.get<string>('TICKER_SOURCE') ?? 'nestjs')
+      .trim()
+      .toLowerCase();
   }
 
   private shouldLog(key: string, windowMs: number = RATE_LIMIT_LOG_MS): boolean {
@@ -67,6 +71,13 @@ export class BinancePriceFeedService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    if (this.tickerSource !== 'nestjs') {
+      this.logger.log(
+        `Binance ticker feed disabled because TICKER_SOURCE=${this.tickerSource}; expecting external ticker producer`,
+      );
+      return;
+    }
+
     await this.loadPairSymbolMapping();
     await this.requestSymbolsForSubscriptions();
   }

@@ -107,6 +107,30 @@ export class OrdersController {
     return this.reconcileMatchingForPairUseCase.execute(pairId);
   }
 
+  @Get('admin/shadow-parity/:pairId')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MATCHING_SHADOW_OBSERVE)
+  @ApiOperation({
+    summary: 'Admin/Ops: Matching go-shadow parity summary',
+    description:
+      'Returns shadow-run artifacts vs executed trades summary for a pair in a given time window.',
+  })
+  @ApiParam({
+    name: 'pairId',
+    type: String,
+    description: 'Market pair_id (UUID) or symbol BASE/QUOTE (e.g. BTC/USDT, URL-encoded)',
+  })
+  @ApiQuery({ name: 'windowHours', required: false, type: Number, example: 24 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  async getShadowParitySummary(
+    @Param('pairId') pairId: string,
+    @Query('windowHours', new DefaultValuePipe(24), ParseIntPipe) windowHours: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    return this.reconcileMatchingForPairUseCase.shadowParity(pairId, windowHours, limit);
+  }
+
   @Get('book/:pairId')
   @ApiOperation({ summary: 'Order book', description: 'Get order book for a pair and side.' })
   @ApiParam({ name: 'pairId', type: String, description: 'Pair UUID' })

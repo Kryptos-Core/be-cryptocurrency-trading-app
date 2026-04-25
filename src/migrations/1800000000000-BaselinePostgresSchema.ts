@@ -134,6 +134,9 @@ export class BaselinePostgresSchema1800000000000 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "idx_onchain_tx_user" ON "onchain_transactions" ("user_id", "type", "status") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "uk_onchain_tx_chain_hash_log" ON "onchain_transactions" ("chain", "tx_hash", "log_index") `);
         await queryRunner.query(`CREATE TYPE "public"."deposit_match_requests_status_enum" AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')`);
+        await queryRunner.query(`CREATE TABLE "shadow_matching_runs" ("run_id" character varying(64) NOT NULL, "pair_id" character(36) NOT NULL, "order_id" character(36) NOT NULL, "mode" character varying(32) NOT NULL, "status" character varying(32) NOT NULL, "payload" jsonb NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_shadow_matching_runs" PRIMARY KEY ("run_id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_shadow_matching_runs_pair_created" ON "shadow_matching_runs" ("pair_id", "created_at") `);
+        await queryRunner.query(`CREATE INDEX "idx_shadow_matching_runs_order" ON "shadow_matching_runs" ("order_id") `);
         await queryRunner.query(`CREATE TABLE "deposit_match_requests" ("match_id" character(36) NOT NULL, "tx_id" character(36) NOT NULL, "requested_user_id" character(36) NOT NULL, "proposer_id" character(36) NOT NULL, "proposer_role" character varying(50) NOT NULL, "approver_id" character(36), "approver_role" character varying(50), "status" "public"."deposit_match_requests_status_enum" NOT NULL DEFAULT 'PENDING', "idempotency_key" character varying(64) NOT NULL, "proposed_at" TIMESTAMP(3) NOT NULL DEFAULT ('now'::text)::timestamp(3) with time zone, "resolved_at" TIMESTAMP(3), "audit_log" json NOT NULL DEFAULT (JSON_ARRAY()), CONSTRAINT "UQ_a9fbdee7007ec8d184f37b9da83" UNIQUE ("idempotency_key"), CONSTRAINT "PK_300b18945914e1eed9c873ecd2f" PRIMARY KEY ("match_id"))`);
         await queryRunner.query(`CREATE INDEX "idx_deposit_match_approver_date" ON "deposit_match_requests" ("approver_id", "resolved_at") `);
         await queryRunner.query(`CREATE INDEX "idx_deposit_match_proposer_date" ON "deposit_match_requests" ("proposer_id", "proposed_at") `);
@@ -251,6 +254,9 @@ export class BaselinePostgresSchema1800000000000 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "market_pairs" DROP CONSTRAINT "FK_53f945c698b9bfb03485fceddf4"`);
         await queryRunner.query(`ALTER TABLE "currency_networks" DROP CONSTRAINT "FK_82da04dcc43079dcf05ea1eb401"`);
         await queryRunner.query(`ALTER TABLE "currency_networks" DROP CONSTRAINT "FK_5aaf9dee3ec9e7b7f7324c78f01"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_shadow_matching_runs_order"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_shadow_matching_runs_pair_created"`);
+        await queryRunner.query(`DROP TABLE "shadow_matching_runs"`);
         await queryRunner.query(`DROP INDEX "public"."uk_deposit_match_tx"`);
         await queryRunner.query(`DROP INDEX "public"."idx_deposit_match_proposer_date"`);
         await queryRunner.query(`DROP INDEX "public"."idx_deposit_match_approver_date"`);

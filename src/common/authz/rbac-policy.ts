@@ -33,6 +33,8 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.ORDERS_READ,
     /** Khôi phục khớp lệnh thủ công theo cặp khi cần */
     Permission.MATCHING_RECONCILE,
+    /** Quan sát parity drift cho shadow/canary matching */
+    Permission.MATCHING_SHADOW_OBSERVE,
     /** Vận hành/replay integration outbox khi projection hoặc publisher lỗi */
     Permission.OUTBOX_MANAGE,
   ],
@@ -58,6 +60,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.ORDERS_READ,
     Permission.ORDERS_MANAGE,
     Permission.MATCHING_RECONCILE,
+    Permission.MATCHING_SHADOW_OBSERVE,
     Permission.WALLETS_READ,
     Permission.WALLETS_MANAGE,
     Permission.WALLETS_WITHDRAW,
@@ -82,5 +85,3 @@ export function hasPermission(
   const granted = new Set(getPermissionsForRole(role));
   return requiredPermissions.every((permission) => granted.has(permission));
 }
-
-

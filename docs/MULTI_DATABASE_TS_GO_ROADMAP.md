@@ -31,9 +31,9 @@
 | Phase 2 | PostgreSQL core source of truth replacement | Near complete | Đây là phần tiến xa nhất; runtime đã PostgreSQL-only |
 | Phase 3 | Market read model trên DB phụ | In progress | Đã có trades/ticker/OHLCV projection nền, read-path feature-flag, reconciliation + lag health/metrics/admin report; chưa hoàn tất Timescale end-to-end |
 | Phase 4 | Event/outbox contract chuẩn cho TS và Go | In progress / near complete | Contract/outbox foundation, DLQ replay, metrics/health và publisher scaffold đã khá đầy đủ; còn thiếu hardening dài hạn |
-| Phase 5 | Go market aggregator | Not started | Chưa có `go-services/market-aggregator` chạy shadow |
-| Phase 6 | Go matching engine shadow mode | Not started | Chưa có shadow parity/canary flow cho matching Go |
-| Phase 7 | Public WS gateway bằng Go | Not started | Chưa tách public market WS khỏi NestJS |
+| Phase 5 | Go market aggregator | In progress (scaffold) | Đã có scaffold `go-services/market-aggregator`, chưa chạy shadow thực chiến |
+| Phase 6 | Go matching engine shadow mode | In progress (scaffold) | Đã có shadow enqueue placeholder + artifact table, chưa có parity/canary đầy đủ |
+| Phase 7 | Public WS gateway bằng Go | In progress (scaffold) | Đã có scaffold `go-services/public-ws-gateway`, chưa có traffic rollout |
 
 ### 0.3 Đã hoàn thành trong repo backend
 
@@ -503,13 +503,13 @@ Acceptance criteria:
 
 ### Phase 5 - Go Market Aggregator Trước
 
-**Trạng thái hiện tại:** Not started  
-**Tiến độ ước lượng:** 0-5%
+**Trạng thái hiện tại:** In progress (scaffold)  
+**Tiến độ ước lượng:** 15-25%
 
 **Checklist trạng thái:**
 - [x] Hướng kiến trúc đã xác định rõ: Go market aggregator là bước Go ưu tiên trước matching.
-- [ ] Chưa có `go-services/market-aggregator` trong runtime rollout hiện tại.
-- [ ] Chưa có consume `trade.executed` bằng Go để build ticker/OHLCV thực chiến.
+- [x] Đã có scaffold `go-services/market-aggregator` để chuẩn bị wiring CI/deploy.
+- [~] Đã có skeleton service và config contract; chưa consume `trade.executed` thực chiến.
 - [ ] Chưa có shadow compare NestJS ticker vs Go ticker.
 - [ ] Chưa có rollback flow thực tế bằng `TICKER_SOURCE=nestjs` cho Go aggregator rollout.
 
@@ -529,15 +529,15 @@ Acceptance criteria:
 
 ### Phase 6 - Go Matching Engine Shadow Mode
 
-**Trạng thái hiện tại:** Not started  
-**Tiến độ ước lượng:** 0-5%
+**Trạng thái hiện tại:** In progress (scaffold)  
+**Tiến độ ước lượng:** 15-25%
 
 **Checklist trạng thái:**
 - [x] Chiến lược shadow -> canary -> primary đã được xác định trong roadmap.
-- [ ] Chưa có `go-services/matching-engine` shadow path trong repo runtime hiện tại.
-- [ ] Chưa có output compare TS matching vs Go matching theo pair/order.
-- [ ] Chưa có canary per pair hoạt động thực tế.
-- [ ] Chưa có reconciliation artifact riêng cho matching Go sau từng canary window.
+- [x] Đã có scaffold `go-services/matching-engine` và runtime shadow job placeholder.
+- [x] Đã có `shadow_matching_runs` artifact table + parity comparator endpoint (ops) để theo dõi drift theo pair/window.
+- [~] Canary per pair đã có routing nền qua `MATCHING_ENGINE=go_canary` + `MATCHING_GO_CANARY_PAIRS`; chưa có Go matching executor thực chiến.
+- [~] Đã có reconciliation artifact (unmatched order list + parity metrics) cho shadow/canary window; cần dashboard production-grade.
 
 Mục tiêu: kiểm chứng matching Go mà không ảnh hưởng tiền/user.
 
@@ -557,12 +557,12 @@ Acceptance criteria:
 
 ### Phase 7 - Public WS Gateway Bằng Go Nếu Cần
 
-**Trạng thái hiện tại:** Not started  
-**Tiến độ ước lượng:** 0-5%
+**Trạng thái hiện tại:** In progress (scaffold)  
+**Tiến độ ước lượng:** 15-25%
 
 **Checklist trạng thái:**
 - [x] Mục tiêu tách public market WS khỏi NestJS đã được xác định về mặt kiến trúc.
-- [ ] Chưa có Go public WS gateway trong rollout runtime hiện tại.
+- [x] Đã có scaffold `go-services/public-ws-gateway` để chuẩn bị rollout.
 - [ ] Chưa có compatibility layer/fallback release plan chi tiết cho FE nếu đổi transport.
 - [ ] Chưa có public payload parity verification riêng cho `TickerData` / `OHLCData`.
 - [ ] Chưa có rollout giữ song song `/trading` cũ và gateway Go trong ít nhất một release thực tế.

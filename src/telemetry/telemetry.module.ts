@@ -95,6 +95,21 @@ import { MetricsService } from './metrics.service';
       help: 'Observed lag in seconds for market read-model projections',
       labelNames: ['projection'],
     }),
+    makeGaugeProvider({
+      name: 'matching_shadow_runs',
+      help: 'Shadow matching runs captured per pair',
+      labelNames: ['pair_id'],
+    }),
+    makeGaugeProvider({
+      name: 'matching_shadow_missing_trades',
+      help: 'Estimated missing trades when comparing shadow runs vs executed trades',
+      labelNames: ['pair_id'],
+    }),
+    makeGaugeProvider({
+      name: 'matching_shadow_match_rate_percent',
+      help: 'Estimated parity rate percentage for shadow matching per pair',
+      labelNames: ['pair_id'],
+    }),
     makeHistogramProvider({
       name: 'blockchain_rpc_duration_seconds',
       help: 'Duration of blockchain RPC calls in seconds',

@@ -8,3 +8,5 @@ export {
   RunMatchCommand,
   RunMatchUseCase,
 } from './matching-engine.use-case';
+
+export { MatchingShadowReconciliationUseCase } from './matching-shadow-reconciliation.use-case';

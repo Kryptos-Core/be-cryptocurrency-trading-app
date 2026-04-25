@@ -9,7 +9,10 @@ describe('OrdersController', () => {
   let controller: OrdersController;
   let ordersService: jest.Mocked<OrdersService>;
   let findMyOrdersQuery: jest.Mocked<FindMyOrdersQuery>;
-  let reconcileMatchingForPairUseCase: jest.Mocked<ReconcileMatchingForPairUseCase>;
+  let reconcileMatchingForPairUseCase: {
+    execute: jest.Mock;
+    shadowParity: jest.Mock;
+  };
 
   const mockOrder = {
     order_id: 1,
@@ -41,6 +44,7 @@ describe('OrdersController', () => {
     };
     const mockReconcileMatchingForPairUseCase = {
       execute: jest.fn(),
+      shadowParity: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -124,6 +128,30 @@ describe('OrdersController', () => {
       reconcileMatchingForPairUseCase.execute.mockResolvedValue(summary);
       const result = await controller.reconcileMatchingForPair('pair-uuid');
       expect(reconcileMatchingForPairUseCase.execute).toHaveBeenCalledWith('pair-uuid');
+      expect(result).toEqual(summary);
+    });
+  });
+
+  describe('getShadowParitySummary', () => {
+    it('calls use-case.shadowParity with pair/window/limit', async () => {
+      const summary = {
+        pairId: 'pair-uuid',
+        windowHours: 24,
+        shadowRuns: 5,
+        matchedTrades: 4,
+        missingTrades: 1,
+        matchRatePercent: 80,
+        recentRuns: [],
+      };
+      reconcileMatchingForPairUseCase.shadowParity.mockResolvedValue(summary);
+
+      const result = await controller.getShadowParitySummary('pair-uuid', 24, 20);
+
+      expect(reconcileMatchingForPairUseCase.shadowParity).toHaveBeenCalledWith(
+        'pair-uuid',
+        24,
+        20,
+      );
       expect(result).toEqual(summary);
     });
   });

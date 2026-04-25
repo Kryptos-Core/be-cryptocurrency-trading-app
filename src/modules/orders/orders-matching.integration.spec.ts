@@ -1,6 +1,7 @@
 import { getQueueToken } from '@nestjs/bull';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { CacheService, RedisService } from '@/common/services';
 import { MARKET_REPOSITORY } from '@/modules/markets/domain/ports';
 import { EnqueueMatchUseCase } from '@/modules/matching/application/use-cases';
@@ -36,6 +37,7 @@ describe('Orders -> Matching queue integration', () => {
     createOrderViaProcedure: jest.fn(),
     findById: jest.fn(),
     findBestLimitSellPrice: jest.fn(),
+    transaction: jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work({})),
   };
   const marketRepository = {
     findById: jest.fn(),
@@ -101,6 +103,7 @@ describe('Orders -> Matching queue integration', () => {
         { provide: RedisService, useValue: redisService },
         { provide: ConfigService, useValue: configService },
         { provide: getQueueToken(MATCHING_QUEUE), useValue: queue },
+        { provide: OutboxAppender, useValue: { append: jest.fn() } },
       ],
     }).compile();
 
@@ -141,7 +144,13 @@ describe('Orders -> Matching queue integration', () => {
       price: '123.45',
       time_in_force: 'GTC',
       created_at: new Date('2026-04-17T10:00:00Z'),
+      updated_at: new Date('2026-04-17T10:00:00Z'),
       slippage_tolerance: null,
+      reserved_quote: '0',
+      reserved_base: '0',
+      idempotency_key: 'idem-1',
+      avg_price: null,
+      client_order_id: null,
     });
 
     await useCase.execute({

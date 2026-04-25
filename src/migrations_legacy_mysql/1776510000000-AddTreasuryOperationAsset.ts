@@ -2,7 +2,13 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddTreasuryOperationAsset1776510000000 implements MigrationInterface {
   private isPostgres(queryRunner: QueryRunner): boolean {
-    return queryRunner.connection.options.type === 'postgres';
+    const connectionType =
+      (queryRunner as unknown as { connection?: { options?: { type?: string } } }).connection
+        ?.options?.type ??
+      (queryRunner as unknown as { dataSource?: { options?: { type?: string } } }).dataSource
+        ?.options?.type;
+
+    return connectionType === 'postgres';
   }
 
   name = 'AddTreasuryOperationAsset1776510000000';

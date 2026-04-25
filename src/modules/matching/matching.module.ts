@@ -6,6 +6,7 @@ import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
 import { ORDER_MATCHING_GATEWAY } from '@/modules/orders/domain/ports/order-matching-gateway.port';
 import {
   EnqueueMatchUseCase,
+  MatchingShadowReconciliationUseCase,
   ReconcileOpenOrdersForPairUseCase,
   RemoveOrderFromBookUseCase,
   RunMatchUseCase,
@@ -48,6 +49,7 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
     RunMatchUseCase,
     RemoveOrderFromBookUseCase,
     ReconcileOpenOrdersForPairUseCase,
+    MatchingShadowReconciliationUseCase,
     OrderMatchingGatewayAdapter,
     {
       provide: ORDER_MATCHING_GATEWAY,
@@ -61,6 +63,7 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
     RunMatchUseCase,
     RemoveOrderFromBookUseCase,
     ReconcileOpenOrdersForPairUseCase,
+    MatchingShadowReconciliationUseCase,
     MetricsTradeVisitor,
     CircuitBreakerService,
     OrderBookService,

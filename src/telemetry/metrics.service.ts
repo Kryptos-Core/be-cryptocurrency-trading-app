@@ -55,6 +55,15 @@ export class MetricsService {
 
     @InjectMetric('market_read_model_projection_lag_seconds')
     private readonly marketReadModelProjectionLagSeconds: Gauge,
+
+    @InjectMetric('matching_shadow_runs')
+    private readonly matchingShadowRuns: Gauge,
+
+    @InjectMetric('matching_shadow_missing_trades')
+    private readonly matchingShadowMissingTrades: Gauge,
+
+    @InjectMetric('matching_shadow_match_rate_percent')
+    private readonly matchingShadowMatchRatePercent: Gauge,
   ) {}
 
   recordHttpRequest(method: string, route: string, statusCode: number, durationMs: number): void {
@@ -129,5 +138,17 @@ export class MetricsService {
 
   setMarketReadModelProjectionLagSeconds(projection: string, lagSeconds: number): void {
     this.marketReadModelProjectionLagSeconds.set({ projection }, lagSeconds);
+  }
+
+  setMatchingShadowRuns(pairId: string, value: number): void {
+    this.matchingShadowRuns.set({ pair_id: pairId }, value);
+  }
+
+  setMatchingShadowMissingTrades(pairId: string, value: number): void {
+    this.matchingShadowMissingTrades.set({ pair_id: pairId }, value);
+  }
+
+  setMatchingShadowMatchRatePercent(pairId: string, value: number): void {
+    this.matchingShadowMatchRatePercent.set({ pair_id: pairId }, value);
   }
 }
