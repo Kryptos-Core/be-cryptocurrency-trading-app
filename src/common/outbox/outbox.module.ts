@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MarketOhlcvReadModelSyncApplierService } from '@/common/read-model/market-ohlcv-read-model-sync-applier.service';
 import { MarketPairReadModelProjectionHandler } from '@/common/read-model/market-pair-read-model.handler';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
 import { MarketTickerReadModelSyncApplierService } from '@/common/read-model/market-ticker-read-model-sync-applier.service';
@@ -9,6 +10,7 @@ import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/o
 import { TradeReadModelSyncApplierService } from '@/common/read-model/trade-read-model-sync-applier.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ProcessedIntegrationEvent } from '@/entities/processed-integration-event.entity';
+import { ReadMarketOhlcv } from '@/entities/read-market-ohlcv.entity';
 import { ReadMarketPair } from '@/entities/read-market-pair.entity';
 import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
 import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
@@ -47,6 +49,7 @@ import { OutboxRelayService } from './outbox-relay.service';
       ReadMarketPair,
       ReadMarketTrade,
       ReadMarketTicker,
+      ReadMarketOhlcv,
       ReadOnchainDeposit,
     ]),
     BullModule.registerQueueAsync({
@@ -74,6 +77,7 @@ import { OutboxRelayService } from './outbox-relay.service';
     OnchainDepositReadModelSyncApplierService,
     TradeReadModelSyncApplierService,
     MarketTickerReadModelSyncApplierService,
+    MarketOhlcvReadModelSyncApplierService,
     OutboxAdminService,
     OutboxIntegrationSyncService,
     OutboxRelayService,

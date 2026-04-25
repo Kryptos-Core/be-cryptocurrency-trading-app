@@ -8,6 +8,7 @@ import { Public } from '@/common/decorators';
 import { OutboxAdminService } from '@/common/outbox/outbox-admin.service';
 import { RedisService } from '@/common/services/redis.service';
 import { ANALYTICS_DB, MARKET_TS_DB } from '@/config';
+import { MarketReadModelReconciliationService } from '@/modules/markets/market-read-model-reconciliation.service';
 
 @ApiTags('health')
 @Controller('health')
@@ -20,6 +21,8 @@ export class HealthController {
     @Optional() @Inject(MARKET_TS_DB) private readonly marketTsDb: DataSource | null = null,
     @Optional() @Inject(ANALYTICS_DB) private readonly analyticsDb: Record<string, unknown> | null = null,
     private readonly outboxAdminService: OutboxAdminService,
+    @Optional()
+    private readonly marketReadModelReconciliationService?: MarketReadModelReconciliationService,
   ) {}
 
   @Public()
@@ -67,6 +70,22 @@ export class HealthController {
       checks.push(async () => this.db.pingCheck('market_ts_db', { connection: this.marketTsDb }));
     }
 
+    const marketReadModelReconciliationService = this.marketReadModelReconciliationService;
+    if (marketReadModelReconciliationService) {
+      checks.push(async () => {
+        const report = await marketReadModelReconciliationService.getProjectionHealth(24);
+        const { status: projectionStatus, ...details } = report;
+        return {
+          market_read_model: {
+            status: 'up' as const,
+            projection_status: projectionStatus,
+            degraded: projectionStatus !== 'up',
+            ...details,
+          },
+        };
+      });
+    }
+
     if (this.analyticsDb) {
       checks.push(async () => ({ analytics_db: { status: 'up' as const } }));
     }
@@ -74,4 +93,3 @@ export class HealthController {
     return this.health.check(checks);
   }
 }
-

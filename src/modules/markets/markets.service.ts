@@ -637,6 +637,10 @@ export class MarketsService implements OnModuleInit {
    * Get ticker by symbol
    */
   async getTickerBySymbol(symbol: string): Promise<MarketTickerDto> {
+    if (this.marketReadModelRepository.shouldUseReadModel()) {
+      const projected = await this.marketReadModelRepository.getTickerBySymbol(symbol);
+      if (projected) return projected;
+    }
     const pair = await this.findBySymbol(symbol);
     return this.getTicker(pair.pair_id);
   }
@@ -840,6 +844,10 @@ export class MarketsService implements OnModuleInit {
    * Get recent trades by symbol
    */
   async getRecentTradesBySymbol(symbol: string, limit: number = 50): Promise<MarketRecentTradeResponse[]> {
+    if (this.marketReadModelRepository.shouldUseReadModel()) {
+      const projected = await this.marketReadModelRepository.getRecentTradesBySymbol(symbol, limit);
+      if (projected.length > 0) return projected;
+    }
     const pair = await this.findBySymbol(symbol);
     return this.getRecentTrades(pair.pair_id, limit);
   }
@@ -856,9 +864,38 @@ export class MarketsService implements OnModuleInit {
     locale: string = 'en',
     interval?: string,
   ) {
-    const pair = await this.findOne(pairId);
     const resolution = resolveOhlcvInterval({ interval, range });
     const intervalSec = this.resolveIntervalSeconds(resolution.interval);
+
+    if (this.marketReadModelRepository.shouldUseReadModel()) {
+      const projected = await this.marketReadModelRepository.getOhlcv(
+        pairId,
+        intervalSec,
+        Math.min(limit, 500),
+      );
+
+      if (projected.length > 0) {
+        return {
+          pair_id: pairId,
+          interval: resolution.interval,
+          interval_sec: intervalSec,
+          range: range ?? null,
+          locale,
+          candles: projected.map((c) => ({
+            pair_id: c.pair_id,
+            interval_sec: c.interval_sec,
+            open_time: c.open_time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+          })),
+        };
+      }
+    }
+
+    const pair = await this.findOne(pairId);
     const fromDate = new Date(Date.now() - resolution.lookbackMs);
     const toDate = new Date();
     const symbol =
@@ -893,7 +930,6 @@ export class MarketsService implements OnModuleInit {
       })),
     };
   }
-
   /**
    * Transparent Price Discovery: real-time depth snapshot from in-memory matching engine.
    * Depth levels: 5, 10, or 20 price levels per side.
@@ -976,5 +1012,8 @@ export class MarketsService implements OnModuleInit {
     return seconds;
   }
 }
+
+
+
 
 

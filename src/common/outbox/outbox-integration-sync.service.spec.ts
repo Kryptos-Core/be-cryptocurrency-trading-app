@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import type { EntityManager } from 'typeorm';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import { MarketOhlcvReadModelSyncApplierService } from '@/common/read-model/market-ohlcv-read-model-sync-applier.service';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
 import { MarketTickerReadModelSyncApplierService } from '@/common/read-model/market-ticker-read-model-sync-applier.service';
 import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/onchain-deposit-read-model-sync-applier.service';
@@ -15,6 +16,7 @@ describe('OutboxIntegrationSyncService', () => {
   let onchainDepositReadApplier: { applyFromOutboxRow: jest.Mock };
   let tradeReadModelApplier: { applyFromOutboxRow: jest.Mock };
   let marketTickerReadModelApplier: { applyFromOutboxRow: jest.Mock };
+  let marketOhlcvReadModelApplier: { applyFromOutboxRow: jest.Mock };
   let onchainDepositNotifications: { applyFromOutboxRow: jest.Mock };
   let processedEvents: { runOnce: jest.Mock };
 
@@ -23,6 +25,7 @@ describe('OutboxIntegrationSyncService', () => {
     onchainDepositReadApplier = { applyFromOutboxRow: jest.fn().mockResolvedValue(undefined) };
     tradeReadModelApplier = { applyFromOutboxRow: jest.fn().mockResolvedValue(undefined) };
     marketTickerReadModelApplier = { applyFromOutboxRow: jest.fn().mockResolvedValue(undefined) };
+    marketOhlcvReadModelApplier = { applyFromOutboxRow: jest.fn().mockResolvedValue(undefined) };
     onchainDepositNotifications = { applyFromOutboxRow: jest.fn().mockResolvedValue(undefined) };
     processedEvents = {
       runOnce: jest.fn(async (_em, _consumer, _eventId, _eventType, callback) => {
@@ -38,6 +41,7 @@ describe('OutboxIntegrationSyncService', () => {
     { provide: OnchainDepositReadModelSyncApplierService, useValue: onchainDepositReadApplier },
     { provide: TradeReadModelSyncApplierService, useValue: tradeReadModelApplier },
     { provide: MarketTickerReadModelSyncApplierService, useValue: marketTickerReadModelApplier },
+    { provide: MarketOhlcvReadModelSyncApplierService, useValue: marketOhlcvReadModelApplier },
     { provide: OnchainDepositOutboxNotificationService, useValue: onchainDepositNotifications },
     { provide: ProcessedIntegrationEventsService, useValue: processedEvents },
   ];
@@ -120,8 +124,9 @@ describe('OutboxIntegrationSyncService', () => {
 
     await service.dispatchRow({} as EntityManager, row);
 
-    expect(processedEvents.runOnce).toHaveBeenCalledTimes(1);
+    expect(processedEvents.runOnce).toHaveBeenCalledTimes(2);
     expect(tradeReadModelApplier.applyFromOutboxRow).toHaveBeenCalledTimes(1);
+    expect(marketOhlcvReadModelApplier.applyFromOutboxRow).toHaveBeenCalledTimes(1);
   });
 
   it('wraps market ticker projection with processed-event idempotency', async () => {

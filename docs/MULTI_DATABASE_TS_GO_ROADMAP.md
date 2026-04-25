@@ -29,7 +29,7 @@
 | Phase 0 | API contract baseline | Partial | Có awareness rất rõ về FE compatibility, nhưng chưa xác nhận full snapshot/coverage cho toàn bộ endpoint critical |
 | Phase 1 | Clean architecture database boundary | Near complete | Phần lớn boundary/repository ports/runtime PostgreSQL đã tách và vận hành được |
 | Phase 2 | PostgreSQL core source of truth replacement | Near complete | Đây là phần tiến xa nhất; runtime đã PostgreSQL-only |
-| Phase 3 | Market read model trên DB phụ | In progress | Đã có nền read-model trades/ticker + reconciliation + feature-flag read path; chưa hoàn tất Timescale end-to-end |
+| Phase 3 | Market read model trên DB phụ | In progress | Đã có trades/ticker/OHLCV projection nền, read-path feature-flag, reconciliation + lag health/metrics/admin report; chưa hoàn tất Timescale end-to-end |
 | Phase 4 | Event/outbox contract chuẩn cho TS và Go | In progress / near complete | Contract/outbox foundation, DLQ replay, metrics/health và publisher scaffold đã khá đầy đủ; còn thiếu hardening dài hạn |
 | Phase 5 | Go market aggregator | Not started | Chưa có `go-services/market-aggregator` chạy shadow |
 | Phase 6 | Go matching engine shadow mode | Not started | Chưa có shadow parity/canary flow cho matching Go |
@@ -202,14 +202,9 @@ Các file thay đổi chính trong các batch này gồm:
   - `GET /markets/tickers/all`
 - reconciliation service bước đầu để so sánh `trades` core với `read_market_trades`
 
-Chưa thấy / chưa hoàn chỉnh trong runtime hiện tại:
+Chưa thấy / chưa hoàn chỉnh trong runtime hiện tại:\n\n- TimescaleDB hypertable/materialization/continuous aggregate đúng nghĩa\n- rollout chứng minh đầy đủ trên môi trường thực với backlog/projection lag dashboard\n- dashboard/alert policy production-grade cho projection lag và parity
 
-- TimescaleDB hypertable/materialization/continuous aggregate đúng nghĩa
-- read path cho OHLCV từ DB phụ
-- reconciliation PostgreSQL ↔ projection cho ticker/OHLCV
-- rollout chứng minh đầy đủ trên môi trường thực với backlog/projection lag dashboard
-
-=> Phase 3 hiện nên coi là **in progress**, đã có foundation và read path đầu tiên, nhưng chưa hoàn tất rollout multi-db market read side.
+=> Phase 3 hiện nên coi là **in progress**, đã có foundation khá rõ cho trades/ticker/OHLCV, on-demand admin reconciliation report, health payload và metrics collector, nhưng chưa hoàn tất rollout multi-db market read side.
 
 #### D. Phase 4 đã gần hoàn tất phần contract + outbox foundation
 
@@ -254,9 +249,9 @@ Chưa thấy các deliverable lớn sau trong repo runtime hiện tại:
 Thứ tự hợp lý tiếp theo sau trạng thái hiện tại:
 
 1. **Tiếp tục hoàn tất Phase 3**
-   - đưa read-model sang MARKET_TS_DB/Timescale rollout thật
-   - mở rộng projection cho ticker/ohlcv
-   - bổ sung reconciliation cho ticker/OHLCV
+   - chuyển từ projection schema hiện tại sang Timescale rollout thật nếu cần hypertable/continuous aggregate
+   - thêm dashboard/alert cho projection lag, stale ticker, ohlcv drift
+   - kiểm chứng performance/read parity trên staging load
 2. **Khóa nốt phần còn lại của Phase 4**
    - hardening Kafka/DLQ/observability
    - review transaction boundary cho các emit path còn lại
@@ -426,109 +421,18 @@ Dependency rule:
 **Tiến độ ước lượng:** 35-50%
 
 **Checklist trạng thái:**
-- [x] Đã có định hướng contract-first rất rõ trong roadmap và FE impact matrix chi tiết.
-- [x] Đã xác định các nhóm endpoint/event critical mà FE đang phụ thuộc mạnh.
-- [ ] Chưa xác nhận export OpenAPI/snapshot contract đầy đủ cho toàn bộ endpoint critical.
-- [ ] Chưa xác nhận snapshot payload đầy đủ cho Socket.IO `/trading` và `/notifications`.
-- [ ] Chưa xác nhận CI contract check đang enforce remove/rename field cho toàn bộ nhóm API quan trọng.
-
-Mục tiêu: khóa lại hành vi API hiện tại để refactor không phá FE.
-
-Deliverables:
-
-- Export OpenAPI từ NestJS Swagger.
-- Tạo contract snapshot cho nhóm endpoint FE dùng nhiều:
-  - Auth/users/profile.
-  - Markets/tickers/orderbook/OHLCV/trades.
-  - Orders create/cancel/my/book/admin.
-  - Wallets/balance/ledger/admin adjust.
-  - Deposits/blockchain/managed-wallets/treasury.
-  - Socket.IO `/trading` và `/notifications` event payload.
-- Thêm CI check cho response shape tối thiểu.
-- Tạo changelog API nội bộ: mỗi PR có BE API change phải ghi `FE impact: none/low/medium/high`.
-
-Acceptance criteria:
-
-- Có danh sách endpoint FE đang dùng và file FE liên quan.
-- Có test fail nếu field core bị rename/remove.
-- Có convention versioning: thêm endpoint `/v2` hoặc field mới nếu cần thay payload lớn.
-
-### Phase 1 - Clean Architecture Database Boundary, Chưa Đổi Logic
-
-**Trạng thái hiện tại:** Near complete  
-**Tiến độ ước lượng:** 75-90%
-
-**Checklist trạng thái:**
-- [x] PostgreSQL runtime boundary cho phần lớn core repository/service đã được hình thành và vận hành.
-- [x] `src/common/unit-of-work` đang đóng vai trò ranh giới transaction quan trọng.
-- [x] `src/common/outbox` đã tồn tại như integration boundary trong runtime.
-- [x] Nhiều batch repository lớn đã được migrate/chuẩn hóa sang PostgreSQL.
-- [~] Một số phần boundary/health check/contract phân tách theo multi-db dài hạn chưa hoàn chỉnh.
-- [ ] Chưa thấy đầy đủ lớp provider naming/runtime wiring mature cho `MARKET_TS_DB` và `ANALYTICS_DB` ở mức rollout thực chiến.
-
-Mục tiêu: chuẩn bị code để có nhiều DataSource mà không đổi business behavior.
-
-Deliverables:
-
-- Tạo database provider naming: `CORE_DB` (PostgreSQL source of truth), `MARKET_TS_DB` (TimescaleDB), `ANALYTICS_DB` (ClickHouse).
-- Thêm repository ports theo Clean Architecture, application layer chỉ phụ thuộc interface, không phụ thuộc TypeORM/DataSource trực tiếp.
-- Audit mọi repository/service inject trực tiếp `DataSource`; phân loại core write, market read, admin analytics.
-- Tách SQL/PostgreSQL functions ra infrastructure adapters; use-case không biết chi tiết SQL.
-- Thêm health checks riêng cho PostgreSQL/cache/queue, sau đó thêm TimescaleDB/ClickHouse.
-- Không sửa business behavior tạo order/cancel/trade settlement ở phase này.
-
-Acceptance criteria:
-
-- App chạy bằng PostgreSQL-only (`CORE_DB_SOURCE=postgres`).
-- Không còn MySQL env/dependency/runtime provider.
-- Database phụ có thể tắt/bật bằng env mà không ảnh hưởng endpoint hiện tại.
-
-### Phase 2 - PostgreSQL Core Source Of Truth Replacement
-
-**Trạng thái hiện tại:** Near complete  
-**Tiến độ ước lượng:** 85-95%
-
-**Checklist trạng thái:**
-- [x] Runtime backend đã chuyển sang hướng PostgreSQL-only cho core persistence.
-- [x] Build hiện tại không còn phụ thuộc MySQL runtime path.
-- [x] Đã thêm `pg-placeholder-adapter` để chặn lỗi placeholder legacy trong giai đoạn chuyển tiếp.
-- [x] Các mảng blockchain, wallets, treasury, notifications, deposits, payment-config, currencies, auth/users, markets, orders, exchange đã được migrate/chuẩn hóa lớn theo PostgreSQL.
-- [x] Đã retire các helper/constants MySQL runtime quan trọng.
-- [x] Verify gần nhất đều pass: lint, type-check, build, test.
-- [~] Dấu vết migration/history MySQL vẫn còn trong repo để bảo toàn historical trace.
-- [ ] Chưa thể khẳng định contract tests FE 100% đã được khóa đầy đủ cho mọi endpoint critical.
-- [ ] Chưa xác nhận toàn bộ reconciliation/reporting bắt buộc đã được chuẩn hóa thành acceptance artifact chính thức trong docs/CI.
-
-Mục tiêu: thay toàn bộ MySQL bằng PostgreSQL trong BE, giữ REST/Socket.IO contract và business behavior. Đây là phase bắt buộc trước khi triển khai TimescaleDB/ClickHouse/Go theo kiến trúc multi-db.
-
-Deliverables:
-
-- Thay `mysql2`/MySQL TypeORM config bằng PostgreSQL driver/config (`pg`) và PostgreSQL DataSource.
-- Thiết kế PostgreSQL schema source of truth cho users, wallets, wallet_ledgers, orders, trades, market_pairs, currencies, deposits, withdrawals, outbox.
-- Chuyển stored procedures quan trọng sang PostgreSQL functions hoặc transactional repository methods, nhưng application use-case chỉ gọi repository ports.
-- Viết migration PostgreSQL-native: constraints, partial indexes, `SELECT ... FOR UPDATE`, idempotency keys, numeric precision, enums/check constraints.
-- Viết script import dữ liệu cũ nếu cần, chạy offline một lần; script này không trở thành dependency runtime của BE.
-- Xóa MySQL env vars, Docker service, package dependency, migration scripts, stored procedure names và code path MySQL khỏi BE sau khi PostgreSQL tests pass.
-
-Acceptance criteria:
-
-- PostgreSQL là source of truth duy nhất cho core state.
-- Không còn MySQL dependency/runtime config trong BE.
-- Contract tests FE pass 100%.
-- Wallet/order/trade reconciliation pass trên PostgreSQL.
-- `npm run migration:*`, seed, test, Docker infra hoạt động với PostgreSQL.
-
-### Phase 3 - Market Read Model Trên Database Phụ
-
-**Trạng thái hiện tại:** In progress  
-**Tiến độ ước lượng:** 25-40%
-
-**Checklist trạng thái:**
 - [x] Roadmap mục tiêu và feature flag `MARKET_READ_SOURCE=postgres|timescale` đã được xác định rõ.
-- [x] Đã có projection schema nền cho `read_market_trades` và `read_market_tickers`.
+- [x] Đã có projection schema nền cho `read_market_trades`, `read_market_tickers`, `read_market_ohlcv`.
 - [x] Đã có projection worker path consume `trade.executed` hoàn chỉnh qua outbox sync.
-- [x] Đã có runtime read path đầu tiên dùng `MARKET_READ_SOURCE=timescale` với fallback an toàn về PostgreSQL source.
-- [~] Đã có reconciliation bước đầu cho trades core ↔ read_model; chưa phủ ticker/ohlcv.
+- [x] Đã có runtime read path dùng `MARKET_READ_SOURCE=timescale` với fallback an toàn cho:
+  - `/markets/:id/trades`
+  - `/markets/:id/ticker`
+  - `/markets/tickers/all`
+  - `/markets/:id/ohlcv`
+  - `symbol -> ticker/trades` path
+- [x] Đã có reconciliation cho trades, tickers và OHLCV; OHLCV đã phủ nhiều interval (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`).
+- [x] Đã có health/metrics cho projection lag market read-model và admin/on-demand reconciliation endpoint.
+- [~] `MARKET_TS_DB` đã được wiring ở mức runtime path/read repository, nhưng chưa chứng minh rollout Timescale production-grade đầy đủ.
 - [ ] Chưa có TimescaleDB/hypertable/continuous aggregate end-to-end đúng nghĩa cho OHLCV.
 
 Mục tiêu: giảm tải PostgreSQL source of truth cho chart/ticker/trades mà không đổi REST contract.
@@ -547,7 +451,8 @@ Acceptance criteria:
 
 - `MARKET_READ_SOURCE=postgres` và `MARKET_READ_SOURCE=timescale` trả response tương thích.
 - FE chart/market list không cần sửa code.
-- Có reconciliation job so sánh count/latest trade giữa PostgreSQL và Timescale.
+- Có reconciliation job/report so sánh trades/tickers/OHLCV giữa PostgreSQL và market read-model DB phụ.
+- Có health payload + Prometheus metrics cho projection lag/read-model drift.
 
 ### Phase 4 - Event/Outbox Contract Chuẩn Cho TS Và Go
 
@@ -1084,5 +989,6 @@ Hướng đi phù hợp nhất cho dự án là tiến hóa có kiểm soát:
 7. Đưa Go matching engine vào shadow/canary sau cùng.
 
 Cách này đạt mục tiêu multi-database + TypeScript/Go nhưng vẫn bảo vệ business logic hiện tại và giảm tối đa việc FE phải sửa bất ngờ.
+
 
 

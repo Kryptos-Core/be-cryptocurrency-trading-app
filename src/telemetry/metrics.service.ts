@@ -40,6 +40,21 @@ export class MetricsService {
 
     @InjectMetric('outbox_relay_dead_lettered_total')
     private readonly outboxRelayDeadLetteredTotal: Counter,
+
+    @InjectMetric('market_read_model_trade_drift')
+    private readonly marketReadModelTradeDrift: Gauge,
+
+    @InjectMetric('market_read_model_ticker_drift')
+    private readonly marketReadModelTickerDrift: Gauge,
+
+    @InjectMetric('market_read_model_ticker_stale_pairs')
+    private readonly marketReadModelTickerStalePairs: Gauge,
+
+    @InjectMetric('market_read_model_ohlcv_drift')
+    private readonly marketReadModelOhlcvDrift: Gauge,
+
+    @InjectMetric('market_read_model_projection_lag_seconds')
+    private readonly marketReadModelProjectionLagSeconds: Gauge,
   ) {}
 
   recordHttpRequest(method: string, route: string, statusCode: number, durationMs: number): void {
@@ -91,5 +106,28 @@ export class MetricsService {
 
   incrementOutboxRelayDeadLettered(eventType: string): void {
     this.outboxRelayDeadLetteredTotal.inc({ event_type: eventType });
+  }
+
+  setMarketReadModelTradeDrift(windowHours: number, drift: number): void {
+    this.marketReadModelTradeDrift.set({ window_hours: String(windowHours) }, drift);
+  }
+
+  setMarketReadModelTickerDrift(windowHours: number, drift: number): void {
+    this.marketReadModelTickerDrift.set({ window_hours: String(windowHours) }, drift);
+  }
+
+  setMarketReadModelTickerStalePairs(windowHours: number, count: number): void {
+    this.marketReadModelTickerStalePairs.set({ window_hours: String(windowHours) }, count);
+  }
+
+  setMarketReadModelOhlcvDrift(windowHours: number, intervalSec: number, drift: number): void {
+    this.marketReadModelOhlcvDrift.set(
+      { window_hours: String(windowHours), interval_sec: String(intervalSec) },
+      drift,
+    );
+  }
+
+  setMarketReadModelProjectionLagSeconds(projection: string, lagSeconds: number): void {
+    this.marketReadModelProjectionLagSeconds.set({ projection }, lagSeconds);
   }
 }

@@ -95,4 +95,75 @@ describe('MarketReadModelRepository', () => {
       timestamp: '2026-04-25T10:00:00.000Z',
     });
   });
+
+  it('resolves pair id by symbol from ticker projection', async () => {
+    const findOne = jest.fn().mockResolvedValue({ pair_id: 'pair-1', symbol: 'BTC/USDT' });
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        MarketReadModelRepository,
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn((key: string) => ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' }[key])) },
+        },
+        {
+          provide: MARKET_TS_DB,
+          useValue: { getRepository: jest.fn(() => ({ findOne, find: jest.fn() })) },
+        },
+      ],
+    }).compile();
+
+    const repo = moduleRef.get(MarketReadModelRepository);
+    const result = await repo.resolvePairIdBySymbol('BTC/USDT');
+    expect(result).toBe('pair-1');
+  });
+
+  it('reads OHLCV projection from MARKET_TS_DB', async () => {
+    const find = jest.fn().mockResolvedValue([
+      {
+        pair_id: 'pair-1',
+        interval_sec: 60,
+        open_time: new Date('2026-04-25T10:00:00.000Z'),
+        open: '100',
+        high: '110',
+        low: '90',
+        close: '105',
+        volume: '1.5',
+        quote_volume: '157.5',
+        trades_count: 3,
+      },
+    ]);
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        MarketReadModelRepository,
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn((key: string) => ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' }[key])) },
+        },
+        {
+          provide: MARKET_TS_DB,
+          useValue: { getRepository: jest.fn(() => ({ find, findOne: jest.fn() })) },
+        },
+      ],
+    }).compile();
+
+    const repo = moduleRef.get(MarketReadModelRepository);
+    const result = await repo.getOhlcv('pair-1', 60, 100);
+
+    expect(result).toEqual([
+      {
+        pair_id: 'pair-1',
+        interval_sec: 60,
+        open_time: new Date('2026-04-25T10:00:00.000Z'),
+        open: '100',
+        high: '110',
+        low: '90',
+        close: '105',
+        volume: '1.5',
+        quote_volume: '157.5',
+        trades_count: 3,
+      },
+    ]);
+  });
 });

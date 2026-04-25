@@ -34,6 +34,7 @@ import {
   GetMarketPairQuery,
   GetMarketTickerQuery,
 } from './application/queries';
+import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
 import {
   CreateMarketPairUseCase,
   DeleteMarketPairUseCase,
@@ -60,6 +61,7 @@ export class MarketsController {
     private readonly createMarketPairUseCase: CreateMarketPairUseCase,
     private readonly updateMarketPairUseCase: UpdateMarketPairUseCase,
     private readonly deleteMarketPairUseCase: DeleteMarketPairUseCase,
+    private readonly marketReadModelReconciliationService: MarketReadModelReconciliationService,
   ) {}
 
   /**
@@ -157,6 +159,53 @@ export class MarketsController {
       sortOrder: sortOrder ?? null,
       fuzzySearch,
     });
+  }
+
+  @Get('admin/read-model/reconciliation')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
+  @ApiOperation({
+    summary: 'Market read-model reconciliation report',
+    description:
+      'On-demand admin/ops report for trades, tickers and OHLCV reconciliation between core PostgreSQL and market read-model projection.',
+  })
+  @ApiQuery({ name: 'windowHours', required: false, type: Number, example: 24 })
+  @ApiQuery({
+    name: 'intervals',
+    required: false,
+    type: String,
+    example: '60,300,900,3600,14400,86400',
+    description: 'Comma-separated OHLCV intervals in seconds to reconcile.',
+  })
+  @ApiSuccessResponse('Market read-model reconciliation report retrieved successfully')
+  async getReadModelReconciliation(
+    @Query('windowHours', new ParseIntPipe({ optional: true })) windowHours: number = 24,
+    @Query('intervals') intervals?: string,
+  ) {
+    return this.marketReadModelReconciliationService.getProjectionHealth(
+      windowHours,
+      this.parseIntervals(intervals),
+    );
+  }
+
+  @Post('admin/read-model/reconciliation/collect-metrics')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
+  @ApiOperation({
+    summary: 'Collect and publish market read-model metrics now',
+    description:
+      'Runs reconciliation/lag collection immediately and refreshes Prometheus gauges for market read-model drift and lag.',
+  })
+  async collectReadModelMetrics(
+    @Body('windowHours', new ParseIntPipe({ optional: true })) windowHours?: number,
+    @Body('intervals') intervals?: string,
+  ) {
+    return this.marketReadModelReconciliationService.collectMetrics(
+      windowHours ?? 24,
+      this.parseIntervals(intervals),
+    );
   }
 
   /**
@@ -491,7 +540,7 @@ export class MarketsController {
     description: 'Create a new trading pair (e.g., BTC/USDT)',
   })
   @ApiBody({ type: CreateMarketPairDto })
-  @RequirePermissions(Permission.MARKETS_MANAGE)
+  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
   @ApiCreatedResponse('Market pair created successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiConflictResponse('Market pair already exists')
@@ -513,7 +562,7 @@ export class MarketsController {
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiBody({ type: UpdateMarketPairDto })
-  @RequirePermissions(Permission.MARKETS_MANAGE)
+  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
   @ApiSuccessResponse('Market pair updated successfully')
   @ApiBadRequestResponse('Invalid input data')
   @ApiNotFoundResponse('Market pair not found')
@@ -536,7 +585,7 @@ export class MarketsController {
     description: 'Soft delete a market pair by setting is_active to false',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
-  @RequirePermissions(Permission.MARKETS_MANAGE)
+  @RequirePermissions(Permission.MARKET_READ_MODEL_OBSERVE)
   @ApiSuccessResponse('Market pair deleted successfully', {
     schema: { example: null },
   })
@@ -545,4 +594,16 @@ export class MarketsController {
   async remove(@Param('id') id: string) {
     await this.deleteMarketPairUseCase.execute(id);
   }
+
+  private parseIntervals(raw?: string): number[] | undefined {
+    if (!raw?.trim()) return undefined;
+    const values = raw
+      .split(',')
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isInteger(value) && value > 0);
+
+    return values.length > 0 ? values : undefined;
+  }
 }
+
+

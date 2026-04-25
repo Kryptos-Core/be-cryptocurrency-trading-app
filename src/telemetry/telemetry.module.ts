@@ -70,6 +70,31 @@ import { MetricsService } from './metrics.service';
       help: 'Total outbox rows moved to dead-letter state',
       labelNames: ['event_type'],
     }),
+    makeGaugeProvider({
+      name: 'market_read_model_trade_drift',
+      help: 'Trade reconciliation drift between core trades and market read model',
+      labelNames: ['window_hours'],
+    }),
+    makeGaugeProvider({
+      name: 'market_read_model_ticker_drift',
+      help: 'Ticker reconciliation drift between core trades and ticker projection',
+      labelNames: ['window_hours'],
+    }),
+    makeGaugeProvider({
+      name: 'market_read_model_ticker_stale_pairs',
+      help: 'Number of stale ticker projection rows compared with core trades',
+      labelNames: ['window_hours'],
+    }),
+    makeGaugeProvider({
+      name: 'market_read_model_ohlcv_drift',
+      help: 'OHLCV reconciliation drift between core trades and OHLCV projection',
+      labelNames: ['window_hours', 'interval_sec'],
+    }),
+    makeGaugeProvider({
+      name: 'market_read_model_projection_lag_seconds',
+      help: 'Observed lag in seconds for market read-model projections',
+      labelNames: ['projection'],
+    }),
     makeHistogramProvider({
       name: 'blockchain_rpc_duration_seconds',
       help: 'Duration of blockchain RPC calls in seconds',

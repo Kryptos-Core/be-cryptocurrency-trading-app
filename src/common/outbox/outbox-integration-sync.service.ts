@@ -6,6 +6,7 @@ import {
   isCanonicalIntegrationEventEnvelope,
   unwrapCanonicalIntegrationEventPayload,
 } from '@/common/integration-events/canonical-integration-event-envelope';
+import { MarketOhlcvReadModelSyncApplierService } from '@/common/read-model/market-ohlcv-read-model-sync-applier.service';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
 import { MarketTickerReadModelSyncApplierService } from '@/common/read-model/market-ticker-read-model-sync-applier.service';
 import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/onchain-deposit-read-model-sync-applier.service';
@@ -20,6 +21,7 @@ const CONSUMERS = {
   onchainDepositNotification: 'onchain-deposit-notification-sync',
   tradeReadModel: 'trade-read-model-sync',
   marketTickerReadModel: 'market-ticker-read-model-sync',
+  marketOhlcvReadModel: 'market-ohlcv-read-model-sync',
 } as const;
 
 @Injectable()
@@ -31,6 +33,7 @@ export class OutboxIntegrationSyncService {
     private readonly onchainDepositReadApplier: OnchainDepositReadModelSyncApplierService,
     private readonly tradeReadModelApplier: TradeReadModelSyncApplierService,
     private readonly marketTickerReadModelApplier: MarketTickerReadModelSyncApplierService,
+    private readonly marketOhlcvReadModelApplier: MarketOhlcvReadModelSyncApplierService,
     private readonly onchainDepositNotifications: OnchainDepositOutboxNotificationService,
     private readonly processedEvents: ProcessedIntegrationEventsService,
   ) {}
@@ -82,6 +85,15 @@ export class OutboxIntegrationSyncService {
           row.event_type,
           async () => {
             await this.tradeReadModelApplier.applyFromOutboxRow(em, row);
+          },
+        );
+        await this.processedEvents.runOnce(
+          em,
+          CONSUMERS.marketOhlcvReadModel,
+          row.id,
+          row.event_type,
+          async () => {
+            await this.marketOhlcvReadModelApplier.applyFromOutboxRow(em, row);
           },
         );
         return;

@@ -12,6 +12,7 @@ import {
   GetMarketPairQuery,
   GetMarketTickerQuery,
 } from './application/queries';
+import { MarketReadModelMetricsCollectorService } from './market-read-model-metrics-collector.service';
 import {
   CreateMarketPairUseCase,
   DeleteMarketPairUseCase,
@@ -34,6 +35,7 @@ import { MarketReadModelRepository, MarketRepository } from './repositories';
   providers: [
     MarketReadModelRepository,
     MarketReadModelReconciliationService,
+    MarketReadModelMetricsCollectorService,
     MarketRepository,
     {
       provide: MARKET_REPOSITORY,
@@ -51,7 +53,11 @@ import { MarketReadModelRepository, MarketRepository } from './repositories';
     GetMarketOHLCVQuery,
   ],
   controllers: [MarketsController],
-  exports: [MarketsService, MARKET_REPOSITORY, MarketRepository],
+  exports: [
+    MarketsService,
+    MARKET_REPOSITORY,
+    MarketRepository,
+    MarketReadModelReconciliationService,
+  ],
 })
 export class MarketsModule {}
-

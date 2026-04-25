@@ -50,6 +50,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.USERS_SECURITY_REVIEW,
     Permission.CURRENCIES_MANAGE,
     Permission.MARKETS_MANAGE,
+    Permission.MARKET_READ_MODEL_OBSERVE,
     Permission.EXCHANGE_SYNC,
     Permission.ORDERS_PLACE,
     Permission.ORDERS_CANCEL,
@@ -81,3 +82,4 @@ export function hasPermission(
   const granted = new Set(getPermissionsForRole(role));
   return requiredPermissions.every((permission) => granted.has(permission));
 }
+
