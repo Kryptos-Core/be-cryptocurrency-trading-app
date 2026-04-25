@@ -12,7 +12,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * Idempotency and order creation/cancellation are handled at DB layer where needed.
  */
 export class CreateOrdersProcedures1768227100000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ----- sp_order_find_by_id -----
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_find_by_id');
     await queryRunner.query(`
@@ -261,6 +268,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_count_by_user');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_find_by_user');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_cancel');

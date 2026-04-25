@@ -1,9 +1,16 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateIntegrationOutboxAndReadMarketPairs1776300000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'CreateIntegrationOutboxAndReadMarketPairs1776300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS integration_outbox (
         id char(36) NOT NULL,
@@ -35,6 +42,9 @@ export class CreateIntegrationOutboxAndReadMarketPairs1776300000000 implements M
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE IF EXISTS read_market_pairs');
     await queryRunner.query('DROP TABLE IF EXISTS integration_outbox');
   }

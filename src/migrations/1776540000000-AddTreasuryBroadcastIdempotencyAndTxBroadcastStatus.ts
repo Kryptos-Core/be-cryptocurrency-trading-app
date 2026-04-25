@@ -12,6 +12,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 export class AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000
   implements MigrationInterface
 {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000';
 
   private async addColumnIfNotExists(
@@ -63,6 +67,9 @@ export class AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.addColumnIfNotExists(
       queryRunner,
       'treasury_operations',
@@ -93,6 +100,9 @@ export class AddTreasuryBroadcastIdempotencyAndTxBroadcastStatus1776540000000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       ALTER TABLE \`treasury_operations\`
         DROP INDEX \`idx_treasury_op_tx_broadcast_stale\`

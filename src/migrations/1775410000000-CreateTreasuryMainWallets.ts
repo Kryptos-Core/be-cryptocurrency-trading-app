@@ -1,9 +1,16 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTreasuryMainWallets1775410000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'CreateTreasuryMainWallets1775410000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS \`treasury_main_wallets\` (
         \`main_wallet_id\` char(36) NOT NULL,
@@ -22,6 +29,9 @@ export class CreateTreasuryMainWallets1775410000000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE `treasury_main_wallets`');
   }
 }

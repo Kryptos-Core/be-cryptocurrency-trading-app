@@ -7,7 +7,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - sp_market_count_filtered: total count with same filters
  */
 export class AddMarketSearchFilterProcedures1768228200000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ----- sp_market_find_all_filtered -----
     // p_search: partial match on mp.symbol (e.g. "BTC" -> symbol LIKE '%BTC%')
     // p_base_symbol: filter by base currency symbol (e.g. "BTC"); NULL = no filter
@@ -77,6 +84,9 @@ export class AddMarketSearchFilterProcedures1768228200000 implements MigrationIn
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_count_filtered`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_all_filtered`);
   }

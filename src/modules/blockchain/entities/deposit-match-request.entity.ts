@@ -46,10 +46,10 @@ export class DepositMatchRequest {
   @Column({ type: 'varchar', length: 64, unique: true })
   idempotency_key!: string;
 
-  @Column({ type: 'datetime', precision: 3, default: () => 'CURRENT_TIMESTAMP(3)' })
+  @Column({ type: 'timestamp', precision: 3, default: () => 'CURRENT_TIMESTAMP(3)' })
   proposed_at!: Date;
 
-  @Column({ type: 'datetime', precision: 3, nullable: true })
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
   resolved_at!: Date | null;
 
   @Column({ type: 'json', default: () => "(JSON_ARRAY())" })

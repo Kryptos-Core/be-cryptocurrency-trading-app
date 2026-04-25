@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Sổ lệnh chỉ hiển thị lệnh LIMIT có giá > 0; lệnh MARKET (price 0/NULL) không xuất hiện.
  */
 export class OrderBookExcludeZeroPrice1768227500000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ----- sp_market_order_book_bids: exclude price <= 0 -----
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_order_book_bids`);
     await queryRunner.query(`
@@ -76,6 +83,9 @@ export class OrderBookExcludeZeroPrice1768227500000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Restore previous version (no price > 0 filter)
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_order_book_bids`);
     await queryRunner.query(`

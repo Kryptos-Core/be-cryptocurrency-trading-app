@@ -13,7 +13,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * 177545 (sp_trade_execute) plus dropping column slippage_tolerance. See README "Matching engine".
  */
 export class MatchingEngineHardening1775510000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       ALTER TABLE orders
       ADD COLUMN slippage_tolerance DECIMAL(36,18) NULL

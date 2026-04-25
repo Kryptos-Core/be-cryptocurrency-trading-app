@@ -6,7 +6,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Run migration 1768227700000-RecreateProceduresUuidV7 after this to recreate procedures.
  */
 export class ConvertAllIdsToUuidV71768227600000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ---- 1. Drop all legacy MySQL legacy MySQL stored procedures ----
     const procedures = [
       'sp_order_count_by_user',
@@ -331,6 +338,9 @@ export class ConvertAllIdsToUuidV71768227600000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('SET FOREIGN_KEY_CHECKS = 0');
     const tables = [
       'app_settings',

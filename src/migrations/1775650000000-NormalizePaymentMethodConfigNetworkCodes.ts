@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Legacy rows used short segments: MAINNET, SEPOLIA, DEVNET, NILE, SHASTA.
  */
 export class NormalizePaymentMethodConfigNetworkCodes1775650000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       UPDATE payment_method_configs SET network = 'SOLANA_MAINNET' WHERE type = 'SOL' AND network = 'MAINNET'
     `);
@@ -36,6 +43,9 @@ export class NormalizePaymentMethodConfigNetworkCodes1775650000000 implements Mi
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       UPDATE payment_method_configs SET network = 'MAINNET' WHERE type = 'SOL' AND network = 'SOLANA_MAINNET'
     `);

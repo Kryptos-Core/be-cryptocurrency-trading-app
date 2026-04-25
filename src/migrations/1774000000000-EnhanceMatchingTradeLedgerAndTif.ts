@@ -7,7 +7,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * - Recreate sp_trade_execute with UUID trade_id and full wallet_ledger writes.
  */
 export class EnhanceMatchingTradeLedgerAndTif1774000000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_orders_open_for_pair');
     const spOrdersOpen = `
 CREATE PROCEDURE sp_orders_open_for_pair(
@@ -245,6 +252,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_trade_execute');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_orders_open_for_pair');
   }

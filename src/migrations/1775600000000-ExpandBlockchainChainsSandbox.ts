@@ -4,7 +4,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 const expandedChainEnum = `'TRON_NILE','TRON_SHASTA','TRON_MAINNET','SOLANA_DEVNET','SOLANA_MAINNET','ETH_SEPOLIA','ETH_MAINNET','BSC_CHAPEL','BSC_MAINNET'`;
 
 export class ExpandBlockchainChainsSandbox1775600000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const tables = [
       'linked_wallets',
       'onchain_transactions',

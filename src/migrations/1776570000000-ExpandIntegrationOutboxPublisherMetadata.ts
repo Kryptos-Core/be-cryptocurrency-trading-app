@@ -1,6 +1,10 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class ExpandIntegrationOutboxPublisherMetadata1776570000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'ExpandIntegrationOutboxPublisherMetadata1776570000000';
 
   private async addColumnIfNotExists(
@@ -52,6 +56,9 @@ export class ExpandIntegrationOutboxPublisherMetadata1776570000000 implements Mi
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.addColumnIfNotExists(
       queryRunner,
       'integration_outbox',
@@ -142,6 +149,9 @@ export class ExpandIntegrationOutboxPublisherMetadata1776570000000 implements Mi
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.dropIndexIfExists(
       queryRunner,
       'integration_outbox',

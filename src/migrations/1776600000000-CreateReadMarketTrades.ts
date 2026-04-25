@@ -1,9 +1,16 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateReadMarketTrades1776600000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'CreateReadMarketTrades1776600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS read_market_trades (
         trade_id char(36) NOT NULL,
@@ -28,6 +35,9 @@ export class CreateReadMarketTrades1776600000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE IF EXISTS read_market_trades');
   }
 }

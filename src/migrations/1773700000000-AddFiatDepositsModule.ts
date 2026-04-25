@@ -1,9 +1,16 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddFiatDepositsModule1773700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS \`fiat_deposits\` (
         \`deposit_id\` char(36) NOT NULL,
@@ -78,6 +85,9 @@ export class AddFiatDepositsModule1773700000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_find_by_order_code`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_find_by_user`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_fiat_deposit_update_status`);

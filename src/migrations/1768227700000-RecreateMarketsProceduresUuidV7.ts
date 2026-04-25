@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * All ID parameters use CHAR(36). Run after 1768227600000-ConvertAllIdsToUuidV7.
  */
 export class RecreateMarketsProceduresUuidV71768227700000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ----- sp_market_find_by_id (p_pair_id CHAR(36)) -----
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_by_id`);
     await queryRunner.query(`
@@ -305,6 +312,9 @@ export class RecreateMarketsProceduresUuidV71768227700000 implements MigrationIn
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const procedures = [
       'sp_market_recent_trades',
       'sp_market_ticker',

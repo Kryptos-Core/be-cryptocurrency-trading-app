@@ -9,6 +9,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - Add index for admin queries on UNMATCHED rows.
  */
 export class AddUnmatchedDepositSupport1776550000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddUnmatchedDepositSupport1776550000000';
 
   private async ensureIndex(
@@ -70,6 +74,9 @@ export class AddUnmatchedDepositSupport1776550000000 implements MigrationInterfa
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Make user_id nullable for unmatched deposits.
     await queryRunner.query(`
       ALTER TABLE \`onchain_transactions\`
@@ -93,6 +100,9 @@ export class AddUnmatchedDepositSupport1776550000000 implements MigrationInterfa
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.dropIndexIfExists(queryRunner, 'onchain_transactions', 'idx_onchain_tx_unmatched');
 
     // Revert status enum — rows with UNMATCHED would need manual cleanup first in prod.

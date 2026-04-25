@@ -7,7 +7,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - SPs: sp_user_update_profile_basic, sp_user_update_avatar, sp_user_security_change_request_*
  */
 export class AddUserProfileSecurityAvatar1774400000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // 1. Add avatar columns to users
     const table = await queryRunner.getTable('users');
     const hasAvatarUrl = table?.findColumnByName('avatar_url');
@@ -186,6 +193,9 @@ export class AddUserProfileSecurityAvatar1774400000000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_security_change_request_review');
     await queryRunner.query(
       'DROP PROCEDURE IF EXISTS sp_user_security_change_request_find_pending',

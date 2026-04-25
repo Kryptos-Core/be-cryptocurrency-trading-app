@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Seeded at app startup via SystemConfigService when rows are missing.
  */
 export class CreateSystemConfigsTable1775640000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS \`system_configs\` (
         \`key\`           VARCHAR(100)   NOT NULL,
@@ -23,6 +30,9 @@ export class CreateSystemConfigsTable1775640000000 implements MigrationInterface
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE IF EXISTS `system_configs`');
   }
 }

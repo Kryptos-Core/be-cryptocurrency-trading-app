@@ -11,7 +11,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Design Pattern: Legacy database-procedure pattern
  */
 export class CreateCurrenciesProcedures1768226400000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ============================================
     // PROCEDURE 1: sp_currency_find_by_id
     // Purpose: Find currency by ID
@@ -366,6 +373,9 @@ export class CreateCurrenciesProcedures1768226400000 implements MigrationInterfa
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Drop all procedures
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_currency_find_by_id;`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_currency_find_by_symbol;`);

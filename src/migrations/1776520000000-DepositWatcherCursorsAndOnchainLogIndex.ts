@@ -1,6 +1,10 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'DepositWatcherCursorsAndOnchainLogIndex1776520000000';
 
   private async addColumnIfNotExists(
@@ -54,6 +58,9 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS deposit_watcher_cursors (
         chain VARCHAR(64) NOT NULL,
@@ -81,6 +88,9 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.dropIndexIfExists(queryRunner, 'onchain_transactions', 'uk_onchain_tx_chain_hash_log');
     await this.addIndexIfNotExists(
       queryRunner,

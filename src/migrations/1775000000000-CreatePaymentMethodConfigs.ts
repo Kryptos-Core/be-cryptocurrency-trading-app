@@ -12,7 +12,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - sp_payment_config_set_status: transition status + set timestamps
  */
 export class CreatePaymentMethodConfigs1775000000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ── payment_method_configs ────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS payment_method_configs (
@@ -130,6 +137,9 @@ export class CreatePaymentMethodConfigs1775000000000 implements MigrationInterfa
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_payment_config_set_status');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_payment_config_upsert');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_payment_config_list');

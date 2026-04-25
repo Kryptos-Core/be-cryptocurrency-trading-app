@@ -1,9 +1,16 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddExchangeRateAuditLog1776200000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddExchangeRateAuditLog1776200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS exchange_rate_audit_log (
         audit_id char(36) NOT NULL,
@@ -25,6 +32,9 @@ export class AddExchangeRateAuditLog1776200000000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE IF EXISTS exchange_rate_audit_log');
   }
 }

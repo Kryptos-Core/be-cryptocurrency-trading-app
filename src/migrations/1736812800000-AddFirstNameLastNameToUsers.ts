@@ -10,7 +10,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * 3. Updates sp_user_find_by_id and sp_user_find_by_email to return new fields
  */
 export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Check if users table exists before altering
     const tableExists = await queryRunner.hasTable('users');
     if (!tableExists) {
@@ -111,6 +118,9 @@ export class AddFirstNameLastNameToUsers1736812800000 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Rollback: Restore original procedures and remove columns
 
     // Step 1: Restore original sp_user_create

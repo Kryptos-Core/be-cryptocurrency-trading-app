@@ -1,9 +1,16 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateProcessedIntegrationEvents1776580000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'CreateProcessedIntegrationEvents1776580000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS processed_integration_events (
         id CHAR(36) NOT NULL,
@@ -18,6 +25,9 @@ export class CreateProcessedIntegrationEvents1776580000000 implements MigrationI
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE IF EXISTS processed_integration_events');
   }
 }

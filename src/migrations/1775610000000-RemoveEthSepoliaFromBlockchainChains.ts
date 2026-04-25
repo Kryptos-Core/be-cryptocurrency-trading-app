@@ -16,7 +16,14 @@ const chainTables = [
 ] as const;
 
 export class RemoveEthSepoliaFromBlockchainChains1775610000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       DELETE lw1 FROM \`linked_wallets\` lw1
       INNER JOIN \`linked_wallets\` lw2

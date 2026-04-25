@@ -16,7 +16,14 @@ const chainTables = [
 ] as const;
 
 export class ExpandMultichainEvmAndTon1775620000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     for (const t of chainTables) {
       await queryRunner.query(
         `ALTER TABLE \`${t}\` MODIFY COLUMN \`chain\` ENUM(${expandedChainEnum}) NOT NULL`,

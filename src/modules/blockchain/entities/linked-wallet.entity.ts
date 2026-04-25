@@ -43,7 +43,7 @@ export class LinkedWallet {
   })
   status!: 'PENDING' | 'VERIFIED' | 'REVOKED';
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   linked_at!: Date | null;
 
   @CreateDateColumn()

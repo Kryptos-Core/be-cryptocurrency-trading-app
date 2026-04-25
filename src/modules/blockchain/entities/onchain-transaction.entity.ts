@@ -77,7 +77,7 @@ export class OnchainTransaction {
   @CreateDateColumn()
   created_at!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   confirmed_at!: Date | null;
 
   /** ID của currency được credit vào ví sau quy đổi (thường là USDT) */

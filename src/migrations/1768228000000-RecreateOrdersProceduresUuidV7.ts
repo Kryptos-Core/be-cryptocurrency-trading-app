@@ -6,7 +6,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * Run after ConvertAllIdsToUuidV7 (which drops these procedures).
  */
 export class RecreateOrdersProceduresUuidV71768228000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ----- sp_order_find_by_id -----
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_find_by_id');
     await queryRunner.query(`
@@ -253,6 +260,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_count_by_user');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_find_by_user');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_cancel');

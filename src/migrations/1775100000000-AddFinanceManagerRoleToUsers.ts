@@ -1,7 +1,14 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddFinanceManagerRoleToUsers1775100000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const tableExists = await queryRunner.hasTable('users');
     if (!tableExists) return;
 
@@ -25,6 +32,9 @@ export class AddFinanceManagerRoleToUsers1775100000000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const tableExists = await queryRunner.hasTable('users');
     if (!tableExists) return;
 

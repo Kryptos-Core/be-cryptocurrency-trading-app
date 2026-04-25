@@ -12,7 +12,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Design Pattern: Legacy database-procedure pattern + Unit of Work Pattern
  */
 export class CreateWalletsProcedures1768226600000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ============================================
     // PROCEDURE 1: sp_wallet_find_by_user_currency
     // Purpose: Find wallet by user and currency
@@ -237,6 +244,9 @@ export class CreateWalletsProcedures1768226600000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Drop all procedures
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_wallet_find_by_user_currency;`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_wallet_get_or_create_for_update;`);

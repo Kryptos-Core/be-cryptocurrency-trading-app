@@ -5,7 +5,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * Fix status computation in sp_trade_execute so PARTIAL/FILLED is based on pre-update remaining.
  */
 export class FixTradeExecuteStatusComputation1774200000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_trade_execute');
 
     const spTradeExecute = `
@@ -236,6 +243,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_trade_execute');
   }
 }

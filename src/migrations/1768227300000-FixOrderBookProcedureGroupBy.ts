@@ -8,7 +8,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - BUY (bids): best bid first = price DESC.
  */
 export class FixOrderBookProcedureGroupBy1768227300000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_book');
     await queryRunner.query(`
       CREATE PROCEDURE sp_order_book(
@@ -29,6 +36,9 @@ export class FixOrderBookProcedureGroupBy1768227300000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_book');
     await queryRunner.query(`
       CREATE PROCEDURE sp_order_book(

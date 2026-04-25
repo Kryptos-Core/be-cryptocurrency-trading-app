@@ -4,7 +4,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Allow main-wallet deletion workflow: Finance requests → Risk approves/rejects before row is removed.
  */
 export class AddTreasuryMainWalletPendingDeletion1775480000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       ALTER TABLE \`treasury_main_wallets\`
         MODIFY COLUMN \`status\` enum (
@@ -17,6 +24,9 @@ export class AddTreasuryMainWalletPendingDeletion1775480000000 implements Migrat
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       UPDATE \`treasury_main_wallets\` SET \`status\` = 'ACTIVE' WHERE \`status\` = 'PENDING_DELETION'
     `);

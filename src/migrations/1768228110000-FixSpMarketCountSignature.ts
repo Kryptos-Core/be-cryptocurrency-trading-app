@@ -6,7 +6,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Safe to run even if 1768228100000 already fixed it (idempotent DROP + CREATE).
  */
 export class FixSpMarketCountSignature1768228110000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_count`);
     await queryRunner.query(`
       CREATE PROCEDURE sp_market_count(IN p_include_inactive BOOLEAN, OUT p_total INT)
@@ -21,6 +28,9 @@ export class FixSpMarketCountSignature1768228110000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_count`);
   }
 }

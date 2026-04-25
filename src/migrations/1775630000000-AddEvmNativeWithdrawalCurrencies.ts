@@ -32,7 +32,14 @@ const ROWS: Array<{
 ];
 
 export class AddEvmNativeWithdrawalCurrencies1775630000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     for (const r of ROWS) {
       await queryRunner.query(
         `INSERT IGNORE INTO \`currencies\` (\`currency_id\`, \`symbol\`, \`name\`, \`precision_scale\`, \`min_withdraw\`, \`is_tradable\`, \`is_active\`)
@@ -43,6 +50,9 @@ export class AddEvmNativeWithdrawalCurrencies1775630000000 implements MigrationI
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const ids = ROWS.map((r) => r.currency_id);
     const placeholders = ids.map(() => '?').join(', ');
     await queryRunner.query(

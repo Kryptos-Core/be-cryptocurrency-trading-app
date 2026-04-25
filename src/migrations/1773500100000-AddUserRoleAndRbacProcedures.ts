@@ -1,7 +1,14 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddUserRoleAndRbacProcedures1773500100000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       ALTER TABLE users
       ADD COLUMN role ENUM(
@@ -102,6 +109,9 @@ export class AddUserRoleAndRbacProcedures1773500100000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_update');
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_update(

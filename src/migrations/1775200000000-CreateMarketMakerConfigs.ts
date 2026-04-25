@@ -1,7 +1,14 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateMarketMakerConfigs1775200000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS market_maker_configs (
         config_id                       CHAR(36)        NOT NULL,
@@ -25,6 +32,9 @@ export class CreateMarketMakerConfigs1775200000000 implements MigrationInterface
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP TABLE IF EXISTS market_maker_configs');
   }
 }

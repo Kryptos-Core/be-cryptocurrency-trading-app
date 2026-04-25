@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - Gỡ GUEST / VERIFIED_USER khỏi enum role; dữ liệu cũ map về TRADER + cờ identity_verified.
  */
 export class AddUserIdentityVerifiedAndTrimRoles1775440000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const table = await queryRunner.getTable('users');
     if (!table) return;
 
@@ -116,6 +123,9 @@ export class AddUserIdentityVerifiedAndTrimRoles1775440000000 implements Migrati
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_update');
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_update(

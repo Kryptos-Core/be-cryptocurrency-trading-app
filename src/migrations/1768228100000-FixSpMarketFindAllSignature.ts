@@ -8,7 +8,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Legacy database-procedure pattern: contract between Repository and Stored Procedure.
  */
 export class FixSpMarketFindAllSignature1768228100000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ----- sp_market_find_all: 3 params -----
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_all`);
     await queryRunner.query(`
@@ -53,6 +60,9 @@ export class FixSpMarketFindAllSignature1768228100000 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_count`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_all`);
   }

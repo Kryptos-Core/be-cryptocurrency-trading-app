@@ -9,7 +9,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - Maintainability: Logic phức tạp ở DB, app chỉ gọi
  */
 export class CreateUsersProcedures1673616000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Check if users table exists before creating procedures
     const tableExists = await queryRunner.hasTable('users');
     if (!tableExists) {
@@ -155,6 +162,9 @@ export class CreateUsersProcedures1673616000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Drop procedures in reverse order
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_email_exists');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_get_statistics');

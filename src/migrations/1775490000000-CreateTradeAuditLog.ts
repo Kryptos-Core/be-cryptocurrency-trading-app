@@ -6,7 +6,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Addresses Phase 2 - Task 8 from matching-engine-analysis-plan.md.
  */
 export class CreateTradeAuditLog1775490000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS trade_audit_log (
         trade_id      CHAR(36)        NOT NULL,
@@ -28,6 +35,9 @@ export class CreateTradeAuditLog1775490000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP TABLE IF EXISTS trade_audit_log`);
   }
 }

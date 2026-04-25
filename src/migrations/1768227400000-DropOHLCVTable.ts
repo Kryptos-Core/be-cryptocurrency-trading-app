@@ -5,6 +5,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * OHLCV data is now provided on-demand by Price Oracle (Binance); no DB persist.
  */
 export class DropOHLCVTable1768227400000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   /** FK may be absent when InitialSchema skipped ADD CONSTRAINT (legacy type mismatch). */
   private async dropForeignKeyIfExists(
     queryRunner: QueryRunner,
@@ -26,6 +30,9 @@ export class DropOHLCVTable1768227400000 implements MigrationInterface {
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_ohlcv_upsert`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_ohlcv_get_by_pair_interval`);
 
@@ -36,6 +43,9 @@ export class DropOHLCVTable1768227400000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(
       `CREATE TABLE \`ohlcv\` (\`pair_id\` int NOT NULL, \`interval_sec\` int NOT NULL, \`open_time\` datetime NOT NULL, \`open\` decimal(36,18) NOT NULL, \`high\` decimal(36,18) NOT NULL, \`low\` decimal(36,18) NOT NULL, \`close\` decimal(36,18) NOT NULL, \`volume\` decimal(36,18) NOT NULL, \`pairPairId\` int NULL, INDEX \`idx_ohlcv_time\` (\`open_time\`), PRIMARY KEY (\`pair_id\`, \`interval_sec\`, \`open_time\`)) ENGINE=InnoDB`,
     );

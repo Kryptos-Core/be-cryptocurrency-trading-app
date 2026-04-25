@@ -11,7 +11,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * - 5 legacy MySQL legacy MySQL stored procedures for notification CRUD
  */
 export class CreateNotificationsModule1774700000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ── fcm_token on users ──────────────────────────────────────────────────
     await queryRunner.query(`
       ALTER TABLE users
@@ -171,6 +178,9 @@ export class CreateNotificationsModule1774700000000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_mark_all_read');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_mark_read');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_notification_count_unread');

@@ -5,9 +5,16 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Repository Pattern + Legacy database-procedure pattern: advanced query logic in DB layer.
  */
 export class AddAdvancedMarketListProcedures1773800100000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddAdvancedMarketListProcedures1773800100000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_market_find_all_advanced');
     await queryRunner.query(`
       CREATE PROCEDURE sp_market_find_all_advanced(
@@ -203,6 +210,9 @@ export class AddAdvancedMarketListProcedures1773800100000 implements MigrationIn
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_market_count_advanced');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_market_find_all_advanced');
   }

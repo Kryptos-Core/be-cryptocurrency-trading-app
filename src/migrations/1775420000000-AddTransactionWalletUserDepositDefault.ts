@@ -6,6 +6,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - Backfills from managed_wallets (match chain+address; import missing rows)
  */
 export class AddTransactionWalletUserDepositDefault1775420000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddTransactionWalletUserDepositDefault1775420000000';
 
   private async addColumnIfNotExists(
@@ -27,6 +31,9 @@ export class AddTransactionWalletUserDepositDefault1775420000000 implements Migr
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.addColumnIfNotExists(
       queryRunner,
       'transaction_wallets',
@@ -90,6 +97,9 @@ export class AddTransactionWalletUserDepositDefault1775420000000 implements Migr
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('ALTER TABLE `transaction_wallets` DROP COLUMN `default_set_at`');
     await queryRunner.query(
       'ALTER TABLE `transaction_wallets` DROP COLUMN `is_default_user_deposit`',

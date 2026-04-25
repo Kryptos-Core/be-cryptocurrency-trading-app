@@ -7,7 +7,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * start its own transaction or legacy MySQL/connection behavior causes "Failed to get or create wallet".
  */
 export class FixWalletGetOrCreateProcedure1768226950000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_wallet_get_or_create_for_update;`);
 
     await queryRunner.query(`
@@ -60,6 +67,9 @@ export class FixWalletGetOrCreateProcedure1768226950000 implements MigrationInte
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_wallet_get_or_create_for_update;`);
 
     await queryRunner.query(`

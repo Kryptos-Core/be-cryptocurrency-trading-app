@@ -8,9 +8,16 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 export class CompleteTreasuryFundSweepOnchainWhenOpCompleted1776530000000
   implements MigrationInterface
 {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'CompleteTreasuryFundSweepOnchainWhenOpCompleted1776530000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       UPDATE \`onchain_transactions\` ot
       INNER JOIN \`treasury_operations\` op ON ot.\`treasury_operation_id\` = op.\`operation_id\`

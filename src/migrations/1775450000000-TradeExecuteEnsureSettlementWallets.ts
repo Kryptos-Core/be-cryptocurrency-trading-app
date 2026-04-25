@@ -7,7 +7,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * without a row, UPDATE wallets touches 0 rows and the post-trade SELECT hits WALLET_NOT_FOUND.
  */
 export class TradeExecuteEnsureSettlementWallets1775450000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_trade_execute');
 
     const spTradeExecute = `
@@ -250,6 +257,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_trade_execute');
   }
 }

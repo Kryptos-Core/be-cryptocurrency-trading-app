@@ -7,7 +7,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * applies the missing columns and procedures.
  */
 export class FixUsersSchemaAndProcedures1768227000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const tableExists = await queryRunner.hasTable('users');
     if (!tableExists) return;
 
@@ -137,6 +144,9 @@ export class FixUsersSchemaAndProcedures1768227000000 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_email_exists');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_get_statistics');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_delete');

@@ -1,13 +1,23 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class DropUnusedWalletGetOrCreateProcedure1773800000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'DropUnusedWalletGetOrCreateProcedure1773800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_wallet_get_or_create_for_update');
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE PROCEDURE sp_wallet_get_or_create_for_update(
         IN p_user_id CHAR(36),

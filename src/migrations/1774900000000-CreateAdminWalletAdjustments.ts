@@ -10,7 +10,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * - sp_admin_wallet_adjustment_find_by_target: paginated list by target user
  */
 export class CreateAdminWalletAdjustments1774900000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ── admin_wallet_adjustments ─────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS admin_wallet_adjustments (
@@ -112,6 +119,9 @@ export class CreateAdminWalletAdjustments1774900000000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_admin_wallet_adjustment_find_by_target');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_admin_wallet_adjustment_create');
     await queryRunner.query('DROP TABLE IF EXISTS admin_wallet_adjustments');

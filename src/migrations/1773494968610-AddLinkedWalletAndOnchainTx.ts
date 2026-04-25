@@ -1,6 +1,10 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddLinkedWalletAndOnchainTx1773494968610 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddLinkedWalletAndOnchainTx1773494968610';
 
   private async addForeignKeyIfNotExists(queryRunner: QueryRunner, sql: string): Promise<void> {
@@ -57,6 +61,9 @@ export class AddLinkedWalletAndOnchainTx1773494968610 implements MigrationInterf
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(
       `CREATE TABLE IF NOT EXISTS \`linked_wallets\` (\`link_id\` char(36) NOT NULL, \`user_id\` char(36) NOT NULL, \`chain\` enum ('TRON_NILE', 'TRON_SHASTA', 'SOLANA_DEVNET', 'ETH_SEPOLIA') NOT NULL, \`address\` varchar(255) NOT NULL, \`label\` varchar(100) NULL, \`status\` enum ('PENDING', 'VERIFIED', 'REVOKED') NOT NULL DEFAULT 'PENDING', \`linked_at\` datetime NULL, \`created_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), INDEX \`idx_linked_wallet_user\` (\`user_id\`, \`status\`), UNIQUE INDEX \`uk_linked_wallet_user_chain_addr\` (\`user_id\`, \`chain\`, \`address\`), PRIMARY KEY (\`link_id\`)) ENGINE=InnoDB`,
     );
@@ -79,6 +86,9 @@ export class AddLinkedWalletAndOnchainTx1773494968610 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(
       `ALTER TABLE \`onchain_transactions\` DROP FOREIGN KEY \`FK_onchain_tx_linked_wallet\``,
     );

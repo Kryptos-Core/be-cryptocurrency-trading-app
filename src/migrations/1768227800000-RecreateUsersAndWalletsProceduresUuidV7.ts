@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * All ID parameters use CHAR(36). Run after 1768227700000-RecreateMarketsProceduresUuidV7.
  */
 export class RecreateUsersAndWalletsProceduresUuidV71768227800000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ========== USER PROCEDURES (CHAR(36)) ==========
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_id');
     await queryRunner.query(`
@@ -235,6 +242,9 @@ export class RecreateUsersAndWalletsProceduresUuidV71768227800000 implements Mig
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const userProcs = [
       'sp_user_email_exists',
       'sp_user_get_statistics',

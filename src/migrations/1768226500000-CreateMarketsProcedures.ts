@@ -11,7 +11,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Design Pattern: Legacy database-procedure pattern
  */
 export class CreateMarketsProcedures1768226500000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // ============================================
     // PROCEDURE 1: sp_market_find_by_id
     // Purpose: Find market pair by ID
@@ -639,6 +646,9 @@ export class CreateMarketsProcedures1768226500000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Drop all procedures
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_by_id;`);
     await queryRunner.query(`DROP PROCEDURE IF EXISTS sp_market_find_by_symbol;`);

@@ -1,6 +1,10 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTreasuryWalletsAndOperations1775300000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'CreateTreasuryWalletsAndOperations1775300000000';
 
   private async addForeignKeyIfNotExists(queryRunner: QueryRunner, sql: string): Promise<void> {
@@ -93,6 +97,9 @@ export class CreateTreasuryWalletsAndOperations1775300000000 implements Migratio
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS \`transaction_wallets\` (
         \`wallet_id\` char(36) NOT NULL,
@@ -177,6 +184,9 @@ export class CreateTreasuryWalletsAndOperations1775300000000 implements Migratio
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(
       'ALTER TABLE `onchain_transactions` DROP FOREIGN KEY `FK_onchain_tx_treasury_operation`',
     );

@@ -8,6 +8,10 @@ const finalChainEnum = `'TRON_MAINNET','SOLANA_MAINNET','ETH_SEPOLIA','ETH_MAINN
  * Ethereum Sepolia is handled later by the dedicated BSC Chapel migration.
  */
 export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   private buildKeyJoinCondition(
     sourceAlias: string,
     targetAlias: string,
@@ -296,6 +300,9 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       ALTER TABLE payment_method_configs
       MODIFY COLUMN type ENUM('PAYOS','ETH','TRON','SOL','BSC') NOT NULL

@@ -9,6 +9,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * 5. Add unique index per (chain, address) to prevent duplicates
  */
 export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'UpgradeTreasuryMainWallets1775460000000';
 
   private async addColumnIfNotExists(
@@ -48,6 +52,9 @@ export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterfa
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // 1. Extend chain enum to include Solana — skip if a later migration already expanded the enum
     const chainColRows: { Type?: string }[] = await queryRunner.query(
       `SHOW COLUMNS FROM \`treasury_main_wallets\` LIKE 'chain'`,
@@ -163,6 +170,9 @@ export class UpgradeTreasuryMainWallets1775460000000 implements MigrationInterfa
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`DROP INDEX \`idx_tmw_status\` ON \`treasury_main_wallets\``);
     await queryRunner.query(`DROP INDEX \`uk_tmw_chain_address\` ON \`treasury_main_wallets\``);
     await queryRunner.query(`

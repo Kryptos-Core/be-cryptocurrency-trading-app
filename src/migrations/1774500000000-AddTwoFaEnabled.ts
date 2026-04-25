@@ -1,7 +1,14 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddTwoFaEnabled1774500000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const table = await queryRunner.getTable('users');
     const hasTwoFaEnabled = table?.findColumnByName('two_fa_enabled');
     if (!hasTwoFaEnabled) {
@@ -73,6 +80,9 @@ export class AddTwoFaEnabled1774500000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_set_two_fa');
 
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_id');

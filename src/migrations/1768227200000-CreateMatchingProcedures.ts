@@ -7,7 +7,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  * - sp_trade_execute: atomic trade execution (insert trade, update orders, update wallets)
  */
 export class CreateMatchingProcedures1768227200000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_orders_open_for_pair');
     const spOrdersOpen = `
 CREATE PROCEDURE sp_orders_open_for_pair(
@@ -137,6 +144,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_trade_execute');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_orders_open_for_pair');
   }

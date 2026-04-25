@@ -8,7 +8,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - sp_ohlcv_upsert: insert or update one candle (persist realtime stream to DB)
  */
 export class CreateOHLCVProcedures1768226800000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       DROP PROCEDURE IF EXISTS sp_ohlcv_get_by_pair_interval;
     `);
@@ -64,6 +71,9 @@ export class CreateOHLCVProcedures1768226800000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       DROP PROCEDURE IF EXISTS sp_ohlcv_upsert;
     `);

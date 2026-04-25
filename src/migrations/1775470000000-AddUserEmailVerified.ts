@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Khác identity_verified (KYC). Không dùng role GUEST/VERIFIED_USER.
  */
 export class AddUserEmailVerified1775470000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const table = await queryRunner.getTable('users');
     if (!table?.findColumnByName('email_verified')) {
       await queryRunner.query(`
@@ -88,6 +95,9 @@ export class AddUserEmailVerified1775470000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_id');
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_id(IN p_user_id CHAR(36))

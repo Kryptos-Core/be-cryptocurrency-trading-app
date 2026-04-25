@@ -4,7 +4,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Migration: Extend wallet_ledger ref_type enum values and procedure
  */
 export class ExtendWalletLedgerRefType1768226700000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const tableExists = await queryRunner.hasTable('wallet_ledger');
     if (!tableExists) {
       return;
@@ -88,6 +95,9 @@ export class ExtendWalletLedgerRefType1768226700000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const tableExists = await queryRunner.hasTable('wallet_ledger');
     if (!tableExists) {
       return;

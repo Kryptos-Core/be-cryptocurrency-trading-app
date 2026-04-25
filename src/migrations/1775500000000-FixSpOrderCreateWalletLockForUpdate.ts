@@ -20,7 +20,14 @@ import { runProcedureSql } from './helpers/raw-procedure-connection.util';
  *   exactly what we need here.
  */
 export class FixSpOrderCreateWalletLockForUpdate1775500000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_create');
 
     const spOrderCreate = `
@@ -116,6 +123,9 @@ END;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     // Restore previous non-locking version (identical to RecreateOrdersProceduresUuidV7 content).
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_order_create');
 

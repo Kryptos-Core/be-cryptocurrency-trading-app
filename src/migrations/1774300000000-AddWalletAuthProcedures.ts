@@ -4,7 +4,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Wallet Auth: legacy MySQL legacy MySQL stored procedures for find user by linked wallet and create wallet-only user.
  */
 export class AddWalletAuthProcedures1774300000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_linked_wallet');
     await queryRunner.query(`
       CREATE PROCEDURE sp_user_find_by_linked_wallet(
@@ -44,6 +51,9 @@ export class AddWalletAuthProcedures1774300000000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_create_wallet_only');
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_user_find_by_linked_wallet');
   }

@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * All ID parameters use CHAR(36). Run after 1768227800000-RecreateUsersAndWalletsProceduresUuidV7.
  */
 export class RecreateCurrenciesProceduresUuidV71768227900000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query('DROP PROCEDURE IF EXISTS sp_currency_find_by_id');
     await queryRunner.query(`
       CREATE PROCEDURE sp_currency_find_by_id(IN p_currency_id CHAR(36))
@@ -155,6 +162,9 @@ export class RecreateCurrenciesProceduresUuidV71768227900000 implements Migratio
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const procedures = [
       'sp_currency_find_tradable',
       'sp_currency_find_active',

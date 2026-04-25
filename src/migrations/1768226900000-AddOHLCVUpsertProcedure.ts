@@ -5,7 +5,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * Persist realtime OHLC stream to DB so GET /markets/:id/ohlcv returns data.
  */
 export class AddOHLCVUpsertProcedure1768226900000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       DROP PROCEDURE IF EXISTS sp_ohlcv_upsert;
     `);
@@ -34,6 +41,9 @@ export class AddOHLCVUpsertProcedure1768226900000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(`
       DROP PROCEDURE IF EXISTS sp_ohlcv_upsert;
     `);

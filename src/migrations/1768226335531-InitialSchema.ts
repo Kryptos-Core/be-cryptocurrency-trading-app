@@ -1,6 +1,9 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class InitialSchema1768226335531 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
   name = 'InitialSchema1768226335531';
 
   /**
@@ -56,6 +59,9 @@ export class InitialSchema1768226335531 implements MigrationInterface {
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(
       `CREATE TABLE IF NOT EXISTS \`user_sessions\` (\`session_id\` bigint NOT NULL AUTO_INCREMENT, \`user_id\` bigint NOT NULL, \`refresh_token_hash\` varbinary(255) NOT NULL, \`ip\` varchar(64) NULL, \`user_agent\` varchar(255) NULL, \`expires_at\` datetime NOT NULL, \`created_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`userUserId\` bigint NULL, INDEX \`idx_sessions_exp\` (\`expires_at\`), INDEX \`idx_sessions_user\` (\`user_id\`), PRIMARY KEY (\`session_id\`)) ENGINE=InnoDB`,
     );
@@ -289,6 +295,9 @@ export class InitialSchema1768226335531 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await this.addForeignKeyIfNotExists(
       queryRunner,
       `ALTER TABLE \`deposits\` DROP FOREIGN KEY \`FK_50143130bceddb0866ed5ea5bf7\``,
@@ -535,3 +544,4 @@ export class InitialSchema1768226335531 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE \`user_sessions\``);
   }
 }
+

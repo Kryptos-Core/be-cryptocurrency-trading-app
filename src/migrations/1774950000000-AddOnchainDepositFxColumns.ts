@@ -12,6 +12,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - conversion_rate: Tỷ giá 1 native coin = X USDT tại thời điểm giao dịch
  */
 export class AddOnchainDepositFxColumns1774950000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   name = 'AddOnchainDepositFxColumns1774950000000';
 
   private async addColumnIfNotExists(
@@ -33,6 +37,9 @@ export class AddOnchainDepositFxColumns1774950000000 implements MigrationInterfa
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const table = 'onchain_transactions';
     await this.addColumnIfNotExists(
       queryRunner,
@@ -55,6 +62,9 @@ export class AddOnchainDepositFxColumns1774950000000 implements MigrationInterfa
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     await queryRunner.query(
       `ALTER TABLE \`onchain_transactions\`
        DROP COLUMN \`conversion_rate\`,

@@ -1,7 +1,14 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateManagedWalletsTable1774600000000 implements MigrationInterface {
+  private isPostgres(queryRunner: QueryRunner): boolean {
+    return queryRunner.connection.options.type === 'postgres';
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const table = await queryRunner.getTable('managed_wallets');
     if (!table) {
       await queryRunner.query(`
@@ -30,6 +37,9 @@ export class CreateManagedWalletsTable1774600000000 implements MigrationInterfac
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    if (this.isPostgres(queryRunner)) {
+      return;
+    }
     const table = await queryRunner.getTable('managed_wallets');
     if (table) {
       await queryRunner.query('DROP TABLE managed_wallets');
