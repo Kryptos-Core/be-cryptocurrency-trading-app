@@ -267,6 +267,14 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS?: string = '1';
+
+  @IsString()
+  @IsOptional()
+  GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS?: string = '72';
+
+  @IsString()
+  @IsOptional()
   MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS?: string = '300';
 
   @IsString()
@@ -836,6 +844,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS',
     'GO_ROLLOUT_WINDOW_HOURS',
     'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS',
+    'GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS',
+    'GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS',
     'MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS',
     'MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS',
     'TYPEORM_DEBUG_SQL',
@@ -1074,6 +1084,7 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+
 
 
 

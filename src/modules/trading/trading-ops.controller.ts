@@ -1,4 +1,14 @@
-import { Controller, DefaultValuePipe, Get, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  ParseBoolPipe,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@/common/decorators';
 import { RequirePermissions } from '@/common/decorators/require-permissions.decorator';
@@ -76,5 +86,51 @@ export class TradingOpsController {
   })
   async snapshotGoRolloutReadiness(@CurrentUser('userId') userId?: string) {
     return this.goRolloutReadinessService.snapshotReadiness(userId ?? 'unknown');
+  }
+
+  @Get('go-rollout-readiness/rollback-drills')
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MATCHING_SHADOW_OBSERVE, Permission.MARKET_READ_MODEL_OBSERVE)
+  @ApiOperation({
+    summary: 'List rollback drill records',
+    description: 'Returns recent rollback drill evidence for Phase 5 rollback readiness.',
+  })
+  async getRollbackDrills(@Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
+    return this.goRolloutReadinessService.listRollbackDrills(limit);
+  }
+
+  @Get('go-rollout-readiness/rollback-drills/latest')
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MATCHING_SHADOW_OBSERVE, Permission.MARKET_READ_MODEL_OBSERVE)
+  @ApiOperation({
+    summary: 'Latest rollback drill record',
+    description: 'Returns latest rollback drill used by readiness parity gate.',
+  })
+  async getLatestRollbackDrill() {
+    return this.goRolloutReadinessService.getLatestRollbackDrill();
+  }
+
+  @Post('go-rollout-readiness/rollback-drills')
+  @RequireRoles(UserRole.ADMIN, UserRole.RISK_OFFICER)
+  @RequirePermissions(Permission.MATCHING_SHADOW_OBSERVE, Permission.MARKET_READ_MODEL_OBSERVE)
+  @ApiOperation({
+    summary: 'Record rollback drill evidence',
+    description:
+      'Persists a rollback drill record (typically go_aggregator -> nestjs) for Phase 5 acceptance gate.',
+  })
+  async recordRollbackDrill(
+    @CurrentUser('userId') userId?: string,
+    @Body('fromSource') fromSource?: string,
+    @Body('toSource') toSource?: string,
+    @Body('success', new ParseBoolPipe({ optional: true })) success?: boolean,
+    @Body('notes') notes?: string,
+  ) {
+    return this.goRolloutReadinessService.recordRollbackDrill({
+      actorUserId: userId ?? 'unknown',
+      fromSource: fromSource ?? 'go_aggregator',
+      toSource: toSource ?? 'nestjs',
+      success: success ?? true,
+      notes,
+    });
   }
 }

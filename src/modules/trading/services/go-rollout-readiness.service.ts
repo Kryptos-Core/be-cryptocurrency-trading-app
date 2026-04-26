@@ -15,6 +15,15 @@ export type GoRolloutPairReadiness = {
   ready: boolean;
 };
 
+export type GoRolloutRollbackDrillRecord = {
+  drilledAt: string;
+  actorUserId: string;
+  fromSource: string;
+  toSource: string;
+  success: boolean;
+  notes?: string;
+};
+
 export type GoRolloutReadinessSnapshot = {
   reportAt: string;
   actorUserId: string;
@@ -36,6 +45,8 @@ export type GoRolloutReadinessReport = {
     minMatchRatePercent: number;
     maxUnmatchedRuns: number;
     maxPublicWsDriftPairs: number;
+    minPublicWsComparedPairs: number;
+    rollbackDrillMaxAgeHours: number;
   };
   marketReadModel: {
     status: 'up' | 'degraded';
@@ -49,6 +60,17 @@ export type GoRolloutReadinessReport = {
     contractValid: boolean;
     comparedPairs: number;
     driftPairs: number;
+  };
+  phase5ParityGate: {
+    pass: boolean;
+    comparedPairs: number;
+    driftPairs: number;
+    minComparedPairs: number;
+    maxDriftPairs: number;
+  };
+  rollbackDrill: {
+    latest: GoRolloutRollbackDrillRecord | null;
+    withinSla: boolean;
   };
   matchingShadow: {
     pairResults: GoRolloutPairReadiness[];
@@ -73,18 +95,31 @@ export class GoRolloutReadinessService {
     const minMatchRatePercent = this.getNumber('MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT', 99.9);
     const maxUnmatchedRuns = this.getNumber('MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS', 0);
     const maxPublicWsDriftPairs = this.getNumber('GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS', 0);
+    const minPublicWsComparedPairs = this.getNumber('GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS', 1);
+    const rollbackDrillMaxAgeHours = this.getNumber('GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS', 72);
 
     const canaryPairs = this.parseCsv(this.configService.get<string>('MATCHING_GO_CANARY_PAIRS'));
     const monitorPairs = this.resolveMonitorPairs(canaryPairs);
 
-    const [marketReadModelHealth, publicWsParity, pairResults] = await Promise.all([
+    const [marketReadModelHealth, publicWsParity, pairResults, latestRollbackDrill] = await Promise.all([
       this.marketReadModelReconciliationService.getProjectionHealth(windowHours),
       Promise.resolve(this.publicWsPayloadParityService.getReport()),
       this.collectPairResults(monitorPairs, windowHours, minMatchRatePercent, maxUnmatchedRuns),
+      this.getLatestRollbackDrill(),
     ]);
 
     const publicWsContractValid =
       publicWsParity.ticker.contractValid && publicWsParity.ohlc.contractValid;
+
+    const phase5ParityGatePass =
+      publicWsParity.goAggregatorParity.comparedPairs >= minPublicWsComparedPairs &&
+      publicWsParity.goAggregatorParity.driftPairs <= maxPublicWsDriftPairs;
+
+    const rollbackWithinSla = this.isRollbackDrillWithinSla(
+      latestRollbackDrill,
+      rollbackDrillMaxAgeHours,
+      checkedAt,
+    );
 
     const blockers: string[] = [];
 
@@ -94,8 +129,14 @@ export class GoRolloutReadinessService {
     if (!publicWsContractValid) {
       blockers.push('public_ws_contract_invalid');
     }
+    if (publicWsParity.goAggregatorParity.comparedPairs < minPublicWsComparedPairs) {
+      blockers.push('public_ws_parity_insufficient_samples');
+    }
     if (publicWsParity.goAggregatorParity.driftPairs > maxPublicWsDriftPairs) {
       blockers.push('public_ws_drift_exceeded');
+    }
+    if (!rollbackWithinSla) {
+      blockers.push('rollback_drill_stale_or_missing');
     }
     if (pairResults.some((result) => !result.ready)) {
       blockers.push('matching_shadow_threshold_exceeded');
@@ -115,6 +156,8 @@ export class GoRolloutReadinessService {
         minMatchRatePercent,
         maxUnmatchedRuns,
         maxPublicWsDriftPairs,
+        minPublicWsComparedPairs,
+        rollbackDrillMaxAgeHours,
       },
       marketReadModel: {
         status: marketReadModelHealth.status,
@@ -128,6 +171,17 @@ export class GoRolloutReadinessService {
         contractValid: publicWsContractValid,
         comparedPairs: publicWsParity.goAggregatorParity.comparedPairs,
         driftPairs: publicWsParity.goAggregatorParity.driftPairs,
+      },
+      phase5ParityGate: {
+        pass: phase5ParityGatePass,
+        comparedPairs: publicWsParity.goAggregatorParity.comparedPairs,
+        driftPairs: publicWsParity.goAggregatorParity.driftPairs,
+        minComparedPairs: minPublicWsComparedPairs,
+        maxDriftPairs: maxPublicWsDriftPairs,
+      },
+      rollbackDrill: {
+        latest: latestRollbackDrill,
+        withinSla: rollbackWithinSla,
       },
       matchingShadow: {
         pairResults,
@@ -149,7 +203,7 @@ export class GoRolloutReadinessService {
 
     const snapshots: GoRolloutReadinessSnapshot[] = [];
 
-    for (const file of files.filter((value) => value.endsWith('.json'))) {
+    for (const file of files.filter((value) => value.endsWith('.json') && value !== 'rollback-drills.json')) {
       const fullPath = path.join(outputDir, file);
       try {
         const raw = await fs.readFile(fullPath, 'utf8');
@@ -214,6 +268,90 @@ export class GoRolloutReadinessService {
 
     await fs.writeFile(outputFile, JSON.stringify(history, null, 2), 'utf8');
     return { outputFile, reportAt: report.checkedAt };
+  }
+
+  async recordRollbackDrill(input: {
+    actorUserId: string;
+    fromSource: string;
+    toSource?: string;
+    success: boolean;
+    notes?: string;
+  }): Promise<GoRolloutRollbackDrillRecord> {
+    const record: GoRolloutRollbackDrillRecord = {
+      drilledAt: new Date().toISOString(),
+      actorUserId: input.actorUserId,
+      fromSource: (input.fromSource || '').trim() || this.getString('TICKER_SOURCE', 'nestjs'),
+      toSource: (input.toSource || '').trim() || 'nestjs',
+      success: input.success,
+      ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
+    };
+
+    const outputDir = path.join(process.cwd(), 'reports', 'go-rollout');
+    const outputFile = path.join(outputDir, 'rollback-drills.json');
+
+    await fs.mkdir(outputDir, { recursive: true });
+
+    const history = await this.loadRollbackDrills(outputFile);
+    history.push(record);
+
+    await fs.writeFile(outputFile, JSON.stringify(history, null, 2), 'utf8');
+    return record;
+  }
+
+  async listRollbackDrills(limit = 20): Promise<GoRolloutRollbackDrillRecord[]> {
+    const outputFile = path.join(process.cwd(), 'reports', 'go-rollout', 'rollback-drills.json');
+    const records = await this.loadRollbackDrills(outputFile);
+
+    return records
+      .sort((a, b) => b.drilledAt.localeCompare(a.drilledAt))
+      .slice(0, Math.max(1, Math.min(limit, 200)));
+  }
+
+  async getLatestRollbackDrill(): Promise<GoRolloutRollbackDrillRecord | null> {
+    const [latest] = await this.listRollbackDrills(1);
+    return latest ?? null;
+  }
+
+  private async loadRollbackDrills(outputFile: string): Promise<GoRolloutRollbackDrillRecord[]> {
+    try {
+      const raw = await fs.readFile(outputFile, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed
+        .map((item) => ({
+          drilledAt: String(item?.drilledAt ?? ''),
+          actorUserId: String(item?.actorUserId ?? 'unknown'),
+          fromSource: String(item?.fromSource ?? ''),
+          toSource: String(item?.toSource ?? 'nestjs'),
+          success: Boolean(item?.success),
+          notes: item?.notes ? String(item.notes) : undefined,
+        }))
+        .filter((item) => item.drilledAt.length > 0 && item.fromSource.length > 0);
+    } catch {
+      return [];
+    }
+  }
+
+  private isRollbackDrillWithinSla(
+    latest: GoRolloutRollbackDrillRecord | null,
+    maxAgeHours: number,
+    nowIso: string,
+  ): boolean {
+    if (!latest?.success) {
+      return false;
+    }
+
+    const nowMs = new Date(nowIso).getTime();
+    const drilledAtMs = new Date(latest.drilledAt).getTime();
+    if (!Number.isFinite(nowMs) || !Number.isFinite(drilledAtMs)) {
+      return false;
+    }
+
+    const ageHours = (nowMs - drilledAtMs) / (1000 * 60 * 60);
+    return ageHours <= maxAgeHours;
   }
 
   private async collectPairResults(
@@ -305,3 +443,4 @@ export class GoRolloutReadinessService {
     return value;
   }
 }
+

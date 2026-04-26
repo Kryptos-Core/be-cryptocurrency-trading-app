@@ -541,15 +541,24 @@ Acceptance criteria:
 
 ### Phase 5 - Go Market Aggregator Trước
 
-**Trạng thái hiện tại:** In progress (scaffold)  
-**Tiến độ ước lượng:** 15-25%
+**Trạng thái hiện tại:** In progress (shadow-ready)  
+**Tiến độ ước lượng:** 45-60%
 
 **Checklist trạng thái:**
 - [x] Hướng kiến trúc đã xác định rõ: Go market aggregator là bước Go ưu tiên trước matching.
 - [x] Đã có scaffold `go-services/market-aggregator` để chuẩn bị wiring CI/deploy.
-- [~] Đã có skeleton service và config contract; chưa consume `trade.executed` thực chiến.
+- [~] Đã có skeleton service + config contract; chưa consume `trade.executed` production stream thực chiến.
 - [x] Đã có shadow compare NestJS emit payload vs Go ingress payload qua admin parity endpoint (`GET /trading/admin/public-ws-parity`).
-- [~] Rollback flow bằng `TICKER_SOURCE=nestjs` đã được chuẩn hóa thêm qua runtime setting keys; vẫn cần diễn tập production rollout end-to-end.
+- [x] Đã bổ sung parity gate vào readiness report (`GET /trading/admin/go-rollout-readiness`) với ngưỡng runtime:
+  - `GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS`
+  - `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS`
+- [x] Đã bổ sung rollback drill evidence endpoints:
+  - `POST /trading/admin/go-rollout-readiness/rollback-drills`
+  - `GET /trading/admin/go-rollout-readiness/rollback-drills`
+  - `GET /trading/admin/go-rollout-readiness/rollback-drills/latest`
+- [x] Đã đưa rollback drill vào readiness gate với SLA age threshold:
+  - `GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS`
+- [~] Còn thiếu bằng chứng rollout production end-to-end (ít nhất một canary window có telemetry/parity/rollback drill hoàn chỉnh).
 
 Mục tiêu: đưa Go vào đường đọc market data, ít rủi ro hơn matching.
 
@@ -558,13 +567,14 @@ Deliverables:
 - Tạo `go-services/market-aggregator`: consume `trade.executed`, update Redis ticker, insert/batch insert TimescaleDB, publish cache/event cho NestJS trading gateway.
 - NestJS `MarketsController` vẫn là REST facade.
 - Socket.IO `/trading` vẫn giữ event names `ticker`, `ohlc`, `dashboard_tickers`.
+- Thiết lập parity gate + rollback drill evidence làm rollout acceptance gate cho Phase 5.
 
 Acceptance criteria:
 
 - So sánh ticker NestJS vs Go trong shadow mode.
 - FE market list/chart không cần đổi endpoint.
-- Rollback bằng `TICKER_SOURCE=nestjs`.
-
+- Rollback bằng `TICKER_SOURCE=nestjs` có drill record mới còn trong SLA.
+- `go-rollout-readiness.ready=true` khi chạy canary checklist.
 ### Phase 6 - Go Matching Engine Shadow Mode
 
 **Trạng thái hiện tại:** In progress (scaffold)  
@@ -1027,6 +1037,7 @@ Hướng đi phù hợp nhất cho dự án là tiến hóa có kiểm soát:
 7. Đưa Go matching engine vào shadow/canary sau cùng.
 
 Cách này đạt mục tiêu multi-database + TypeScript/Go nhưng vẫn bảo vệ business logic hiện tại và giảm tối đa việc FE phải sửa bất ngờ.
+
 
 
 

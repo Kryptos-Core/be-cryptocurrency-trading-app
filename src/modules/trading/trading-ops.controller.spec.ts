@@ -29,6 +29,9 @@ describe('TradingOpsController', () => {
             snapshotReadiness: jest.fn(),
             listSnapshots: jest.fn(),
             getLatestSnapshot: jest.fn(),
+            listRollbackDrills: jest.fn(),
+            getLatestRollbackDrill: jest.fn(),
+            recordRollbackDrill: jest.fn(),
           },
         },
       ],
@@ -44,6 +47,11 @@ describe('TradingOpsController', () => {
     const goRolloutReadinessService = {
       getReadiness: jest.fn().mockResolvedValue(readiness),
       snapshotReadiness: jest.fn(),
+      listSnapshots: jest.fn(),
+      getLatestSnapshot: jest.fn(),
+      listRollbackDrills: jest.fn(),
+      getLatestRollbackDrill: jest.fn(),
+      recordRollbackDrill: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -65,6 +73,11 @@ describe('TradingOpsController', () => {
         outputFile: 'reports/go-rollout/2026-04-26.json',
         reportAt: '2026-04-26T00:00:00.000Z',
       }),
+      listSnapshots: jest.fn(),
+      getLatestSnapshot: jest.fn(),
+      listRollbackDrills: jest.fn(),
+      getLatestRollbackDrill: jest.fn(),
+      recordRollbackDrill: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -82,8 +95,6 @@ describe('TradingOpsController', () => {
     });
     expect(goRolloutReadinessService.snapshotReadiness).toHaveBeenCalledWith('admin-user');
   });
-});
-
 
   it('returns go rollout readiness snapshots', async () => {
     const snapshots = [{ reportAt: '2026-04-26T00:00:00.000Z' }];
@@ -93,6 +104,9 @@ describe('TradingOpsController', () => {
       snapshotReadiness: jest.fn(),
       listSnapshots: jest.fn().mockResolvedValue(snapshots),
       getLatestSnapshot: jest.fn(),
+      listRollbackDrills: jest.fn(),
+      getLatestRollbackDrill: jest.fn(),
+      recordRollbackDrill: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -116,6 +130,9 @@ describe('TradingOpsController', () => {
       snapshotReadiness: jest.fn(),
       listSnapshots: jest.fn(),
       getLatestSnapshot: jest.fn().mockResolvedValue(latest),
+      listRollbackDrills: jest.fn(),
+      getLatestRollbackDrill: jest.fn(),
+      recordRollbackDrill: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -129,3 +146,49 @@ describe('TradingOpsController', () => {
     const controller = moduleRef.get(TradingOpsController);
     await expect(controller.getLatestGoRolloutReadinessSnapshot()).resolves.toEqual(latest);
   });
+
+  it('records and reads rollback drill evidence', async () => {
+    const latest = {
+      drilledAt: '2026-04-26T00:00:00.000Z',
+      actorUserId: 'admin-user',
+      fromSource: 'go_aggregator',
+      toSource: 'nestjs',
+      success: true,
+    };
+
+    const goRolloutReadinessService = {
+      getReadiness: jest.fn(),
+      snapshotReadiness: jest.fn(),
+      listSnapshots: jest.fn(),
+      getLatestSnapshot: jest.fn(),
+      listRollbackDrills: jest.fn().mockResolvedValue([latest]),
+      getLatestRollbackDrill: jest.fn().mockResolvedValue(latest),
+      recordRollbackDrill: jest.fn().mockResolvedValue(latest),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TradingOpsController],
+      providers: [
+        { provide: PublicWsPayloadParityService, useValue: { getReport: jest.fn() } },
+        { provide: GoRolloutReadinessService, useValue: goRolloutReadinessService },
+      ],
+    }).compile();
+
+    const controller = moduleRef.get(TradingOpsController);
+
+    await expect(controller.getRollbackDrills(5)).resolves.toEqual([latest]);
+    await expect(controller.getLatestRollbackDrill()).resolves.toEqual(latest);
+    await expect(
+      controller.recordRollbackDrill('admin-user', 'go_aggregator', 'nestjs', true, 'drill ok'),
+    ).resolves.toEqual(latest);
+
+    expect(goRolloutReadinessService.listRollbackDrills).toHaveBeenCalledWith(5);
+    expect(goRolloutReadinessService.recordRollbackDrill).toHaveBeenCalledWith({
+      actorUserId: 'admin-user',
+      fromSource: 'go_aggregator',
+      toSource: 'nestjs',
+      success: true,
+      notes: 'drill ok',
+    });
+  });
+});

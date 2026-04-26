@@ -67,6 +67,8 @@ Các key nên cấu hình trước khi rollout/canary:
 - `MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS`
 - `GO_ROLLOUT_WINDOW_HOURS`
 - `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS`
+- `GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS`
+- `GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS`
 
 ## Outbox relay observability (Phase 4 hardening)
 
@@ -151,3 +153,28 @@ Prometheus signal:
    - `outbox_relay_alert_severity=0` ổn định qua nhiều chu kỳ,
    - không còn dead-letter tăng thêm,
    - replay audit thể hiện requeue hoàn tất và không tái-dead-letter bất thường.
+
+
+## Phase 5 parity gate + rollback drill evidence
+
+Parity gate được tổng hợp trong readiness report:
+
+- `GET /api/v1/trading/admin/go-rollout-readiness`
+  - `phase5ParityGate.pass`
+  - `phase5ParityGate.comparedPairs` vs `GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS`
+  - `phase5ParityGate.driftPairs` vs `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS`
+
+Rollback drill evidence endpoints:
+
+- `POST /api/v1/trading/admin/go-rollout-readiness/rollback-drills`
+- `GET /api/v1/trading/admin/go-rollout-readiness/rollback-drills?limit=20`
+- `GET /api/v1/trading/admin/go-rollout-readiness/rollback-drills/latest`
+
+Rollback drill records lưu tại:
+- `reports/go-rollout/rollback-drills.json`
+
+Checklist closure Phase 5:
+1. Có parity samples >= `GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS`.
+2. Drift pairs <= `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS`.
+3. Có rollback drill thành công mới nhất còn trong SLA `GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS`.
+4. `go-rollout-readiness.ready=true` trước khi mở rộng canary.

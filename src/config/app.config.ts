@@ -56,6 +56,8 @@ export interface AppConfig {
     matchingShadowAlertMaxUnmatchedRuns: number;
     goRolloutWindowHours: number;
     goRolloutMaxPublicWsDriftPairs: number;
+    goRolloutMinPublicWsComparedPairs: number;
+    goRolloutRollbackDrillMaxAgeHours: number;
     marketReadModelAlertMaxLagSeconds: number;
     marketReadModelAlertCriticalMaxLagSeconds: number;
     eventOutboxEnabled: boolean;
@@ -479,6 +481,12 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       goRolloutMaxPublicWsDriftPairs: Number(
         env.GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS || '0',
       ),
+      goRolloutMinPublicWsComparedPairs: Number(
+        env.GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS || '1',
+      ),
+      goRolloutRollbackDrillMaxAgeHours: Number(
+        env.GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS || '72',
+      ),
       marketReadModelAlertMaxLagSeconds: Number(
         env.MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS || '300',
       ),
@@ -586,6 +594,7 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
+
 
 
 
