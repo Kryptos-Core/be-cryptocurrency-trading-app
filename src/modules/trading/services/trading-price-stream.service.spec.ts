@@ -61,6 +61,57 @@ describe('TradingPriceStreamService', () => {
     );
   });
 
+  it('normalizes numeric ticker timestamps before appending outbox event', async () => {
+    const publish = jest.fn().mockResolvedValue(1);
+    const redisService = {
+      getPublisher: () => ({ publish }),
+      getSubscriber: () => ({ subscribe: jest.fn(), on: jest.fn() }),
+    };
+    const unitOfWork = {
+      run: jest.fn(async (work) => work({})),
+    };
+    const outboxAppender = {
+      append: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        TradingPriceStreamService,
+        { provide: RedisService, useValue: redisService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: UnitOfWork, useValue: unitOfWork },
+        { provide: OutboxAppender, useValue: outboxAppender },
+      ],
+    }).compile();
+
+    const service = moduleRef.get(TradingPriceStreamService);
+
+    await service.publishPriceUpdate({
+      pair_id: 'pair-1',
+      symbol: 'BTC/USDT',
+      last_price: '65000',
+      bid: '64999',
+      ask: '65001',
+      volume_24h: '100',
+      volume_24h_usd: '6500000',
+      change_24h: '1000',
+      change_percent_24h: '1.56',
+      high_24h: '66000',
+      low_24h: '64000',
+      open_24h: '64000',
+      timestamp: '1714080000000',
+    });
+
+    expect(outboxAppender.append).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          timestamp: new Date(1714080000000).toISOString(),
+        }),
+      }),
+    );
+  });
+
   it('does not append outbox event when publish fails after retries', async () => {
     const publish = jest.fn().mockRejectedValue(new Error('redis down'));
     const redisService = {

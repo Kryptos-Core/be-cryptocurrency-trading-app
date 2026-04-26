@@ -19,6 +19,30 @@ const RATE_LIMIT_LOG_MS = 60_000;
 const PUBLISH_RETRY_COUNT = 3;
 const PUBLISH_RETRY_DELAY_MS = 100;
 
+function normalizeTickerTimestamp(timestamp: string): string {
+  const trimmed = timestamp.trim();
+  if (!trimmed) {
+    return new Date().toISOString();
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    const epochMs = Number(trimmed);
+    if (Number.isFinite(epochMs)) {
+      const parsed = new Date(epochMs);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
 @Injectable()
 export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TradingPriceStreamService.name);
@@ -255,7 +279,7 @@ export class TradingPriceStreamService implements OnModuleInit, OnModuleDestroy 
       high24h: ticker.high_24h,
       low24h: ticker.low_24h,
       open24h: ticker.open_24h,
-      timestamp: ticker.timestamp,
+      timestamp: normalizeTickerTimestamp(ticker.timestamp),
     };
 
     try {

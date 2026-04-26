@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { trace } from '@opentelemetry/api';
-import { DataSource, IsNull, MoreThan } from 'typeorm';
+import { DataSource, IsNull, MoreThan, QueryFailedError } from 'typeorm';
 import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
@@ -14,6 +14,16 @@ import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-eve
 const OUTBOX_RELAY_LOCK_KEY = 'outbox:relay:lock';
 const OUTBOX_RELAY_LOCK_TTL_SECONDS = 45;
 const MAX_ROWS_PER_FLUSH = 50;
+
+class OutboxRelayRowFailure extends Error {
+  constructor(
+    readonly row: IntegrationOutbox,
+    readonly causeError: Error,
+  ) {
+    super(causeError.message);
+    this.name = 'OutboxRelayRowFailure';
+  }
+}
 
 @Injectable()
 export class OutboxRelayService {
@@ -101,28 +111,11 @@ export class OutboxRelayService {
                     row.next_retry_at = null;
                     row.dead_lettered_at = null;
                     this.metricsService.incrementOutboxRelayPublished(row.event_type);
-                    this.logger.debug(
-                      `Outbox relayed id=${row.id} event_type=${row.event_type} attempts=${row.publish_attempts}`,
-                    );
+                    // this.logger.debug(
+                    //   `Outbox relayed id=${row.id} event_type=${row.event_type} attempts=${row.publish_attempts}`,
+                    // );
                   } catch (err) {
-                    row.last_publish_error = (err as Error).message;
-                    this.metricsService.incrementOutboxRelayFailure(row.event_type);
-                    if (row.publish_attempts >= this.maxAttempts) {
-                      row.dead_lettered_at = new Date();
-                      row.next_retry_at = null;
-                      this.metricsService.incrementOutboxRelayDeadLettered(row.event_type);
-                    } else {
-                      row.next_retry_at = new Date(
-                        Date.now() + this.computeRetryDelayMs(row.publish_attempts),
-                      );
-                      this.metricsService.incrementOutboxRelayRetryScheduled(row.event_type);
-                    }
-                    await em.save(IntegrationOutbox, row);
-                    this.logger.error(
-                      `Outbox sync/publish failed id=${row.id} event_type=${row.event_type}: ${(err as Error).message}`,
-                      (err as Error).stack,
-                    );
-                    throw err;
+                    throw new OutboxRelayRowFailure(row, err as Error);
                   }
 
                   row.published_at = new Date();
@@ -135,6 +128,17 @@ export class OutboxRelayService {
                 }
                 published += step;
               } catch (err) {
+                if (err instanceof OutboxRelayRowFailure) {
+                  const error = err.causeError;
+                  this.applyFailureMetadata(err.row, error);
+                  await this.persistFailureState(err.row);
+                  this.logger.error(
+                    `Outbox sync/publish failed id=${err.row.id} event_type=${err.row.event_type}: ${error.message}`,
+                    error.stack,
+                  );
+                  break;
+                }
+
                 this.logger.error(
                   `Outbox relay iteration aborted: ${(err as Error).message}`,
                   (err as Error).stack,
@@ -152,6 +156,39 @@ export class OutboxRelayService {
     );
     await this.updateOperationalMetrics();
     return { published };
+  }
+
+  private applyFailureMetadata(row: IntegrationOutbox, error: Error): void {
+    row.last_publish_error = error.message;
+    this.metricsService.incrementOutboxRelayFailure(row.event_type);
+
+    if (row.publish_attempts >= this.maxAttempts) {
+      row.dead_lettered_at = new Date();
+      row.next_retry_at = null;
+      this.metricsService.incrementOutboxRelayDeadLettered(row.event_type);
+      return;
+    }
+
+    row.dead_lettered_at = null;
+    row.next_retry_at = new Date(Date.now() + this.computeRetryDelayMs(row.publish_attempts));
+    this.metricsService.incrementOutboxRelayRetryScheduled(row.event_type);
+  }
+
+  private async persistFailureState(row: IntegrationOutbox): Promise<void> {
+    try {
+      await this.dataSource.transaction(async (em) => {
+        await em.save(IntegrationOutbox, row);
+        return 0;
+      });
+    } catch (error) {
+      if (error instanceof QueryFailedError) {
+        this.logger.error(
+          `Failed to persist outbox failure state id=${row.id} event_type=${row.event_type}: ${error.message}`,
+          error.stack,
+        );
+      }
+      throw error;
+    }
   }
 
   private async updateOperationalMetrics(): Promise<void> {

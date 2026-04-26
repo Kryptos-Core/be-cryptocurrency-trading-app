@@ -41,6 +41,71 @@ describe('MarketTickerReadModelSyncApplierService', () => {
     );
   });
 
+
+  it('accepts epoch-millisecond timestamp strings from legacy ticker payloads', async () => {
+    const service = new MarketTickerReadModelSyncApplierService();
+    const upsert = jest.fn().mockResolvedValue(undefined);
+    const em = { getRepository: jest.fn().mockReturnValue({ upsert }) };
+
+    await service.applyFromOutboxRow(em as never, {
+      id: 'outbox-legacy-ms',
+      event_type: OutboxIntegrationEventType.MarketTickerUpdatedV1,
+      payload: {
+        pairId: 'pair-legacy',
+        symbol: 'ETH/USDT',
+        lastPrice: '3000',
+        bid: '2999',
+        ask: '3001',
+        volume24h: '200',
+        volume24hUsd: '600000',
+        change24h: '50',
+        changePercent24h: '1.7',
+        high24h: '3100',
+        low24h: '2900',
+        open24h: '2950',
+        timestamp: '1714080000000',
+      },
+    } as never);
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pair_id: 'pair-legacy',
+        ticker_timestamp: new Date(1714080000000),
+      }),
+      { conflictPaths: ['pair_id'] },
+    );
+  });
+
+  it('throws on invalid timestamp payload', async () => {
+    const service = new MarketTickerReadModelSyncApplierService();
+    const upsert = jest.fn().mockResolvedValue(undefined);
+    const em = { getRepository: jest.fn().mockReturnValue({ upsert }) };
+
+    await expect(
+      service.applyFromOutboxRow(em as never, {
+        id: 'outbox-invalid-ts',
+        event_type: OutboxIntegrationEventType.MarketTickerUpdatedV1,
+        payload: {
+          pairId: 'pair-1',
+          symbol: 'BTC/USDT',
+          lastPrice: '65000',
+          bid: '64999',
+          ask: '65001',
+          volume24h: '100',
+          volume24hUsd: '6500000',
+          change24h: '1000',
+          changePercent24h: '1.56',
+          high24h: '66000',
+          low24h: '64000',
+          open24h: '64000',
+          timestamp: 'NaN',
+        },
+      } as never),
+    ).rejects.toThrow('INVALID_MARKET_TICKER_OUTBOX_TIMESTAMP');
+
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('throws on invalid payload', async () => {
     const service = new MarketTickerReadModelSyncApplierService();
     const em = { getRepository: jest.fn() };

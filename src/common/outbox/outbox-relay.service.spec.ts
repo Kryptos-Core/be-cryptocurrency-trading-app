@@ -49,6 +49,7 @@ describe('OutboxRelayService', () => {
   let outboxPublisher: { publish: jest.Mock };
   let savedRows: IntegrationOutbox[];
   let queryCall: number;
+  let persistFailureStateInSameTransaction: boolean;
   let metricsService: {
     incrementOutboxRelayPublished: jest.Mock;
     incrementOutboxRelayFailure: jest.Mock;
@@ -78,6 +79,7 @@ describe('OutboxRelayService', () => {
       getRepository: jest.fn(() => backlogRepository),
       transaction: jest.fn(async (fn: (em: unknown) => Promise<number>) => {
         const seq = rowsSequence[queryCall] ?? [];
+        const txIndex = queryCall;
         queryCall++;
         const em = {
           createQueryBuilder: () => ({
@@ -100,6 +102,9 @@ describe('OutboxRelayService', () => {
             }),
           }),
           save: jest.fn(async (_entity: unknown, row: IntegrationOutbox) => {
+            if (persistFailureStateInSameTransaction && txIndex === 0 && row.last_publish_error) {
+              throw new Error('current transaction is aborted, commands ignored until end of transaction block');
+            }
             savedRows.push({ ...row });
             if (row.published_at) {
               row.published_at = new Date();
@@ -112,6 +117,7 @@ describe('OutboxRelayService', () => {
   };
 
   beforeEach(() => {
+    persistFailureStateInSameTransaction = false;
     integrationSync = { dispatchRow: jest.fn().mockResolvedValue(undefined) };
     outboxPublisher = {
       publish: jest.fn().mockResolvedValue({
@@ -185,6 +191,42 @@ describe('OutboxRelayService', () => {
     expect(metricsService.setOutboxBacklog).toHaveBeenCalledWith('all', expect.any(Number));
     expect(metricsService.setOutboxOldestUnpublishedAgeSeconds).toHaveBeenCalledWith(expect.any(Number));
     expect(metricsService.setOutboxOldestDeadLetterAgeSeconds).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('persists retry schedule in a separate transaction when the main transaction is aborted', async () => {
+    const rowA = makeRow(
+      'abababab-abab-7aba-8aba-abababababab',
+      OutboxIntegrationEventType.MarketPairUpdatedV1,
+    );
+    const ds = buildDataSource([[rowA], []]);
+    persistFailureStateInSameTransaction = true;
+    outboxPublisher.publish.mockRejectedValueOnce(new Error('publisher boom'));
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OutboxRelayService,
+        { provide: DataSource, useValue: ds },
+        { provide: RedisService, useValue: {} },
+        { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configService },
+        { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
+      ],
+    }).compile();
+
+    const relay = moduleRef.get(OutboxRelayService);
+    const { published } = await relay.flushOnce();
+
+    expect(published).toBe(0);
+    expect(savedRows).toHaveLength(1);
+    expect(savedRows[0].publish_attempts).toBe(1);
+    expect(savedRows[0].last_publish_error).toBe('publisher boom');
+    expect(savedRows[0].next_retry_at).toBeInstanceOf(Date);
+    expect(savedRows[0].dead_lettered_at).toBeNull();
+    expect(savedRows[0].published_at).toBeNull();
+    expect(ds.transaction).toHaveBeenCalledTimes(2);
+    expect(metricsService.incrementOutboxRelayFailure).toHaveBeenCalledWith(rowA.event_type);
+    expect(metricsService.incrementOutboxRelayRetryScheduled).toHaveBeenCalledWith(rowA.event_type);
   });
 
   it('stores retry schedule when publisher fails before max attempts', async () => {

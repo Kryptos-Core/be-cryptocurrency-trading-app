@@ -8,6 +8,23 @@ import type { EntityManager } from 'typeorm';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
 
+
+function parseTickerTimestamp(raw: string): Date | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const asEpochMs = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+  if (Number.isFinite(asEpochMs)) {
+    const date = new Date(asEpochMs);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function parsePayload(row: IntegrationOutbox): MarketTickerUpdatedOutboxPayloadV1 | null {
   const envelopePayload = unwrapCanonicalIntegrationEventPayload<MarketTickerUpdatedOutboxPayloadV1>(
     row.payload,
@@ -31,6 +48,14 @@ export class MarketTickerReadModelSyncApplierService {
       throw new Error('INVALID_MARKET_TICKER_OUTBOX_PAYLOAD');
     }
 
+    const tickerTimestamp = parseTickerTimestamp(payload.timestamp);
+    if (!tickerTimestamp) {
+      this.logger.warn(
+        `Invalid market ticker timestamp id=${row.id} pairId=${payload.pairId} timestamp=${payload.timestamp}`,
+      );
+      throw new Error('INVALID_MARKET_TICKER_OUTBOX_TIMESTAMP');
+    }
+
     await em.getRepository(ReadMarketTicker).upsert(
       {
         pair_id: payload.pairId,
@@ -45,7 +70,7 @@ export class MarketTickerReadModelSyncApplierService {
         high_24h: payload.high24h,
         low_24h: payload.low24h,
         open_24h: payload.open24h,
-        ticker_timestamp: new Date(payload.timestamp),
+        ticker_timestamp: tickerTimestamp,
         last_outbox_id: row.id,
       },
       { conflictPaths: ['pair_id'] },
