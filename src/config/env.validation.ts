@@ -265,6 +265,14 @@ export class EnvironmentVariables {
   @IsOptional()
   GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS?: string = '0';
 
+  @IsString()
+  @IsOptional()
+  MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS?: string = '300';
+
+  @IsString()
+  @IsOptional()
+  MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS?: string = '900';
+
   /**
    * When true/1/yes/on: log SQL queries via TypeORM. Ignored when NODE_ENV=production.
    */
@@ -828,6 +836,8 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS',
     'GO_ROLLOUT_WINDOW_HOURS',
     'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS',
+    'MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS',
+    'MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS',
     'TYPEORM_DEBUG_SQL',
     'MM_DEFAULT_SPREAD_BPS',
     'MM_DEFAULT_SPREAD_ALERT_THRESHOLD_BPS',
@@ -1064,6 +1074,7 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+
 
 
 

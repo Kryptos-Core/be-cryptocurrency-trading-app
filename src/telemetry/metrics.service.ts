@@ -65,6 +65,9 @@ export class MetricsService {
     @InjectMetric('market_read_model_projection_lag_seconds')
     private readonly marketReadModelProjectionLagSeconds: Gauge,
 
+    @InjectMetric('market_read_model_alert_severity')
+    private readonly marketReadModelAlertSeverity: Gauge,
+
     @InjectMetric('matching_shadow_runs')
     private readonly matchingShadowRuns: Gauge,
 
@@ -167,6 +170,10 @@ export class MetricsService {
     this.marketReadModelProjectionLagSeconds.set({ projection }, lagSeconds);
   }
 
+  setMarketReadModelAlertSeverity(level: number): void {
+    this.marketReadModelAlertSeverity.set(level);
+  }
+
   setMatchingShadowRuns(pairId: string, value: number): void {
     this.matchingShadowRuns.set({ pair_id: pairId }, value);
   }
@@ -187,5 +194,6 @@ export class MetricsService {
     this.publicWsParityDriftPairs.set({ source }, value);
   }
 }
+
 
 

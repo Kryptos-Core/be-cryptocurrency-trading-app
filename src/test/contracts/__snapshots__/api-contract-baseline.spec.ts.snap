@@ -1,0 +1,74 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`API contract baseline snapshots locks markets ticker/trades response shape 1`] = `
+{
+  "ticker": {
+    "ask": "100010",
+    "bid": "99990",
+    "change_24h": "500",
+    "change_percent_24h": "0.5",
+    "high_24h": "101000",
+    "last_price": "100000",
+    "low_24h": "98000",
+    "open_24h": "99500",
+    "pair_id": "pair-1",
+    "symbol": "BTC/USDT",
+    "timestamp": "2026-04-26T00:00:00.000Z",
+    "volume_24h": "12.34",
+    "volume_24h_usd": "1234000",
+  },
+  "trades": [
+    {
+      "amount": "0.01000000",
+      "executed_at": "2026-04-26T00:00:01.000Z",
+      "pair_id": "pair-1",
+      "price": "100000",
+      "side": "BUY",
+      "symbol": "BTC/USDT",
+      "trade_id": "trade-1",
+    },
+  ],
+}
+`;
+
+exports[`API contract baseline snapshots locks orders create/cancel/my-orders response shape 1`] = `
+{
+  "cancelled": {
+    "order_id": "order-1",
+    "status": "CANCELLED",
+    "updated_at": "2026-04-26T00:10:00.000Z",
+  },
+  "created": {
+    "amount": "0.01",
+    "created_at": "2026-04-26T00:00:00.000Z",
+    "filled_amount": "0",
+    "idempotency_key": "idempotent-1",
+    "order_id": "order-1",
+    "pair_id": "pair-1",
+    "price": "50000",
+    "reserved_base": "0",
+    "reserved_quote": "500",
+    "side": "BUY",
+    "status": "OPEN",
+    "time_in_force": "GTC",
+    "type": "LIMIT",
+    "updated_at": "2026-04-26T00:00:00.000Z",
+    "user_id": "user-1",
+  },
+  "myOrders": {
+    "data": [
+      {
+        "amount": "0.01",
+        "filled_amount": "0",
+        "order_id": "order-1",
+        "pair_id": "pair-1",
+        "price": "50000",
+        "status": "OPEN",
+      },
+    ],
+    "limit": 20,
+    "page": 1,
+    "total": 1,
+  },
+}
+`;

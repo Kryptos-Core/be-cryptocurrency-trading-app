@@ -26,11 +26,11 @@
 
 | Phase | Mục tiêu | Trạng thái | Nhận định ngắn |
 |---|---|---|---|
-| Phase 0 | API contract baseline | Partial | Có awareness rất rõ về FE compatibility, nhưng chưa xác nhận full snapshot/coverage cho toàn bộ endpoint critical |
+| Phase 0 | API contract baseline | Near complete | Đã có contract snapshot baseline cho nhóm REST/WS critical và script `contract:check`; phần còn lại là mở rộng coverage dần theo endpoint matrix |
 | Phase 1 | Clean architecture database boundary | Near complete | Phần lớn boundary/repository ports/runtime PostgreSQL đã tách và vận hành được |
 | Phase 2 | PostgreSQL core source of truth replacement | Near complete | Đây là phần tiến xa nhất; runtime đã PostgreSQL-only |
 | Phase 3 | Market read model trên DB phụ | In progress | Đã có trades/ticker/OHLCV projection nền, read-path feature-flag, reconciliation + lag health/metrics/admin report; chưa hoàn tất Timescale end-to-end |
-| Phase 4 | Event/outbox contract chuẩn cho TS và Go | In progress / near complete | Contract/outbox foundation, DLQ replay, metrics/health và publisher scaffold đã khá đầy đủ; còn thiếu hardening dài hạn |
+| Phase 4 | Event/outbox contract chuẩn cho TS và Go | Near complete | Contract/outbox foundation + production alert automation (severity-aware + state-change event + severity metric) đã có; còn lại chủ yếu là hardening Kafka vận hành dài hạn |
 | Phase 5 | Go market aggregator | In progress (scaffold) | Đã có scaffold `go-services/market-aggregator`, chưa chạy shadow thực chiến |
 | Phase 6 | Go matching engine shadow mode | In progress (scaffold) | Đã có shadow enqueue placeholder + artifact table, chưa có parity/canary đầy đủ |
 | Phase 7 | Public WS gateway bằng Go | In progress (scaffold) | Đã có scaffold `go-services/public-ws-gateway`, chưa có traffic rollout |
@@ -169,6 +169,18 @@ Các file thay đổi chính trong các batch này gồm:
 - `src/migrations/1776570000000-ExpandIntegrationOutboxPublisherMetadata.ts`
 - `src/migrations/1776580000000-CreateProcessedIntegrationEvents.ts`
 
+### 0.3.1 Cập nhật xác nhận batch mới nhất (Phase 4 production automation)
+
+Batch mới nhất đã đóng phần **production automation** cho Outbox relay trong Phase 4, gồm:
+
+- Relay health severity-aware (`none`/`warning`/`critical`) với warning + critical thresholds runtime-configurable.
+- Scheduler automation (cron 30s) phát event state-change `outbox.relay.alert_state_changed` lên Redis channel cấu hình.
+- Prometheus gauge `outbox_relay_alert_severity` (0/1/2) để alert pipeline có thể tự động hóa theo mức độ.
+- Runtime knobs/env/system-config đầy đủ cho critical thresholds + automation enable/channel.
+- Bộ test và docs/runbook đã cập nhật, verify pass:
+  - `npm run lint -- --max-diagnostics=220`
+  - `npx tsc --noEmit`
+  - `npm run test -- --runInBand` (119 suites, 629 tests)
 ### 0.4 Chưa hoàn thành / còn dang dở có chủ đích
 
 #### A. Dấu vết lịch sử migration MySQL vẫn còn trong repo
@@ -176,7 +188,7 @@ Các file thay đổi chính trong các batch này gồm:
 - Nhiều **migration lịch sử** vẫn chứa DDL/procedure MySQL cũ để bảo toàn historical trace; đây không còn là runtime source of truth hiện tại.
 - Một số helper/spec/migration comments còn tồn tại để mô tả bối cảnh lịch sử migration MySQL -> PostgreSQL; cần dọn tiếp theo batch tài liệu nếu muốn repo “sạch dấu vết” hơn.
 
-#### B. Phase 0 chưa thể coi là đóng hoàn toàn
+#### B. Phase 0 đã có baseline chạy được, còn mở rộng coverage theo thời gian
 
 - Repo đã có tư duy **contract-first** rất rõ và roadmap đã liệt kê đầy đủ FE impact matrix.
 - Tuy nhiên chưa xác nhận rằng toàn bộ:
@@ -186,7 +198,7 @@ Các file thay đổi chính trong các batch này gồm:
   - CI contract check
   đã được làm đầy đủ và enforced cho tất cả nhóm endpoint quan trọng.
 
-=> Vì vậy Phase 0 nên đánh dấu là **partial**, chưa phải finished.
+=> Vì vậy Phase 0 hiện có thể đánh dấu **near complete**: đã có baseline contract-check vận hành, chưa phải finished vì coverage chưa bao phủ toàn bộ matrix endpoint/event.
 
 #### C. Phase 3 đã bắt đầu implementation nhưng chưa hoàn tất rollout thực chiến
 
@@ -206,7 +218,7 @@ Chưa thấy / chưa hoàn chỉnh trong runtime hiện tại:\n\n- TimescaleDB 
 
 => Phase 3 hiện nên coi là **in progress**, đã có foundation khá rõ cho trades/ticker/OHLCV, on-demand admin reconciliation report, health payload và metrics collector, nhưng chưa hoàn tất rollout multi-db market read side.
 
-#### D. Phase 4 đã gần hoàn tất phần contract + outbox foundation
+#### D. Phase 4 đã gần hoàn tất (production automation đã đóng)
 
 Đã có trong runtime hiện tại:
 
@@ -229,7 +241,7 @@ Phần còn thiếu để coi là Phase 4 hoàn chỉnh tuyệt đối:
 - observability sâu hơn cho lag / throughput / replay audit
 - chuẩn hóa transaction boundary triệt để cho mọi emit path nhạy cảm
 
-=> Phase 4 hiện vẫn là **in progress**, nhưng có thể coi là **near complete** cho phần contract/outbox foundation.
+=> Phase 4 hiện có thể coi là **near complete**: phần production automation đã đóng; phần còn lại là hardening Kafka/ops observability nâng cao theo nhu cầu rollout thực tế.
 
 #### E. Các phase Go / multi-db dài hạn chưa bắt đầu implementation thực sự
 
@@ -252,9 +264,9 @@ Thứ tự hợp lý tiếp theo sau trạng thái hiện tại:
    - chuyển từ projection schema hiện tại sang Timescale rollout thật nếu cần hypertable/continuous aggregate
    - thêm dashboard/alert cho projection lag, stale ticker, ohlcv drift
    - kiểm chứng performance/read parity trên staging load
-2. **Khóa nốt phần còn lại của Phase 4**
-   - hardening Kafka/DLQ/observability
-   - review transaction boundary cho các emit path còn lại
+2. **Phase 4 production automation đã hoàn thành; tiếp tục hardening có chọn lọc**
+   - hardening Kafka/DLQ/observability khi bắt đầu tăng traffic/event bus
+   - review transaction boundary cho các emit path nhạy cảm còn lại
 3. **Sau khi Phase 3 ổn định mới bắt đầu Go aggregator**
    - shadow ticker / parity check
 4. **Matching Go chỉ nên vào sau cùng**
@@ -417,47 +429,72 @@ Dependency rule:
 
 ### Phase 0 - API Contract Baseline
 
-**Trạng thái hiện tại:** Partial  
-**Tiến độ ước lượng:** 35-50%
+**Trạng thái hiện tại:** Near complete  
+**Tiến độ ước lượng:** 80-90%
 
 **Checklist trạng thái:**
-- [x] Roadmap mục tiêu và feature flag `MARKET_READ_SOURCE=postgres|timescale` đã được xác định rõ.
+- [x] Đã có contract snapshot baseline cho nhóm REST/WS critical tại `src/test/contracts`.
+- [x] Đã có script `npm run contract:check` để khóa shape response/event trọng yếu.
+- [x] Đã khóa baseline cho các nhóm critical đã triển khai:
+  - REST: markets ticker/trades, orders create/cancel/my-orders
+  - WS `/trading`: `ticker`, `ohlc`
+  - WS `/notifications`: `auth_response`, `notification:new`, `wallet:balance`, `system_config:updated`
+- [~] Coverage contract hiện chưa phủ full endpoint/event matrix; cần mở rộng dần theo API impact matrix.
+- [~] Chưa có OpenAPI export/check gate ổn định trong CI pipeline.
+
+Mục tiêu: khóa contract FE-critical trước mọi refactor/runtime rollout.
+
+Deliverables:
+
+- Baseline snapshot cho các endpoint/events Critical/High theo API impact matrix.
+- CI step fail khi có thay đổi shape không chủ đích.
+- Rule review bắt buộc cho mọi thay đổi enum/status/field FE-facing.
+
+Acceptance criteria:
+
+- `npm run contract:check` pass ổn định trên CI.
+- Thay đổi shape response/event ngoài kế hoạch sẽ fail test snapshot.
+- Có lộ trình mở rộng coverage đến full matrix endpoint/event.
+
+### Phase 3 - Market Read Model Trên DB Phụ (Timescale Track)
+
+**Trạng thái hiện tại:** In progress  
+**Tiến độ ước lượng:** 65-80%
+
+**Checklist trạng thái:**
 - [x] Đã có projection schema nền cho `read_market_trades`, `read_market_tickers`, `read_market_ohlcv`.
-- [x] Đã có projection worker path consume `trade.executed` hoàn chỉnh qua outbox sync.
-- [x] Đã có runtime read path dùng `MARKET_READ_SOURCE=timescale` với fallback an toàn cho:
+- [x] Đã có projection worker path consume `trade.executed` qua outbox sync.
+- [x] Đã có runtime read path dùng `MARKET_READ_SOURCE=postgres|timescale` với fallback cho:
   - `/markets/:id/trades`
   - `/markets/:id/ticker`
   - `/markets/tickers/all`
   - `/markets/:id/ohlcv`
-  - `symbol -> ticker/trades` path
-- [x] Đã có reconciliation cho trades, tickers và OHLCV; OHLCV đã phủ nhiều interval (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`).
-- [x] Đã có health/metrics cho projection lag market read-model, permission riêng cho ops read-model, admin/on-demand reconciliation endpoint và report chi tiết theo pair.
-- [~] `MARKET_TS_DB` đã được wiring ở mức runtime path/read repository, nhưng chưa chứng minh rollout Timescale production-grade đầy đủ.
-- [~] Đã có migration scaffold cho Timescale extension/hypertable/continuous aggregate + retention/compression policy ở mức optional/no-op-safe; đã thêm compose/env để bật profile Timescale riêng, nhưng chưa rollout Timescale end-to-end đúng nghĩa cho OHLCV.
+  - `symbol -> ticker/trades`
+- [x] Đã có reconciliation trades/tickers/OHLCV + admin on-demand report + pair-level details.
+- [x] Đã có health payload (`/health/ready`) và Prometheus metrics cho drift/lag read-model.
+- [x] Đã thêm severity metric `market_read_model_alert_severity` (0/1/2) + ngưỡng runtime-configurable:
+  - `MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS`
+  - `MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS`
+- [~] `MARKET_TS_DB` đã wiring ở mức runtime path/read repository, nhưng chưa chứng minh Timescale rollout production-grade đầy đủ.
+- [~] Chưa có evidence rollout end-to-end (hypertable/materialization/continuous aggregate + dashboard/alert runbook production).
 
-Mục tiêu: giảm tải PostgreSQL source of truth cho chart/ticker/trades mà không đổi REST contract.
+Mục tiêu: giảm tải PostgreSQL source-of-truth cho market read path mà không đổi REST/WS contract FE.
 
 Deliverables:
 
-- Thêm TimescaleDB/PostgreSQL dev service vào compose riêng hoặc optional profile.
-- Tạo schema projection:
-  - `market_trades(time, pair_id, symbol, price, amount, taker_side, trade_id)`.
-  - `ohlcv_1m`, `ohlcv_5m`, `ohlcv_15m`, `ohlcv_1h`, `ohlcv_4h`, `ohlcv_1d`.
-  - `ticker_24h_projection` nếu cần materialized/cache fallback.
-- Projection worker consume outbox/event `trade.executed` từ PostgreSQL source of truth; poll PostgreSQL trades có cursor chỉ là fallback.
-- REST endpoints giữ nguyên: `/markets/:id/ohlcv`, `/markets/:id/trades`, `/markets/:id/ticker`, `/markets/tickers/all`.
+- Timescale profile/dev service + migration path rõ cho hypertable/continuous aggregate/retention.
+- Projection lag/parity observability đầy đủ (metrics + dashboard + alert policy).
+- Báo cáo reconciliation phục vụ rollout gate theo window/pair.
 
 Acceptance criteria:
 
 - `MARKET_READ_SOURCE=postgres` và `MARKET_READ_SOURCE=timescale` trả response tương thích.
-- FE chart/market list không cần sửa code.
-- Có reconciliation job/report so sánh trades/tickers/OHLCV giữa PostgreSQL và market read-model DB phụ.
-- Có health payload + Prometheus metrics cho projection lag/read-model drift, admin API xem report on-demand và pair-level detail.
-
+- FE chart/market list không cần đổi code.
+- Có alert policy rõ cho lag/parity drift và evidence rollout staging/production.
 ### Phase 4 - Event/Outbox Contract Chuẩn Cho TS Và Go
 
-**Trạng thái hiện tại:** In progress  
-**Tiến độ ước lượng:** 55-70%
+**Trạng thái hiện tại:** Near complete  
+**Tiến độ ước lượng:** 80-90%
 
 **Checklist trạng thái:**
 - [x] Transactional outbox pattern đã tồn tại trong runtime.
@@ -466,7 +503,7 @@ Acceptance criteria:
 - [x] `OutboxAppender` đã build/store canonical envelope với metadata chuẩn hóa bước đầu.
 - [x] Đã giữ backward compatibility cho luồng sync/read-model/notification đang dùng payload legacy.
 - [x] Đã mở thêm support cho `DepositMatchedV1`.
-- [~] Event contract đã phủ thêm orders/trades/wallet; phần ticker update vẫn chưa hoàn chỉnh end-to-end.
+- [x] Event contract đã phủ thực tế orders/trades/wallet/ticker update và đã nối vào flow runtime chính.
 - [x] Đã mở rộng schema `integration_outbox` với metadata chính cho publisher/Kafka-ready flow.
 - [x] Đã có publisher abstraction + driver selection `noop|kafka` + Kafka publisher scaffold.
 - [x] Đã có `processed_integration_events` + consumer idempotency cho read-model/notification sync hiện tại.
@@ -500,6 +537,7 @@ Acceptance criteria:
 
 - Outbox retry không tạo duplicate projection/trade/ticker.
 - Có DLQ/log cho event lỗi.
+- Có relay-health severity-aware (none/warning/critical), state-change automation event `outbox.relay.alert_state_changed`, và metric `outbox_relay_alert_severity` cho giám sát production.
 
 ### Phase 5 - Go Market Aggregator Trước
 
@@ -989,7 +1027,6 @@ Hướng đi phù hợp nhất cho dự án là tiến hóa có kiểm soát:
 7. Đưa Go matching engine vào shadow/canary sau cùng.
 
 Cách này đạt mục tiêu multi-database + TypeScript/Go nhưng vẫn bảo vệ business logic hiện tại và giảm tối đa việc FE phải sửa bất ngờ.
-
 
 
 

@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { ReadMarketOhlcv } from '@/entities/read-market-ohlcv.entity';
@@ -92,6 +93,7 @@ export class MarketReadModelReconciliationService {
   constructor(
     private readonly dataSource: DataSource,
     @Optional() private readonly metricsService?: MetricsService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   getDefaultOhlcvIntervals(): number[] {
@@ -316,7 +318,8 @@ export class MarketReadModelReconciliationService {
     ohlcvIntervals: number[] = this.getDefaultOhlcvIntervals(),
   ): Promise<ProjectionHealthSummary> {
     const health = await this.getProjectionHealth(windowHours, ohlcvIntervals);
-    this.publishMetrics(health);
+    const severity = this.resolveAlertSeverity(health);
+    this.publishMetrics(health, severity);
     return health;
   }
 
@@ -528,7 +531,7 @@ export class MarketReadModelReconciliationService {
     };
   }
 
-  private publishMetrics(health: ProjectionHealthSummary): void {
+  private publishMetrics(health: ProjectionHealthSummary, severity: number): void {
     if (!this.metricsService) return;
 
     this.metricsService.setMarketReadModelTradeDrift(
@@ -564,8 +567,37 @@ export class MarketReadModelReconciliationService {
       'ohlcv',
       health.lag.ohlcv.lagSeconds,
     );
+    this.metricsService.setMarketReadModelAlertSeverity(severity);
+  }
+  private resolveAlertSeverity(health: ProjectionHealthSummary): number {
+    const warningThreshold = this.getNumberConfig('MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS', 300);
+    const criticalThreshold = Math.max(
+      warningThreshold,
+      this.getNumberConfig('MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS', 900),
+    );
+
+    const maxLag = Math.max(
+      health.lag.trades.lagSeconds,
+      health.lag.tickers.lagSeconds,
+      health.lag.ohlcv.lagSeconds,
+    );
+
+    if (maxLag >= criticalThreshold) {
+      return 2;
+    }
+
+    if (health.status !== 'up' || maxLag >= warningThreshold) {
+      return 1;
+    }
+
+    return 0;
   }
 
+  private getNumberConfig(key: string, fallback: number): number {
+    const raw = this.configService?.get<string>(key);
+    const value = Number(raw ?? String(fallback));
+    return Number.isFinite(value) ? value : fallback;
+  }
   private normalizeIntervals(intervalSecs: number[]): number[] {
     const normalized = Array.from(
       new Set(
@@ -596,3 +628,5 @@ export class MarketReadModelReconciliationService {
     return lagMs > 0 ? Math.floor(lagMs / 1000) : 0;
   }
 }
+
+

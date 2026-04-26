@@ -1,0 +1,61 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`WebSocket contract baseline snapshots locks /trading payload shape for ticker + ohlc events 1`] = `
+{
+  "ohlcEvent": {
+    "data": {
+      "close": "100",
+      "close_time": 1714080060,
+      "high": "100",
+      "interval": "1m",
+      "is_closed": true,
+      "low": "98",
+      "open": "99",
+      "open_time": 1714080000,
+      "pair_id": "pair-1",
+      "quote_volume": "1000",
+      "symbol": "BTC/USDT",
+      "trades_count": 10,
+      "volume": "10",
+    },
+    "type": "ohlc",
+  },
+  "parityHealth": {
+    "checkedAt": "__dynamic__",
+    "goAggregatorParity": {
+      "comparedPairs": 1,
+      "driftPairs": 0,
+      "topDrifts": [],
+    },
+    "ohlc": {
+      "contractValid": true,
+      "hasSample": true,
+      "missingFields": [],
+    },
+    "source": "nestjs",
+    "ticker": {
+      "contractValid": true,
+      "hasSample": true,
+      "missingFields": [],
+    },
+  },
+  "tickerEvent": {
+    "data": {
+      "ask": "100.1",
+      "bid": "99.9",
+      "change_24h": "1",
+      "change_percent_24h": "1",
+      "high_24h": "105",
+      "last_price": "100",
+      "low_24h": "95",
+      "open_24h": "99",
+      "pair_id": "pair-1",
+      "symbol": "BTC/USDT",
+      "timestamp": "2026-04-26T00:00:00.000Z",
+      "volume_24h": "1.5",
+      "volume_24h_usd": "150",
+    },
+    "type": "ticker",
+  },
+}
+`;

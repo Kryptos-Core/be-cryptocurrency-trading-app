@@ -108,6 +108,10 @@ import { MetricsService } from './metrics.service';
       labelNames: ['projection'],
     }),
     makeGaugeProvider({
+      name: 'market_read_model_alert_severity',
+      help: 'Market read-model alert severity (none=0, warning=1, critical=2)',
+    }),
+    makeGaugeProvider({
       name: 'matching_shadow_runs',
       help: 'Shadow matching runs captured per pair',
       labelNames: ['pair_id'],
@@ -142,5 +146,3 @@ import { MetricsService } from './metrics.service';
   exports: [MetricsService],
 })
 export class TelemetryModule {}
-
-

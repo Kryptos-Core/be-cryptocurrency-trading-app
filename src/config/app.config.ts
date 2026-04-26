@@ -56,6 +56,8 @@ export interface AppConfig {
     matchingShadowAlertMaxUnmatchedRuns: number;
     goRolloutWindowHours: number;
     goRolloutMaxPublicWsDriftPairs: number;
+    marketReadModelAlertMaxLagSeconds: number;
+    marketReadModelAlertCriticalMaxLagSeconds: number;
     eventOutboxEnabled: boolean;
     eventSchemaFormat: string;
     eventPublisherDriver: string;
@@ -477,6 +479,12 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       goRolloutMaxPublicWsDriftPairs: Number(
         env.GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS || '0',
       ),
+      marketReadModelAlertMaxLagSeconds: Number(
+        env.MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS || '300',
+      ),
+      marketReadModelAlertCriticalMaxLagSeconds: Number(
+        env.MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS || '900',
+      ),
       eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
       eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',
       eventPublisherDriver: env.EVENT_PUBLISHER_DRIVER || 'noop',
@@ -578,6 +586,7 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
+
 
 
 

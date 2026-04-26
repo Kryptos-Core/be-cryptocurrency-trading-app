@@ -46,7 +46,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "postman:build": "node postman/build-collection.mjs"
+    "postman:build": "node postman/build-collection.mjs",
+    "contract:check": "jest --runInBand test/contracts"
   },
   "dependencies": {
     "@bull-board/express": "^7.0.0",
@@ -151,5 +152,3 @@
     "coverageDirectory": "coverage"
   }
 }
-
-

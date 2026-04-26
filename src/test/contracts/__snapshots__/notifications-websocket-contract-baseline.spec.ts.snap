@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Notifications websocket contract baseline snapshots locks /notifications payload envelopes 1`] = `
+{
+  "authResponseEvent": {
+    "data": {
+      "message": "Authenticated",
+      "success": true,
+      "user_id": "user-1",
+    },
+    "timestamp": 1714080000000,
+    "type": "auth_response",
+  },
+  "notificationNewEvent": {
+    "data": {
+      "body": "Maintenance window",
+      "created_at": "2026-04-26T00:00:00.000Z",
+      "notification_id": "notif-1",
+      "title": "System notice",
+      "type": "system",
+    },
+    "timestamp": 1714080000001,
+    "type": "notification:new",
+  },
+  "systemConfigUpdatedEvent": {
+    "data": {
+      "key": "MATCHING_ENGINE",
+      "value": "ts",
+    },
+    "timestamp": 1714080000003,
+    "type": "system_config:updated",
+  },
+  "walletBalanceEvent": {
+    "data": {
+      "available": "100.00",
+      "currencyId": "currency-1",
+      "frozen": "0",
+      "symbol": "USDT",
+      "total": "100.00",
+      "updatedAt": "2026-04-26T00:00:00.000Z",
+    },
+    "timestamp": 1714080000002,
+    "type": "wallet:balance",
+  },
+}
+`;
