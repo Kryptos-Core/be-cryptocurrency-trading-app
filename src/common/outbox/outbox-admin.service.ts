@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, MoreThan, Repository } from 'typeorm';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import {
+  OutboxReplayAuditRecord,
+  OutboxReplayAuditRowSnapshot,
+  OutboxReplayAuditService,
+} from './outbox-replay-audit.service';
 
 export type OutboxDeadLetterListItem = {
   id: string;
@@ -19,11 +26,36 @@ export type OutboxDeadLetterListItem = {
   kafkaTopic: string | null;
 };
 
+export type OutboxRelayHealthSummary = {
+  unpublishedBacklog: number;
+  deadLetterRows: number;
+  retryScheduledRows: number;
+  oldestUnpublishedAt: string | null;
+  oldestDeadLetterAt: string | null;
+  oldestUnpublishedAgeSeconds: number;
+  oldestDeadLetterAgeSeconds: number;
+  alerts: {
+    deadLetterRowsExceeded: boolean;
+    oldestUnpublishedAgeExceeded: boolean;
+    oldestDeadLetterAgeExceeded: boolean;
+    degraded: boolean;
+  };
+};
+
+export type OutboxRequeueContext = {
+  actorUserId: string;
+  actorRole: string;
+  reason?: string | null;
+};
+
 @Injectable()
 export class OutboxAdminService {
   constructor(
     @InjectRepository(IntegrationOutbox)
     private readonly outboxRepository: Repository<IntegrationOutbox>,
+    private readonly configService: ConfigService,
+    private readonly systemConfigService: SystemConfigService,
+    private readonly outboxReplayAuditService: OutboxReplayAuditService,
   ) {}
 
   async listDeadLetterRows(limit = 100): Promise<OutboxDeadLetterListItem[]> {
@@ -42,7 +74,18 @@ export class OutboxAdminService {
     return rows.map((row) => this.toDeadLetterListItem(row));
   }
 
-  async requeueDeadLetterRow(id: string): Promise<{ id: string; requeued: boolean }> {
+  async requeueDeadLetterRow(
+    id: string,
+    context: OutboxRequeueContext,
+  ): Promise<{ id: string; requeued: boolean; auditId: string; auditOutputFile: string }> {
+    const selectedRow = await this.outboxRepository.findOne({
+      where: {
+        id,
+        published_at: IsNull(),
+        dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
+      },
+    });
+
     const result = await this.outboxRepository
       .createQueryBuilder()
       .update(IntegrationOutbox)
@@ -56,22 +99,50 @@ export class OutboxAdminService {
       .andWhere('dead_lettered_at IS NOT NULL')
       .execute();
 
-    return { id, requeued: (result.affected ?? 0) > 0 };
+    const requeued = (result.affected ?? 0) > 0;
+    const audit = await this.outboxReplayAuditService.record({
+      action: 'requeue_one',
+      actorUserId: context.actorUserId,
+      actorRole: context.actorRole,
+      reason: this.normalizeReason(context.reason),
+      targetRowId: id,
+      requestedLimit: null,
+      selectedRowCount: selectedRow ? 1 : 0,
+      requeuedRowCount: requeued ? 1 : 0,
+      rowSnapshots: selectedRow ? [this.toReplaySnapshot(selectedRow)] : [],
+    });
+
+    return { id, requeued, auditId: audit.auditId, auditOutputFile: audit.outputFile };
   }
 
-  async requeueAllDeadLetterRows(limit = 100): Promise<{ requested: number; requeued: number }> {
+  async requeueAllDeadLetterRows(
+    limit = 100,
+    context: OutboxRequeueContext,
+  ): Promise<{ requested: number; requeued: number; auditId: string; auditOutputFile: string }> {
+    const boundedLimit = Math.max(1, Math.min(limit, 500));
     const rows = await this.outboxRepository.find({
       where: {
         published_at: IsNull(),
         dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
       },
-      select: ['id'],
       order: { dead_lettered_at: 'DESC' },
-      take: Math.max(1, Math.min(limit, 500)),
+      take: boundedLimit,
     });
 
     if (rows.length === 0) {
-      return { requested: 0, requeued: 0 };
+      const audit = await this.outboxReplayAuditService.record({
+        action: 'requeue_bulk',
+        actorUserId: context.actorUserId,
+        actorRole: context.actorRole,
+        reason: this.normalizeReason(context.reason),
+        targetRowId: null,
+        requestedLimit: boundedLimit,
+        selectedRowCount: 0,
+        requeuedRowCount: 0,
+        rowSnapshots: [],
+      });
+
+      return { requested: 0, requeued: 0, auditId: audit.auditId, auditOutputFile: audit.outputFile };
     }
 
     const ids = rows.map((row) => row.id);
@@ -88,44 +159,133 @@ export class OutboxAdminService {
       .andWhere('dead_lettered_at IS NOT NULL')
       .execute();
 
+    const requeued = result.affected ?? 0;
+    const audit = await this.outboxReplayAuditService.record({
+      action: 'requeue_bulk',
+      actorUserId: context.actorUserId,
+      actorRole: context.actorRole,
+      reason: this.normalizeReason(context.reason),
+      targetRowId: null,
+      requestedLimit: boundedLimit,
+      selectedRowCount: ids.length,
+      requeuedRowCount: requeued,
+      rowSnapshots: rows.map((row) => this.toReplaySnapshot(row)),
+    });
+
     return {
       requested: ids.length,
-      requeued: result.affected ?? 0,
+      requeued,
+      auditId: audit.auditId,
+      auditOutputFile: audit.outputFile,
     };
   }
 
-  async getRelayHealth(): Promise<{
-    unpublishedBacklog: number;
-    deadLetterRows: number;
-    retryScheduledRows: number;
-    oldestUnpublishedAt: string | null;
-  }> {
-    const [unpublishedBacklog, deadLetterRows, retryScheduledRows, oldestUnpublished] =
-      await Promise.all([
-        this.outboxRepository.count({ where: { published_at: IsNull() } }),
-        this.outboxRepository.count({
-          where: {
-            published_at: IsNull(),
-            dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
-          },
-        }),
-        this.outboxRepository
-          .createQueryBuilder('o')
-          .where('o.published_at IS NULL')
-          .andWhere('o.dead_lettered_at IS NULL')
-          .andWhere('o.next_retry_at IS NOT NULL')
-          .getCount(),
-        this.outboxRepository.findOne({
-          where: { published_at: IsNull() },
-          order: { occurred_at: 'ASC' },
-        }),
-      ]);
+  async listReplayAudits(limit = 20): Promise<OutboxReplayAuditRecord[]> {
+    return this.outboxReplayAuditService.list(limit);
+  }
+
+  async getRelayHealth(): Promise<OutboxRelayHealthSummary> {
+    const [
+      unpublishedBacklog,
+      deadLetterRows,
+      retryScheduledRows,
+      oldestUnpublished,
+      oldestDeadLetter,
+      maxDeadLetterRows,
+      maxOldestUnpublishedAgeSeconds,
+      maxOldestDeadLetterAgeSeconds,
+    ] = await Promise.all([
+      this.outboxRepository.count({ where: { published_at: IsNull() } }),
+      this.outboxRepository.count({
+        where: {
+          published_at: IsNull(),
+          dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
+        },
+      }),
+      this.outboxRepository
+        .createQueryBuilder('o')
+        .where('o.published_at IS NULL')
+        .andWhere('o.dead_lettered_at IS NULL')
+        .andWhere('o.next_retry_at IS NOT NULL')
+        .getCount(),
+      this.outboxRepository.findOne({
+        where: { published_at: IsNull() },
+        order: { occurred_at: 'ASC' },
+      }),
+      this.outboxRepository.findOne({
+        where: {
+          published_at: IsNull(),
+          dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
+        },
+        order: { dead_lettered_at: 'ASC' },
+      }),
+      this.resolveThreshold('EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS', 0),
+      this.resolveThreshold('EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS', 300),
+      this.resolveThreshold('EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS', 60),
+    ]);
+
+    const nowMs = Date.now();
+    const oldestUnpublishedAt = oldestUnpublished?.occurred_at?.toISOString() ?? null;
+    const oldestDeadLetterAt = oldestDeadLetter?.dead_lettered_at?.toISOString() ?? null;
+    const oldestUnpublishedAgeSeconds = this.computeAgeSeconds(oldestUnpublished?.occurred_at, nowMs);
+    const oldestDeadLetterAgeSeconds = this.computeAgeSeconds(oldestDeadLetter?.dead_lettered_at, nowMs);
+
+    const deadLetterRowsExceeded = deadLetterRows > maxDeadLetterRows;
+    const oldestUnpublishedAgeExceeded =
+      oldestUnpublishedAgeSeconds > maxOldestUnpublishedAgeSeconds;
+    const oldestDeadLetterAgeExceeded =
+      oldestDeadLetterAgeSeconds > maxOldestDeadLetterAgeSeconds;
 
     return {
       unpublishedBacklog,
       deadLetterRows,
       retryScheduledRows,
-      oldestUnpublishedAt: oldestUnpublished?.occurred_at?.toISOString() ?? null,
+      oldestUnpublishedAt,
+      oldestDeadLetterAt,
+      oldestUnpublishedAgeSeconds,
+      oldestDeadLetterAgeSeconds,
+      alerts: {
+        deadLetterRowsExceeded,
+        oldestUnpublishedAgeExceeded,
+        oldestDeadLetterAgeExceeded,
+        degraded:
+          deadLetterRowsExceeded || oldestUnpublishedAgeExceeded || oldestDeadLetterAgeExceeded,
+      },
+    };
+  }
+
+  private normalizeReason(reason: string | null | undefined): string | null {
+    const trimmed = String(reason ?? '').trim();
+    return trimmed.length > 0 ? trimmed.slice(0, 500) : null;
+  }
+
+  private async resolveThreshold(key: string, fallback: number): Promise<number> {
+    const fromRuntime = await this.systemConfigService.get<string>(key);
+    const fromEnv = this.configService.get<string>(key);
+    const parsed = Number(fromRuntime ?? fromEnv ?? String(fallback));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return fallback;
+    }
+    return parsed;
+  }
+
+  private computeAgeSeconds(value: Date | null | undefined, nowMs: number): number {
+    if (!value) {
+      return 0;
+    }
+
+    const ageMs = Math.max(nowMs - value.getTime(), 0);
+    return Math.floor(ageMs / 1000);
+  }
+
+  private toReplaySnapshot(row: IntegrationOutbox): OutboxReplayAuditRowSnapshot {
+    return {
+      id: row.id,
+      eventType: row.event_type,
+      kafkaTopic: row.kafka_topic ?? null,
+      publishAttempts: row.publish_attempts ?? 0,
+      lastPublishError: row.last_publish_error ?? null,
+      deadLetteredAt: row.dead_lettered_at?.toISOString() ?? null,
     };
   }
 

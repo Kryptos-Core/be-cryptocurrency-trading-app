@@ -179,6 +179,18 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS?: string = '0';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS?: string = '300';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS?: string = '60';
+
+  @IsString()
+  @IsOptional()
   KAFKA_BROKERS?: string;
 
   @IsString()
@@ -774,6 +786,9 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'EVENT_PUBLISHER_DRIVER',
     'EVENT_OUTBOX_MAX_ATTEMPTS',
     'EVENT_OUTBOX_RETRY_BASE_MS',
+    'EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS',
+    'EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
+    'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
     'KAFKA_BROKERS',
     'KAFKA_CLIENT_ID',
     'KAFKA_TOPIC_PREFIX',
@@ -1024,6 +1039,7 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+
 
 
 

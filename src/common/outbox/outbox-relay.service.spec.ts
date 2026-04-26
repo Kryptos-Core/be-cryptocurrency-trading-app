@@ -57,6 +57,8 @@ describe('OutboxRelayService', () => {
     setOutboxBacklog: jest.Mock;
     setOutboxDeadLetterRows: jest.Mock;
     setOutboxRetryScheduledRows: jest.Mock;
+    setOutboxOldestUnpublishedAgeSeconds: jest.Mock;
+    setOutboxOldestDeadLetterAgeSeconds: jest.Mock;
   };
 
   const buildDataSource = (rowsSequence: IntegrationOutbox[][]) => {
@@ -64,6 +66,7 @@ describe('OutboxRelayService', () => {
     savedRows = [];
     const backlogRepository = {
       count: jest.fn().mockResolvedValue(0),
+      findOne: jest.fn().mockResolvedValue(null),
       createQueryBuilder: jest.fn(() => ({
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -125,6 +128,8 @@ describe('OutboxRelayService', () => {
       setOutboxBacklog: jest.fn(),
       setOutboxDeadLetterRows: jest.fn(),
       setOutboxRetryScheduledRows: jest.fn(),
+      setOutboxOldestUnpublishedAgeSeconds: jest.fn(),
+      setOutboxOldestDeadLetterAgeSeconds: jest.fn(),
     };
   });
 
@@ -178,6 +183,8 @@ describe('OutboxRelayService', () => {
     expect(savedRows[0].published_at).not.toBeNull();
     expect(metricsService.incrementOutboxRelayPublished).toHaveBeenCalledWith(rowA.event_type);
     expect(metricsService.setOutboxBacklog).toHaveBeenCalledWith('all', expect.any(Number));
+    expect(metricsService.setOutboxOldestUnpublishedAgeSeconds).toHaveBeenCalledWith(expect.any(Number));
+    expect(metricsService.setOutboxOldestDeadLetterAgeSeconds).toHaveBeenCalledWith(expect.any(Number));
   });
 
   it('stores retry schedule when publisher fails before max attempts', async () => {

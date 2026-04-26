@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { trace } from '@opentelemetry/api';
-import { DataSource, IsNull } from 'typeorm';
+import { DataSource, IsNull, MoreThan } from 'typeorm';
 import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
@@ -156,28 +156,52 @@ export class OutboxRelayService {
 
   private async updateOperationalMetrics(): Promise<void> {
     const repository = this.dataSource.getRepository(IntegrationOutbox);
-    const [unpublishedRows, deadLetterRows, retryScheduledRows] = await Promise.all([
-      repository.count({ where: { published_at: IsNull() } }),
-      repository
-        .createQueryBuilder('o')
-        .where('o.published_at IS NULL')
-        .andWhere('o.dead_lettered_at IS NOT NULL')
-        .getCount(),
-      repository
-        .createQueryBuilder('o')
-        .where('o.published_at IS NULL')
-        .andWhere('o.dead_lettered_at IS NULL')
-        .andWhere('o.next_retry_at IS NOT NULL')
-        .getCount(),
-    ]);
+    const [unpublishedRows, deadLetterRows, retryScheduledRows, oldestUnpublishedRow, oldestDeadLetterRow] =
+      await Promise.all([
+        repository.count({ where: { published_at: IsNull() } }),
+        repository
+          .createQueryBuilder('o')
+          .where('o.published_at IS NULL')
+          .andWhere('o.dead_lettered_at IS NOT NULL')
+          .getCount(),
+        repository
+          .createQueryBuilder('o')
+          .where('o.published_at IS NULL')
+          .andWhere('o.dead_lettered_at IS NULL')
+          .andWhere('o.next_retry_at IS NOT NULL')
+          .getCount(),
+        repository.findOne({
+          where: { published_at: IsNull() },
+          order: { occurred_at: 'ASC' },
+        }),
+        repository.findOne({
+          where: {
+            published_at: IsNull(),
+            dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
+          },
+          order: { dead_lettered_at: 'ASC' },
+        }),
+      ]);
+
+    const nowMs = Date.now();
+    const oldestUnpublishedAgeSeconds = oldestUnpublishedRow?.occurred_at
+      ? Math.floor(Math.max(nowMs - oldestUnpublishedRow.occurred_at.getTime(), 0) / 1000)
+      : 0;
+    const oldestDeadLetterAgeSeconds = oldestDeadLetterRow?.dead_lettered_at
+      ? Math.floor(Math.max(nowMs - oldestDeadLetterRow.dead_lettered_at.getTime(), 0) / 1000)
+      : 0;
 
     this.metricsService.setOutboxBacklog('all', unpublishedRows);
     this.metricsService.setOutboxDeadLetterRows(deadLetterRows);
     this.metricsService.setOutboxRetryScheduledRows(retryScheduledRows);
+    this.metricsService.setOutboxOldestUnpublishedAgeSeconds(oldestUnpublishedAgeSeconds);
+    this.metricsService.setOutboxOldestDeadLetterAgeSeconds(oldestDeadLetterAgeSeconds);
   }
 
   private computeRetryDelayMs(attempt: number): number {
     return this.retryBaseMs * attempt;
   }
 }
+
+
 

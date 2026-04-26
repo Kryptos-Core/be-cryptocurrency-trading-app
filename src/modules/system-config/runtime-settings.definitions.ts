@@ -328,6 +328,27 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Go rollout max public WS drift pairs',
     description: 'Maximum allowed drift pair count before rollout readiness fails.',
   },
+  {
+    key: 'EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Outbox alert max dead-letter rows',
+    description: 'Alert threshold: dead-letter row count above this value marks outbox relay degraded.',
+  },
+  {
+    key: 'EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Outbox alert max oldest unpublished age (seconds)',
+    description: 'Alert threshold: oldest unpublished outbox row age in seconds before degraded signal.',
+  },
+  {
+    key: 'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Outbox alert max oldest dead-letter age (seconds)',
+    description: 'Alert threshold: oldest dead-letter outbox row age in seconds before degraded signal.',
+  },
 ];
 
 function buildEvmRpcSeeds(baseKeys: Set<string>): RuntimeSettingSeed[] {
@@ -370,3 +391,4 @@ export const RUNTIME_SETTING_KEYS = RUNTIME_SETTING_SEEDS.map((s) => s.key);
 export type RuntimeSettingKey = (typeof RUNTIME_SETTING_KEYS)[number];
 
 export const RUNTIME_SETTING_KEY_SET = new Set<string>(RUNTIME_SETTING_KEYS);
+

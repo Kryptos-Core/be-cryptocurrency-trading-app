@@ -50,6 +50,14 @@ import { MetricsService } from './metrics.service';
       name: 'outbox_retry_scheduled_rows',
       help: 'Current count of integration_outbox rows waiting for scheduled retry',
     }),
+    makeGaugeProvider({
+      name: 'outbox_oldest_unpublished_age_seconds',
+      help: 'Age in seconds of the oldest unpublished outbox row',
+    }),
+    makeGaugeProvider({
+      name: 'outbox_oldest_dead_letter_age_seconds',
+      help: 'Age in seconds of the oldest dead-letter outbox row',
+    }),
     makeCounterProvider({
       name: 'outbox_relay_published_total',
       help: 'Total outbox rows successfully relayed',
@@ -130,3 +138,4 @@ import { MetricsService } from './metrics.service';
   exports: [MetricsService],
 })
 export class TelemetryModule {}
+

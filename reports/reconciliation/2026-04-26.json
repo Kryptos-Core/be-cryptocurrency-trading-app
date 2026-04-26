@@ -1,0 +1,95 @@
+[
+  {
+    "reportAt": "2026-04-26T10:49:56.500Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-26T10:49:56.506Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
+  },
+  {
+    "reportAt": "2026-04-26T10:58:36.932Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-26T10:58:36.935Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
+  },
+  {
+    "reportAt": "2026-04-26T11:09:33.434Z",
+    "actorUserId": "admin-uid",
+    "limit": 1000,
+    "summary": {
+      "checked": 0,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 0
+    },
+    "items": []
+  },
+  {
+    "reportAt": "2026-04-26T11:09:33.439Z",
+    "actorUserId": "admin-uid",
+    "limit": 10,
+    "summary": {
+      "checked": 1,
+      "balanced": 0,
+      "discrepancyDetected": 0,
+      "failed": 1
+    },
+    "items": [
+      {
+        "userId": "uid-1",
+        "currencyId": "cid-1",
+        "status": "FAILED",
+        "error": "Wallet not found for user uid-1 and currency cid-1"
+      }
+    ]
+  }
+]

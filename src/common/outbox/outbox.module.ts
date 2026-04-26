@@ -17,6 +17,7 @@ import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
 import { ReadOnchainDeposit } from '@/entities/read-onchain-deposit.entity';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { RedisModule } from '@/modules/redis/redis.module';
+import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { TelemetryModule } from '@/telemetry';
 import {
   KafkaOutboxEventPublisher,
@@ -38,6 +39,7 @@ import { OutboxAppender } from './outbox-appender.service';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
 import { OutboxRelayEnqueueScheduler } from './outbox-relay.enqueue.scheduler';
+import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 import { OutboxRelayProcessor } from './outbox-relay.processor';
 import { OutboxRelayService } from './outbox-relay.service';
 
@@ -56,6 +58,7 @@ import { OutboxRelayService } from './outbox-relay.service';
     RedisModule,
     TelemetryModule,
     forwardRef(() => NotificationsModule),
+    SystemConfigModule,
   ],
   providers: [
     OutboxAppender,
@@ -70,6 +73,7 @@ import { OutboxRelayService } from './outbox-relay.service';
     OutboxRelayService,
     OutboxRelayProcessor,
     OutboxRelayEnqueueScheduler,
+    OutboxReplayAuditService,
     MarketPairReadModelProjectionHandler,
     NoopOutboxEventPublisher,
     NoopOutboxEventPublisherDriver,
@@ -107,4 +111,6 @@ import { OutboxRelayService } from './outbox-relay.service';
   exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService],
 })
 export class OutboxModule {}
+
+
 

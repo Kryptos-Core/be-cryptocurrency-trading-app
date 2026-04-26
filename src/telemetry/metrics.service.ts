@@ -29,6 +29,12 @@ export class MetricsService {
     @InjectMetric('outbox_retry_scheduled_rows')
     private readonly outboxRetryScheduledRows: Gauge,
 
+    @InjectMetric('outbox_oldest_unpublished_age_seconds')
+    private readonly outboxOldestUnpublishedAgeSeconds: Gauge,
+
+    @InjectMetric('outbox_oldest_dead_letter_age_seconds')
+    private readonly outboxOldestDeadLetterAgeSeconds: Gauge,
+
     @InjectMetric('outbox_relay_published_total')
     private readonly outboxRelayPublishedTotal: Counter,
 
@@ -107,6 +113,14 @@ export class MetricsService {
     this.outboxRetryScheduledRows.set(count);
   }
 
+  setOutboxOldestUnpublishedAgeSeconds(ageSeconds: number): void {
+    this.outboxOldestUnpublishedAgeSeconds.set(ageSeconds);
+  }
+
+  setOutboxOldestDeadLetterAgeSeconds(ageSeconds: number): void {
+    this.outboxOldestDeadLetterAgeSeconds.set(ageSeconds);
+  }
+
   incrementOutboxRelayPublished(eventType: string): void {
     this.outboxRelayPublishedTotal.inc({ event_type: eventType });
   }
@@ -166,3 +180,4 @@ export class MetricsService {
     this.publicWsParityDriftPairs.set({ source }, value);
   }
 }
+

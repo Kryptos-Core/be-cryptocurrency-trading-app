@@ -470,7 +470,7 @@ Acceptance criteria:
 - [x] Đã mở rộng schema `integration_outbox` với metadata chính cho publisher/Kafka-ready flow.
 - [x] Đã có publisher abstraction + driver selection `noop|kafka` + Kafka publisher scaffold.
 - [x] Đã có `processed_integration_events` + consumer idempotency cho read-model/notification sync hiện tại.
-- [ ] Chưa hoàn thiện DLQ/observability/retry story cho integration path dài hạn.
+- [~] Đã mở rộng relay-health + Prometheus với backlog/dead-letter age signals (oldestUnpublishedAgeSeconds, oldestDeadLetterAgeSeconds) và threshold alert policy runtime-configurable (EVENT_OUTBOX_ALERT_MAX_*); đã bổ sung replay audit trail (actor/reason/selected-vs-requeued rows + report file), vẫn còn cần automation/alerting production sâu hơn cho Kafka path dài hạn.
 
 Mục tiêu: tạo biên giới integration an toàn trước khi Go tham gia.
 
@@ -989,6 +989,9 @@ Hướng đi phù hợp nhất cho dự án là tiến hóa có kiểm soát:
 7. Đưa Go matching engine vào shadow/canary sau cùng.
 
 Cách này đạt mục tiêu multi-database + TypeScript/Go nhưng vẫn bảo vệ business logic hiện tại và giảm tối đa việc FE phải sửa bất ngờ.
+
+
+
 
 
 

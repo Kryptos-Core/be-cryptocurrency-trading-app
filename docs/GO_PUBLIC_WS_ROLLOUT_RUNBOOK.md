@@ -67,3 +67,37 @@ Các key nên cấu hình trước khi rollout/canary:
 - `MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS`
 - `GO_ROLLOUT_WINDOW_HOURS`
 - `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS`
+
+## Outbox relay observability (Phase 4 hardening)
+
+Theo dõi thêm tín hiệu tuổi backlog/DLQ để phát hiện relay bị nghẽn kéo dài:
+
+- `GET /api/v1/admin/outbox/relay-health`
+  - `oldestUnpublishedAt`, `oldestUnpublishedAgeSeconds`
+  - `oldestDeadLetterAt`, `oldestDeadLetterAgeSeconds`
+- Prometheus metrics:
+  - `outbox_oldest_unpublished_age_seconds`
+  - `outbox_oldest_dead_letter_age_seconds`
+
+Gợi ý guardrail vận hành:
+
+- Nếu `outbox_oldest_unpublished_age_seconds` tăng liên tục qua nhiều flush windows, kiểm tra relay throughput / consumer errors.
+- Nếu `outbox_oldest_dead_letter_age_seconds` > 0 kéo dài, chạy triage và `requeue` sau khi xử lý root cause.
+
+
+Threshold keys (runtime/system-config capable):
+- EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS
+- EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS
+- EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS
+
+
+Replay audit endpoints (outbox admin):
+- `POST /api/v1/admin/outbox/dead-letter/:id/requeue` (body optional: `{ "reason": "..." }`)
+- `POST /api/v1/admin/outbox/dead-letter/requeue` (body: `{ "limit": number, "reason"?: string }`)
+- `GET /api/v1/admin/outbox/replay-audits?limit=20`
+
+Mỗi action requeue sẽ ghi audit evidence vào `reports/outbox-replay/YYYY-MM-DD.json` gồm:
+- actor (`actorUserId`, `actorRole`), thời điểm, reason
+- target row hoặc batch size
+- selected row count vs requeued row count
+- snapshot metadata của dead-letter rows trước khi requeue

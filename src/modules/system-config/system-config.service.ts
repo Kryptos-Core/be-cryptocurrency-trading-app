@@ -299,6 +299,12 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('GO_ROLLOUT_WINDOW_HOURS', '24');
       case 'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS':
         return envOr('GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS', '0');
+      case 'EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS':
+        return envOr('EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS', '0');
+      case 'EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS':
+        return envOr('EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS', '300');
+      case 'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS':
+        return envOr('EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS', '60');
       default: {
         const rpcDef = EVM_CHAIN_DEFINITIONS.find((d) => d.rpcConfigKey === key);
         if (rpcDef) {
@@ -463,3 +469,4 @@ export class SystemConfigService implements OnModuleInit {
     await this.syncDbToRedis();
   }
 }
+

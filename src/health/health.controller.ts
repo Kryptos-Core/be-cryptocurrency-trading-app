@@ -66,6 +66,7 @@ export class HealthController {
         return {
           outbox_relay: {
             status: 'up' as const,
+            degraded: outbox.alerts.degraded,
             ...outbox,
           },
         };
@@ -135,3 +136,4 @@ export class HealthController {
     return this.health.check(checks);
   }
 }
+

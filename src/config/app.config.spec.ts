@@ -45,6 +45,9 @@ describe('createAppConfig', () => {
       CLICKHOUSE_DB: 'analytics',
       MATCHING_GO_CANARY_PAIRS: 'BTC_USDT, ETH_USDT',
       EVENT_OUTBOX_ENABLED: 'false',
+      EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS: '4',
+      EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS: '120',
+      EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS: '30',
       PUBLIC_WS_SOURCE: 'go',
       GO_AGGREGATOR_TICKER_CHANNEL: 'trading:go:ticker',
       GO_AGGREGATOR_OHLC_CHANNEL: 'trading:go:ohlc',
@@ -75,6 +78,10 @@ describe('createAppConfig', () => {
     expect(config.featureFlags.goRolloutWindowHours).toBe(12);
     expect(config.featureFlags.goRolloutMaxPublicWsDriftPairs).toBe(1);
     expect(config.featureFlags.eventOutboxEnabled).toBe(false);
+    expect(config.featureFlags.eventOutboxAlertMaxDeadLetterRows).toBe(4);
+    expect(config.featureFlags.eventOutboxAlertMaxOldestUnpublishedAgeSeconds).toBe(120);
+    expect(config.featureFlags.eventOutboxAlertMaxOldestDeadLetterAgeSeconds).toBe(30);
     expect(config.featureFlags.matchingGoCanaryPairs).toEqual(['BTC_USDT', 'ETH_USDT']);
   });
 });
+

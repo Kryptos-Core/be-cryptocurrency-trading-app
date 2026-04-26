@@ -59,6 +59,9 @@ export interface AppConfig {
     eventOutboxEnabled: boolean;
     eventSchemaFormat: string;
     eventPublisherDriver: string;
+    eventOutboxAlertMaxDeadLetterRows: number;
+    eventOutboxAlertMaxOldestUnpublishedAgeSeconds: number;
+    eventOutboxAlertMaxOldestDeadLetterAgeSeconds: number;
     kafkaBrokers: string[];
     kafkaClientId: string;
     kafkaTopicPrefix: string;
@@ -472,6 +475,15 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
       eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',
       eventPublisherDriver: env.EVENT_PUBLISHER_DRIVER || 'noop',
+      eventOutboxAlertMaxDeadLetterRows: Number(
+        env.EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS || '0',
+      ),
+      eventOutboxAlertMaxOldestUnpublishedAgeSeconds: Number(
+        env.EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS || '300',
+      ),
+      eventOutboxAlertMaxOldestDeadLetterAgeSeconds: Number(
+        env.EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS || '60',
+      ),
       kafkaBrokers: (env.KAFKA_BROKERS || '')
         .split(',')
         .map((broker) => broker.trim())
@@ -549,5 +561,6 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
+
 
 
