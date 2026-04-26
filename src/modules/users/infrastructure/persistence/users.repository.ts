@@ -139,6 +139,32 @@ export class UsersRepository {
     };
   }
 
+  async findTestUsersByRole(
+    role: UserRole,
+    search?: string,
+    limit: number = 20,
+  ): Promise<User[]> {
+    const params: Array<string | number> = [role, limit];
+    let whereSearch = '';
+    if (search?.trim()) {
+      params.splice(1, 0, `%${search.trim()}%`);
+      whereSearch = ` AND (u.email ILIKE $2 OR u.first_name ILIKE $2 OR u.last_name ILIKE $2)`;
+      params[2] = limit;
+    }
+
+    const limitIndex = search?.trim() ? 3 : 2;
+    const rows = await this.dataSource.query(
+      `SELECT *
+         FROM users u
+        WHERE u.role = $1 AND u.status = 'ACTIVE'${whereSearch}
+        ORDER BY u.created_at DESC
+        LIMIT $${limitIndex}`,
+      params,
+    );
+
+    return (rows ?? []) as User[];
+  }
+
   async findSecurityChangesByUserId(
     userId: string,
     page: number = 1,

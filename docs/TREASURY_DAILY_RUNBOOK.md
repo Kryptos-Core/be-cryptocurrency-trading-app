@@ -26,7 +26,7 @@ Trong môi trường phát triển (dev), trình chạy mặc định:
 - `TREASURY_E2E_ALLOW_SKIP=true` (nếu thiếu biến môi trường E2E thì bỏ qua, không báo lỗi).
 - `TREASURY_HEALTH_FAIL_ON_CRITICAL=false` (nếu có cảnh báo nghiêm trọng vẫn ghi log, không làm dừng tác vụ).
 
-Nếu cần chạy đầy đủ E2E, hãy tạo file `scripts/treasury-e2e.env` từ mẫu:
+Nếu cần chạy đầy đủ E2E, ưu tiên tạo cấu hình ACTIVE trong Admin UI -> Treasury E2E Config. File `scripts/treasury-e2e.env` chỉ còn là fallback/override dev từ mẫu:
 - `scripts/treasury-e2e.env.example`
 
 Chạy riêng luồng E2E:
@@ -60,7 +60,13 @@ Gỡ bỏ tác vụ trong Task Scheduler:
 npm run treasury:schedule:unregister
 ```
 
-## 3) Biến môi trường cho script E2E
+## 3) Nguồn cấu hình cho script E2E
+
+Ưu tiên đọc cấu hình ACTIVE từ DB theo environment (`TREASURY_E2E_CONFIG_ENV` hoặc `NODE_ENV`).
+
+Fallback legacy: nếu chưa có config ACTIVE trong DB hoặc đặt `TREASURY_E2E_CONFIG_SOURCE=env`, runner sẽ dùng env/file cũ.
+
+## 4) Biến môi trường fallback cho script E2E
 
 Bắt buộc:
 - E2E_API_BASE_URL (ví dụ: http://127.0.0.1:3000)
@@ -78,7 +84,7 @@ Tùy chọn (để chạy nạp tiền on-chain):
 Chế độ bỏ qua E2E khi thiếu biến môi trường (để pipeline không bị dừng):
 - TREASURY_E2E_ALLOW_SKIP=true
 
-## 4) Các quy tắc cảnh báo tối thiểu (phát triển)
+## 5) Các quy tắc cảnh báo tối thiểu (phát triển)
 
 Script `treasury:health` sẽ cảnh báo theo các quy tắc sau:
 
@@ -90,7 +96,7 @@ Script `treasury:health` sẽ cảnh báo theo các quy tắc sau:
 Nếu có cảnh báo nghiêm trọng, script sẽ trả về exit code 1.
 Lưu ý: hành vi này chỉ xảy ra khi `TREASURY_HEALTH_FAIL_ON_CRITICAL=true`.
 
-## 5) Các giá trị ngưỡng cho kiểm tra sức khỏe (Health check threshold)
+## 6) Các giá trị ngưỡng cho kiểm tra sức khỏe (Health check threshold)
 
 - TREASURY_ALERT_STALE_MANUAL_MINUTES=15
 - TREASURY_ALERT_STALE_CONFIRMING_MINUTES=30
@@ -98,7 +104,7 @@ Lưu ý: hành vi này chỉ xảy ra khi `TREASURY_HEALTH_FAIL_ON_CRITICAL=true
 - TREASURY_RECONCILE_PAIR_LIMIT=100
 - WALLET_RECONCILIATION_THRESHOLD=0.001
 
-## 6) Endpoint xuất báo cáo đối soát định dạng JSON
+## 7) Endpoint xuất báo cáo đối soát định dạng JSON
 
 Endpoint:
 - `POST /api/v1/wallets/reconciliation-report/export?limit=100`
@@ -114,7 +120,7 @@ File đầu ra (Output file):
 - File là một mảng JSON (array), mỗi lần xuất sẽ thêm (append) một mục (entry) mới.
 - Mỗi mục bao gồm: `reportAt`, `actorUserId`, `summary`, `items`.
 
-## 7) Danh sách kiểm tra vận hành (Operational Checklist)
+## 8) Danh sách kiểm tra vận hành (Operational Checklist)
 
 1. Kiểm tra báo cáo JSON của `treasury:e2e`: số lượng bước thất bại (step failed) phải bằng 0.
 2. Kiểm tra báo cáo JSON của `treasury:health`: số lượng cảnh báo nghiêm trọng (criticalAlerts) phải bằng 0.
@@ -124,7 +130,7 @@ File đầu ra (Output file):
 - Tăng đột biến số lệnh thất bại (Failed spike): kiểm tra mạng lưới (chain)/nhà cung cấp/khung thời gian, tạm dừng tự động duyệt nếu cần.
 - Sai lệch đối soát (Reconcile mismatch): đối chiếu sổ cái (ledger)/ví/ngoại vi và tạo ghi chú sự cố (incident note).
 
-## 8) Ghi nhật ký chuẩn kho bạc (Standard Treasury Logging)
+## 9) Ghi nhật ký chuẩn kho bạc (Standard Treasury Logging)
 
 Các sự kiện quan trọng đã được ghi nhật ký với định dạng JSON trong blockchain service:
 - withdraw.request.received

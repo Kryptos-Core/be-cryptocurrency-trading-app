@@ -136,6 +136,41 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     return rows?.[0]?.link_id ?? linkId;
   }
 
+  async findVerifiedByChain(chain: string): Promise<
+    Array<{
+      link_id: string;
+      user_id: string;
+      chain: string;
+      address: string;
+      label: string | null;
+      status: string;
+      linked_at: Date | null;
+    }>
+  > {
+    const rows = await this.dataSource.query(
+      `SELECT link_id, user_id, chain, address, label, status, linked_at
+         FROM linked_wallets
+        WHERE chain = $1 AND status = 'VERIFIED'
+        ORDER BY linked_at DESC NULLS LAST, created_at DESC`,
+      [chain],
+    );
+
+    return (rows || []).map((r: Record<string, unknown>) => ({
+      link_id: r.link_id,
+      user_id: r.user_id,
+      chain: r.chain,
+      address: r.address,
+      label: r.label ?? null,
+      status: r.status,
+      linked_at:
+        r.linked_at instanceof Date
+          ? r.linked_at
+          : typeof r.linked_at === 'string' || typeof r.linked_at === 'number'
+            ? new Date(r.linked_at)
+            : null,
+    }));
+  }
+
   async revokeByLinkIdAndUserId(linkId: string, userId: string): Promise<number> {
     const rows = await this.dataSource.query(
       `UPDATE linked_wallets

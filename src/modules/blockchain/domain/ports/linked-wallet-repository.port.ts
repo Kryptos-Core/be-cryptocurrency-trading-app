@@ -67,6 +67,18 @@ export interface LinkedWalletRepositoryPort {
    * Trả về số row bị ảnh hưởng - 0 = không tìm thấy hoặc đã REVOKED.
    */
   revokeByLinkIdAndUserId(linkId: string, userId: string): Promise<number>;
+
+  findVerifiedByChain(chain: string): Promise<
+    Array<{
+      link_id: string;
+      user_id: string;
+      chain: string;
+      address: string;
+      label: string | null;
+      status: string;
+      linked_at: Date | null;
+    }>
+  >;
 }
 
 export const LINKED_WALLET_REPOSITORY = Symbol('LINKED_WALLET_REPOSITORY');

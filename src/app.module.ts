@@ -39,6 +39,7 @@ import { RedisModule } from './modules/redis/redis.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
 import { TradingModule } from './modules/trading/trading.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
+import { TreasuryE2EConfigModule } from './modules/treasury-e2e-config/treasury-e2e-config.module';
 import { UsersModule } from './modules/users/users.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { TelemetryModule } from './telemetry';
@@ -128,6 +129,7 @@ class BullBoardAuthMiddleware {
     MarketMakerModule,
     PaymentConfigModule,
     TreasuryModule,
+    TreasuryE2EConfigModule,
     SystemConfigModule,
     MetadataModule,
   ],
@@ -143,3 +145,4 @@ export class AppModule implements NestModule {
     consumer.apply(BullBoardAuthMiddleware).forRoutes('/admin/queues');
   }
 }
+

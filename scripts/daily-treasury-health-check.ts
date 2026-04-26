@@ -4,6 +4,7 @@ import Decimal from 'decimal.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { SystemConfigService } from '../src/modules/system-config/system-config.service';
+import { TreasuryE2EConfigService } from '../src/modules/treasury-e2e-config/treasury-e2e-config.service';
 import { WalletsService } from '../src/modules/wallets/wallets.service';
 
 type Severity = 'critical' | 'warning';
@@ -44,17 +45,20 @@ async function main() {
   const dataSource = app.get(DataSource);
   const walletsService = app.get(WalletsService);
   const systemConfig = app.get(SystemConfigService);
+  const treasuryE2EConfig = app.get(TreasuryE2EConfigService);
 
   const reportAt = new Date().toISOString();
   const alerts: AlertItem[] = [];
+  const envName = (process.env.TREASURY_E2E_CONFIG_ENV || process.env.NODE_ENV || 'development').trim().toLowerCase();
+  const activeConfig = await treasuryE2EConfig.getRunnerConfigForEnvironment(envName);
 
-  const staleManualMinutes = envNumber('TREASURY_ALERT_STALE_MANUAL_MINUTES', 15);
-  const staleConfirmingMinutes = envNumber('TREASURY_ALERT_STALE_CONFIRMING_MINUTES', 30);
-  const failedWithdrawLimit = envNumber('TREASURY_ALERT_FAILED_WITHDRAWALS_24H', 10);
-  const reconcileLimit = envNumber('TREASURY_RECONCILE_PAIR_LIMIT', 100);
-  const discrepancyThreshold = await systemConfig.getEffectiveString('WALLET_RECONCILIATION_THRESHOLD');
-  const failOnCritical =
-    (process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true';
+  const staleManualMinutes = activeConfig?.staleManualMinutes ?? envNumber('TREASURY_ALERT_STALE_MANUAL_MINUTES', 15);
+  const staleConfirmingMinutes = activeConfig?.staleConfirmingMinutes ?? envNumber('TREASURY_ALERT_STALE_CONFIRMING_MINUTES', 30);
+  const failedWithdrawLimit = activeConfig?.failedWithdrawals24h ?? envNumber('TREASURY_ALERT_FAILED_WITHDRAWALS_24H', 10);
+  const reconcileLimit = activeConfig?.reconcilePairLimit ?? envNumber('TREASURY_RECONCILE_PAIR_LIMIT', 100);
+  const discrepancyThreshold = activeConfig?.reconciliationThreshold ?? await systemConfig.getEffectiveString('WALLET_RECONCILIATION_THRESHOLD');
+  const failOnCritical = activeConfig?.healthFailOnCritical ??
+    ((process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true');
 
   try {
     const staleManualRows = (await dataSource.query(
@@ -121,72 +125,68 @@ async function main() {
       [reconcileLimit],
     )) as WalletPairRow[];
 
-    const reconcileResults: Array<{
-      userId: string;
-      currencyId: string;
-      internalBalance: string;
-      externalBalance: string;
-      discrepancy: string;
-      status: string;
-    }> = [];
-
     for (const pair of walletPairs) {
-      try {
-        const result = await walletsService.reconcileBalance(String(pair.user_id), String(pair.currency_id));
-        reconcileResults.push({ userId: String(pair.user_id), currencyId: String(pair.currency_id), ...result });
-      } catch (error: unknown) {
+      const report = await walletsService.getWalletLedgerComparison(pair.user_id, pair.currency_id);
+      const delta = new Decimal(report.discrepancy || '0').abs();
+      if (delta.gt(discrepancyThreshold)) {
         alerts.push({
-          severity: 'warning',
-          code: 'RECONCILE_CALL_FAILED',
-          message: `Reconcile failed for user=${pair.user_id}, currency=${pair.currency_id}`,
-          context: { error: errorMessage(error) },
+          severity: 'critical',
+          code: 'RECONCILIATION_MISMATCH',
+          message: `Wallet reconciliation mismatch exceeds threshold for user=${pair.user_id}, currency=${pair.currency_id}`,
+          context: {
+            discrepancy: report.discrepancy,
+            threshold: discrepancyThreshold,
+          },
         });
       }
     }
+  } catch (error: unknown) {
+    alerts.push({
+      severity: 'critical',
+      code: 'HEALTH_CHECK_EXECUTION_FAILED',
+      message: errorMessage(error),
+    });
+  } finally {
+    await app.close();
+  }
 
-    const highDiscrepancy = reconcileResults.filter((item) =>
-      new Decimal(item.discrepancy || '0').abs().greaterThan(discrepancyThreshold),
-    );
+  const criticalAlerts = alerts.filter((item) => item.severity === 'critical').length;
+  const warningAlerts = alerts.filter((item) => item.severity === 'warning').length;
 
-    if (highDiscrepancy.length > 0) {
-      alerts.push({
-        severity: 'critical',
-        code: 'RECONCILE_MISMATCH',
-        message: `Found ${highDiscrepancy.length} wallet discrepancies > ${discrepancyThreshold}`,
-        context: {
-          samples: highDiscrepancy.slice(0, 5).map((x) => ({
-            userId: x.userId,
-            currencyId: x.currencyId,
-            discrepancy: x.discrepancy,
-          })),
-        },
-      });
-    }
-
-    const report = {
-      reportAt,
+  const report = {
+    reportAt,
+    configSource: activeConfig ? 'db' : 'env',
+    thresholds: {
       staleManualMinutes,
       staleConfirmingMinutes,
       failedWithdrawLimit,
       reconcileLimit,
       discrepancyThreshold,
       failOnCritical,
-      summary: {
-        walletPairsChecked: reconcileResults.length,
-        alertsTotal: alerts.length,
-        criticalAlerts: alerts.filter((a) => a.severity === 'critical').length,
-      },
-      alerts,
-    };
+    },
+    criticalAlerts,
+    warningAlerts,
+    alerts,
+  };
 
-    console.log(JSON.stringify(report, null, 2));
-    if (failOnCritical && alerts.some((x) => x.severity === 'critical')) process.exitCode = 1;
-  } finally {
-    await app.close();
+  console.log(JSON.stringify(report, null, 2));
+
+  if (criticalAlerts > 0 && failOnCritical) {
+    process.exitCode = 1;
   }
 }
 
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
+main().catch((error) => {
+  console.error(
+    JSON.stringify(
+      {
+        reportAt: new Date().toISOString(),
+        fatal: true,
+        error: errorMessage(error),
+      },
+      null,
+      2,
+    ),
+  );
+  process.exitCode = 1;
 });

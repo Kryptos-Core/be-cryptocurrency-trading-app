@@ -40,6 +40,7 @@ export interface UsersRepositoryPort {
   findAllWithFilters(
     filters: UserFilterDto,
   ): Promise<{ users: UserRecord[]; total: number; page: number; limit: number }>;
+  findTestUsersByRole(role: UserRole, search?: string, limit?: number): Promise<UserRecord[]>;
   findSecurityChangesByUserId(
     userId: string,
     page?: number,

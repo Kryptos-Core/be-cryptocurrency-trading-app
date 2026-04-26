@@ -26,6 +26,7 @@ import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
 import { TransactionWallet } from '../entities/transaction-wallet.entity';
 import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
+import { TreasuryE2EConfig } from '../entities/treasury-e2e-config.entity';
 import { TreasuryOperation } from '../entities/treasury-operation.entity';
 import { User } from '../entities/user.entity';
 import { UserNotification } from '../entities/user-notification.entity';
@@ -70,6 +71,7 @@ const ALL_ENTITIES = [
   PaymentMethodConfig,
   TransactionWallet,
   TreasuryMainWallet,
+  TreasuryE2EConfig,
   TreasuryOperation,
   SystemConfig,
 ];
@@ -109,3 +111,4 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     },
   };
 };
+

@@ -125,6 +125,10 @@ export class UsersService {
     return this.usersRepository.findByEmail(email);
   }
 
+  async findTestUsersByRole(role: import('@/common/enums').UserRole, search?: string, limit: number = 20) {
+    return this.usersRepository.findTestUsersByRole(role, search, limit);
+  }
+
   /**
    * Create new user
    */

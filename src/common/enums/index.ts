@@ -90,6 +90,8 @@ export enum Permission {
   OUTBOX_MANAGE = 'outbox:manage',
   /** Manage payment gateway configs: PayOS credentials, blockchain hot wallet keys, network settings */
   PAYMENT_CONFIGS_MANAGE = 'payment_configs:manage',
+  /** Manage treasury E2E runner configs and health thresholds */
+  TREASURY_E2E_CONFIGS_MANAGE = 'treasury_e2e_configs:manage',
   /** Approve or reject withdrawal requests (manual review queue) */
   WITHDRAWALS_APPROVE = 'withdrawals:approve',
   /** Admin: force-ingest deposits, manage UNMATCHED records */
@@ -247,5 +249,6 @@ export enum OnchainTxStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
 }
+
 
 

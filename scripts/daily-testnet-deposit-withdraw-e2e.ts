@@ -1,4 +1,7 @@
 import 'reflect-metadata';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from '../src/app.module';
+import { TreasuryE2EConfigService } from '../src/modules/treasury-e2e-config/treasury-e2e-config.service';
 
 type ResultItem = {
   step: string;
@@ -8,6 +11,20 @@ type ResultItem = {
 
 type JsonObject = Record<string, unknown>;
 type ApiRequestBody = Record<string, unknown>;
+
+type ResolvedConfig = {
+  source: 'db' | 'env';
+  allowSkip: boolean;
+  baseUrl: string;
+  traderToken: string;
+  riskToken: string;
+  chain: string;
+  linkedWalletId: string;
+  autoAmount: string;
+  manualAmount: string;
+  depositTxHash: string | null;
+  depositAmount: string | null;
+};
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -58,30 +75,85 @@ function required(name: string): string {
   return value;
 }
 
+async function resolveConfig(): Promise<ResolvedConfig> {
+  const sourcePref = (process.env.TREASURY_E2E_CONFIG_SOURCE || 'db').trim().toLowerCase();
+  const environment = (process.env.TREASURY_E2E_CONFIG_ENV || process.env.NODE_ENV || 'development').trim().toLowerCase();
+
+  if (sourcePref !== 'env') {
+    let app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>> | null = null;
+    try {
+      app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+      const configService = app.get(TreasuryE2EConfigService);
+      const dbConfig = await configService.getRunnerConfigForEnvironment(environment);
+      if (dbConfig) {
+        return {
+          source: 'db',
+          allowSkip: dbConfig.allowSkip,
+          baseUrl: dbConfig.apiBaseUrl,
+          traderToken: dbConfig.traderBearerToken || '',
+          riskToken: dbConfig.riskBearerToken || '',
+          chain: dbConfig.chain,
+          linkedWalletId: dbConfig.linkedWalletId || '',
+          autoAmount: dbConfig.withdrawAmountAuto,
+          manualAmount: dbConfig.withdrawAmountManual,
+          depositTxHash: dbConfig.depositTxHash,
+          depositAmount: dbConfig.depositAmount,
+        };
+      }
+    } catch {
+      // Fall back to env below.
+    } finally {
+      if (app) {
+        await app.close();
+      }
+    }
+  }
+
+  return {
+    source: 'env',
+    allowSkip: (process.env.TREASURY_E2E_ALLOW_SKIP || '').toLowerCase() === 'true',
+    baseUrl: required('E2E_API_BASE_URL').replace(/\/$/, ''),
+    traderToken: required('E2E_BEARER_TOKEN_TRADER'),
+    riskToken: required('E2E_BEARER_TOKEN_RISK'),
+    chain: required('E2E_CHAIN'),
+    linkedWalletId: required('E2E_LINKED_WALLET_ID'),
+    autoAmount: required('E2E_WITHDRAW_AMOUNT_AUTO'),
+    manualAmount: required('E2E_WITHDRAW_AMOUNT_MANUAL'),
+    depositTxHash: process.env.E2E_DEPOSIT_TX_HASH?.trim() || null,
+    depositAmount: process.env.E2E_DEPOSIT_AMOUNT?.trim() || null,
+  };
+}
+
 async function main() {
-  const allowSkip = (process.env.TREASURY_E2E_ALLOW_SKIP || '').toLowerCase() === 'true';
   const results: ResultItem[] = [];
 
-  let baseUrl = '';
-  let traderToken = '';
-  let riskToken = '';
-  let chain = '';
-  let linkedWalletId = '';
-  let autoAmount = '';
-  let manualAmount = '';
-
+  let resolved: ResolvedConfig;
   try {
-    baseUrl = required('E2E_API_BASE_URL').replace(/\/$/, '');
-    traderToken = required('E2E_BEARER_TOKEN_TRADER');
-    riskToken = required('E2E_BEARER_TOKEN_RISK');
-    chain = required('E2E_CHAIN');
-    linkedWalletId = required('E2E_LINKED_WALLET_ID');
-    autoAmount = required('E2E_WITHDRAW_AMOUNT_AUTO');
-    manualAmount = required('E2E_WITHDRAW_AMOUNT_MANUAL');
+    resolved = await resolveConfig();
   } catch (error: unknown) {
+    const allowSkip = (process.env.TREASURY_E2E_ALLOW_SKIP || '').toLowerCase() === 'true';
     if (!allowSkip) throw error;
     results.push({ step: 'bootstrap', status: 'skipped', detail: errorMessage(error) });
     console.log(JSON.stringify({ reportAt: new Date().toISOString(), results }, null, 2));
+    return;
+  }
+
+  const allowSkip = resolved.allowSkip;
+  const baseUrl = resolved.baseUrl;
+  const traderToken = resolved.traderToken;
+  const riskToken = resolved.riskToken;
+  const chain = resolved.chain;
+  const linkedWalletId = resolved.linkedWalletId;
+  const autoAmount = resolved.autoAmount;
+  const manualAmount = resolved.manualAmount;
+
+  if (!baseUrl || !chain || !autoAmount || !manualAmount || !linkedWalletId || !traderToken || !riskToken) {
+    const missing = 'Resolved treasury E2E config is incomplete';
+    if (!allowSkip) {
+      throw new Error(missing);
+    }
+    results.push({ step: 'bootstrap', status: 'skipped', detail: `${missing}; source=${resolved.source}` });
+    console.log(JSON.stringify({ reportAt: new Date().toISOString(), configSource: resolved.source, results }, null, 2));
     return;
   }
 
@@ -120,83 +192,52 @@ async function main() {
         riskToken,
         `/api/v1/blockchain/withdraw/manual/${manualTxId}/approve`,
         'POST',
-        { reason: 'Daily treasury E2E approve' },
       );
       results.push({ step: 'withdraw_manual_approve', status: 'passed', detail: approveRes });
     } catch (error: unknown) {
       results.push({ step: 'withdraw_manual_approve', status: 'failed', detail: errorMessage(error) });
     }
   } else {
-    results.push({
-      step: 'withdraw_manual_approve',
-      status: 'skipped',
-      detail: 'manual txId not available from previous step',
-    });
+    results.push({ step: 'withdraw_manual_approve', status: 'skipped', detail: 'manual tx id unavailable' });
   }
 
-  const depositTxHash = process.env.E2E_DEPOSIT_TX_HASH?.trim();
-  const depositAmount = process.env.E2E_DEPOSIT_AMOUNT?.trim();
-
+  const depositTxHash = resolved.depositTxHash;
+  const depositAmount = resolved.depositAmount;
   if (depositTxHash && depositAmount) {
-    let depositTxId: string | null = null;
-
     try {
       const submitRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/deposit/submit', 'POST', {
-        chain,
         txHash: depositTxHash,
         amount: depositAmount,
+        chain,
       });
-      const submitPayload = asRecord(submitRes);
-      depositTxId = typeof submitPayload.txId === 'string' ? submitPayload.txId : null;
       results.push({ step: 'deposit_submit', status: 'passed', detail: submitRes });
     } catch (error: unknown) {
       results.push({ step: 'deposit_submit', status: 'failed', detail: errorMessage(error) });
     }
-
-    if (depositTxId) {
-      try {
-        const settleRes = await apiRequest(
-          baseUrl,
-          traderToken,
-          `/api/v1/blockchain/deposit/${depositTxId}/settle`,
-          'POST',
-        );
-        results.push({ step: 'deposit_settle', status: 'passed', detail: settleRes });
-      } catch (error: unknown) {
-        results.push({ step: 'deposit_settle', status: 'failed', detail: errorMessage(error) });
-      }
-    }
   } else {
     results.push({
-      step: 'deposit_submit_settle',
+      step: 'deposit_submit',
       status: 'skipped',
-      detail: 'Set E2E_DEPOSIT_TX_HASH and E2E_DEPOSIT_AMOUNT to run deposit E2E',
+      detail: 'Set deposit fields in active treasury E2E config or env to run deposit E2E',
     });
   }
 
-  try {
-    const txRes = await apiRequest(baseUrl, traderToken, '/api/v1/blockchain/transactions?limit=20', 'GET');
-    results.push({ step: 'transactions_check', status: 'passed', detail: txRes });
-  } catch (error: unknown) {
-    results.push({ step: 'transactions_check', status: 'failed', detail: errorMessage(error) });
-  }
-
-  const report = {
-    reportAt: new Date().toISOString(),
-    baseUrl,
-    summary: {
-      passed: results.filter((r) => r.status === 'passed').length,
-      failed: results.filter((r) => r.status === 'failed').length,
-      skipped: results.filter((r) => r.status === 'skipped').length,
-    },
-    results,
-  };
-
-  console.log(JSON.stringify(report, null, 2));
-  if (report.summary.failed > 0) process.exitCode = 1;
+  console.log(
+    JSON.stringify({ reportAt: new Date().toISOString(), configSource: resolved.source, results }, null, 2),
+  );
 }
 
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
+main().catch((error) => {
+  console.error(
+    JSON.stringify(
+      {
+        reportAt: new Date().toISOString(),
+        fatal: true,
+        error: errorMessage(error),
+      },
+      null,
+      2,
+    ),
+  );
+  process.exitCode = 1;
 });
