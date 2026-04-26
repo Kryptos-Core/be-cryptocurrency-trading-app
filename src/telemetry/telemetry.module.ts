@@ -58,6 +58,10 @@ import { MetricsService } from './metrics.service';
       name: 'outbox_oldest_dead_letter_age_seconds',
       help: 'Age in seconds of the oldest dead-letter outbox row',
     }),
+    makeGaugeProvider({
+      name: 'outbox_relay_alert_severity',
+      help: 'Outbox relay alert severity (none=0, warning=1, critical=2)',
+    }),
     makeCounterProvider({
       name: 'outbox_relay_published_total',
       help: 'Total outbox rows successfully relayed',
@@ -138,4 +142,5 @@ import { MetricsService } from './metrics.service';
   exports: [MetricsService],
 })
 export class TelemetryModule {}
+
 

@@ -305,6 +305,16 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS', '300');
       case 'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS':
         return envOr('EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS', '60');
+      case 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS':
+        return envOr('EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS', '10');
+      case 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS':
+        return envOr('EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS', '1800');
+      case 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS':
+        return envOr('EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS', '600');
+      case 'EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED':
+        return envOr('EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED', 'true');
+      case 'EVENT_OUTBOX_ALERTS_CHANNEL':
+        return envOr('EVENT_OUTBOX_ALERTS_CHANNEL', 'outbox:alerts');
       default: {
         const rpcDef = EVM_CHAIN_DEFINITIONS.find((d) => d.rpcConfigKey === key);
         if (rpcDef) {
@@ -469,4 +479,5 @@ export class SystemConfigService implements OnModuleInit {
     await this.syncDbToRedis();
   }
 }
+
 

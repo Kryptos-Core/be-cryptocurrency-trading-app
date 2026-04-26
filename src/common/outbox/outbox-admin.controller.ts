@@ -94,9 +94,10 @@ export class OutboxAdminController {
   @Get('relay-health')
   @ApiOperation({
     summary: 'Outbox relay operational health + age SLO signals',
-    description: 'Returns backlog/retry/dead-letter counts plus oldest-unpublished and oldest-dead-letter ages for relay observability.',
+    description: 'Returns backlog/retry/dead-letter counts, age signals, warning/critical thresholds, and computed alert severity for relay observability + automation.',
   })
   async relayHealth() {
     return this.outboxAdminService.getRelayHealth();
   }
 }
+

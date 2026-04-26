@@ -41,6 +41,7 @@ import { ProcessedIntegrationEventsService } from './processed-integration-event
 import { OutboxRelayEnqueueScheduler } from './outbox-relay.enqueue.scheduler';
 import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 import { OutboxRelayProcessor } from './outbox-relay.processor';
+import { OutboxRelayAlertingCollectorService } from './outbox-relay-alerting-collector.service';
 import { OutboxRelayService } from './outbox-relay.service';
 
 @Module({
@@ -72,6 +73,7 @@ import { OutboxRelayService } from './outbox-relay.service';
     OutboxIntegrationSyncService,
     OutboxRelayService,
     OutboxRelayProcessor,
+    OutboxRelayAlertingCollectorService,
     OutboxRelayEnqueueScheduler,
     OutboxReplayAuditService,
     MarketPairReadModelProjectionHandler,
@@ -111,6 +113,7 @@ import { OutboxRelayService } from './outbox-relay.service';
   exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService],
 })
 export class OutboxModule {}
+
 
 
 

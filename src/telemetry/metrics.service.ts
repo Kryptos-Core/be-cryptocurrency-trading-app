@@ -35,6 +35,9 @@ export class MetricsService {
     @InjectMetric('outbox_oldest_dead_letter_age_seconds')
     private readonly outboxOldestDeadLetterAgeSeconds: Gauge,
 
+    @InjectMetric('outbox_relay_alert_severity')
+    private readonly outboxRelayAlertSeverity: Gauge,
+
     @InjectMetric('outbox_relay_published_total')
     private readonly outboxRelayPublishedTotal: Counter,
 
@@ -121,6 +124,10 @@ export class MetricsService {
     this.outboxOldestDeadLetterAgeSeconds.set(ageSeconds);
   }
 
+  setOutboxRelayAlertSeverity(level: number): void {
+    this.outboxRelayAlertSeverity.set(level);
+  }
+
   incrementOutboxRelayPublished(eventType: string): void {
     this.outboxRelayPublishedTotal.inc({ event_type: eventType });
   }
@@ -180,4 +187,5 @@ export class MetricsService {
     this.publicWsParityDriftPairs.set({ source }, value);
   }
 }
+
 

@@ -216,11 +216,14 @@ describe('OutboxAdminService', () => {
     expect(outboxReplayAuditService.list).toHaveBeenCalledWith(5);
   });
 
-  it('returns relay health summary with threshold alerts', async () => {
+  it('returns relay health summary with warning and critical thresholds', async () => {
     systemConfigService.get
       .mockResolvedValueOnce('0')
       .mockResolvedValueOnce('300')
-      .mockResolvedValueOnce('60');
+      .mockResolvedValueOnce('60')
+      .mockResolvedValueOnce('10')
+      .mockResolvedValueOnce('1800')
+      .mockResolvedValueOnce('600');
 
     repository.count.mockResolvedValueOnce(11).mockResolvedValueOnce(2);
     repository.createQueryBuilder().getCount.mockResolvedValueOnce(3);
@@ -242,10 +245,26 @@ describe('OutboxAdminService', () => {
       oldestDeadLetterAt: '2026-04-25T09:30:00.000Z',
       oldestUnpublishedAgeSeconds: expect.any(Number),
       oldestDeadLetterAgeSeconds: expect.any(Number),
+      thresholds: {
+        warning: {
+          maxDeadLetterRows: 0,
+          maxOldestUnpublishedAgeSeconds: 300,
+          maxOldestDeadLetterAgeSeconds: 60,
+        },
+        critical: {
+          maxDeadLetterRows: 10,
+          maxOldestUnpublishedAgeSeconds: 1800,
+          maxOldestDeadLetterAgeSeconds: 600,
+        },
+      },
       alerts: {
         deadLetterRowsExceeded: true,
         oldestUnpublishedAgeExceeded: expect.any(Boolean),
         oldestDeadLetterAgeExceeded: expect.any(Boolean),
+        deadLetterRowsCritical: false,
+        oldestUnpublishedAgeCritical: expect.any(Boolean),
+        oldestDeadLetterAgeCritical: expect.any(Boolean),
+        severity: expect.stringMatching(/none|warning|critical/),
         degraded: true,
       },
     });

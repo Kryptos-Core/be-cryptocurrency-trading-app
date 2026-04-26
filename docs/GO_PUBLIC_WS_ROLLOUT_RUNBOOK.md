@@ -101,3 +101,53 @@ Mỗi action requeue sẽ ghi audit evidence vào `reports/outbox-replay/YYYY-MM
 - target row hoặc batch size
 - selected row count vs requeued row count
 - snapshot metadata của dead-letter rows trước khi requeue
+
+## Outbox degraded alert automation (warning/critical)
+
+Runtime keys (env + system-config) cho automation:
+- `EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED` (default `true`)
+- `EVENT_OUTBOX_ALERTS_CHANNEL` (default `outbox:alerts`)
+- Warning thresholds:
+  - `EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS`
+  - `EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS`
+  - `EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS`
+- Critical thresholds:
+  - `EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS`
+  - `EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS`
+  - `EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS`
+
+Automation collector:
+- Cron `EVERY_30_SECONDS`.
+- Đọc `GET /api/v1/admin/outbox/relay-health` internal summary.
+- Emit Redis pub/sub event khi severity đổi trạng thái:
+  - event name: `outbox.relay.alert_state_changed`
+  - severity: `none | warning | critical`
+  - payload gồm reasons + health snapshot + thresholds snapshot.
+
+Prometheus signal:
+- `outbox_relay_alert_severity` (`0=none`, `1=warning`, `2=critical`)
+
+### Runbook theo mức độ
+
+#### Warning
+1. Xác minh `EVENT_PUBLISHER_DRIVER` và Kafka broker reachability.
+2. Kiểm tra `GET /api/v1/admin/outbox/relay-health`:
+   - phân biệt backlog age tăng do throughput thấp hay dead-letter mới phát sinh.
+3. Kiểm tra log relay lỗi gần nhất (`last_publish_error`, event_type, topic).
+4. Nếu root cause đã xử lý, thực hiện requeue có lý do:
+   - `POST /api/v1/admin/outbox/dead-letter/:id/requeue`
+   - hoặc `POST /api/v1/admin/outbox/dead-letter/requeue`
+5. Theo dõi recovery về `severity=none` trước khi đóng incident.
+
+#### Critical
+1. Mở incident ngay (P1/P2 tùy SLA), đóng băng rollout thay đổi Kafka path.
+2. Kiểm tra nhanh:
+   - Kafka cluster health, topic ACL, ISR/leader, producer auth.
+   - Redis health (đảm bảo alert events vẫn phát được).
+3. Nếu cần, tạm giảm blast-radius:
+   - chuyển `EVENT_PUBLISHER_DRIVER=noop` ở môi trường bị sự cố để bảo toàn core transaction path (chỉ khi đã chấp thuận tradeoff event delivery).
+4. Fix root cause, sau đó replay có kiểm soát theo batch nhỏ + reason audit.
+5. Chỉ đóng incident khi:
+   - `outbox_relay_alert_severity=0` ổn định qua nhiều chu kỳ,
+   - không còn dead-letter tăng thêm,
+   - replay audit thể hiện requeue hoàn tất và không tái-dead-letter bất thường.

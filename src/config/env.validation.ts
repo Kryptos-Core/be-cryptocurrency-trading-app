@@ -191,6 +191,26 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS?: string = '10';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS?: string = '1800';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS?: string = '600';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED?: string = 'true';
+
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_ALERTS_CHANNEL?: string = 'outbox:alerts';
+
+  @IsString()
+  @IsOptional()
   KAFKA_BROKERS?: string;
 
   @IsString()
@@ -789,6 +809,11 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS',
     'EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
     'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
+    'EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS',
+    'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
+    'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
+    'EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED',
+    'EVENT_OUTBOX_ALERTS_CHANNEL',
     'KAFKA_BROKERS',
     'KAFKA_CLIENT_ID',
     'KAFKA_TOPIC_PREFIX',
@@ -1039,6 +1064,7 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
+
 
 
 

@@ -48,6 +48,11 @@ describe('createAppConfig', () => {
       EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS: '4',
       EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS: '120',
       EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS: '30',
+      EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS: '12',
+      EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS: '900',
+      EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS: '240',
+      EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED: 'false',
+      EVENT_OUTBOX_ALERTS_CHANNEL: 'ops:outbox:alerts',
       PUBLIC_WS_SOURCE: 'go',
       GO_AGGREGATOR_TICKER_CHANNEL: 'trading:go:ticker',
       GO_AGGREGATOR_OHLC_CHANNEL: 'trading:go:ohlc',
@@ -81,7 +86,13 @@ describe('createAppConfig', () => {
     expect(config.featureFlags.eventOutboxAlertMaxDeadLetterRows).toBe(4);
     expect(config.featureFlags.eventOutboxAlertMaxOldestUnpublishedAgeSeconds).toBe(120);
     expect(config.featureFlags.eventOutboxAlertMaxOldestDeadLetterAgeSeconds).toBe(30);
+    expect(config.featureFlags.eventOutboxAlertCriticalMaxDeadLetterRows).toBe(12);
+    expect(config.featureFlags.eventOutboxAlertCriticalMaxOldestUnpublishedAgeSeconds).toBe(900);
+    expect(config.featureFlags.eventOutboxAlertCriticalMaxOldestDeadLetterAgeSeconds).toBe(240);
+    expect(config.featureFlags.eventOutboxAlertAutomationEnabled).toBe(false);
+    expect(config.featureFlags.eventOutboxAlertsChannel).toBe('ops:outbox:alerts');
     expect(config.featureFlags.matchingGoCanaryPairs).toEqual(['BTC_USDT', 'ETH_USDT']);
   });
 });
+
 

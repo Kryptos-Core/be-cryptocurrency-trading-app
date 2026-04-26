@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, MoreThan, Repository } from 'typeorm';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
+import { OutboxRelayAlertSeverity } from './outbox-alerting.constants';
 import {
   OutboxReplayAuditRecord,
   OutboxReplayAuditRowSnapshot,
@@ -34,10 +35,26 @@ export type OutboxRelayHealthSummary = {
   oldestDeadLetterAt: string | null;
   oldestUnpublishedAgeSeconds: number;
   oldestDeadLetterAgeSeconds: number;
+  thresholds: {
+    warning: {
+      maxDeadLetterRows: number;
+      maxOldestUnpublishedAgeSeconds: number;
+      maxOldestDeadLetterAgeSeconds: number;
+    };
+    critical: {
+      maxDeadLetterRows: number;
+      maxOldestUnpublishedAgeSeconds: number;
+      maxOldestDeadLetterAgeSeconds: number;
+    };
+  };
   alerts: {
     deadLetterRowsExceeded: boolean;
     oldestUnpublishedAgeExceeded: boolean;
     oldestDeadLetterAgeExceeded: boolean;
+    deadLetterRowsCritical: boolean;
+    oldestUnpublishedAgeCritical: boolean;
+    oldestDeadLetterAgeCritical: boolean;
+    severity: OutboxRelayAlertSeverity;
     degraded: boolean;
   };
 };
@@ -191,9 +208,12 @@ export class OutboxAdminService {
       retryScheduledRows,
       oldestUnpublished,
       oldestDeadLetter,
-      maxDeadLetterRows,
-      maxOldestUnpublishedAgeSeconds,
-      maxOldestDeadLetterAgeSeconds,
+      warningMaxDeadLetterRows,
+      warningMaxOldestUnpublishedAgeSeconds,
+      warningMaxOldestDeadLetterAgeSeconds,
+      criticalMaxDeadLetterRows,
+      criticalMaxOldestUnpublishedAgeSeconds,
+      criticalMaxOldestDeadLetterAgeSeconds,
     ] = await Promise.all([
       this.outboxRepository.count({ where: { published_at: IsNull() } }),
       this.outboxRepository.count({
@@ -222,6 +242,9 @@ export class OutboxAdminService {
       this.resolveThreshold('EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS', 0),
       this.resolveThreshold('EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS', 300),
       this.resolveThreshold('EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS', 60),
+      this.resolveThreshold('EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS', 10),
+      this.resolveThreshold('EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS', 1800),
+      this.resolveThreshold('EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS', 600),
     ]);
 
     const nowMs = Date.now();
@@ -230,11 +253,24 @@ export class OutboxAdminService {
     const oldestUnpublishedAgeSeconds = this.computeAgeSeconds(oldestUnpublished?.occurred_at, nowMs);
     const oldestDeadLetterAgeSeconds = this.computeAgeSeconds(oldestDeadLetter?.dead_lettered_at, nowMs);
 
-    const deadLetterRowsExceeded = deadLetterRows > maxDeadLetterRows;
+    const deadLetterRowsExceeded = deadLetterRows > warningMaxDeadLetterRows;
     const oldestUnpublishedAgeExceeded =
-      oldestUnpublishedAgeSeconds > maxOldestUnpublishedAgeSeconds;
+      oldestUnpublishedAgeSeconds > warningMaxOldestUnpublishedAgeSeconds;
     const oldestDeadLetterAgeExceeded =
-      oldestDeadLetterAgeSeconds > maxOldestDeadLetterAgeSeconds;
+      oldestDeadLetterAgeSeconds > warningMaxOldestDeadLetterAgeSeconds;
+
+    const deadLetterRowsCritical = deadLetterRows > criticalMaxDeadLetterRows;
+    const oldestUnpublishedAgeCritical =
+      oldestUnpublishedAgeSeconds > criticalMaxOldestUnpublishedAgeSeconds;
+    const oldestDeadLetterAgeCritical =
+      oldestDeadLetterAgeSeconds > criticalMaxOldestDeadLetterAgeSeconds;
+
+    const severity: OutboxRelayAlertSeverity =
+      deadLetterRowsCritical || oldestUnpublishedAgeCritical || oldestDeadLetterAgeCritical
+        ? 'critical'
+        : deadLetterRowsExceeded || oldestUnpublishedAgeExceeded || oldestDeadLetterAgeExceeded
+          ? 'warning'
+          : 'none';
 
     return {
       unpublishedBacklog,
@@ -244,12 +280,27 @@ export class OutboxAdminService {
       oldestDeadLetterAt,
       oldestUnpublishedAgeSeconds,
       oldestDeadLetterAgeSeconds,
+      thresholds: {
+        warning: {
+          maxDeadLetterRows: warningMaxDeadLetterRows,
+          maxOldestUnpublishedAgeSeconds: warningMaxOldestUnpublishedAgeSeconds,
+          maxOldestDeadLetterAgeSeconds: warningMaxOldestDeadLetterAgeSeconds,
+        },
+        critical: {
+          maxDeadLetterRows: criticalMaxDeadLetterRows,
+          maxOldestUnpublishedAgeSeconds: criticalMaxOldestUnpublishedAgeSeconds,
+          maxOldestDeadLetterAgeSeconds: criticalMaxOldestDeadLetterAgeSeconds,
+        },
+      },
       alerts: {
         deadLetterRowsExceeded,
         oldestUnpublishedAgeExceeded,
         oldestDeadLetterAgeExceeded,
-        degraded:
-          deadLetterRowsExceeded || oldestUnpublishedAgeExceeded || oldestDeadLetterAgeExceeded,
+        deadLetterRowsCritical,
+        oldestUnpublishedAgeCritical,
+        oldestDeadLetterAgeCritical,
+        severity,
+        degraded: severity !== 'none',
       },
     };
   }

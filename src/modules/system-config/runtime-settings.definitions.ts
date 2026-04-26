@@ -377,12 +377,50 @@ const baseKeySet = new Set(BASE_RUNTIME_SETTING_SEEDS.map((s) => s.key));
 const evmRpcSeeds = buildEvmRpcSeeds(baseKeySet);
 const afterRpcKeys = new Set([...baseKeySet, ...evmRpcSeeds.map((s) => s.key)]);
 const evmAutoMaxSeeds = buildEvmWithdrawAutoMaxSeeds(afterRpcKeys);
+const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+  {
+    key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Outbox critical max dead-letter rows',
+    description: 'Critical threshold: dead-letter row count above this value marks outbox relay critical.',
+  },
+  {
+    key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Outbox critical max oldest unpublished age (seconds)',
+    description: 'Critical threshold: oldest unpublished outbox row age in seconds before critical signal.',
+  },
+  {
+    key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Outbox critical max oldest dead-letter age (seconds)',
+    description: 'Critical threshold: oldest dead-letter outbox row age in seconds before critical signal.',
+  },
+  {
+    key: 'EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED',
+    type: ConfigDataType.BOOLEAN,
+    category: ConfigCategory.CORE,
+    name: 'Outbox alert automation enabled',
+    description: 'Enables scheduled outbox degraded/critical alert automation collector.',
+  },
+  {
+    key: 'EVENT_OUTBOX_ALERTS_CHANNEL',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.CORE,
+    name: 'Outbox alerts pubsub channel',
+    description: 'Redis pub/sub channel for outbox relay alert state-change events.',
+  },
+];
 
 /** Full seed list: core + every `*_RPC_URL` from evm-chain-definitions + per-chain auto max (no duplicates). */
 export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   ...BASE_RUNTIME_SETTING_SEEDS,
   ...evmRpcSeeds,
   ...evmAutoMaxSeeds,
+  ...EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS,
 ];
 
 /** Whitelisted keys manageable via UI / runtime settings (mirror .env names). */
@@ -391,4 +429,8 @@ export const RUNTIME_SETTING_KEYS = RUNTIME_SETTING_SEEDS.map((s) => s.key);
 export type RuntimeSettingKey = (typeof RUNTIME_SETTING_KEYS)[number];
 
 export const RUNTIME_SETTING_KEY_SET = new Set<string>(RUNTIME_SETTING_KEYS);
+
+
+
+
 

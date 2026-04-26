@@ -62,6 +62,11 @@ export interface AppConfig {
     eventOutboxAlertMaxDeadLetterRows: number;
     eventOutboxAlertMaxOldestUnpublishedAgeSeconds: number;
     eventOutboxAlertMaxOldestDeadLetterAgeSeconds: number;
+    eventOutboxAlertCriticalMaxDeadLetterRows: number;
+    eventOutboxAlertCriticalMaxOldestUnpublishedAgeSeconds: number;
+    eventOutboxAlertCriticalMaxOldestDeadLetterAgeSeconds: number;
+    eventOutboxAlertAutomationEnabled: boolean;
+    eventOutboxAlertsChannel: string;
     kafkaBrokers: string[];
     kafkaClientId: string;
     kafkaTopicPrefix: string;
@@ -484,6 +489,18 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       eventOutboxAlertMaxOldestDeadLetterAgeSeconds: Number(
         env.EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS || '60',
       ),
+      eventOutboxAlertCriticalMaxDeadLetterRows: Number(
+        env.EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS || '10',
+      ),
+      eventOutboxAlertCriticalMaxOldestUnpublishedAgeSeconds: Number(
+        env.EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS || '1800',
+      ),
+      eventOutboxAlertCriticalMaxOldestDeadLetterAgeSeconds: Number(
+        env.EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS || '600',
+      ),
+      eventOutboxAlertAutomationEnabled:
+        String(env.EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED || 'true').toLowerCase() !== 'false',
+      eventOutboxAlertsChannel: env.EVENT_OUTBOX_ALERTS_CHANNEL || 'outbox:alerts',
       kafkaBrokers: (env.KAFKA_BROKERS || '')
         .split(',')
         .map((broker) => broker.trim())
@@ -561,6 +578,7 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
+
 
 
 
