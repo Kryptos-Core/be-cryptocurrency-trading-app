@@ -57,6 +57,8 @@ type DepositMethodItem = {
   estimated_time: string;
 };
 
+type DepositMethodBaseItem = Omit<DepositMethodItem, 'is_recommended'>;
+
 @Injectable()
 export class ManagedWalletsService {
   private readonly logger = new Logger(ManagedWalletsService.name);
@@ -271,6 +273,17 @@ export class ManagedWalletsService {
     return this.resolveDepositMethodDisplayAddress(chain);
   }
 
+  /**
+   * Public deposit methods — operational wallets (ví vận hành) only.
+   * 
+   * Returns deposit addresses that have been set by operators as defaults:
+   * - Only operational transaction wallets with purpose DEPOSIT|BOTH
+   * - Only TRON mainnet, TRON Nile, and TRON Shasta supported
+   * - Non-TRON chains NOT returned (no master wallet fallback)
+   * - Methods with empty addresses are filtered out
+   * 
+   * Recommended chain indicator shows which method to highlight in UI.
+   */
   async getDepositMethods(): Promise<{
     /** Effective recommended row for public deposit UI — always a chain from `onchain_deposit_withdraw`. */
     recommended_chain: string;
@@ -289,32 +302,42 @@ export class ManagedWalletsService {
     );
     const chains: string[] = fromPicker.length > 0 ? fromPicker : fallback;
 
-    const settingRecommended = await this.getRecommendedChain();
-    const recommendedChain = resolveRecommendedChainForDepositPicker(
-      settingRecommended,
-      chains,
-      pickerDto.tronDefaultNetwork,
-    );
-
     const networkMap =
       await this.managedWalletsDataRepository.aggregateDepositFlagsByNetworkCodes(chains);
 
-    const methods = await Promise.all(
+    const rawMethods = await Promise.all<DepositMethodBaseItem | null>(
       chains.map(async (chain) => {
         const address = await this.resolveDepositMethodDisplayAddress(chain);
+        if (!address.trim()) {
+          return null;
+        }
         const networkConfig = networkMap.get(chain);
         const hasDefault = address.length > 0;
         return {
           chain,
           label: ManagedWalletsService.depositLabelForChain(chain),
           deposit_address: address,
-          is_recommended: chain === recommendedChain,
           deposit_enabled: (networkConfig?.deposit_enabled ?? true) && hasDefault,
           min_confirmations: networkConfig?.min_confirmations ?? 12,
           estimated_time: '~3 minutes',
-        } satisfies DepositMethodItem;
+        } satisfies DepositMethodBaseItem;
       }),
     );
+
+    const configuredMethods = rawMethods.filter(
+      (method): method is DepositMethodBaseItem => method !== null,
+    );
+    const configuredChains = configuredMethods.map((method) => method.chain);
+    const settingRecommended = await this.getRecommendedChain();
+    const recommendedChain = resolveRecommendedChainForDepositPicker(
+      settingRecommended,
+      configuredChains.length > 0 ? configuredChains : chains,
+      pickerDto.tronDefaultNetwork,
+    );
+    const methods = configuredMethods.map((method) => ({
+      ...method,
+      is_recommended: method.chain === recommendedChain,
+    }));
 
     return {
       recommended_chain: recommendedChain,
@@ -382,12 +405,16 @@ export class ManagedWalletsService {
   }
 
   /**
-   * Tron mainnet: default user-deposit transaction wallet only (same as GET /blockchain/deposit/address).
-   * Tron testnets: transaction default, else treasury main wallet.
-   * EVM / Solana: treasury main wallet address when configured.
+   * Operational wallet (ví vận hành) set by operators as default deposit address only.
+   * Only transaction wallets with purpose DEPOSIT|BOTH are returned.
+   * 
+   * Tron mainnet: default user-deposit transaction wallet only.
+   * Tron testnets: default user-deposit transaction wallet only.
+   * Other chains: NOT supported — no fallback to treasury main wallets.
    */
   private async resolveDepositMethodDisplayAddress(chain: string): Promise<string> {
     const c = chain as BlockchainNetwork;
+    // Only TRON chains support operational wallet defaults set by operators
     if (c === BlockchainNetwork.TRON_MAINNET) {
       const tw = await this.transactionWalletService.getDefaultUserDepositWallet(
         BlockchainNetwork.TRON_MAINNET,
@@ -398,16 +425,11 @@ export class ManagedWalletsService {
       const tw = await this.transactionWalletService.getDefaultUserDepositWallet(
         c as TronDepositUiChain,
       );
-      if (tw?.address) {
-        return tw.address;
-      }
-      return (
-        (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? ''
-      );
+      return tw?.address ?? '';
     }
-    return (
-      (await this.treasuryMainWalletService.getDefaultActiveMainWalletAddressOrNull(chain)) ?? ''
-    );
+    // Non-TRON chains: operational wallet defaults not supported
+    // Do not fallback to treasury main wallets
+    return '';
   }
 
   private static depositLabelForChain(chain: string): string {
