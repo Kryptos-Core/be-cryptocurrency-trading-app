@@ -71,6 +71,6 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     },
   ],
   controllers: [AuthController],
-  exports: [AuthService, AUTH_REPOSITORY, TwoFaService, JwtModule, MailService],
+  exports: [AuthService, AUTH_REPOSITORY, TwoFaService, JwtModule, MailService, TOKEN_ISSUER],
 })
 export class AuthModule {}
