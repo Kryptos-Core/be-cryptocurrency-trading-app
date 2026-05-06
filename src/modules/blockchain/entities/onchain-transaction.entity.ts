@@ -55,8 +55,8 @@ export class OnchainTransaction {
   @Column({ type: 'int', default: 0 })
   log_index!: number;
 
-  @Column({ type: 'varchar', length: 255 })
-  from_address!: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  from_address!: string | null;
 
   @Column({ type: 'varchar', length: 255 })
   to_address!: string;

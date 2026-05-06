@@ -18,7 +18,7 @@ function mapOnchainToTreasuryHistoryRecord(
     chain: tx.chain,
     type: tx.type,
     tx_hash: tx.tx_hash,
-    from_address: tx.from_address,
+    from_address: tx.from_address ?? '',
     to_address: tx.to_address,
     amount: tx.amount,
     confirmations: tx.confirmations,

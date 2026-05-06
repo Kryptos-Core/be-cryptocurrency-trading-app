@@ -12,6 +12,15 @@ import type { LinkedWalletRepositoryPort } from '@/modules/blockchain/domain/por
 export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
   constructor(private readonly dataSource: DataSource) {}
 
+  private static normalizeLookupAddress(address: string): string {
+    return address.trim();
+  }
+
+  private static isEvmStyleAddress(address: string): boolean {
+    const normalized = address.trim();
+    return normalized.startsWith('0x') || normalized.startsWith('0X');
+  }
+
   async findByUserAndChain(userId: string, chain: string): Promise<LinkedWallet | null> {
     return this.dataSource.getRepository(LinkedWallet).findOne({
       where: { user_id: userId, chain },
@@ -19,8 +28,20 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
   }
 
   async findByAddress(chain: string, address: string): Promise<LinkedWallet | null> {
+    const normalized = LinkedWalletRepository.normalizeLookupAddress(address);
+    if (LinkedWalletRepository.isEvmStyleAddress(normalized)) {
+      return this.dataSource
+        .getRepository(LinkedWallet)
+        .createQueryBuilder('w')
+        .where('w.chain = :chain AND LOWER(w.address) = LOWER(:address)', {
+          chain,
+          address: normalized,
+        })
+        .getOne();
+    }
+
     return this.dataSource.getRepository(LinkedWallet).findOne({
-      where: { chain, address },
+      where: { chain, address: normalized },
     });
   }
 
@@ -69,8 +90,22 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     chain: string,
     address: string,
   ): Promise<LinkedWallet | null> {
+    const normalized = LinkedWalletRepository.normalizeLookupAddress(address);
+    if (LinkedWalletRepository.isEvmStyleAddress(normalized)) {
+      return this.dataSource
+        .getRepository(LinkedWallet)
+        .createQueryBuilder('w')
+        .where('w.user_id = :userId AND w.chain = :chain AND LOWER(w.address) = LOWER(:address)', {
+          userId,
+          chain,
+          address: normalized,
+        })
+        .andWhere('w.status = :status', { status: 'VERIFIED' })
+        .getOne();
+    }
+
     return this.dataSource.getRepository(LinkedWallet).findOne({
-      where: { user_id: userId, chain, address, status: 'VERIFIED' },
+      where: { user_id: userId, chain, address: normalized, status: 'VERIFIED' },
     });
   }
 
@@ -78,17 +113,21 @@ export class LinkedWalletRepository implements LinkedWalletRepositoryPort {
     chain: string,
     address: string,
   ): Promise<LinkedWallet | null> {
-    return this.dataSource
-      .getRepository(LinkedWallet)
-      .createQueryBuilder('w')
-      .where('w.chain = :chain AND w.address = :address AND w.status = :st', {
-        chain,
-        address: address.trim(),
-        st: 'VERIFIED',
-      })
-      .orderBy('w.linked_at', 'ASC')
-      .addOrderBy('w.created_at', 'ASC')
-      .getOne();
+    const normalized = LinkedWalletRepository.normalizeLookupAddress(address);
+    const repo = this.dataSource.getRepository(LinkedWallet).createQueryBuilder('w');
+    const query = LinkedWalletRepository.isEvmStyleAddress(normalized)
+      ? repo.where('w.chain = :chain AND LOWER(w.address) = LOWER(:address) AND w.status = :st', {
+          chain,
+          address: normalized,
+          st: 'VERIFIED',
+        })
+      : repo.where('w.chain = :chain AND w.address = :address AND w.status = :st', {
+          chain,
+          address: normalized,
+          st: 'VERIFIED',
+        });
+
+    return query.orderBy('w.linked_at', 'ASC').addOrderBy('w.created_at', 'ASC').getOne();
   }
 
   async findByLinkIdAndUserId(linkId: string, userId: string): Promise<LinkedWallet | null> {
