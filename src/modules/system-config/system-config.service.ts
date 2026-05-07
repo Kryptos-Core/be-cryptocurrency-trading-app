@@ -47,28 +47,58 @@ export class SystemConfigService implements OnModuleInit {
     } finally {
       await runner.release();
     }
-    await this.ensureRuntimeRows();
+    try {
+      await this.ensureRuntimeRows();
+    } catch (err) {
+      this.logger.warn(
+        `ensureRuntimeRows failed — will retry on next request: ${(err as Error).message}`,
+      );
+    }
     await this.syncDbToRedis();
     this.subscribeToPubSub();
   }
 
-  /** Bootstrap: insert any missing whitelisted rows using env/app defaults. */
+  /** Bootstrap: insert any missing whitelisted rows using env/app defaults; sync category if stale. */
   private async ensureRuntimeRows() {
     for (const seed of RUNTIME_SETTING_SEEDS) {
       const exists = await this.configRepo.findOne({ where: { key: seed.key } });
-      if (exists) continue;
+      if (exists) {
+        if (exists.category !== seed.category) {
+          this.logger.log(
+            `Syncing category for "${seed.key}": ${exists.category} → ${seed.category}`,
+          );
+          exists.category = seed.category;
+          exists.name = seed.name;
+          exists.description = seed.description;
+          exists.type = seed.type;
+          try {
+            await this.configRepo.save(exists);
+          } catch (err) {
+            this.logger.warn(
+              `Could not sync category for "${seed.key}" — enum may not include "${seed.category}" yet. Run migrations.`,
+            );
+          }
+        }
+        continue;
+      }
 
       const value = this.resolveEnvFallback(seed.key);
-      await this.configRepo.save({
-        key: seed.key,
-        value,
-        type: seed.type,
-        category: seed.category,
-        name: seed.name,
-        description: seed.description,
-        isReadOnly: seed.isReadOnly ?? false,
-      });
-      this.logger.log(`Seeded runtime config key: ${seed.key}`);
+      try {
+        await this.configRepo.save({
+          key: seed.key,
+          value,
+          type: seed.type,
+          category: seed.category,
+          name: seed.name,
+          description: seed.description,
+          isReadOnly: seed.isReadOnly ?? false,
+        });
+        this.logger.log(`Seeded runtime config key: ${seed.key}`);
+      } catch (err) {
+        this.logger.warn(
+          `Could not seed key "${seed.key}" (category="${seed.category}"): ${(err as Error).message}. Run migrations first.`,
+        );
+      }
     }
   }
 

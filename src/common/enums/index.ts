@@ -90,6 +90,14 @@ export enum Permission {
   OUTBOX_MANAGE = 'outbox:manage',
   /** Manage payment gateway configs: PayOS credentials, blockchain hot wallet keys, network settings */
   PAYMENT_CONFIGS_MANAGE = 'payment_configs:manage',
+  /** Ops: manage TECH runtime settings (RPC URLs, blockchain infra) */
+  SYSTEM_CONFIG_EDIT_TECH = 'system_config:edit_tech',
+  /** Finance: manage FINANCE runtime settings (withdraw limits, rate fallbacks, MM defaults) */
+  SYSTEM_CONFIG_EDIT_FINANCE = 'system_config:edit_finance',
+  /** Ops: manage OPS runtime settings (matching engine, Go aggregator, outbox, rollout) */
+  SYSTEM_CONFIG_EDIT_OPS = 'system_config:edit_ops',
+  /** Ops: manage CORE runtime settings (symbols, market sources, wallet config) */
+  SYSTEM_CONFIG_EDIT_CORE = 'system_config:edit_core',
   /** Manage treasury E2E runner configs and health thresholds */
   TREASURY_E2E_CONFIGS_MANAGE = 'treasury_e2e_configs:manage',
   /** Approve or reject withdrawal requests (manual review queue) */

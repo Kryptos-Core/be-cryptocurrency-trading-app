@@ -8,18 +8,18 @@ import { tronContractAddressesEqual } from '../utils/tron-contract-address.util'
 import { DepositIngestionService } from './deposit-ingestion.service';
 import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
 
-/** TronGrid endpoints (require API key for higher rate limits) */
+/** TronGrid endpoints for mainnet (requires API key for higher rate limits) */
 const TRON_GRID: Partial<Record<BlockchainNetwork, string>> = {
   [BlockchainNetwork.TRON_MAINNET]: 'https://api.trongrid.io',
   [BlockchainNetwork.TRON_NILE]: 'https://nile.trongrid.io',
   [BlockchainNetwork.TRON_SHASTA]: 'https://api.shasta.trongrid.io',
 };
 
-/** Public full-node RPC endpoints (no API key required, but rate-limited) */
-const TRON_PUBLIC_RPC: Partial<Record<BlockchainNetwork, string>> = {
-  [BlockchainNetwork.TRON_MAINNET]: 'https://api.trongrid.io',
-  [BlockchainNetwork.TRON_NILE]: 'https://nile.tronapi.io',
-  [BlockchainNetwork.TRON_SHASTA]: 'https://api.shasta.trongrid.io',
+/** TronScan API endpoints for testnets (no API key required) */
+const TRON_SCAN: Partial<Record<BlockchainNetwork, string>> = {
+  [BlockchainNetwork.TRON_MAINNET]: 'https://apilist.tronscanapi.com',
+  [BlockchainNetwork.TRON_NILE]: 'https://nileapi.tronscan.org',
+  [BlockchainNetwork.TRON_SHASTA]: 'https://nileapi.tronscan.org', // Shasta uses Nile API
 };
 
 type TronGridTrc20Row = {
@@ -28,13 +28,26 @@ type TronGridTrc20Row = {
   token_info?: { address?: string; symbol?: string };
 };
 
+type TronScanTrc20Row = {
+  transaction_id?: string;
+  block_ts?: number;
+  contract_address?: string;
+  to_address?: string;
+  from_address?: string;
+  confirmed?: boolean;
+  tokenInfo?: { tokenAbbr?: string; tokenDecimal?: number };
+};
+
+
 /**
- * Poll TronGrid TRC-20 history for the platform deposit address and enqueue new tx hashes for ingestion.
- * Falls back to public RPC when TronGrid API key is not configured.
+ * Poll TronScan/TronGrid for TRC-20 and native TRX transfers for the platform deposit address.
+ * - Mainnet: TronGrid (with API key)
+ * - Testnets (Nile/Shasta): TronScan API
  */
 @Injectable()
 export class TronDepositObserverService {
   private readonly logger = new Logger(TronDepositObserverService.name);
+  private lastProcessedTimestamp = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -47,35 +60,22 @@ export class TronDepositObserverService {
     return this.configService.get<string>('TRON_GRID_API_KEY')?.trim() || undefined;
   }
 
-  /**
-   * Get the base URL for TRON API calls.
-   * Uses TronGrid with API key if available, otherwise falls back to public RPC.
-   */
-  private getApiBase(chain: BlockchainNetwork): string | undefined {
-    const gridBase = TRON_GRID[chain];
-    if (!gridBase) return undefined;
-
-    const apiKey = this.tronGridApiKey();
-    if (apiKey) {
-      this.logger.debug(`Using TronGrid with API key for ${chain}`);
-      return gridBase;
-    }
-
-    const publicRpc = TRON_PUBLIC_RPC[chain];
-    if (publicRpc) {
-      this.logger.debug(
-        `No TronGrid API key, falling back to public RPC for ${chain}: ${publicRpc}`,
-      );
-      return publicRpc;
-    }
-
-    this.logger.warn(`No API endpoint available for chain ${chain}`);
-    return undefined;
+  private isTronScan(chain: BlockchainNetwork): boolean {
+    return chain !== BlockchainNetwork.TRON_MAINNET;
   }
 
-  /**
-   * Get HTTP headers for API calls (includes API key if available).
-   */
+  private getApiBase(chain: BlockchainNetwork): string | undefined {
+    if (this.isTronScan(chain)) {
+      return TRON_SCAN[chain];
+    }
+    // Mainnet: require API key
+    if (!this.tronGridApiKey()) {
+      this.logger.warn('tron.deposit.watch.no_api_key_mainnet - TRON_GRID_API_KEY required for mainnet');
+      return undefined;
+    }
+    return TRON_GRID[chain];
+  }
+
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = { Accept: 'application/json' };
     const key = this.tronGridApiKey();
@@ -84,6 +84,9 @@ export class TronDepositObserverService {
   }
 
   async scanChain(chain: BlockchainNetwork): Promise<void> {
+    // Reset state for this scan
+    this.lastProcessedTimestamp = 0;
+
     if (
       chain !== BlockchainNetwork.TRON_MAINNET &&
       chain !== BlockchainNetwork.TRON_NILE &&
@@ -91,6 +94,9 @@ export class TronDepositObserverService {
     ) {
       return;
     }
+
+    const base = this.getApiBase(chain);
+    if (!base) return;
 
     const deposit = (
       await this.managedWalletsService.getPublicDepositRecipientAddress(chain)
@@ -106,30 +112,24 @@ export class TronDepositObserverService {
       minTs = Math.max(0, Date.now() - 86400000 * 7);
     }
 
-    const base = this.getApiBase(chain);
-    if (!base) return;
     const headers = this.getHeaders();
 
-    // Try TronGrid API first (TRC-20 transfers)
-    const trc20Success = await this.scanTrc20Transfers(chain, deposit, minTs, base, headers);
+    // Scan TRC-20 token transfers
+    await this.scanTrc20Transfers(chain, deposit, minTs, base, headers);
 
-    // Also scan native TRX transfers
+    // Scan native TRX transfers
     await this.scanNativeTransfers(chain, deposit, minTs, base, headers);
 
-    // If TronGrid failed completely, try alternative RPC-based approach
-    if (!trc20Success) {
-      await this.scanViaAlternativeRpc(chain, deposit, minTs);
-    }
-
-    // Always update cursor (even if some requests failed)
-    const maxTs = await this.calculateMaxTimestamp(chain, deposit, minTs);
-    const nextCursor = BigInt(maxTs + 1);
-    await this.cursors.upsertCursor(chain, nextCursor, 'TIMESTAMP_MS');
+    // Update cursor to max timestamp of processed transactions, or keep existing
+    const existingCursor = await this.cursors.findByChain(chain);
+    const currentTs = existingCursor?.cursor_kind === 'TIMESTAMP_MS' ? Number(BigInt(existingCursor.cursor_value)) : 0;
+    const maxProcessedTs = this.lastProcessedTimestamp ?? 0;
+    const nextCursor = Math.max(currentTs, maxProcessedTs + 1);
+    await this.cursors.upsertCursor(chain, BigInt(nextCursor), 'TIMESTAMP_MS');
   }
 
   /**
-   * Scan TRC-20 token transfers via TronGrid API.
-   * Returns true if successful, false if failed.
+   * Scan TRC-20 token transfers.
    */
   private async scanTrc20Transfers(
     chain: BlockchainNetwork,
@@ -137,26 +137,67 @@ export class TronDepositObserverService {
     minTs: number,
     base: string,
     headers: Record<string, string>,
-  ): Promise<boolean> {
-    const url = new URL(`/v1/accounts/${encodeURIComponent(deposit)}/transactions/trc20`, base);
-    url.searchParams.set('only_confirmed', 'true');
-    url.searchParams.set('limit', '40');
-    url.searchParams.set('order_by', 'block_timestamp,asc');
-    url.searchParams.set('min_timestamp', String(minTs));
-
+  ): Promise<void> {
     try {
-      const res = await fetch(url.toString(), { headers });
-      if (!res.ok) {
-        this.logger.warn(`tron.deposit.watch.trc20_http_error chain=${chain} status=${res.status}`);
-        return false;
-      }
+      let data: TronGridTrc20Row[] = [];
 
-      const body = (await res.json()) as { data?: TronGridTrc20Row[] };
-      const data = Array.isArray(body.data) ? body.data : [];
+      if (this.isTronScan(chain)) {
+        // TronScan API format
+        const url = new URL('/api/token_trc20/transfers', base);
+        url.searchParams.set('address', deposit);
+        url.searchParams.set('limit', '40');
+        url.searchParams.set('start_timestamp', String(minTs));
+        url.searchParams.set('order_by', 'block_timestamp,asc');
 
-      if (data.length === 0) {
-        this.logger.debug(`tron.deposit.watch.trc20_no_txs chain=${chain} minTs=${minTs}`);
-        return true; // Empty is not an error
+        this.logger.debug(`tron.deposit.watch.scanning chain=${chain} url=${url.toString()}`);
+        const res = await fetch(url.toString(), { headers });
+        if (!res.ok) {
+          this.logger.warn(`tron.deposit.watch.trc20_http_error chain=${chain} status=${res.status}`);
+          return;
+        }
+
+        const body = (await res.json()) as { token_transfers?: TronScanTrc20Row[] };
+        const tronscanData = Array.isArray(body.token_transfers) ? body.token_transfers : [];
+
+        if (tronscanData.length === 0) {
+          this.logger.debug(`tron.deposit.watch.trc20_no_txs chain=${chain} minTs=${minTs}`);
+          return;
+        }
+
+        // Convert TronScan format to common format
+        data = tronscanData
+          .filter((row) => {
+            return row.confirmed && row.to_address?.toLowerCase() === deposit.toLowerCase();
+          })
+          .map((row) => ({
+            transaction_id: row.transaction_id,
+            block_timestamp: row.block_ts,
+            token_info: {
+              address: row.contract_address,
+              symbol: row.tokenInfo?.tokenAbbr,
+            },
+          }));
+      } else {
+        // TronGrid API format
+        const url = new URL(`/v1/accounts/${encodeURIComponent(deposit)}/transactions/trc20`, base);
+        url.searchParams.set('only_confirmed', 'true');
+        url.searchParams.set('limit', '40');
+        url.searchParams.set('order_by', 'block_timestamp,asc');
+        url.searchParams.set('min_timestamp', String(minTs));
+
+        const res = await fetch(url.toString(), { headers });
+        if (!res.ok) {
+          this.logger.warn(`tron.deposit.watch.trc20_http_error chain=${chain} status=${res.status}`);
+          return;
+        }
+
+        const body = (await res.json()) as { data?: TronGridTrc20Row[] };
+        data = Array.isArray(body.data) ? body.data : [];
+
+        if (data.length === 0) {
+          this.logger.debug(`tron.deposit.watch.trc20_no_txs chain=${chain} minTs=${minTs}`);
+          return;
+        }
       }
 
       const tronNet: TronTreasuryNetwork =
@@ -167,7 +208,7 @@ export class TronDepositObserverService {
             : 'TRON_NILE';
       const usdtContract = TRON_USDT_CONTRACT[tronNet];
 
-      let maxTs = minTs;
+      let maxTs = 0;
       for (const item of data) {
         const txId = item.transaction_id?.trim();
         const ts = item.block_timestamp ?? 0;
@@ -185,15 +226,18 @@ export class TronDepositObserverService {
           this.logger.warn(`tron.deposit.watch.ingest_failed tx=${txId} ${(e as Error).message}`);
         }
       }
-      return true;
+
+      // Track max timestamp for cursor update
+      if (maxTs > this.lastProcessedTimestamp) {
+        this.lastProcessedTimestamp = maxTs;
+      }
     } catch (e) {
       this.logger.warn(`tron.deposit.watch.trc20_error chain=${chain}: ${(e as Error).message}`);
-      return false;
     }
   }
 
   /**
-   * Scan native TRX transfers via TronGrid API.
+   * Scan native TRX transfers.
    */
   private async scanNativeTransfers(
     chain: BlockchainNetwork,
@@ -202,25 +246,32 @@ export class TronDepositObserverService {
     base: string,
     headers: Record<string, string>,
   ): Promise<void> {
-    const nativeUrl = new URL(`/v1/accounts/${encodeURIComponent(deposit)}/transactions`, base);
-    nativeUrl.searchParams.set('only_confirmed', 'true');
-    nativeUrl.searchParams.set('limit', '25');
-    nativeUrl.searchParams.set('order_by', 'block_timestamp,asc');
-    nativeUrl.searchParams.set('min_timestamp', String(minTs));
+    // TronScan testnets don't support native TRX transfer API, skip
+    if (this.isTronScan(chain)) {
+      this.logger.debug(`tron.deposit.watch.skip_native_testnet chain=${chain}`);
+      return;
+    }
 
     try {
+      const nativeUrl = new URL(`/v1/accounts/${encodeURIComponent(deposit)}/transactions`, base);
+      nativeUrl.searchParams.set('only_confirmed', 'true');
+      nativeUrl.searchParams.set('limit', '25');
+      nativeUrl.searchParams.set('order_by', 'block_timestamp,asc');
+      nativeUrl.searchParams.set('min_timestamp', String(minTs));
+
       const resNative = await fetch(nativeUrl.toString(), { headers });
       if (!resNative.ok) {
-        this.logger.warn(
-          `tron.deposit.watch.native_http_error chain=${chain} status=${resNative.status}`,
-        );
+        this.logger.warn(`tron.deposit.watch.native_http_error chain=${chain} status=${resNative.status}`);
         return;
       }
 
-      const nativeBody = (await resNative.json()) as {
-        data?: { txID?: string; block_timestamp?: number }[];
-      };
+      const nativeBody = (await resNative.json()) as { data?: { txID?: string; block_timestamp?: number }[] };
       const nativeRows = Array.isArray(nativeBody.data) ? nativeBody.data : [];
+
+      if (nativeRows.length === 0) {
+        this.logger.debug(`tron.deposit.watch.native_no_txs chain=${chain} minTs=${minTs}`);
+        return;
+      }
 
       const seenTx = new Set<string>();
       for (const tx of nativeRows) {
@@ -233,97 +284,11 @@ export class TronDepositObserverService {
         try {
           await this.ingestion.ingestTxHash(chain, txId);
         } catch (e) {
-          this.logger.warn(
-            `tron.deposit.watch.ingest_failed_native tx=${txId} ${(e as Error).message}`,
-          );
+          this.logger.warn(`tron.deposit.watch.ingest_failed_native tx=${txId} ${(e as Error).message}`);
         }
       }
     } catch (e) {
       this.logger.warn(`tron.deposit.watch.native_error chain=${chain}: ${(e as Error).message}`);
-    }
-  }
-
-  /**
-   * Alternative RPC-based scanning using TronWeb.
-   * This is used when TronGrid API fails or is unavailable.
-   */
-  private async scanViaAlternativeRpc(
-    chain: BlockchainNetwork,
-    deposit: string,
-    minTs: number,
-  ): Promise<void> {
-    try {
-      const { TronWeb } = await import('tronweb');
-      const fullHost = TRON_PUBLIC_RPC[chain];
-      if (!fullHost) return;
-
-      const tronWeb = new TronWeb({ fullHost });
-
-      // Get recent transactions involving this address
-      // TronWeb.getTransactionsRelated returns GetTransactionResponse[] directly
-      const txInfo = await tronWeb.trx.getTransactionsRelated(deposit, 'all', 20);
-
-      if (!Array.isArray(txInfo)) {
-        this.logger.debug(`tron.deposit.watch.alt_rpc_no_txs chain=${chain}`);
-        return;
-      }
-
-      const seenTx = new Set<string>();
-      for (const tx of txInfo) {
-        const txId = tx.txID?.trim();
-        // TronWeb's GetTransactionResponse stores timestamp in raw_data
-        const txRaw = tx as { block_timestamp?: number; raw_data?: { timestamp?: number } };
-        const ts = txRaw.block_timestamp ?? txRaw.raw_data?.timestamp ?? 0;
-
-        if (!txId || ts <= 0 || ts < minTs) continue;
-        if (seenTx.has(txId)) continue;
-        seenTx.add(txId);
-
-        try {
-          await this.ingestion.ingestTxHash(chain, txId);
-        } catch (e) {
-          this.logger.warn(
-            `tron.deposit.watch.alt_rpc_ingest_failed tx=${txId} ${(e as Error).message}`,
-          );
-        }
-      }
-
-      this.logger.log(`tron.deposit.watch.alt_rpc_scanned chain=${chain} count=${seenTx.size}`);
-    } catch (e) {
-      this.logger.warn(`tron.deposit.watch.alt_rpc_error chain=${chain}: ${(e as Error).message}`);
-    }
-  }
-
-  /**
-   * Calculate the maximum timestamp for cursor update.
-   * Tries to get recent transactions to find the latest timestamp.
-   */
-  private async calculateMaxTimestamp(
-    chain: BlockchainNetwork,
-    deposit: string,
-    currentMinTs: number,
-  ): Promise<number> {
-    try {
-      const { TronWeb } = await import('tronweb');
-      const fullHost = TRON_PUBLIC_RPC[chain];
-      if (!fullHost) return currentMinTs;
-
-      const tronWeb = new TronWeb({ fullHost });
-      const txInfo = await tronWeb.trx.getTransactionsRelated(deposit, 'all', 5);
-
-      if (!Array.isArray(txInfo)) {
-        return currentMinTs;
-      }
-
-      let maxTs = currentMinTs;
-      for (const tx of txInfo) {
-        const txRaw = tx as { block_timestamp?: number; raw_data?: { timestamp?: number } };
-        const ts = txRaw.block_timestamp ?? txRaw.raw_data?.timestamp ?? 0;
-        if (ts > maxTs) maxTs = ts;
-      }
-      return maxTs;
-    } catch (e) {
-      return currentMinTs;
     }
   }
 }

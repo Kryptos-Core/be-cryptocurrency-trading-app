@@ -15,7 +15,7 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'WALLET_SYNC_INTERVAL',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Wallet sync interval (ms)',
     description: 'Interval for wallet sync workers (milliseconds).',
   },
@@ -247,91 +247,91 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'MARKET_READ_SOURCE',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Market read source',
     description: 'Select read source for market APIs: postgres|timescale.',
   },
   {
     key: 'TICKER_SOURCE',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Ticker source',
     description: 'Select ticker publisher source: nestjs|go_aggregator.',
   },
   {
     key: 'MATCHING_ENGINE',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Matching engine mode',
     description: 'Matching mode: ts|go_shadow|go_canary|go.',
   },
   {
     key: 'MATCHING_GO_CANARY_PAIRS',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go matching canary pairs',
     description: 'Comma-separated pair_id allowlist for go_canary shadow/canary routing.',
   },
   {
     key: 'PUBLIC_WS_SOURCE',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Public WS source',
     description: 'Public market websocket source: nestjs|go.',
   },
   {
     key: 'GO_AGGREGATOR_TICKER_CHANNEL',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go aggregator ticker channel',
     description: 'Redis pub/sub channel used for external Go ticker ingress.',
   },
   {
     key: 'GO_AGGREGATOR_OHLC_CHANNEL',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go aggregator OHLC channel',
     description: 'Redis pub/sub channel used for external Go OHLC ingress.',
   },
   {
     key: 'MATCHING_SHADOW_MONITOR_PAIRS',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Matching shadow monitor pairs',
     description: 'Comma-separated pair_id list to collect scheduled shadow parity metrics.',
   },
   {
     key: 'MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT',
     type: ConfigDataType.FLOAT,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Matching shadow min match rate alert',
     description: 'Raise ops warning when shadow parity drops below this percent.',
   },
   {
     key: 'MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Matching shadow max unmatched runs alert',
     description: 'Raise ops warning when unmatched shadow runs exceed this threshold.',
   },
   {
     key: 'GO_ROLLOUT_WINDOW_HOURS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go rollout readiness window (hours)',
     description: 'Window size in hours used by go rollout readiness checks.',
   },
   {
     key: 'GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go rollout max public WS drift pairs',
     description: 'Maximum allowed drift pair count before rollout readiness fails.',
   },
   {
     key: 'EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox alert max dead-letter rows',
     description:
       'Alert threshold: dead-letter row count above this value marks outbox relay degraded.',
@@ -339,7 +339,7 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox alert max oldest unpublished age (seconds)',
     description:
       'Alert threshold: oldest unpublished outbox row age in seconds before degraded signal.',
@@ -347,7 +347,7 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox alert max oldest dead-letter age (seconds)',
     description:
       'Alert threshold: oldest dead-letter outbox row age in seconds before degraded signal.',
@@ -384,7 +384,7 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_DEAD_LETTER_ROWS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox critical max dead-letter rows',
     description:
       'Critical threshold: dead-letter row count above this value marks outbox relay critical.',
@@ -392,7 +392,7 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox critical max oldest unpublished age (seconds)',
     description:
       'Critical threshold: oldest unpublished outbox row age in seconds before critical signal.',
@@ -400,7 +400,7 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox critical max oldest dead-letter age (seconds)',
     description:
       'Critical threshold: oldest dead-letter outbox row age in seconds before critical signal.',
@@ -408,14 +408,14 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED',
     type: ConfigDataType.BOOLEAN,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox alert automation enabled',
     description: 'Enables scheduled outbox degraded/critical alert automation collector.',
   },
   {
     key: 'EVENT_OUTBOX_ALERTS_CHANNEL',
     type: ConfigDataType.STRING,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Outbox alerts pubsub channel',
     description: 'Redis pub/sub channel for outbox relay alert state-change events.',
   },
@@ -425,14 +425,14 @@ const EXTRA_MARKET_READ_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Market read model max lag alert (seconds)',
     description: 'Alert threshold: market read model lag in seconds before degraded signal.',
   },
   {
     key: 'MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Market read model critical max lag (seconds)',
     description: 'Critical threshold: market read model lag in seconds before critical signal.',
   },
@@ -442,7 +442,7 @@ const EXTRA_GO_ROLLOUT_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go rollout min compared pairs',
     description:
       'Minimum number of pairs that must have WS parity data before readiness check passes.',
@@ -450,7 +450,7 @@ const EXTRA_GO_ROLLOUT_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   {
     key: 'GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS',
     type: ConfigDataType.INTEGER,
-    category: ConfigCategory.CORE,
+    category: ConfigCategory.OPS,
     name: 'Go rollback drill max age (hours)',
     description: 'Maximum age in hours for a rollback drill to be considered valid.',
   },

@@ -2,8 +2,9 @@ import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } fro
 
 export enum ConfigCategory {
   TECH = 'tech', // RPC URLs, Intervals
-  FINANCE = 'finance', // Withdraw Max, Transfer Limits
-  CORE = 'core', // Default symbols, etc.
+  FINANCE = 'finance', // Withdraw Max, Transfer Limits, Rate fallbacks
+  OPS = 'ops', // Matching engine, Go aggregator, outbox alerts, rollout, market read
+  CORE = 'core', // Default symbols, market sources, wallet config
 }
 
 export enum ConfigDataType {

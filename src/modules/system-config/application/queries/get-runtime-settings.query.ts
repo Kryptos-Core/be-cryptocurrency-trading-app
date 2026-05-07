@@ -4,7 +4,9 @@ import {
   SYSTEM_CONFIG_REPOSITORY,
   type SystemConfigRepositoryPort,
 } from '@/modules/system-config/domain/ports';
-import { RUNTIME_SETTING_SEEDS } from '@/modules/system-config/runtime-settings.definitions';
+import {
+  RUNTIME_SETTING_SEEDS,
+} from '@/modules/system-config/runtime-settings.definitions';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 export interface RuntimeSettingView {
@@ -31,15 +33,25 @@ export class GetRuntimeSettingsQuery {
     private readonly configService: SystemConfigService,
   ) {}
 
-  async execute(): Promise<RuntimeSettingView[]> {
-    const rows = await this.configRepo.find();
-    const byKey = new Map(rows.map((r) => [r.key, r]));
+  /**
+   * Returns runtime settings filtered by [category].
+   * Pass `null` to get all categories (used by `/system-configs/runtime` without sub-path).
+   */
+  async execute(category?: ConfigCategory): Promise<RuntimeSettingView[]> {
     const nodeEnv = (process.env.NODE_ENV ?? '').toLowerCase();
     const allowUiTestSig = ['true', '1', 'yes', 'on'].includes(
       (process.env.ALLOW_UI_TEST_SIGNATURE ?? '').toLowerCase(),
     );
 
-    return RUNTIME_SETTING_SEEDS.map((seed) => {
+    const seeds =
+      category !== undefined
+        ? RUNTIME_SETTING_SEEDS.filter((s) => s.category === category)
+        : RUNTIME_SETTING_SEEDS;
+
+    const rows = await this.configRepo.find();
+    const byKey = new Map(rows.map((r) => [r.key, r]));
+
+    return seeds.map((seed) => {
       const row = byKey.get(seed.key);
       const envFallback = this.configService.resolveEnvFallback(seed.key);
       const effectiveValue = row?.value ?? envFallback;
@@ -52,11 +64,11 @@ export class GetRuntimeSettingsQuery {
         value: row?.value ?? envFallback,
         effectiveValue,
         valueSource: (row ? 'database' : 'environment') as 'database' | 'environment',
-        type: row?.type ?? seed.type,
-        category: row?.category ?? seed.category,
-        name: row?.name ?? seed.name,
-        description: row?.description ?? seed.description,
-        isReadOnly: testSigLocked || row?.isReadOnly || seed.isReadOnly || false,
+        type: seed.type,
+        category: seed.category,
+        name: seed.name,
+        description: seed.description,
+        isReadOnly: testSigLocked || (row?.isReadOnly ?? false),
       };
     });
   }

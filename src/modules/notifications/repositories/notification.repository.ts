@@ -54,7 +54,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
   async findByUser(userId: string, limit: number, offset: number): Promise<NotificationRow[]> {
     const rows = await this.dataSource.query(
       `SELECT un.id, un.user_id, un.notification_id,
-              CASE WHEN un.is_read THEN 1 ELSE 0 END AS is_read,
+              CASE WHEN un.is_read = 1 THEN 1 ELSE 0 END AS is_read,
               un.read_at, un.created_at,
               n.title, n.body, n.type, n.created_by, n.data,
               n.created_at AS notification_created_at
@@ -85,7 +85,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
     const rows = await this.dataSource.query(
       `SELECT COUNT(*)::int AS unread_count
        FROM user_notifications
-       WHERE user_id = $1 AND is_read = false`,
+       WHERE user_id = $1 AND is_read = 0`,
       [userId],
     );
     return Number(rows?.[0]?.unread_count ?? 0);
@@ -94,7 +94,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
   async markRead(notificationId: string, userId: string): Promise<void> {
     await this.dataSource.query(
       `UPDATE user_notifications
-       SET is_read = true,
+       SET is_read = 1,
            read_at = COALESCE(read_at, NOW())
        WHERE notification_id = $1 AND user_id = $2`,
       [notificationId, userId],
@@ -104,9 +104,9 @@ export class NotificationRepository extends BaseRepository<Notification> {
   async markAllRead(userId: string): Promise<void> {
     await this.dataSource.query(
       `UPDATE user_notifications
-       SET is_read = true,
+       SET is_read = 1,
            read_at = COALESCE(read_at, NOW())
-       WHERE user_id = $1 AND is_read = false`,
+       WHERE user_id = $1 AND is_read = 0`,
       [userId],
     );
   }
