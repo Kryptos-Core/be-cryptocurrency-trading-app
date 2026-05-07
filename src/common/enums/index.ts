@@ -249,6 +249,3 @@ export enum OnchainTxStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
 }
-
-
-

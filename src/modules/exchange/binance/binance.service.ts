@@ -9,7 +9,6 @@ import type {
   IExchangeProvider,
 } from '../interfaces/exchange.interface';
 
-
 type BinanceOrderApiResponse = {
   orderId?: string | number;
   symbol?: string;
@@ -181,8 +180,6 @@ export class BinanceExchangeService implements IExchangeProvider {
     };
   }
 
-
-
   private mapOrderStatus(value: string | undefined): ExchangeOrderResponse['status'] {
     switch (value) {
       case 'NEW':
@@ -196,7 +193,10 @@ export class BinanceExchangeService implements IExchangeProvider {
     }
   }
 
-  private mapOrderSide(value: string | undefined, fallback: ExchangeOrderResponse['side']): ExchangeOrderResponse['side'] {
+  private mapOrderSide(
+    value: string | undefined,
+    fallback: ExchangeOrderResponse['side'],
+  ): ExchangeOrderResponse['side'] {
     return value === 'SELL' ? 'SELL' : value === 'BUY' ? 'BUY' : fallback;
   }
 

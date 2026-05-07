@@ -40,7 +40,10 @@ export class DepositsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new deposit link using PayOS' })
-  async createDepositLinkEndpoint(@Req() req: AuthenticatedRequest, @Body() dto: CreateFiatDepositDto) {
+  async createDepositLinkEndpoint(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateFiatDepositDto,
+  ) {
     return this.createDepositLink.execute(req.user.userId, dto.amount);
   }
 
@@ -63,8 +66,14 @@ export class DepositsController {
   @Get(':orderCode/sync-status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Sync payment status directly from PayOS (useful for local/dev when webhook is unreachable)' })
-  async syncStatus(@Req() req: AuthenticatedRequest, @Param('orderCode', ParseIntPipe) orderCode: number) {
+  @ApiOperation({
+    summary:
+      'Sync payment status directly from PayOS (useful for local/dev when webhook is unreachable)',
+  })
+  async syncStatus(
+    @Req() req: AuthenticatedRequest,
+    @Param('orderCode', ParseIntPipe) orderCode: number,
+  ) {
     return this.syncDepositStatus.execute(req.user.userId, orderCode);
   }
 

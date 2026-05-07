@@ -23,7 +23,6 @@ function minimalValidConfig(overrides: Record<string, unknown> = {}): Record<str
 }
 
 describe('validateEnvironment', () => {
-
   it('maps legacy DB_* into CORE_DB_* when CORE_DB_* is omitted', () => {
     const v = validateEnvironment({
       NODE_ENV: Environment.Development,

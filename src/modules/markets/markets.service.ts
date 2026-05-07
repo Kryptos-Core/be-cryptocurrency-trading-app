@@ -832,7 +832,9 @@ export class MarketsService implements OnModuleInit {
           pair_id: trade.pair_id,
           price: trade.price?.toString() || '0',
           amount: trade.amount?.toString() || '0',
-          side: ((trade as unknown as { taker_order?: { side?: 'BUY' | 'SELL' } }).taker_order?.side ?? 'BUY'),
+          side:
+            (trade as unknown as { taker_order?: { side?: 'BUY' | 'SELL' } }).taker_order?.side ??
+            'BUY',
           created_at: trade.created_at,
         }));
       },
@@ -843,7 +845,10 @@ export class MarketsService implements OnModuleInit {
   /**
    * Get recent trades by symbol
    */
-  async getRecentTradesBySymbol(symbol: string, limit: number = 50): Promise<MarketRecentTradeResponse[]> {
+  async getRecentTradesBySymbol(
+    symbol: string,
+    limit: number = 50,
+  ): Promise<MarketRecentTradeResponse[]> {
     if (this.marketReadModelRepository.shouldUseReadModel()) {
       const projected = await this.marketReadModelRepository.getRecentTradesBySymbol(symbol, limit);
       if (projected.length > 0) return projected;
@@ -1012,8 +1017,3 @@ export class MarketsService implements OnModuleInit {
     return seconds;
   }
 }
-
-
-
-
-

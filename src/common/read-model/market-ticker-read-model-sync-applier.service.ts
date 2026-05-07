@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
+import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import {
   isMarketTickerUpdatedOutboxPayloadV1,
   type MarketTickerUpdatedOutboxPayloadV1,
 } from '@/common/integration-events/market-ticker-updated-outbox-payload';
-import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
-import type { EntityManager } from 'typeorm';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
-
 
 function parseTickerTimestamp(raw: string): Date | null {
   const trimmed = raw.trim();
@@ -26,9 +25,8 @@ function parseTickerTimestamp(raw: string): Date | null {
 }
 
 function parsePayload(row: IntegrationOutbox): MarketTickerUpdatedOutboxPayloadV1 | null {
-  const envelopePayload = unwrapCanonicalIntegrationEventPayload<MarketTickerUpdatedOutboxPayloadV1>(
-    row.payload,
-  );
+  const envelopePayload =
+    unwrapCanonicalIntegrationEventPayload<MarketTickerUpdatedOutboxPayloadV1>(row.payload);
   if (isMarketTickerUpdatedOutboxPayloadV1(envelopePayload)) return envelopePayload;
 
   const legacy = row.payload as unknown;

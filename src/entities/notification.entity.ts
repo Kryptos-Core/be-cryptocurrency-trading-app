@@ -39,6 +39,9 @@ export class Notification {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   creator!: User;
 
-  @OneToMany(() => UserNotification, (un) => un.notification)
+  @OneToMany(
+    () => UserNotification,
+    (un) => un.notification,
+  )
   user_notifications!: UserNotification[];
 }

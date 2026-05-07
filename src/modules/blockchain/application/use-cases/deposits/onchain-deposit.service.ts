@@ -92,22 +92,9 @@ export class OnchainDepositService {
     return addr;
   }
 
-  private async pickResolvedLegForUser(
-    userId: string,
-    chain: BlockchainNetwork,
-    legs: ResolvedDepositTransfer[],
-  ): Promise<{ resolved: ResolvedDepositTransfer; linkId: string }> {
+  private pickResolvedLeg(legs: ResolvedDepositTransfer[]): ResolvedDepositTransfer {
     const ordered = this.sortDepositLegsByPreference(legs);
-    for (const leg of ordered) {
-      const linked = await this.walletLinkingService.findVerifiedWallet(userId, chain, leg.from);
-      if (linked) {
-        return { resolved: leg, linkId: linked.link_id };
-      }
-    }
-    throw new BadRequestException(
-      `Địa chỉ gửi không phải ví đã liên kết của bạn. Hãy liên kết ví trước.`,
-      'SENDER_NOT_LINKED',
-    );
+    return ordered[0];
   }
 
   async previewDepositTx(userId: string, chain: BlockchainNetwork, txHash: string) {
@@ -129,15 +116,7 @@ export class OnchainDepositService {
         'DEPOSIT_LEG_NOT_FOUND',
       );
     }
-    const ordered = this.sortDepositLegsByPreference(legs);
-    let chosen = ordered[0];
-    for (const leg of ordered) {
-      const lw = await this.walletLinkingService.findVerifiedWallet(userId, chain, leg.from);
-      if (lw) {
-        chosen = leg;
-        break;
-      }
-    }
+    const chosen = this.pickResolvedLeg(legs);
     const senderLinked = !!(await this.walletLinkingService.findVerifiedWallet(
       userId,
       chain,
@@ -232,7 +211,12 @@ export class OnchainDepositService {
         joinTransaction,
       );
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === 'DUPLICATE_LEDGER_ENTRY') {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: unknown }).code === 'DUPLICATE_LEDGER_ENTRY'
+      ) {
         return { settled: false, alreadySettled: true };
       }
       throw error;
@@ -277,20 +261,6 @@ export class OnchainDepositService {
     chain: string;
     settled: boolean;
   } | null> {
-    const linked = await this.walletLinkingService.findVerifiedWallet(
-      userId,
-      resolved.chain,
-      resolved.from,
-    );
-    if (!linked) {
-      this.treasuryLog('deposit.ingest.skip_unlinked_sender', {
-        userId,
-        chain: resolved.chain,
-        from: resolved.from,
-        txHash: resolved.txHash,
-      });
-      return null;
-    }
     const lockKey = this.depositProcessingLockKey(
       resolved.chain,
       resolved.txHash,
@@ -301,7 +271,7 @@ export class OnchainDepositService {
     }
     await this.cacheService.set(lockKey, '1', OnchainDepositService.DEPOSIT_LOCK_TTL);
     try {
-      return await this.persistDepositFromResolved(userId, linked.link_id, resolved, {
+      return await this.persistDepositFromResolved(userId, null, resolved, {
         lockHeld: true,
       });
     } finally {
@@ -329,7 +299,7 @@ export class OnchainDepositService {
       );
     }
 
-    const { resolved, linkId } = await this.pickResolvedLegForUser(userId, dto.chain, legs);
+    const resolved = this.pickResolvedLeg(legs);
     const lockKey = this.depositProcessingLockKey(dto.chain, dto.txHash, resolved.logIndex);
     const locked = await this.cacheService.exists(lockKey);
     if (locked) {
@@ -369,7 +339,7 @@ export class OnchainDepositService {
         }
       }
 
-      return await this.persistDepositFromResolved(userId, linkId, resolved, { lockHeld: true });
+      return await this.persistDepositFromResolved(userId, null, resolved, { lockHeld: true });
     } finally {
       await this.cacheService.delete(lockKey);
     }
@@ -377,7 +347,7 @@ export class OnchainDepositService {
 
   private async persistDepositFromResolved(
     userId: string,
-    linkedWalletId: string,
+    linkedWalletId: string | null,
     resolved: ResolvedDepositTransfer,
     opts?: { lockHeld?: boolean },
   ): Promise<{ txId: string; status: string; amount: string; chain: string; settled: boolean }> {
@@ -663,16 +633,14 @@ export class OnchainDepositService {
 
     await this.dataSource.transaction(async (em: EntityManager) => {
       // Check unique constraint before insert to give a clean ConflictException.
-      const existing = await em
-        .getRepository('onchain_transactions')
-        .findOne({
-          where: {
-            chain: resolved.chain,
-            tx_hash: resolved.txHash,
-            log_index: resolved.logIndex ?? 0,
-          },
-          select: ['tx_id'],
-        });
+      const existing = await em.getRepository('onchain_transactions').findOne({
+        where: {
+          chain: resolved.chain,
+          tx_hash: resolved.txHash,
+          log_index: resolved.logIndex ?? 0,
+        },
+        select: ['tx_id'],
+      });
 
       if (existing) {
         throw new ConflictException(

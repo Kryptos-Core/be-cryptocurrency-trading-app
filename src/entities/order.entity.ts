@@ -84,11 +84,19 @@ export class Order {
   @UpdateDateColumn()
   updated_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.orders, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.orders,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @ManyToOne(() => MarketPair, (pair) => pair.orders, { onDelete: 'RESTRICT' })
+  @ManyToOne(
+    () => MarketPair,
+    (pair) => pair.orders,
+    { onDelete: 'RESTRICT' },
+  )
   @JoinColumn({ name: 'pair_id' })
   pair!: MarketPair;
 

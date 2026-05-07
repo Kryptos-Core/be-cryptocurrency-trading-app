@@ -15,10 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { RedisService } from '@/common/services';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import {
-  TREASURY_CONFIRM_JOB,
-  TREASURY_QUEUE,
-} from '@/modules/treasury/constants';
+import { TREASURY_CONFIRM_JOB, TREASURY_QUEUE } from '@/modules/treasury/constants';
 import {
   TREASURY_ONCHAIN_READ_REPOSITORY,
   TREASURY_OPERATION_REPOSITORY,

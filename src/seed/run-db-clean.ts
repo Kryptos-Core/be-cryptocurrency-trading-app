@@ -9,7 +9,10 @@
 
 import { DataSource } from 'typeorm';
 import { loadEnvFilesForCli } from '@/config/load-env-files';
-import { typeormEntityGlobPaths, typeormMigrationFilePaths } from '@/config/typeorm-entity-glob-paths';
+import {
+  typeormEntityGlobPaths,
+  typeormMigrationFilePaths,
+} from '@/config/typeorm-entity-glob-paths';
 
 loadEnvFilesForCli();
 

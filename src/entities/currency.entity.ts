@@ -27,10 +27,16 @@ export class Currency {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
-  @OneToMany(() => MarketPair, (pair) => pair.base_currency)
+  @OneToMany(
+    () => MarketPair,
+    (pair) => pair.base_currency,
+  )
   base_pairs!: MarketPair[];
 
-  @OneToMany(() => MarketPair, (pair) => pair.quote_currency)
+  @OneToMany(
+    () => MarketPair,
+    (pair) => pair.quote_currency,
+  )
   quote_pairs!: MarketPair[];
 
   @OneToMany('Wallet', 'currency')
@@ -39,7 +45,10 @@ export class Currency {
   @OneToMany('WalletLedger', 'currency')
   wallet_ledgers!: unknown[];
 
-  @OneToMany(() => CurrencyNetwork, (network) => network.currency)
+  @OneToMany(
+    () => CurrencyNetwork,
+    (network) => network.currency,
+  )
   networks!: CurrencyNetwork[];
 
   @OneToMany('Deposit', 'currency')

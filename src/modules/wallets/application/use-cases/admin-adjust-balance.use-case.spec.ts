@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
-import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { WalletReferenceType } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import {
   ADMIN_ADJUSTMENT_REPOSITORY,
   CURRENCY_LOOKUP,

@@ -60,8 +60,8 @@ import { TreasuryController } from './treasury.controller';
 import { TreasuryProcessor } from './treasury.processor';
 import { TreasuryMainWalletService } from './treasury-main-wallet.service';
 import { TreasuryOperationsService } from './treasury-operations.service';
-import { TreasuryReconciliationScheduler } from './treasury-reconciliation.scheduler';
 import { treasuryDeferBackoff } from './treasury-queue-backoff';
+import { TreasuryReconciliationScheduler } from './treasury-reconciliation.scheduler';
 
 @Module({
   imports: [

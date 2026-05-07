@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
-import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
-import type { MarketPairReadModelSyncPayload } from '@/common/integration-events/market-pair-read-model-sync.integration-event';
 import {
   isCanonicalIntegrationEventEnvelope,
   unwrapCanonicalIntegrationEventPayload,
 } from '@/common/integration-events/canonical-integration-event-envelope';
+import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
+import type { MarketPairReadModelSyncPayload } from '@/common/integration-events/market-pair-read-model-sync.integration-event';
 import { MarketOhlcvReadModelSyncApplierService } from '@/common/read-model/market-ohlcv-read-model-sync-applier.service';
 import { MarketPairReadModelSyncApplierService } from '@/common/read-model/market-pair-read-model-sync-applier.service';
 import { MarketTickerReadModelSyncApplierService } from '@/common/read-model/market-ticker-read-model-sync-applier.service';
@@ -123,8 +123,8 @@ export class OutboxIntegrationSyncService {
   }
 
   private getPayload<TPayload extends object>(row: IntegrationOutbox): TPayload {
-    const payload = unwrapCanonicalIntegrationEventPayload<TPayload>(row.payload) ??
-      (row.payload as TPayload);
+    const payload =
+      unwrapCanonicalIntegrationEventPayload<TPayload>(row.payload) ?? (row.payload as TPayload);
 
     if (isCanonicalIntegrationEventEnvelope(row.payload)) {
       if (row.payload.eventType !== row.event_type) {

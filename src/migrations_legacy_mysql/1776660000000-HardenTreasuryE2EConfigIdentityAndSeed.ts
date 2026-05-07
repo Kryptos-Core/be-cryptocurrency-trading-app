@@ -4,8 +4,12 @@ export class HardenTreasuryE2EConfigIdentityAndSeed1776660000000 implements Migr
   name = 'HardenTreasuryE2EConfigIdentityAndSeed1776660000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE treasury_e2e_configs ADD COLUMN trader_user_id char(36) NULL`);
-    await queryRunner.query(`ALTER TABLE treasury_e2e_configs ADD COLUMN risk_user_id char(36) NULL`);
+    await queryRunner.query(
+      `ALTER TABLE treasury_e2e_configs ADD COLUMN trader_user_id char(36) NULL`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE treasury_e2e_configs ADD COLUMN risk_user_id char(36) NULL`,
+    );
 
     const traders = await queryRunner.query(
       `SELECT user_id FROM users WHERE role = 'TRADER' AND status = 'ACTIVE' ORDER BY created_at ASC LIMIT 1`,

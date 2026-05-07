@@ -65,15 +65,28 @@ export type OutboxRequeueContext = {
   reason?: string | null;
 };
 
+export type OutboxPurgeAbandonedResult = {
+  deletedCount: number;
+  auditId: string;
+  auditOutputFile: string;
+};
+
 @Injectable()
 export class OutboxAdminService {
+  private readonly maxAttempts: number;
+
   constructor(
     @InjectRepository(IntegrationOutbox)
     private readonly outboxRepository: Repository<IntegrationOutbox>,
     private readonly configService: ConfigService,
     private readonly systemConfigService: SystemConfigService,
     private readonly outboxReplayAuditService: OutboxReplayAuditService,
-  ) {}
+  ) {
+    this.maxAttempts = Math.max(
+      1,
+      Number(this.configService.get<string>('EVENT_OUTBOX_MAX_ATTEMPTS') ?? '5'),
+    );
+  }
 
   async listDeadLetterRows(limit = 100): Promise<OutboxDeadLetterListItem[]> {
     const rows = await this.outboxRepository.find({
@@ -159,7 +172,12 @@ export class OutboxAdminService {
         rowSnapshots: [],
       });
 
-      return { requested: 0, requeued: 0, auditId: audit.auditId, auditOutputFile: audit.outputFile };
+      return {
+        requested: 0,
+        requeued: 0,
+        auditId: audit.auditId,
+        auditOutputFile: audit.outputFile,
+      };
     }
 
     const ids = rows.map((row) => row.id);
@@ -199,6 +217,70 @@ export class OutboxAdminService {
 
   async listReplayAudits(limit = 20): Promise<OutboxReplayAuditRecord[]> {
     return this.outboxReplayAuditService.list(limit);
+  }
+
+  /**
+   * Purges unpublished outbox rows that have exceeded max retry attempts and are older than
+   * the specified threshold. This handles the case where noop driver or misconfiguration
+   * left messages in an unrecoverable state without ever being dead-lettered.
+   */
+  async purgeAbandonedMessages(
+    maxAgeSeconds: number,
+    context: OutboxRequeueContext,
+  ): Promise<OutboxPurgeAbandonedResult> {
+    const cutoff = new Date(Date.now() - maxAgeSeconds * 1000);
+
+    const rows = await this.outboxRepository.find({
+      where: {
+        published_at: IsNull(),
+      },
+      order: { occurred_at: 'ASC' },
+    });
+
+    const toDelete = rows.filter(
+      (row) => row.occurred_at <= cutoff && (row.publish_attempts ?? 0) >= this.maxAttempts,
+    );
+
+    if (toDelete.length === 0) {
+      const audit = await this.outboxReplayAuditService.record({
+        action: 'purge_abandoned',
+        actorUserId: context.actorUserId,
+        actorRole: context.actorRole,
+        reason: this.normalizeReason(context.reason),
+        targetRowId: null,
+        requestedLimit: null,
+        selectedRowCount: 0,
+        requeuedRowCount: 0,
+        rowSnapshots: [],
+      });
+      return { deletedCount: 0, auditId: audit.auditId, auditOutputFile: audit.outputFile };
+    }
+
+    const ids = toDelete.map((r) => r.id);
+    const result = await this.outboxRepository
+      .createQueryBuilder()
+      .delete()
+      .from(IntegrationOutbox)
+      .where('id IN (:...ids)', { ids })
+      .execute();
+
+    const audit = await this.outboxReplayAuditService.record({
+      action: 'purge_abandoned',
+      actorUserId: context.actorUserId,
+      actorRole: context.actorRole,
+      reason: this.normalizeReason(context.reason),
+      targetRowId: null,
+      requestedLimit: null,
+      selectedRowCount: toDelete.length,
+      requeuedRowCount: result.affected ?? 0,
+      rowSnapshots: toDelete.map((row) => this.toReplaySnapshot(row)),
+    });
+
+    return {
+      deletedCount: result.affected ?? 0,
+      auditId: audit.auditId,
+      auditOutputFile: audit.outputFile,
+    };
   }
 
   async getRelayHealth(): Promise<OutboxRelayHealthSummary> {
@@ -250,8 +332,14 @@ export class OutboxAdminService {
     const nowMs = Date.now();
     const oldestUnpublishedAt = oldestUnpublished?.occurred_at?.toISOString() ?? null;
     const oldestDeadLetterAt = oldestDeadLetter?.dead_lettered_at?.toISOString() ?? null;
-    const oldestUnpublishedAgeSeconds = this.computeAgeSeconds(oldestUnpublished?.occurred_at, nowMs);
-    const oldestDeadLetterAgeSeconds = this.computeAgeSeconds(oldestDeadLetter?.dead_lettered_at, nowMs);
+    const oldestUnpublishedAgeSeconds = this.computeAgeSeconds(
+      oldestUnpublished?.occurred_at,
+      nowMs,
+    );
+    const oldestDeadLetterAgeSeconds = this.computeAgeSeconds(
+      oldestDeadLetter?.dead_lettered_at,
+      nowMs,
+    );
 
     const deadLetterRowsExceeded = deadLetterRows > warningMaxDeadLetterRows;
     const oldestUnpublishedAgeExceeded =

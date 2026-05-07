@@ -364,12 +364,7 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
       );
     }
 
-    await this.collapseLinkedWallets(
-      queryRunner,
-      ['SOLANA_DEVNET'],
-      null,
-      'SOLANA_MAINNET',
-    );
+    await this.collapseLinkedWallets(queryRunner, ['SOLANA_DEVNET'], null, 'SOLANA_MAINNET');
 
     await this.collapseSourceChains(
       queryRunner,
@@ -380,12 +375,7 @@ export class MainnetOnlyBlockchainChains1775520000000 implements MigrationInterf
       'SOLANA_MAINNET',
     );
 
-    await this.collapseTransactionWallets(
-      queryRunner,
-      ['SOLANA_DEVNET'],
-      null,
-      'SOLANA_MAINNET',
-    );
+    await this.collapseTransactionWallets(queryRunner, ['SOLANA_DEVNET'], null, 'SOLANA_MAINNET');
 
     await this.collapseSourceChains(
       queryRunner,

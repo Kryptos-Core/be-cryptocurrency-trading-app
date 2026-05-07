@@ -12,7 +12,10 @@ import { DataSource } from 'typeorm';
 import { UserRole } from '@/common/enums';
 import { newUuid } from '@/common/utils/uuid.util';
 import { loadEnvFilesForCli } from '@/config/load-env-files';
-import { typeormEntityGlobPaths, typeormMigrationFilePaths } from '@/config/typeorm-entity-glob-paths';
+import {
+  typeormEntityGlobPaths,
+  typeormMigrationFilePaths,
+} from '@/config/typeorm-entity-glob-paths';
 import { parseAndValidateSeedUsers } from '@/seed/seed-users-json.util';
 import { resolveSeedUsersJsonPath } from '@/seed/seed-users-path.util';
 

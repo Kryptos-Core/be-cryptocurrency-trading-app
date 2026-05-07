@@ -1,7 +1,7 @@
 import { Controller, Get, Inject, Optional } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import type { HealthIndicatorResult } from '@nestjs/terminus';
+import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { Public } from '@/common/decorators';
@@ -21,7 +21,9 @@ export class HealthController {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     @Optional() @Inject(MARKET_TS_DB) private readonly marketTsDb: DataSource | null = null,
-    @Optional() @Inject(ANALYTICS_DB) private readonly analyticsDb: Record<string, unknown> | null = null,
+    @Optional()
+    @Inject(ANALYTICS_DB)
+    private readonly analyticsDb: Record<string, unknown> | null = null,
     private readonly outboxAdminService: OutboxAdminService,
     @Optional()
     private readonly marketReadModelReconciliationService?: MarketReadModelReconciliationService,
@@ -136,4 +138,3 @@ export class HealthController {
     return this.health.check(checks);
   }
 }
-

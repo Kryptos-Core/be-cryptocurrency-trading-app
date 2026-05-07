@@ -1,7 +1,7 @@
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { MetricsService } from '@/telemetry/metrics.service';
+import { Test } from '@nestjs/testing';
 import { RedisService } from '@/common/services/redis.service';
+import { MetricsService } from '@/telemetry/metrics.service';
 import { OutboxAdminService } from './outbox-admin.service';
 import { OutboxRelayAlertingCollectorService } from './outbox-relay-alerting-collector.service';
 

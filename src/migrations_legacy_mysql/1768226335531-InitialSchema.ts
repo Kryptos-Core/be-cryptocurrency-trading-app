@@ -544,4 +544,3 @@ export class InitialSchema1768226335531 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE \`user_sessions\``);
   }
 }
-

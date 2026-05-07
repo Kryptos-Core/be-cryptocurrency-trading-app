@@ -275,13 +275,13 @@ export class ManagedWalletsService {
 
   /**
    * Public deposit methods — operational wallets (ví vận hành) only.
-   * 
+   *
    * Returns deposit addresses that have been set by operators as defaults:
    * - Only operational transaction wallets with purpose DEPOSIT|BOTH
    * - Only TRON mainnet, TRON Nile, and TRON Shasta supported
    * - Non-TRON chains NOT returned (no master wallet fallback)
    * - Methods with empty addresses are filtered out
-   * 
+   *
    * Recommended chain indicator shows which method to highlight in UI.
    */
   async getDepositMethods(): Promise<{
@@ -407,7 +407,7 @@ export class ManagedWalletsService {
   /**
    * Operational wallet (ví vận hành) set by operators as default deposit address only.
    * Only transaction wallets with purpose DEPOSIT|BOTH are returned.
-   * 
+   *
    * Tron mainnet: default user-deposit transaction wallet only.
    * Tron testnets: default user-deposit transaction wallet only.
    * Other chains: NOT supported — no fallback to treasury main wallets.

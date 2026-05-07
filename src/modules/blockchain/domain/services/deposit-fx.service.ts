@@ -114,7 +114,9 @@ export class DepositFxService {
     try {
       rate = await this.fetchFromBinance(pair);
     } catch (err: unknown) {
-      this.logger.warn(`[DepositFx] Binance API failed for ${pair}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `[DepositFx] Binance API failed for ${pair}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     // Fallback: config cứng

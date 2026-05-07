@@ -321,7 +321,9 @@ export class DepositsService {
     const { payOS } = await this.getPayOSInstance();
 
     try {
-      const verifiedData = (await payOS.webhooks.verify(webhookData as Parameters<typeof payOS.webhooks.verify>[0])) as {
+      const verifiedData = (await payOS.webhooks.verify(
+        webhookData as Parameters<typeof payOS.webhooks.verify>[0],
+      )) as {
         orderCode?: string | number;
         code?: string;
         desc?: string;
@@ -332,7 +334,11 @@ export class DepositsService {
         `Received valid webhook data for Order ${verifiedData.orderCode} with status ${verifiedData.code}`,
       );
 
-      if (verifiedData.code === '00' || verifiedData.desc === 'success' || verifiedData.success === true) {
+      if (
+        verifiedData.code === '00' ||
+        verifiedData.desc === 'success' ||
+        verifiedData.success === true
+      ) {
         const deposit = await this.fiatDepositRepo.findByOrderCode(Number(verifiedData.orderCode));
         if (!deposit || deposit.status === 'PAID') {
           return { message: 'Order already paid or not found' };

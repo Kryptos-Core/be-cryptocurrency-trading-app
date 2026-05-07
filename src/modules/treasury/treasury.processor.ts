@@ -2,7 +2,12 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { BusinessException, TreasuryWalletBusyException } from '@/common/exceptions';
-import { TREASURY_CONFIRM_JOB, TREASURY_FUND_JOB, TREASURY_QUEUE, TREASURY_SWEEP_JOB } from './constants';
+import {
+  TREASURY_CONFIRM_JOB,
+  TREASURY_FUND_JOB,
+  TREASURY_QUEUE,
+  TREASURY_SWEEP_JOB,
+} from './constants';
 import { TreasuryOperationsService } from './treasury-operations.service';
 
 interface TreasuryJobData {

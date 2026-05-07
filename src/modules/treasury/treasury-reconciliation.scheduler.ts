@@ -57,9 +57,7 @@ export class TreasuryReconciliationScheduler {
         }
       }
     } catch (error) {
-      this.logger.error(
-        `Treasury reconciliation failed: ${(error as Error).message}`,
-      );
+      this.logger.error(`Treasury reconciliation failed: ${(error as Error).message}`);
     }
   }
 }

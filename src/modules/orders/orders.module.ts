@@ -1,7 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Order } from '@/entities/order.entity';
 import { OutboxModule } from '@/common/outbox/outbox.module';
+import { Order } from '@/entities/order.entity';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { MatchingModule } from '@/modules/matching/matching.module';
 import { FindAllOrdersAdminQuery } from '@/modules/orders/application/queries/find-all-orders-admin.query';
@@ -22,8 +22,8 @@ import { OrderValidationStrategy } from '@/modules/orders/strategies';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { TelemetryModule } from '@/telemetry';
 import { OrdersController } from './orders.controller';
-import { OrdersMatchingShadowMetricsCollectorService } from './orders-matching-shadow-metrics-collector.service';
 import { OrdersService } from './orders.service';
+import { OrdersMatchingShadowMetricsCollectorService } from './orders-matching-shadow-metrics-collector.service';
 
 @Module({
   imports: [
@@ -66,4 +66,3 @@ import { OrdersService } from './orders.service';
   exports: [OrdersService, ORDER_REPOSITORY],
 })
 export class OrdersModule {}
-

@@ -46,7 +46,9 @@ export class CreateTreasuryE2EConfigs1776650000000 implements MigrationInterface
       `CREATE INDEX idx_treasury_e2e_env_status ON treasury_e2e_configs(environment, status)`,
     );
     await queryRunner.query(`CREATE INDEX idx_treasury_e2e_chain ON treasury_e2e_configs(chain)`);
-    await queryRunner.query(`CREATE INDEX idx_treasury_e2e_updated ON treasury_e2e_configs(updated_at)`);
+    await queryRunner.query(
+      `CREATE INDEX idx_treasury_e2e_updated ON treasury_e2e_configs(updated_at)`,
+    );
     await queryRunner.query(
       `CREATE UNIQUE INDEX uq_treasury_e2e_active_env ON treasury_e2e_configs(environment) WHERE status = 'ACTIVE'`,
     );

@@ -92,7 +92,10 @@ export class GoRolloutReadinessService {
     const checkedAt = new Date().toISOString();
     const windowHours = this.getNumber('GO_ROLLOUT_WINDOW_HOURS', 24);
 
-    const minMatchRatePercent = this.getNumber('MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT', 99.9);
+    const minMatchRatePercent = this.getNumber(
+      'MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT',
+      99.9,
+    );
     const maxUnmatchedRuns = this.getNumber('MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS', 0);
     const maxPublicWsDriftPairs = this.getNumber('GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS', 0);
     const minPublicWsComparedPairs = this.getNumber('GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS', 1);
@@ -101,12 +104,13 @@ export class GoRolloutReadinessService {
     const canaryPairs = this.parseCsv(this.configService.get<string>('MATCHING_GO_CANARY_PAIRS'));
     const monitorPairs = this.resolveMonitorPairs(canaryPairs);
 
-    const [marketReadModelHealth, publicWsParity, pairResults, latestRollbackDrill] = await Promise.all([
-      this.marketReadModelReconciliationService.getProjectionHealth(windowHours),
-      Promise.resolve(this.publicWsPayloadParityService.getReport()),
-      this.collectPairResults(monitorPairs, windowHours, minMatchRatePercent, maxUnmatchedRuns),
-      this.getLatestRollbackDrill(),
-    ]);
+    const [marketReadModelHealth, publicWsParity, pairResults, latestRollbackDrill] =
+      await Promise.all([
+        this.marketReadModelReconciliationService.getProjectionHealth(windowHours),
+        Promise.resolve(this.publicWsPayloadParityService.getReport()),
+        this.collectPairResults(monitorPairs, windowHours, minMatchRatePercent, maxUnmatchedRuns),
+        this.getLatestRollbackDrill(),
+      ]);
 
     const publicWsContractValid =
       publicWsParity.ticker.contractValid && publicWsParity.ohlc.contractValid;
@@ -203,7 +207,9 @@ export class GoRolloutReadinessService {
 
     const snapshots: GoRolloutReadinessSnapshot[] = [];
 
-    for (const file of files.filter((value) => value.endsWith('.json') && value !== 'rollback-drills.json')) {
+    for (const file of files.filter(
+      (value) => value.endsWith('.json') && value !== 'rollback-drills.json',
+    )) {
       const fullPath = path.join(outputDir, file);
       try {
         const raw = await fs.readFile(fullPath, 'utf8');
@@ -227,8 +233,7 @@ export class GoRolloutReadinessService {
             report,
           });
         }
-      } catch {
-      }
+      } catch {}
     }
 
     return snapshots
@@ -443,4 +448,3 @@ export class GoRolloutReadinessService {
     return value;
   }
 }
-

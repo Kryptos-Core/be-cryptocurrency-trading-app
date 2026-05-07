@@ -26,10 +26,7 @@ import {
   DeactivateTreasuryE2EConfigUseCase,
   UpdateTreasuryE2EConfigUseCase,
 } from './application/use-cases';
-import type {
-  CreateTreasuryE2EConfigDto,
-  UpdateTreasuryE2EConfigDto,
-} from './dto';
+import type { CreateTreasuryE2EConfigDto, UpdateTreasuryE2EConfigDto } from './dto';
 import { TreasuryE2EConfigService } from './treasury-e2e-config.service';
 
 @Controller('treasury/e2e-configs')

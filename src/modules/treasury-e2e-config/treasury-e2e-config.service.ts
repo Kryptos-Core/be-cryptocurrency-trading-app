@@ -1,16 +1,19 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { newUuid } from '@/common/utils/uuid.util';
+import { uuidv7 } from 'uuidv7';
 import { Permission, UserRole } from '@/common/enums';
-import { LINKED_WALLET_REPOSITORY, type LinkedWalletRepositoryPort } from '@/modules/blockchain/domain/ports';
-import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
-import type { TokenIssuerPort } from '@/modules/auth/application/ports/token-issuer.port';
-import { buildAuthAccessTokenPayload } from '@/modules/auth/application/use-cases/shared/auth-response.util';
-import { UsersService } from '@/modules/users/users.service';
 import { WalletEncryptionService } from '@/common/services';
+import { newUuid } from '@/common/utils/uuid.util';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { TreasuryE2EConfig } from '@/entities/treasury-e2e-config.entity';
-import { uuidv7 } from 'uuidv7';
+import type { TokenIssuerPort } from '@/modules/auth/application/ports/token-issuer.port';
+import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
+import { buildAuthAccessTokenPayload } from '@/modules/auth/application/use-cases/shared/auth-response.util';
+import {
+  LINKED_WALLET_REPOSITORY,
+  type LinkedWalletRepositoryPort,
+} from '@/modules/blockchain/domain/ports';
+import { UsersService } from '@/modules/users/users.service';
 import {
   TREASURY_E2E_CONFIG_REPOSITORY,
   type TreasuryE2EConfigRepositoryPort,
@@ -75,7 +78,11 @@ export class TreasuryE2EConfigService {
       params.traderSearch,
       20,
     );
-    const riskUsers = await this.usersService.findTestUsersByRole(UserRole.RISK_OFFICER, undefined, 20);
+    const riskUsers = await this.usersService.findTestUsersByRole(
+      UserRole.RISK_OFFICER,
+      undefined,
+      20,
+    );
     const adminUsers = await this.usersService.findTestUsersByRole(UserRole.ADMIN, undefined, 20);
     const riskActors = [...riskUsers, ...adminUsers];
 
@@ -174,7 +181,12 @@ export class TreasuryE2EConfigService {
       userId: dto.risk_user_id,
     });
 
-    await this.testAuthenticatedStep(steps, 'trader_token', traderToken, `${baseUrl}/api/v1/users/me`);
+    await this.testAuthenticatedStep(
+      steps,
+      'trader_token',
+      traderToken,
+      `${baseUrl}/api/v1/users/me`,
+    );
     await this.testAuthenticatedStep(
       steps,
       'risk_token',
@@ -221,7 +233,9 @@ export class TreasuryE2EConfigService {
       const wallets = await this.linkedWalletRepo.findVerifiedByChain(dto.chain);
       linkedWalletMatched = wallets.some((wallet) => wallet.link_id === dto.linked_wallet_id);
       if (!linkedWalletMatched) {
-        throw new BadRequestException('linked_wallet_id is not a verified wallet for the selected chain');
+        throw new BadRequestException(
+          'linked_wallet_id is not a verified wallet for the selected chain',
+        );
       }
     }
 
@@ -288,29 +302,34 @@ export class TreasuryE2EConfigService {
     if (!existing) throw new NotFoundException('TreasuryE2EConfig', configId);
 
     const existingSecrets = this.decryptSecrets(existing.encrypted_secrets);
-    const traderToken = dto.trader_bearer_token !== undefined
-      ? dto.trader_bearer_token.trim() || null
-      : existingSecrets.traderBearerToken ?? null;
-    const riskToken = dto.risk_bearer_token !== undefined
-      ? dto.risk_bearer_token.trim() || null
-      : existingSecrets.riskBearerToken ?? null;
+    const traderToken =
+      dto.trader_bearer_token !== undefined
+        ? dto.trader_bearer_token.trim() || null
+        : (existingSecrets.traderBearerToken ?? null);
+    const riskToken =
+      dto.risk_bearer_token !== undefined
+        ? dto.risk_bearer_token.trim() || null
+        : (existingSecrets.riskBearerToken ?? null);
 
     const merged = {
       environment: dto.environment ?? existing.environment,
       display_name: dto.display_name ?? existing.display_name,
       api_base_url: (dto.api_base_url ?? existing.api_base_url).replace(/\/$/, ''),
       chain: dto.chain ?? existing.chain,
-      linked_wallet_id: dto.linked_wallet_id !== undefined
-        ? dto.linked_wallet_id?.trim() || null
-        : existing.linked_wallet_id,
+      linked_wallet_id:
+        dto.linked_wallet_id !== undefined
+          ? dto.linked_wallet_id?.trim() || null
+          : existing.linked_wallet_id,
       withdraw_amount_auto: dto.withdraw_amount_auto ?? existing.withdraw_amount_auto,
       withdraw_amount_manual: dto.withdraw_amount_manual ?? existing.withdraw_amount_manual,
-      deposit_tx_hash: dto.deposit_tx_hash !== undefined
-        ? dto.deposit_tx_hash?.trim() || null
-        : existing.deposit_tx_hash,
-      deposit_amount: dto.deposit_amount !== undefined
-        ? dto.deposit_amount?.trim() || null
-        : existing.deposit_amount,
+      deposit_tx_hash:
+        dto.deposit_tx_hash !== undefined
+          ? dto.deposit_tx_hash?.trim() || null
+          : existing.deposit_tx_hash,
+      deposit_amount:
+        dto.deposit_amount !== undefined
+          ? dto.deposit_amount?.trim() || null
+          : existing.deposit_amount,
       allow_skip: dto.allow_skip ?? existing.allow_skip,
       health_fail_on_critical: dto.health_fail_on_critical ?? existing.health_fail_on_critical,
       stale_manual_minutes: dto.stale_manual_minutes ?? existing.stale_manual_minutes,
@@ -318,8 +337,12 @@ export class TreasuryE2EConfigService {
       failed_withdrawals_24h: dto.failed_withdrawals_24h ?? existing.failed_withdrawals_24h,
       reconcile_pair_limit: dto.reconcile_pair_limit ?? existing.reconcile_pair_limit,
       reconciliation_threshold: dto.reconciliation_threshold ?? existing.reconciliation_threshold,
-      trader_user_id: dto.trader_user_id !== undefined ? dto.trader_user_id?.trim() || null : existing.trader_user_id,
-      risk_user_id: dto.risk_user_id !== undefined ? dto.risk_user_id?.trim() || null : existing.risk_user_id,
+      trader_user_id:
+        dto.trader_user_id !== undefined
+          ? dto.trader_user_id?.trim() || null
+          : existing.trader_user_id,
+      risk_user_id:
+        dto.risk_user_id !== undefined ? dto.risk_user_id?.trim() || null : existing.risk_user_id,
     };
 
     await this.validateConfigDraft({
@@ -382,7 +405,9 @@ export class TreasuryE2EConfigService {
     return updated;
   }
 
-  async getRunnerConfigForEnvironment(environment: string): Promise<TreasuryE2ERunnerConfig | null> {
+  async getRunnerConfigForEnvironment(
+    environment: string,
+  ): Promise<TreasuryE2ERunnerConfig | null> {
     const active = await this.repo.findActiveByEnvironment(environment);
     if (!active) return null;
     const secrets = this.decryptSecrets(active.encrypted_secrets);
@@ -423,7 +448,9 @@ export class TreasuryE2EConfigService {
       throw new BadRequestException('deposit_tx_hash and deposit_amount must be provided together');
     }
     if (Number(dto.withdraw_amount_manual) < Number(dto.withdraw_amount_auto)) {
-      throw new BadRequestException('withdraw_amount_manual must be greater than or equal to withdraw_amount_auto');
+      throw new BadRequestException(
+        'withdraw_amount_manual must be greater than or equal to withdraw_amount_auto',
+      );
     }
     if (!dto.allow_skip) {
       if (!dto.linked_wallet_id?.trim()) {
@@ -466,7 +493,9 @@ export class TreasuryE2EConfigService {
       steps.push({
         step,
         ok: res.ok,
-        detail: res.ok ? 'Authenticated request succeeded' : `Authenticated request failed: HTTP ${res.status}`,
+        detail: res.ok
+          ? 'Authenticated request succeeded'
+          : `Authenticated request failed: HTTP ${res.status}`,
       });
     } catch (error) {
       steps.push({

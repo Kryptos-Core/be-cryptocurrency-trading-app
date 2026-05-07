@@ -45,7 +45,10 @@ export class WebSocketExceptionFilter extends BaseWsExceptionFilter {
     if (typeof exception === 'object' && exception !== null) {
       const maybeMessage = 'message' in exception ? exception.message : undefined;
       return {
-        message: typeof maybeMessage === 'string' && maybeMessage.length > 0 ? maybeMessage : 'An unknown error occurred',
+        message:
+          typeof maybeMessage === 'string' && maybeMessage.length > 0
+            ? maybeMessage
+            : 'An unknown error occurred',
         details: exception as Record<string, unknown>,
       };
     }
@@ -54,6 +57,11 @@ export class WebSocketExceptionFilter extends BaseWsExceptionFilter {
   }
 
   private hasGetError(exception: unknown): exception is { getError: () => unknown } {
-    return typeof exception === 'object' && exception !== null && 'getError' in exception && typeof (exception as { getError?: unknown }).getError === 'function';
+    return (
+      typeof exception === 'object' &&
+      exception !== null &&
+      'getError' in exception &&
+      typeof (exception as { getError?: unknown }).getError === 'function'
+    );
   }
 }

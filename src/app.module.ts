@@ -1,11 +1,11 @@
 import { BullModule, type BullRootModuleOptions } from '@nestjs/bull';
-import type { NextFunction, Request, Response } from 'express';
 import { Injectable, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import type { NextFunction, Request, Response } from 'express';
 import { ApplicationBusModule } from './common/application-bus/application-bus.module';
 import { BullBoardModule } from './common/bull-board/bull-board.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
@@ -145,4 +145,3 @@ export class AppModule implements NestModule {
     consumer.apply(BullBoardAuthMiddleware).forRoutes('/admin/queues');
   }
 }
-

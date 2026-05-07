@@ -121,8 +121,6 @@ describe('OnchainDepositService', () => {
     cacheService.exists.mockResolvedValue(false);
     onchainTxRepo.findByChainAndTxHash.mockResolvedValue(null);
     provider.resolveDepositTransfers.mockResolvedValue([ethResolvedPending]);
-    walletLinkingService.findVerifiedWallet.mockResolvedValue({ link_id: 'link-1' });
-
     const result = await service.submitDeposit('user-1', {
       chain: BlockchainNetwork.ETH_MAINNET,
       txHash: '0xtx',
@@ -136,7 +134,7 @@ describe('OnchainDepositService', () => {
       expect.anything(),
       expect.objectContaining({
         user_id: 'user-1',
-        linked_wallet_id: 'link-1',
+        linked_wallet_id: null,
         tx_hash: '0xtx',
         status: OnchainTxStatus.CONFIRMING,
         confirmations: 2,
@@ -161,7 +159,6 @@ describe('OnchainDepositService', () => {
     cacheService.exists.mockResolvedValue(false);
     onchainTxRepo.findByChainAndTxHash.mockResolvedValue(null);
     provider.resolveDepositTransfers.mockResolvedValue([ethResolvedConfirmed]);
-    walletLinkingService.findVerifiedWallet.mockResolvedValue({ link_id: 'link-2' });
     depositFxService.convertToPlatformCash.mockResolvedValue({
       creditCurrencyId: 'usdt',
       creditAmount: '250',
@@ -201,11 +198,32 @@ describe('OnchainDepositService', () => {
     expect(result.settled).toBe(true);
   });
 
+  it('submitDeposit accepts deposits even when sender wallet is not linked', async () => {
+    cacheService.exists.mockResolvedValue(false);
+    onchainTxRepo.findByChainAndTxHash.mockResolvedValue(null);
+    provider.resolveDepositTransfers.mockResolvedValue([ethResolvedPending]);
+
+    const result = await service.submitDeposit('user-3', {
+      chain: BlockchainNetwork.ETH_MAINNET,
+      txHash: '0xtx',
+      amount: '1.25',
+    } as any);
+
+    expect(onchainTxRepo.createWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        user_id: 'user-3',
+        linked_wallet_id: null,
+        from_address: '0xsender',
+        to_address: '0xdeposit',
+      }),
+    );
+    expect(result.status).toBe(OnchainTxStatus.CONFIRMING);
+  });
+
   it('submitDeposit rejects duplicate processing locks and existing txs', async () => {
     const legDup = { ...ethResolvedPending, txHash: '0xdup' };
     provider.resolveDepositTransfers.mockResolvedValue([legDup]);
-    walletLinkingService.findVerifiedWallet.mockResolvedValue({ link_id: 'link-1' });
-
     cacheService.exists.mockResolvedValue(true);
     await expect(
       service.submitDeposit('user-1', {

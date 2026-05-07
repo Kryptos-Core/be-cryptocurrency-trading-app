@@ -39,9 +39,11 @@ describe('MarketReadModelReconciliationService', () => {
           orderBy: jest.fn().mockReturnThis(),
           getMany: jest.fn().mockResolvedValue([]),
         })),
-        find: jest.fn().mockResolvedValue([
-          { pair_id: 'pair-1', ticker_timestamp: new Date('2026-04-25T10:09:30.000Z') },
-        ]),
+        find: jest
+          .fn()
+          .mockResolvedValue([
+            { pair_id: 'pair-1', ticker_timestamp: new Date('2026-04-25T10:09:30.000Z') },
+          ]),
       })),
     } as never);
 
@@ -208,11 +210,13 @@ describe('MarketReadModelReconciliationService', () => {
           orderBy: jest.fn().mockReturnThis(),
           getMany,
         })),
-        find: jest.fn().mockResolvedValue(
-          entity?.name === 'ReadMarketTicker'
-            ? [{ pair_id: 'pair-1', ticker_timestamp: new Date('2026-04-25T10:10:20.000Z') }]
-            : [],
-        ),
+        find: jest
+          .fn()
+          .mockResolvedValue(
+            entity?.name === 'ReadMarketTicker'
+              ? [{ pair_id: 'pair-1', ticker_timestamp: new Date('2026-04-25T10:10:20.000Z') }]
+              : [],
+          ),
       })),
     } as never);
 

@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
-import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
+import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import type { TransactionContext } from '@/common/types/transaction-context';
 import {
   CURRENCY_LOOKUP,

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { newUuid } from '@/common/utils/uuid.util';
 
-export type OutboxReplayAuditAction = 'requeue_one' | 'requeue_bulk';
+export type OutboxReplayAuditAction = 'requeue_one' | 'requeue_bulk' | 'purge_abandoned';
 
 export type OutboxReplayAuditRowSnapshot = {
   id: string;
@@ -96,14 +96,14 @@ export class OutboxReplayAuditService {
           const recordedAt = String((item as { recordedAt?: unknown }).recordedAt ?? '').trim();
           const action = String((item as { action?: unknown }).action ?? '').trim();
 
-          if (!auditId || !recordedAt || (action !== 'requeue_one' && action !== 'requeue_bulk')) {
+          const VALID_ACTIONS = ['requeue_one', 'requeue_bulk', 'purge_abandoned'];
+          if (!auditId || !recordedAt || !VALID_ACTIONS.includes(action)) {
             continue;
           }
 
           records.push(item as OutboxReplayAuditRecord);
         }
-      } catch {
-      }
+      } catch {}
     }
 
     return records

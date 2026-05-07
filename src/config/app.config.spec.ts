@@ -94,5 +94,3 @@ describe('createAppConfig', () => {
     expect(config.featureFlags.matchingGoCanaryPairs).toEqual(['BTC_USDT', 'ETH_USDT']);
   });
 });
-
-

@@ -194,6 +194,3 @@ export class MetricsService {
     this.publicWsParityDriftPairs.set({ source }, value);
   }
 }
-
-
-

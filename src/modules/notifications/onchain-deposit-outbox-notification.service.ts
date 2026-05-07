@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
+import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { OnchainDepositOutboxPayloadV1 } from '@/common/integration-events/onchain-deposit-outbox-payload';
 import { isOnchainDepositOutboxPayloadV1 } from '@/common/integration-events/onchain-deposit-outbox-payload';
-import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { NotificationRepository } from './repositories/notification.repository';
 

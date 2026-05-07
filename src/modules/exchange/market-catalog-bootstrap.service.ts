@@ -46,12 +46,15 @@ export class MarketCatalogBootstrapService implements OnApplicationBootstrap {
     }
   }
 
-
   private shouldSkipBootstrap(): boolean {
-    const nodeEnv = String(this.configService.get<string>('NODE_ENV') ?? '').trim().toLowerCase();
+    const nodeEnv = String(this.configService.get<string>('NODE_ENV') ?? '')
+      .trim()
+      .toLowerCase();
     if (nodeEnv === 'test') return true;
 
-    const rawFlag = String(this.configService.get<string>('DISABLE_STARTUP_CATALOG_BOOTSTRAP') ?? '')
+    const rawFlag = String(
+      this.configService.get<string>('DISABLE_STARTUP_CATALOG_BOOTSTRAP') ?? '',
+    )
       .trim()
       .toLowerCase();
     return ['1', 'true', 'yes', 'on'].includes(rawFlag);

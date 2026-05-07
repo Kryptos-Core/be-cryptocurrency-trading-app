@@ -29,7 +29,9 @@ export class GetTransactionWalletQuery {
 
   async getWalletDetail(
     walletId: string,
-  ): Promise<TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }> {
+  ): Promise<
+    TransactionWalletRecord & { balance: string; symbol: string; usdtTrc20Balance?: string }
+  > {
     return this.service.getWalletDetail(walletId);
   }
 

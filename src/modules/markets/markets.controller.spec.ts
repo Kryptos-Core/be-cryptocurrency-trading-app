@@ -1,6 +1,15 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { GetMarketDepthQuery, GetMarketOHLCVQuery, GetMarketPairQuery, GetMarketTickerQuery } from './application/queries';
-import { CreateMarketPairUseCase, DeleteMarketPairUseCase, UpdateMarketPairUseCase } from './application/use-cases';
+import {
+  GetMarketDepthQuery,
+  GetMarketOHLCVQuery,
+  GetMarketPairQuery,
+  GetMarketTickerQuery,
+} from './application/queries';
+import {
+  CreateMarketPairUseCase,
+  DeleteMarketPairUseCase,
+  UpdateMarketPairUseCase,
+} from './application/use-cases';
 import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
 import { MarketsController } from './markets.controller';
 
@@ -12,9 +21,34 @@ describe('MarketsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MarketsController],
       providers: [
-        { provide: GetMarketPairQuery, useValue: { findAll: jest.fn(), findOne: jest.fn(), findBySymbol: jest.fn(), findActive: jest.fn() } },
-        { provide: GetMarketTickerQuery, useValue: { getAllTickers: jest.fn(), getTicker: jest.fn(), getTickerBySymbol: jest.fn() } },
-        { provide: GetMarketDepthQuery, useValue: { getOrderBook: jest.fn(), getOrderBookBySymbol: jest.fn(), getRecentTrades: jest.fn(), getRecentTradesBySymbol: jest.fn(), getDepthSnapshot: jest.fn(), getDepthSnapshotBySymbol: jest.fn() } },
+        {
+          provide: GetMarketPairQuery,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            findBySymbol: jest.fn(),
+            findActive: jest.fn(),
+          },
+        },
+        {
+          provide: GetMarketTickerQuery,
+          useValue: {
+            getAllTickers: jest.fn(),
+            getTicker: jest.fn(),
+            getTickerBySymbol: jest.fn(),
+          },
+        },
+        {
+          provide: GetMarketDepthQuery,
+          useValue: {
+            getOrderBook: jest.fn(),
+            getOrderBookBySymbol: jest.fn(),
+            getRecentTrades: jest.fn(),
+            getRecentTradesBySymbol: jest.fn(),
+            getDepthSnapshot: jest.fn(),
+            getDepthSnapshotBySymbol: jest.fn(),
+          },
+        },
         { provide: GetMarketOHLCVQuery, useValue: { getOHLCV: jest.fn() } },
         { provide: CreateMarketPairUseCase, useValue: { execute: jest.fn() } },
         { provide: UpdateMarketPairUseCase, useValue: { execute: jest.fn() } },
@@ -39,13 +73,38 @@ describe('MarketsController', () => {
       checkedAt: '2026-04-25T00:00:00.000Z',
       windowHours: 24,
       trades: { coreCount: 1, readModelCount: 1, missingTrades: [], drift: 0, windowHours: 24 },
-      tickers: { corePairs: 1, readModelPairs: 1, missingPairs: [], stalePairs: [], drift: 0, windowHours: 24 },
+      tickers: {
+        corePairs: 1,
+        readModelPairs: 1,
+        missingPairs: [],
+        stalePairs: [],
+        drift: 0,
+        windowHours: 24,
+      },
       ohlcv: [
-        { intervalSec: 60, windowHours: 24, coreCandles: 1, readModelCandles: 1, missingCandles: [], staleCandles: [], drift: 0 },
+        {
+          intervalSec: 60,
+          windowHours: 24,
+          coreCandles: 1,
+          readModelCandles: 1,
+          missingCandles: [],
+          staleCandles: [],
+          drift: 0,
+        },
       ],
       lag: {
-        trades: { projection: 'trades', lagSeconds: 0, latestCoreAt: null, latestProjectionAt: null },
-        tickers: { projection: 'tickers', lagSeconds: 0, latestCoreAt: null, latestProjectionAt: null },
+        trades: {
+          projection: 'trades',
+          lagSeconds: 0,
+          latestCoreAt: null,
+          latestProjectionAt: null,
+        },
+        tickers: {
+          projection: 'tickers',
+          lagSeconds: 0,
+          latestCoreAt: null,
+          latestProjectionAt: null,
+        },
         ohlcv: { projection: 'ohlcv', lagSeconds: 0, latestCoreAt: null, latestProjectionAt: null },
       },
     };
@@ -62,13 +121,41 @@ describe('MarketsController', () => {
       status: 'degraded',
       checkedAt: '2026-04-25T00:05:00.000Z',
       windowHours: 12,
-      trades: { coreCount: 10, readModelCount: 9, missingTrades: ['t-1'], drift: 1, windowHours: 12 },
-      tickers: { corePairs: 2, readModelPairs: 2, missingPairs: [], stalePairs: ['pair-1'], drift: 0, windowHours: 12 },
+      trades: {
+        coreCount: 10,
+        readModelCount: 9,
+        missingTrades: ['t-1'],
+        drift: 1,
+        windowHours: 12,
+      },
+      tickers: {
+        corePairs: 2,
+        readModelPairs: 2,
+        missingPairs: [],
+        stalePairs: ['pair-1'],
+        drift: 0,
+        windowHours: 12,
+      },
       ohlcv: [],
       lag: {
-        trades: { projection: 'trades', lagSeconds: 30, latestCoreAt: null, latestProjectionAt: null },
-        tickers: { projection: 'tickers', lagSeconds: 25, latestCoreAt: null, latestProjectionAt: null },
-        ohlcv: { projection: 'ohlcv', lagSeconds: 60, latestCoreAt: null, latestProjectionAt: null },
+        trades: {
+          projection: 'trades',
+          lagSeconds: 30,
+          latestCoreAt: null,
+          latestProjectionAt: null,
+        },
+        tickers: {
+          projection: 'tickers',
+          lagSeconds: 25,
+          latestCoreAt: null,
+          latestProjectionAt: null,
+        },
+        ohlcv: {
+          projection: 'ohlcv',
+          lagSeconds: 60,
+          latestCoreAt: null,
+          latestProjectionAt: null,
+        },
       },
     };
     reconciliationService.collectMetrics.mockResolvedValue(report as never);
@@ -79,4 +166,3 @@ describe('MarketsController', () => {
     expect(result).toEqual(report);
   });
 });
-

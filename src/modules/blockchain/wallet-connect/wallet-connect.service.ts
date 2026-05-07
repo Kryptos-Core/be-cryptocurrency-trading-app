@@ -773,7 +773,10 @@ export class WalletConnectService implements OnModuleInit {
     // TODO: Map topic → sessionId để update status
   }
 
-  private async handleSessionRequest(topic: string, _payload: unknown): Promise<string | undefined> {
+  private async handleSessionRequest(
+    topic: string,
+    _payload: unknown,
+  ): Promise<string | undefined> {
     this.logger.debug(`[WC] session_request: topic=${topic}`);
     return undefined;
   }

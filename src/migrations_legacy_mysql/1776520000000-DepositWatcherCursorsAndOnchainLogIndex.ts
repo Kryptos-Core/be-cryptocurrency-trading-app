@@ -32,8 +32,9 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
     indexName: string,
     createIndexSql: string,
   ): Promise<void> {
-    const hasIndex = (queryRunner as QueryRunner & { hasIndex?: (table: string, index: string) => Promise<boolean> })
-      .hasIndex;
+    const hasIndex = (
+      queryRunner as QueryRunner & { hasIndex?: (table: string, index: string) => Promise<boolean> }
+    ).hasIndex;
     if (typeof hasIndex === 'function') {
       if (await hasIndex.call(queryRunner, tableName, indexName)) {
         return;
@@ -50,8 +51,9 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
     tableName: string,
     indexName: string,
   ): Promise<void> {
-    const hasIndex = (queryRunner as QueryRunner & { hasIndex?: (table: string, index: string) => Promise<boolean> })
-      .hasIndex;
+    const hasIndex = (
+      queryRunner as QueryRunner & { hasIndex?: (table: string, index: string) => Promise<boolean> }
+    ).hasIndex;
     if (typeof hasIndex === 'function') {
       if (!(await hasIndex.call(queryRunner, tableName, indexName))) {
         return;
@@ -97,7 +99,11 @@ export class DepositWatcherCursorsAndOnchainLogIndex1776520000000 implements Mig
     if (this.isPostgres(queryRunner)) {
       return;
     }
-    await this.dropIndexIfExists(queryRunner, 'onchain_transactions', 'uk_onchain_tx_chain_hash_log');
+    await this.dropIndexIfExists(
+      queryRunner,
+      'onchain_transactions',
+      'uk_onchain_tx_chain_hash_log',
+    );
     await this.addIndexIfNotExists(
       queryRunner,
       'onchain_transactions',

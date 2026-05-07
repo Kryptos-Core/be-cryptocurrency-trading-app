@@ -33,11 +33,6 @@ import {
   UnsetDefaultUserDepositUseCase,
   UpdateMainWalletLabelUseCase,
 } from './application';
-import {
-  ManualAbortTreasuryOperationDto,
-  ManualRetryTreasuryOperationDto,
-  ManualSettleTreasuryOperationDto,
-} from './dto';
 import type {
   CreateTransactionWalletDto,
   FundWalletDto,
@@ -49,6 +44,11 @@ import type {
   ReviewMainWalletDto,
   SweepWalletDto,
   UpdateMainWalletDto,
+} from './dto';
+import {
+  ManualAbortTreasuryOperationDto,
+  ManualRetryTreasuryOperationDto,
+  ManualSettleTreasuryOperationDto,
 } from './dto';
 import { OnchainChainPickerService } from './onchain-chain-picker.service';
 import type { SupportedTreasuryChain } from './treasury-main-wallet.service';
@@ -406,7 +406,8 @@ export class TreasuryController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({
-    summary: 'Mark a stuck Fund/Sweep operation as FAILED and release wallet lock (operator escape hatch)',
+    summary:
+      'Mark a stuck Fund/Sweep operation as FAILED and release wallet lock (operator escape hatch)',
   })
   async manualAbortTreasuryOperation(
     @Param('operationId') operationId: string,
@@ -433,7 +434,11 @@ export class TreasuryController {
     @Body() dto: ManualSettleTreasuryOperationDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    return this.treasuryOperationsService.manualSettleTreasuryOperation(operationId, dto, actorUserId);
+    return this.treasuryOperationsService.manualSettleTreasuryOperation(
+      operationId,
+      dto,
+      actorUserId,
+    );
   }
 
   @Get('transactions')

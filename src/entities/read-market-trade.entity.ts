@@ -1,5 +1,8 @@
 import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
-import { DECIMAL_36_18_COLUMN, DECIMAL_36_18_DEFAULT_0_COLUMN } from '@/common/constants/column-types';
+import {
+  DECIMAL_36_18_COLUMN,
+  DECIMAL_36_18_DEFAULT_0_COLUMN,
+} from '@/common/constants/column-types';
 
 @Entity('read_market_trades')
 @Index('idx_read_market_trades_pair_executed', ['pair_id', 'executed_at'])

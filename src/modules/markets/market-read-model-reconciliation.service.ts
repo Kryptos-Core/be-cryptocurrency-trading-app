@@ -281,9 +281,7 @@ export class MarketReadModelReconciliationService {
 
     const degradedOhlcv = ohlcv.some(
       (report) =>
-        report.drift !== 0 ||
-        report.missingCandles.length > 0 ||
-        report.staleCandles.length > 0,
+        report.drift !== 0 || report.missingCandles.length > 0 || report.staleCandles.length > 0,
     );
 
     const degraded =
@@ -298,7 +296,11 @@ export class MarketReadModelReconciliationService {
       lag.ohlcv.lagSeconds > 300;
 
     const pairDetails = options?.includePairDetails
-      ? await this.getProjectionPairDetails(windowHours, normalizedIntervals, options?.pairLimit ?? 20)
+      ? await this.getProjectionPairDetails(
+          windowHours,
+          normalizedIntervals,
+          options?.pairLimit ?? 20,
+        )
       : undefined;
 
     return {
@@ -331,9 +333,7 @@ export class MarketReadModelReconciliationService {
       const tickerReport = health.tickers;
       const ohlcvIssues = health.ohlcv.filter(
         (report) =>
-          report.drift !== 0 ||
-          report.missingCandles.length > 0 ||
-          report.staleCandles.length > 0,
+          report.drift !== 0 || report.missingCandles.length > 0 || report.staleCandles.length > 0,
       );
 
       if (tradeReport.drift !== 0 || tradeReport.missingTrades.length > 0) {
@@ -395,7 +395,10 @@ export class MarketReadModelReconciliationService {
     return { trades, tickers, ohlcv };
   }
 
-  private async getTradePairDetails(windowHours: number, pairLimit: number): Promise<TradePairDetail[]> {
+  private async getTradePairDetails(
+    windowHours: number,
+    pairLimit: number,
+  ): Promise<TradePairDetail[]> {
     const [coreRows, readRows] = await Promise.all([
       this.dataSource.query(
         `SELECT pair_id, COUNT(*)::int AS core_count
@@ -425,7 +428,10 @@ export class MarketReadModelReconciliationService {
       .slice(0, pairLimit);
   }
 
-  private async getTickerPairDetails(windowHours: number, pairLimit: number): Promise<TickerPairDetail[]> {
+  private async getTickerPairDetails(
+    windowHours: number,
+    pairLimit: number,
+  ): Promise<TickerPairDetail[]> {
     const coreRows = (await this.dataSource.query(
       `SELECT pair_id, MAX(created_at) AS last_trade_at
          FROM trades
@@ -628,5 +634,3 @@ export class MarketReadModelReconciliationService {
     return lagMs > 0 ? Math.floor(lagMs / 1000) : 0;
   }
 }
-
-

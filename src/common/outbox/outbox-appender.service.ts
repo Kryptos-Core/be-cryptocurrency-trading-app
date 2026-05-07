@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
-import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import {
   buildCanonicalIntegrationEventEnvelope,
   type CanonicalIntegrationEventEnvelope,
 } from '@/common/integration-events/canonical-integration-event-envelope';
+import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 
 export interface AppendIntegrationOutboxInput {
   aggregateType: string;

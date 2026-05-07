@@ -15,11 +15,17 @@ export class GetMarketDepthQuery {
     return this.marketsService.getOrderBookBySymbol(symbol, limit);
   }
 
-  async getRecentTrades(pairIdOrSymbol: string, limit?: number): Promise<MarketRecentTradeResponse[]> {
+  async getRecentTrades(
+    pairIdOrSymbol: string,
+    limit?: number,
+  ): Promise<MarketRecentTradeResponse[]> {
     return this.marketsService.getRecentTrades(pairIdOrSymbol, limit);
   }
 
-  async getRecentTradesBySymbol(symbol: string, limit?: number): Promise<MarketRecentTradeResponse[]> {
+  async getRecentTradesBySymbol(
+    symbol: string,
+    limit?: number,
+  ): Promise<MarketRecentTradeResponse[]> {
     return this.marketsService.getRecentTradesBySymbol(symbol, limit);
   }
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { TransactionContext } from '@/common/types/transaction-context';
 import { WalletReferenceType } from '@/common/enums';
 import { BadRequestException, BusinessException } from '@/common/exceptions';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import {
   EXCHANGE_SERVICE_PORT,
   type ExchangeServicePort,
@@ -30,7 +30,11 @@ export class ReconcileBalanceUseCase {
     private readonly balanceCalc: BalanceCalculationService,
   ) {}
 
-  async execute(userId: string, currencyId: string, manager?: TransactionContext): Promise<ReconcileResult> {
+  async execute(
+    userId: string,
+    currencyId: string,
+    manager?: TransactionContext,
+  ): Promise<ReconcileResult> {
     const wallet = await this.walletRepo.findByUserCurrency(userId, currencyId);
     if (!wallet) {
       throw new BadRequestException(

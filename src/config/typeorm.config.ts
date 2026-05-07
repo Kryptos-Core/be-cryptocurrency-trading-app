@@ -17,25 +17,25 @@ import { Notification } from '../entities/notification.entity';
 import { Order } from '../entities/order.entity';
 import { PaymentMethodConfig } from '../entities/payment-method-config.entity';
 import { ProcessedIntegrationEvent } from '../entities/processed-integration-event.entity';
-import { ReadMarketPair } from '../entities/read-market-pair.entity';
-import { ReadMarketTrade } from '../entities/read-market-trade.entity';
 import { ReadMarketOhlcv } from '../entities/read-market-ohlcv.entity';
+import { ReadMarketPair } from '../entities/read-market-pair.entity';
 import { ReadMarketTicker } from '../entities/read-market-ticker.entity';
+import { ReadMarketTrade } from '../entities/read-market-trade.entity';
 import { ReadOnchainDeposit } from '../entities/read-onchain-deposit.entity';
 import { SystemConfig } from '../entities/system-config.entity';
 import { Trade } from '../entities/trade.entity';
 import { TransactionWallet } from '../entities/transaction-wallet.entity';
-import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
 import { TreasuryE2EConfig } from '../entities/treasury-e2e-config.entity';
+import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '../entities/treasury-operation.entity';
 import { User } from '../entities/user.entity';
 import { UserNotification } from '../entities/user-notification.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { WalletLedger } from '../entities/wallet-ledger.entity';
 import { Withdrawal } from '../entities/withdrawal.entity';
+import { DepositMatchRequest } from '../modules/blockchain/entities/deposit-match-request.entity';
 import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
 import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
-import { DepositMatchRequest } from '../modules/blockchain/entities/deposit-match-request.entity';
 import { typeormMigrationFilePaths } from './typeorm-entity-glob-paths';
 
 const ALL_ENTITIES = [
@@ -111,4 +111,3 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     },
   };
 };
-

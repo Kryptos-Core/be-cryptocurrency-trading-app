@@ -34,13 +34,13 @@ import {
   GetMarketPairQuery,
   GetMarketTickerQuery,
 } from './application/queries';
-import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
 import {
   CreateMarketPairUseCase,
   DeleteMarketPairUseCase,
   UpdateMarketPairUseCase,
 } from './application/use-cases';
 import { CreateMarketPairDto, UpdateMarketPairDto } from './dto';
+import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
 import { resolveOhlcvLocale } from './ohlcv-locale.util';
 
 /**
@@ -605,8 +605,3 @@ export class MarketsController {
     return values.length > 0 ? values : undefined;
   }
 }
-
-
-
-
-

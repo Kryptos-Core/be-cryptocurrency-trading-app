@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import type { TransactionContext } from '@/common/types/transaction-context';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { WalletBalanceChangedOutboxPayloadV1 } from '@/common/integration-events/wallet-balance-changed-outbox-payload';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import type { TransactionContext } from '@/common/types/transaction-context';
 import { newUuid } from '@/common/utils/uuid.util';
 import {
   ADMIN_ADJUSTMENT_REPOSITORY,

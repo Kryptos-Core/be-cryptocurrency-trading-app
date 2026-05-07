@@ -51,11 +51,19 @@ export class MarketPair {
   @CreateDateColumn()
   created_at!: Date;
 
-  @ManyToOne(() => Currency, (currency) => currency.base_pairs, { onDelete: 'RESTRICT' })
+  @ManyToOne(
+    () => Currency,
+    (currency) => currency.base_pairs,
+    { onDelete: 'RESTRICT' },
+  )
   @JoinColumn({ name: 'base_currency_id' })
   base_currency!: Currency;
 
-  @ManyToOne(() => Currency, (currency) => currency.quote_pairs, { onDelete: 'RESTRICT' })
+  @ManyToOne(
+    () => Currency,
+    (currency) => currency.quote_pairs,
+    { onDelete: 'RESTRICT' },
+  )
   @JoinColumn({ name: 'quote_currency_id' })
   quote_currency!: Currency;
 

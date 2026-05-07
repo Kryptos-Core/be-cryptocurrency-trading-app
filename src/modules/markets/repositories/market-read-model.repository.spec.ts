@@ -1,5 +1,5 @@
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { MARKET_TS_DB } from '@/config';
 import { MarketReadModelRepository } from './market-read-model.repository';
 
@@ -20,7 +20,12 @@ describe('MarketReadModelRepository', () => {
         MarketReadModelRepository,
         {
           provide: ConfigService,
-          useValue: { get: jest.fn((key: string) => ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' }[key])) },
+          useValue: {
+            get: jest.fn(
+              (key: string) =>
+                ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' })[key],
+            ),
+          },
         },
         {
           provide: MARKET_TS_DB,
@@ -67,7 +72,12 @@ describe('MarketReadModelRepository', () => {
         MarketReadModelRepository,
         {
           provide: ConfigService,
-          useValue: { get: jest.fn((key: string) => ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' }[key])) },
+          useValue: {
+            get: jest.fn(
+              (key: string) =>
+                ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' })[key],
+            ),
+          },
         },
         {
           provide: MARKET_TS_DB,
@@ -104,7 +114,12 @@ describe('MarketReadModelRepository', () => {
         MarketReadModelRepository,
         {
           provide: ConfigService,
-          useValue: { get: jest.fn((key: string) => ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' }[key])) },
+          useValue: {
+            get: jest.fn(
+              (key: string) =>
+                ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' })[key],
+            ),
+          },
         },
         {
           provide: MARKET_TS_DB,
@@ -139,7 +154,12 @@ describe('MarketReadModelRepository', () => {
         MarketReadModelRepository,
         {
           provide: ConfigService,
-          useValue: { get: jest.fn((key: string) => ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' }[key])) },
+          useValue: {
+            get: jest.fn(
+              (key: string) =>
+                ({ MARKET_READ_SOURCE: 'timescale', MARKET_TS_ENABLED: 'true' })[key],
+            ),
+          },
         },
         {
           provide: MARKET_TS_DB,

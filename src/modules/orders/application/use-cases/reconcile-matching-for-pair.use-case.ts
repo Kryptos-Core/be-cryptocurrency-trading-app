@@ -1,21 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { MatchingShadowReconciliationUseCase } from '@/modules/matching/application/use-cases';
-import { MetricsService } from '@/telemetry';
 import { NotFoundException } from '@/common/exceptions';
 import { MARKET_REPOSITORY, type MarketRepositoryPort } from '@/modules/markets/domain/ports';
+import { MatchingShadowReconciliationUseCase } from '@/modules/matching/application/use-cases';
 import {
   type MatchingReconcileResultSnapshot,
   ORDER_MATCHING_GATEWAY,
   type OrderMatchingGatewayPort,
 } from '@/modules/orders/domain/ports';
+import { MetricsService } from '@/telemetry';
 
 @Injectable()
 export class ReconcileMatchingForPairUseCase {
-  async shadowParity(
-    pairIdOrSymbol: string,
-    windowHours = 24,
-    limit = 20,
-  ) {
+  async shadowParity(pairIdOrSymbol: string, windowHours = 24, limit = 20) {
     const raw = (pairIdOrSymbol ?? '').trim();
     let pair = await this.marketRepository.findById(raw);
     if (!pair && raw.includes('/')) {

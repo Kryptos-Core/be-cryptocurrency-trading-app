@@ -5,9 +5,9 @@ import { RedisService } from '@/common/services/redis.service';
 import { MetricsService } from '@/telemetry/metrics.service';
 import { OutboxAdminService } from './outbox-admin.service';
 import {
+  OUTBOX_ALERTS_CHANNEL_DEFAULT,
   OutboxRelayAlertSeverity,
   OutboxRelayAlertStateChangedEvent,
-  OUTBOX_ALERTS_CHANNEL_DEFAULT,
 } from './outbox-alerting.constants';
 
 @Injectable()
@@ -144,4 +144,3 @@ export class OutboxRelayAlertingCollectorService {
     }
   }
 }
-

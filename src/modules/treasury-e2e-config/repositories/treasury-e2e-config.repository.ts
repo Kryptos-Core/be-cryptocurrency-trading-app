@@ -152,7 +152,11 @@ export class TreasuryE2EConfigRepository extends BaseRepository<TreasuryE2EConfi
     return rows[0] as TreasuryE2EConfig;
   }
 
-  async activate(configId: string, environment: string, userId: string): Promise<TreasuryE2EConfig> {
+  async activate(
+    configId: string,
+    environment: string,
+    userId: string,
+  ): Promise<TreasuryE2EConfig> {
     await this.dataSource.transaction(async (manager) => {
       await manager.query(
         `UPDATE treasury_e2e_configs

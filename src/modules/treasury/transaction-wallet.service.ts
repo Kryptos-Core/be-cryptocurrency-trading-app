@@ -351,11 +351,7 @@ export class TransactionWalletService {
     if (!tw.isAddress(toBase58)) {
       throw new BadRequestException('Invalid Tron destination address', 'INVALID_TRON_ADDRESS');
     }
-    await this.assertTronAccountExistsOrThrow(
-      tw,
-      toBase58,
-      'TRON_USDT_DESTINATION_NOT_ACTIVATED',
-    );
+    await this.assertTronAccountExistsOrThrow(tw, toBase58, 'TRON_USDT_DESTINATION_NOT_ACTIVATED');
     const valueInt = new Decimal(amountHuman).mul(new Decimal(10).pow(TRON_USDT_DECIMALS)).floor();
     if (valueInt.lte(0)) {
       throw new BadRequestException(

@@ -7,8 +7,8 @@ import { NotFoundException } from '../../common/exceptions';
 import { CacheService } from '../../common/services';
 import { MarketsService } from '../markets/markets.service';
 import { OrdersService } from '../orders/orders.service';
-import { MarketMakerService } from './market-maker.service';
 import { MARKET_MAKER_CONFIG_REPOSITORY } from './domain/ports';
+import { MarketMakerService } from './market-maker.service';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 describe('MarketMakerService', () => {

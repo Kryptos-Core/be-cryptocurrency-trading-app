@@ -65,7 +65,11 @@ function toPostgresPlaceholders(sql: string, maxParams: number): string {
   return result;
 }
 
-function shouldTransform(contextType: unknown, query: unknown, parameters: unknown): parameters is unknown[] {
+function shouldTransform(
+  contextType: unknown,
+  query: unknown,
+  parameters: unknown,
+): parameters is unknown[] {
   return (
     contextType === 'postgres' &&
     typeof query === 'string' &&
@@ -94,7 +98,9 @@ export function enablePostgresQuestionMarkAdapter(): void {
     return originalDataSourceQuery.call(this, effectiveQuery, parameters, queryRunner);
   };
 
-  const entityManagerProto = EntityManager.prototype as unknown as { query: EntityManagerQueryMethod };
+  const entityManagerProto = EntityManager.prototype as unknown as {
+    query: EntityManagerQueryMethod;
+  };
   const originalEntityManagerQuery = entityManagerProto.query;
   entityManagerProto.query = function patchedEntityManagerQuery(
     this: EntityManager,

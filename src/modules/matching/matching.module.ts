@@ -70,4 +70,3 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
   ],
 })
 export class MatchingModule {}
-

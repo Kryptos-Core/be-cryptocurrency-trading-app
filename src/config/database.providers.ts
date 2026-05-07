@@ -110,4 +110,8 @@ const analyticsDbProvider: Provider = {
   },
 };
 
-export const databaseProviders: Provider[] = [coreDbProvider, marketTsDbProvider, analyticsDbProvider];
+export const databaseProviders: Provider[] = [
+  coreDbProvider,
+  marketTsDbProvider,
+  analyticsDbProvider,
+];

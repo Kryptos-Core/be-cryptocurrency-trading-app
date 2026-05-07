@@ -6,9 +6,9 @@ import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { MetricsService } from '@/telemetry/metrics.service';
-import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
-import type { OutboxEventPublisher } from './outbox-event-publisher.port';
 import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
+import type { OutboxEventPublisher } from './outbox-event-publisher.port';
+import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-event-types';
 
 const OUTBOX_RELAY_LOCK_KEY = 'outbox:relay:lock';
@@ -104,7 +104,8 @@ export class OutboxRelayService {
                       kafkaTopic: row.kafka_topic,
                     });
 
-                    row.kafka_partition = publishResult?.kafkaPartition ?? row.kafka_partition ?? null;
+                    row.kafka_partition =
+                      publishResult?.kafkaPartition ?? row.kafka_partition ?? null;
                     row.kafka_offset = publishResult?.kafkaOffset ?? row.kafka_offset ?? null;
                     row.kafka_published_at =
                       publishResult?.publishedAt ?? row.kafka_published_at ?? new Date();
@@ -193,32 +194,37 @@ export class OutboxRelayService {
 
   private async updateOperationalMetrics(): Promise<void> {
     const repository = this.dataSource.getRepository(IntegrationOutbox);
-    const [unpublishedRows, deadLetterRows, retryScheduledRows, oldestUnpublishedRow, oldestDeadLetterRow] =
-      await Promise.all([
-        repository.count({ where: { published_at: IsNull() } }),
-        repository
-          .createQueryBuilder('o')
-          .where('o.published_at IS NULL')
-          .andWhere('o.dead_lettered_at IS NOT NULL')
-          .getCount(),
-        repository
-          .createQueryBuilder('o')
-          .where('o.published_at IS NULL')
-          .andWhere('o.dead_lettered_at IS NULL')
-          .andWhere('o.next_retry_at IS NOT NULL')
-          .getCount(),
-        repository.findOne({
-          where: { published_at: IsNull() },
-          order: { occurred_at: 'ASC' },
-        }),
-        repository.findOne({
-          where: {
-            published_at: IsNull(),
-            dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
-          },
-          order: { dead_lettered_at: 'ASC' },
-        }),
-      ]);
+    const [
+      unpublishedRows,
+      deadLetterRows,
+      retryScheduledRows,
+      oldestUnpublishedRow,
+      oldestDeadLetterRow,
+    ] = await Promise.all([
+      repository.count({ where: { published_at: IsNull() } }),
+      repository
+        .createQueryBuilder('o')
+        .where('o.published_at IS NULL')
+        .andWhere('o.dead_lettered_at IS NOT NULL')
+        .getCount(),
+      repository
+        .createQueryBuilder('o')
+        .where('o.published_at IS NULL')
+        .andWhere('o.dead_lettered_at IS NULL')
+        .andWhere('o.next_retry_at IS NOT NULL')
+        .getCount(),
+      repository.findOne({
+        where: { published_at: IsNull() },
+        order: { occurred_at: 'ASC' },
+      }),
+      repository.findOne({
+        where: {
+          published_at: IsNull(),
+          dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
+        },
+        order: { dead_lettered_at: 'ASC' },
+      }),
+    ]);
 
     const nowMs = Date.now();
     const oldestUnpublishedAgeSeconds = oldestUnpublishedRow?.occurred_at
@@ -239,6 +245,3 @@ export class OutboxRelayService {
     return this.retryBaseMs * attempt;
   }
 }
-
-
-

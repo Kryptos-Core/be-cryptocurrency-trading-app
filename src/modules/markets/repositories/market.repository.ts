@@ -8,11 +8,11 @@ import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
 import { MarketPair } from '@/entities/market-pair.entity';
 import { Trade } from '@/entities/trade.entity';
-import type { IMarketTickerData } from '../interfaces/market-ticker.interface';
 import type {
   MarketRepositoryFilterOptions,
   MarketRepositoryOrderBookLevel,
 } from '../domain/ports';
+import type { IMarketTickerData } from '../interfaces/market-ticker.interface';
 
 type SqlExecutor = Pick<DataSource | EntityManager, 'query'>;
 type MarketSortBy = 'symbol' | 'base' | 'quote' | 'createdAt';
@@ -58,7 +58,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     super(MarketPair, dataSource);
   }
 
-  async findOne(options: { where: { pair_id?: string; symbol?: string }; relations?: string[] }): Promise<MarketPair | null> {
+  async findOne(options: {
+    where: { pair_id?: string; symbol?: string };
+    relations?: string[];
+  }): Promise<MarketPair | null> {
     if (options?.where?.pair_id !== undefined) {
       return this.findById(options.where.pair_id);
     }
@@ -72,7 +75,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     return this.findByIdUsingExecutor(this.dataSource, id);
   }
 
-  private async findByIdUsingExecutor(executor: SqlExecutor, id: number | string): Promise<MarketPair | null> {
+  private async findByIdUsingExecutor(
+    executor: SqlExecutor,
+    id: number | string,
+  ): Promise<MarketPair | null> {
     const rows = await executor.query(this.baseSelectSql('WHERE mp.pair_id = $1'), [id]);
     return rows?.[0] ? this.mapRowToEntity(rows[0] as MarketPairRow) : null;
   }
@@ -84,7 +90,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     return rows?.[0] ? this.mapRowToEntity(rows[0] as MarketPairRow) : null;
   }
 
-  async findByCurrencies(baseCurrencyId: number, quoteCurrencyId: number): Promise<MarketPair | null> {
+  async findByCurrencies(
+    baseCurrencyId: number,
+    quoteCurrencyId: number,
+  ): Promise<MarketPair | null> {
     const rows = await this.dataSource.query(
       this.baseSelectSql('WHERE mp.base_currency_id = $1 AND mp.quote_currency_id = $2'),
       [String(baseCurrencyId), String(quoteCurrencyId)],
@@ -182,7 +191,11 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     return (rows ?? []).map((row: MarketPairRow) => this.mapRowToEntity(row));
   }
 
-  async pairExists(baseCurrencyId: string, quoteCurrencyId: string, excludePairId?: string): Promise<boolean> {
+  async pairExists(
+    baseCurrencyId: string,
+    quoteCurrencyId: string,
+    excludePairId?: string,
+  ): Promise<boolean> {
     const rows = await this.dataSource.query(
       `SELECT EXISTS(
          SELECT 1
@@ -209,7 +222,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     return rows?.[0]?.exists === true;
   }
 
-  async getOrderBook(pairId: string, limit: number = 20): Promise<{ bids: OrderBookLevel[]; asks: OrderBookLevel[] }> {
+  async getOrderBook(
+    pairId: string,
+    limit: number = 20,
+  ): Promise<{ bids: OrderBookLevel[]; asks: OrderBookLevel[] }> {
     const baseSql = `
       SELECT
         o.price::text AS price,
@@ -294,7 +310,8 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     const lastPrice = String(row.last_price ?? '0');
     const open24h = String(row.open_24h ?? lastPrice);
     const changeAmount = Number(lastPrice) - Number(open24h);
-    const changePercent = Number(open24h) > 0 ? ((changeAmount / Number(open24h)) * 100).toFixed(2) : '0';
+    const changePercent =
+      Number(open24h) > 0 ? ((changeAmount / Number(open24h)) * 100).toFixed(2) : '0';
 
     return {
       lastPrice,
@@ -344,7 +361,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     return createdPair;
   }
 
-  async createWithinTransaction(ctx: TransactionContext, entity: Partial<MarketPair>): Promise<MarketPair> {
+  async createWithinTransaction(
+    ctx: TransactionContext,
+    entity: Partial<MarketPair>,
+  ): Promise<MarketPair> {
     const em = getEntityManagerFromTransactionContext(ctx) as unknown as EntityManager;
     const pairId = entity.pair_id ?? newUuid();
     await this.insertPair(em, pairId, entity);
@@ -382,7 +402,11 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     await this.dataSource.query('DELETE FROM market_pairs WHERE pair_id = $1', [id]);
   }
 
-  private async insertPair(executor: SqlExecutor, pairId: string, entity: Partial<MarketPair>): Promise<void> {
+  private async insertPair(
+    executor: SqlExecutor,
+    pairId: string,
+    entity: Partial<MarketPair>,
+  ): Promise<void> {
     await executor.query(
       `INSERT INTO market_pairs (
           pair_id,
@@ -413,7 +437,11 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     );
   }
 
-  private async updatePair(executor: SqlExecutor, id: number | string, entity: Partial<MarketPair>): Promise<void> {
+  private async updatePair(
+    executor: SqlExecutor,
+    id: number | string,
+    entity: Partial<MarketPair>,
+  ): Promise<void> {
     const updates: string[] = [];
     const params: Array<string | number | boolean | null> = [id];
 
@@ -458,7 +486,10 @@ export class MarketRepository extends BaseRepository<MarketPair> {
       return;
     }
 
-    await executor.query(`UPDATE market_pairs SET ${updates.join(', ')} WHERE pair_id = $1`, params);
+    await executor.query(
+      `UPDATE market_pairs SET ${updates.join(', ')} WHERE pair_id = $1`,
+      params,
+    );
   }
 
   private baseSelectSql(whereSql: string): string {
@@ -538,7 +569,7 @@ export class MarketRepository extends BaseRepository<MarketPair> {
     trade.maker_fee = String(row.maker_fee ?? '0');
     trade.fee_currency_id = String(row.fee_currency_id ?? '');
     trade.created_at = row.created_at;
-trade.taker_order = {
+    trade.taker_order = {
       side: row.taker_side ?? 'BUY',
     } as unknown as Trade['taker_order'];
     return trade;

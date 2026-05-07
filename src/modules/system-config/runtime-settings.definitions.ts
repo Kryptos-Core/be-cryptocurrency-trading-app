@@ -333,21 +333,24 @@ const BASE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     type: ConfigDataType.INTEGER,
     category: ConfigCategory.CORE,
     name: 'Outbox alert max dead-letter rows',
-    description: 'Alert threshold: dead-letter row count above this value marks outbox relay degraded.',
+    description:
+      'Alert threshold: dead-letter row count above this value marks outbox relay degraded.',
   },
   {
     key: 'EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
     category: ConfigCategory.CORE,
     name: 'Outbox alert max oldest unpublished age (seconds)',
-    description: 'Alert threshold: oldest unpublished outbox row age in seconds before degraded signal.',
+    description:
+      'Alert threshold: oldest unpublished outbox row age in seconds before degraded signal.',
   },
   {
     key: 'EVENT_OUTBOX_ALERT_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
     category: ConfigCategory.CORE,
     name: 'Outbox alert max oldest dead-letter age (seconds)',
-    description: 'Alert threshold: oldest dead-letter outbox row age in seconds before degraded signal.',
+    description:
+      'Alert threshold: oldest dead-letter outbox row age in seconds before degraded signal.',
   },
 ];
 
@@ -383,21 +386,24 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     type: ConfigDataType.INTEGER,
     category: ConfigCategory.CORE,
     name: 'Outbox critical max dead-letter rows',
-    description: 'Critical threshold: dead-letter row count above this value marks outbox relay critical.',
+    description:
+      'Critical threshold: dead-letter row count above this value marks outbox relay critical.',
   },
   {
     key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
     category: ConfigCategory.CORE,
     name: 'Outbox critical max oldest unpublished age (seconds)',
-    description: 'Critical threshold: oldest unpublished outbox row age in seconds before critical signal.',
+    description:
+      'Critical threshold: oldest unpublished outbox row age in seconds before critical signal.',
   },
   {
     key: 'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
     type: ConfigDataType.INTEGER,
     category: ConfigCategory.CORE,
     name: 'Outbox critical max oldest dead-letter age (seconds)',
-    description: 'Critical threshold: oldest dead-letter outbox row age in seconds before critical signal.',
+    description:
+      'Critical threshold: oldest dead-letter outbox row age in seconds before critical signal.',
   },
   {
     key: 'EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED',
@@ -415,12 +421,68 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   },
 ];
 
+const EXTRA_MARKET_READ_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+  {
+    key: 'MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Market read model max lag alert (seconds)',
+    description: 'Alert threshold: market read model lag in seconds before degraded signal.',
+  },
+  {
+    key: 'MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Market read model critical max lag (seconds)',
+    description: 'Critical threshold: market read model lag in seconds before critical signal.',
+  },
+];
+
+const EXTRA_GO_ROLLOUT_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+  {
+    key: 'GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Go rollout min compared pairs',
+    description:
+      'Minimum number of pairs that must have WS parity data before readiness check passes.',
+  },
+  {
+    key: 'GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.CORE,
+    name: 'Go rollback drill max age (hours)',
+    description: 'Maximum age in hours for a rollback drill to be considered valid.',
+  },
+];
+
+const EXTRA_FINANCE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+  {
+    key: 'BLOCKCHAIN_WITHDRAW_AUTO_MIN_AMOUNT',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.FINANCE,
+    name: 'Global auto-approve withdraw min (native)',
+    description:
+      'Minimum native amount for auto-processed withdrawals. Amounts below this require manual review.',
+  },
+  {
+    key: 'BLOCKCHAIN_DEPOSIT_BSC_TO_USDT_RATE',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'Fallback rate BSC → USDT',
+    description: 'Used when price oracle unavailable; 1 BNB = X USDT.',
+  },
+];
+
 /** Full seed list: core + every `*_RPC_URL` from evm-chain-definitions + per-chain auto max (no duplicates). */
 export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   ...BASE_RUNTIME_SETTING_SEEDS,
   ...evmRpcSeeds,
   ...evmAutoMaxSeeds,
   ...EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS,
+  ...EXTRA_MARKET_READ_RUNTIME_SETTING_SEEDS,
+  ...EXTRA_GO_ROLLOUT_RUNTIME_SETTING_SEEDS,
+  ...EXTRA_FINANCE_RUNTIME_SETTING_SEEDS,
 ];
 
 /** Whitelisted keys manageable via UI / runtime settings (mirror .env names). */
@@ -429,8 +491,3 @@ export const RUNTIME_SETTING_KEYS = RUNTIME_SETTING_SEEDS.map((s) => s.key);
 export type RuntimeSettingKey = (typeof RUNTIME_SETTING_KEYS)[number];
 
 export const RUNTIME_SETTING_KEY_SET = new Set<string>(RUNTIME_SETTING_KEYS);
-
-
-
-
-

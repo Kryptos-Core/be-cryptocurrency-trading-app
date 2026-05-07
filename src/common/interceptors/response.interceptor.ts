@@ -25,8 +25,15 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isPaginatedEnvelope(value: unknown): value is ResponseEnvelope & { data: unknown[]; total: unknown } {
-  return isObjectRecord(value) && Array.isArray(value.data) && value.total !== undefined && value.total !== null;
+function isPaginatedEnvelope(
+  value: unknown,
+): value is ResponseEnvelope & { data: unknown[]; total: unknown } {
+  return (
+    isObjectRecord(value) &&
+    Array.isArray(value.data) &&
+    value.total !== undefined &&
+    value.total !== null
+  );
 }
 
 @Injectable()

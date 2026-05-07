@@ -6,11 +6,7 @@ import { ProcessedIntegrationEvent } from '@/entities/processed-integration-even
 export class ProcessedIntegrationEventsService {
   private readonly logger = new Logger(ProcessedIntegrationEventsService.name);
 
-  async hasProcessed(
-    em: EntityManager,
-    consumerName: string,
-    eventId: string,
-  ): Promise<boolean> {
+  async hasProcessed(em: EntityManager, consumerName: string, eventId: string): Promise<boolean> {
     const existing = await em.getRepository(ProcessedIntegrationEvent).findOne({
       where: {
         consumer_name: consumerName,
@@ -39,7 +35,11 @@ export class ProcessedIntegrationEventsService {
       await repo.insert(entity);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('duplicate') || message.includes('Duplicate') || message.includes('unique')) {
+      if (
+        message.includes('duplicate') ||
+        message.includes('Duplicate') ||
+        message.includes('unique')
+      ) {
         this.logger.debug(
           `Processed integration event already marked consumer=${consumerName} eventId=${eventId}`,
         );

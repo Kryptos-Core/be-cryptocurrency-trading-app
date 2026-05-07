@@ -85,7 +85,8 @@ export class WalletLedgerRepositoryImpl
       ref_id: Number(r.ref_id ?? 0),
       direction: String(r.direction ?? ''),
       amount: String(r.amount ?? '0'),
-      created_at: r.created_at instanceof Date ? r.created_at : new Date(String(r.created_at ?? '')),
+      created_at:
+        r.created_at instanceof Date ? r.created_at : new Date(String(r.created_at ?? '')),
     }));
   }
 

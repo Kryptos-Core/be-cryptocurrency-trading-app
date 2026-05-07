@@ -1,8 +1,6 @@
 import { Test } from '@nestjs/testing';
 import type { EntityManager } from 'typeorm';
-import {
-  isCanonicalIntegrationEventEnvelope,
-} from '@/common/integration-events/canonical-integration-event-envelope';
+import { isCanonicalIntegrationEventEnvelope } from '@/common/integration-events/canonical-integration-event-envelope';
 import { OutboxAppender } from './outbox-appender.service';
 
 describe('OutboxAppender', () => {

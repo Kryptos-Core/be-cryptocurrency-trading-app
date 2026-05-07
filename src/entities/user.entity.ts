@@ -99,4 +99,3 @@ export class User {
   )
   treasury_operations!: TreasuryOperation[];
 }
-

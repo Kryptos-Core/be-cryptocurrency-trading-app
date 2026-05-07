@@ -1,5 +1,5 @@
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { PublicWsPayloadParityService } from '@/modules/trading/services/public-ws-payload-parity.service';
 
 describe('WebSocket contract baseline snapshots', () => {
@@ -67,4 +67,3 @@ describe('WebSocket contract baseline snapshots', () => {
     }).toMatchSnapshot();
   });
 });
-

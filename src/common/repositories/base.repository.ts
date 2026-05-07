@@ -11,8 +11,8 @@ import type {
   Repository,
 } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
-import { calcSkip } from '@/common/utils/pagination.util';
 import type { TransactionContext } from '@/common/types/transaction-context';
+import { calcSkip } from '@/common/utils/pagination.util';
 import type { IRepository } from './interfaces/irepository.interface';
 
 @Injectable()
@@ -47,8 +47,12 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     return await this.repository.findOne({ where: whereClause } as FindOneOptions<T>);
   }
 
-  async findOne(options: FindOneOptions<T>): Promise<T | null> { return await this.repository.findOne(options); }
-  async find(options?: FindManyOptions<T>): Promise<T[]> { return await this.repository.find(options); }
+  async findOne(options: FindOneOptions<T>): Promise<T | null> {
+    return await this.repository.findOne(options);
+  }
+  async find(options?: FindManyOptions<T>): Promise<T[]> {
+    return await this.repository.find(options);
+  }
 
   async findWithPagination(
     page: number = 1,
@@ -61,7 +65,9 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     return { data, total, page, limit };
   }
 
-  async count(options?: FindManyOptions<T>): Promise<number> { return await this.repository.count(options); }
+  async count(options?: FindManyOptions<T>): Promise<number> {
+    return await this.repository.count(options);
+  }
 
   async exists(options: FindOptionsWhere<T>): Promise<boolean> {
     return (await this.repository.count({ where: options })) > 0;
@@ -101,10 +107,18 @@ export abstract class BaseRepository<T extends ObjectLiteral> implements IReposi
     return result.affected || 0;
   }
 
-  async save(entity: DeepPartial<T>): Promise<T> { return await this.repository.save(entity); }
-  async saveMany(entities: DeepPartial<T>[]): Promise<T[]> { return await this.repository.save(entities); }
-  getRepository(): Repository<T> { return this.repository; }
-  getDataSource(): DataSource { return this.dataSource; }
+  async save(entity: DeepPartial<T>): Promise<T> {
+    return await this.repository.save(entity);
+  }
+  async saveMany(entities: DeepPartial<T>[]): Promise<T[]> {
+    return await this.repository.save(entities);
+  }
+  getRepository(): Repository<T> {
+    return this.repository;
+  }
+  getDataSource(): DataSource {
+    return this.dataSource;
+  }
 
   async query<TResult = unknown>(sql: string, parameters?: unknown[]): Promise<TResult> {
     return (await this.dataSource.query(sql, parameters)) as TResult;

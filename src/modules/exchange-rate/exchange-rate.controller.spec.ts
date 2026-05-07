@@ -1,11 +1,15 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ExchangeRateController } from './exchange-rate.controller';
 import { GetExchangeRateQuery } from './application/queries';
 import { SyncExchangeRateUseCase, UpdateExchangeRateConfigUseCase } from './application/use-cases';
+import { ExchangeRateController } from './exchange-rate.controller';
 
 describe('ExchangeRateController', () => {
   let controller: ExchangeRateController;
-  let getExchangeRateQuery: { getMarketPrices: jest.Mock; getDepositPreview: jest.Mock; getAdminCurrentConfig: jest.Mock };
+  let getExchangeRateQuery: {
+    getMarketPrices: jest.Mock;
+    getDepositPreview: jest.Mock;
+    getAdminCurrentConfig: jest.Mock;
+  };
   let syncExchangeRateUseCase: { execute: jest.Mock };
   let updateExchangeRateConfigUseCase: { execute: jest.Mock };
 

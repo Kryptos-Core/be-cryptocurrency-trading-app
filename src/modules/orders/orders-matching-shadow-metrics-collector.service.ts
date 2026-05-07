@@ -47,7 +47,9 @@ export class OrdersMatchingShadowMetricsCollectorService {
   }
 
   private getMonitorPairs(): string[] {
-    const explicitPairs = this.parseCsv(this.configService.get<string>('MATCHING_SHADOW_MONITOR_PAIRS'));
+    const explicitPairs = this.parseCsv(
+      this.configService.get<string>('MATCHING_SHADOW_MONITOR_PAIRS'),
+    );
     if (explicitPairs.length > 0) {
       return explicitPairs;
     }

@@ -57,10 +57,7 @@ export interface TreasuryOperationRepositoryPort {
    * Conditional — only updates if status is PENDING or PROCESSING (not already TX_BROADCAST/COMPLETED).
    * Returns true if the row was updated (this attempt owns the broadcast), false otherwise.
    */
-  setBroadcastIdempotencyKey(
-    operationId: string,
-    key: string,
-  ): Promise<boolean>;
+  setBroadcastIdempotencyKey(operationId: string, key: string): Promise<boolean>;
 
   /** Find stale TX_BROADCAST operations for reconciliation. */
   findStaleTxBroadcastOperations(olderThanMinutes: number): Promise<TreasuryOperationRecord[]>;

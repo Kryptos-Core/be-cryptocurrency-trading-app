@@ -4,7 +4,6 @@ import type { Trade } from '@/entities/trade.entity';
 import type { MarketPairRecord } from '@/modules/markets/contracts';
 import type { IMarketTickerData } from '../../interfaces/market-ticker.interface';
 
-
 export type MarketRepositoryOrderBookLevel = {
   price: string;
   amount: string;
@@ -21,7 +20,6 @@ export type MarketRepositoryFilterOptions = {
   sortOrder?: 'asc' | 'desc';
   fuzzySearch?: boolean;
 };
-
 
 export interface MarketRepositoryPort {
   findOne(options: {

@@ -379,7 +379,11 @@ export class MatchingRepository implements MatchingRepositoryPort {
         order.side === 'BUY' ? numeric(order.reserved_quote) : numeric(order.reserved_base);
       const releaseCurrencyId =
         order.side === 'BUY' ? pair.quote_currency_id : pair.base_currency_id;
-      const wallet = await this.getOrCreateWalletForUpdate(manager, order.user_id, releaseCurrencyId);
+      const wallet = await this.getOrCreateWalletForUpdate(
+        manager,
+        order.user_id,
+        releaseCurrencyId,
+      );
 
       if (releaseAmount > 0) {
         await this.applyWalletDelta(manager, wallet.wallet_id, releaseAmount, -releaseAmount);
@@ -402,7 +406,10 @@ export class MatchingRepository implements MatchingRepositoryPort {
     }
   }
 
-  private async findOrderForUpdate(manager: EntityManager, orderId: string): Promise<OrderRow | null> {
+  private async findOrderForUpdate(
+    manager: EntityManager,
+    orderId: string,
+  ): Promise<OrderRow | null> {
     const rows = await manager.query(
       `SELECT order_id, pair_id, user_id, side, type, time_in_force, price, amount, filled_amount,
               status, reserved_quote, reserved_base, slippage_tolerance, created_at
@@ -545,8 +552,12 @@ export class MatchingRepository implements MatchingRepositoryPort {
       order_id: String(r.order_id ?? '').trim(),
       pair_id: String(r.pair_id ?? '').trim(),
       user_id: String(r.user_id ?? '').trim(),
-      side: String(r.side ?? '').trim().toUpperCase() as 'BUY' | 'SELL',
-      type: String(r.type ?? '').trim().toUpperCase() as 'LIMIT' | 'MARKET',
+      side: String(r.side ?? '')
+        .trim()
+        .toUpperCase() as 'BUY' | 'SELL',
+      type: String(r.type ?? '')
+        .trim()
+        .toUpperCase() as 'LIMIT' | 'MARKET',
       time_in_force: r.time_in_force ?? 'GTC',
       price: r.price != null ? String(r.price) : null,
       amount: String(r.amount ?? '0'),

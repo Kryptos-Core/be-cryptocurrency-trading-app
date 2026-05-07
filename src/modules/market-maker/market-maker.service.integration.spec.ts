@@ -3,8 +3,8 @@ import { CacheService } from '@/common/services';
 import { MarketsService } from '@/modules/markets/markets.service';
 import { OrdersService } from '@/modules/orders/orders.service';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { MarketMakerService } from './market-maker.service';
 import { MARKET_MAKER_CONFIG_REPOSITORY } from './domain/ports';
+import { MarketMakerService } from './market-maker.service';
 import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 
 describe('MarketMakerService + MmOrderStrategyService Integration', () => {

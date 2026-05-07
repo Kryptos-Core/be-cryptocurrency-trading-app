@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
-import { TradingOpsController } from './trading-ops.controller';
 import { GoRolloutReadinessService } from './services/go-rollout-readiness.service';
 import { PublicWsPayloadParityService } from './services/public-ws-payload-parity.service';
+import { TradingOpsController } from './trading-ops.controller';
 
 describe('TradingOpsController', () => {
   it('returns public ws parity report', async () => {

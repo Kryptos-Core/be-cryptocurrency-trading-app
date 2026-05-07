@@ -8,8 +8,8 @@ import { OnchainDepositReadModelSyncApplierService } from '@/common/read-model/o
 import { TradeReadModelSyncApplierService } from '@/common/read-model/trade-read-model-sync-applier.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { OnchainDepositOutboxNotificationService } from '@/modules/notifications/onchain-deposit-outbox-notification.service';
-import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
+import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
 
 describe('OutboxIntegrationSyncService', () => {
   let marketPairApplier: { apply: jest.Mock };

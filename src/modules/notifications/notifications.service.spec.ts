@@ -1,7 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { NOTIFICATION_REPOSITORY } from './domain/ports';
 import type { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationsService } from './notifications.service';
-import { NOTIFICATION_REPOSITORY } from './domain/ports';
 import {
   type INotificationStrategy,
   NOTIFICATION_STRATEGIES,
@@ -9,9 +9,7 @@ import {
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
-  let notificationRepo: jest.Mocked<
-    Record<'createForUser' | 'getFcmTokenByUserId', jest.Mock>
-  >;
+  let notificationRepo: jest.Mocked<Record<'createForUser' | 'getFcmTokenByUserId', jest.Mock>>;
   let strategy: jest.Mocked<INotificationStrategy>;
 
   const dto: CreateNotificationDto = {

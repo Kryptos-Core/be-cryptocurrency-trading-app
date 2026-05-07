@@ -59,7 +59,9 @@ describe('MainnetOnlyBlockchainChains1775520000000', () => {
       ),
     );
     const txWalletDeleteIndex = queries.findIndex((sql) =>
-      sql.includes('DELETE source FROM transaction_wallets source INNER JOIN transaction_wallets target ON'),
+      sql.includes(
+        'DELETE source FROM transaction_wallets source INNER JOIN transaction_wallets target ON',
+      ),
     );
     expect(txWalletRemapIndex).toBeGreaterThanOrEqual(0);
     expect(txWalletDeleteIndex).toBeGreaterThan(txWalletRemapIndex);
@@ -75,13 +77,16 @@ describe('MainnetOnlyBlockchainChains1775520000000', () => {
     ).toBe(true);
 
     const onchainTxRemapIndex = queries.findIndex((sql) =>
-      sql.includes('UPDATE treasury_operations op INNER JOIN onchain_transactions source ON source.tx_id = op.onchain_tx_id'),
+      sql.includes(
+        'UPDATE treasury_operations op INNER JOIN onchain_transactions source ON source.tx_id = op.onchain_tx_id',
+      ),
     );
-    const onchainTxDeleteIndex = queries.findIndex((sql) =>
-      sql.includes('DELETE source FROM') &&
-      sql.includes('onchain_transactions') &&
-      sql.includes('source.`tx_hash` = target.`tx_hash`') &&
-      !sql.includes('log_index'),
+    const onchainTxDeleteIndex = queries.findIndex(
+      (sql) =>
+        sql.includes('DELETE source FROM') &&
+        sql.includes('onchain_transactions') &&
+        sql.includes('source.`tx_hash` = target.`tx_hash`') &&
+        !sql.includes('log_index'),
     );
     expect(onchainTxRemapIndex).toBeGreaterThanOrEqual(0);
     expect(onchainTxDeleteIndex).toBeGreaterThan(onchainTxRemapIndex);
@@ -89,18 +94,20 @@ describe('MainnetOnlyBlockchainChains1775520000000', () => {
 
     expect(
       queries.some((sql) =>
-        sql.includes("UPDATE `linked_wallets` SET `chain` = 'ETH_MAINNET' WHERE `chain` = 'ETH_SEPOLIA'"),
+        sql.includes(
+          "UPDATE `linked_wallets` SET `chain` = 'ETH_MAINNET' WHERE `chain` = 'ETH_SEPOLIA'",
+        ),
       ),
     ).toBe(false);
-    expect(
-      queries.some((sql) => sql.includes('SET ot.linked_wallet_id = target.link_id')),
-    ).toBe(true);
-    expect(
-      queries.some((sql) => sql.includes('SET op.from_wallet_id = target.wallet_id')),
-    ).toBe(true);
-    expect(
-      queries.some((sql) => sql.includes('SET op.to_wallet_id = target.wallet_id')),
-    ).toBe(true);
+    expect(queries.some((sql) => sql.includes('SET ot.linked_wallet_id = target.link_id'))).toBe(
+      true,
+    );
+    expect(queries.some((sql) => sql.includes('SET op.from_wallet_id = target.wallet_id'))).toBe(
+      true,
+    );
+    expect(queries.some((sql) => sql.includes('SET op.to_wallet_id = target.wallet_id'))).toBe(
+      true,
+    );
     expect(queries).toEqual(
       expect.arrayContaining([
         expect.stringContaining(
@@ -144,7 +151,9 @@ describe('MainnetOnlyBlockchainChains1775520000000', () => {
     expect(systemConfigCalls).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          sql: expect.stringContaining('DELETE s1 FROM system_configs s1 INNER JOIN system_configs s2 ON s2.`key` = ? WHERE s1.`key` = ?'),
+          sql: expect.stringContaining(
+            'DELETE s1 FROM system_configs s1 INNER JOIN system_configs s2 ON s2.`key` = ? WHERE s1.`key` = ?',
+          ),
           params: ['TRON_MAINNET_FULL_HOST', 'TRON_NILE_FULL_HOST'],
         }),
         expect.objectContaining({
@@ -152,7 +161,9 @@ describe('MainnetOnlyBlockchainChains1775520000000', () => {
           params: ['TRON_MAINNET_FULL_HOST', 'TRON_NILE_FULL_HOST'],
         }),
         expect.objectContaining({
-          sql: expect.stringContaining('DELETE s1 FROM system_configs s1 INNER JOIN system_configs s2 ON s2.`key` = ? WHERE s1.`key` = ?'),
+          sql: expect.stringContaining(
+            'DELETE s1 FROM system_configs s1 INNER JOIN system_configs s2 ON s2.`key` = ? WHERE s1.`key` = ?',
+          ),
           params: ['SOLANA_MAINNET_URL', 'SOLANA_DEVNET_URL'],
         }),
         expect.objectContaining({
@@ -160,10 +171,14 @@ describe('MainnetOnlyBlockchainChains1775520000000', () => {
           params: ['SOLANA_MAINNET_URL', 'SOLANA_DEVNET_URL'],
         }),
         expect.objectContaining({
-          sql: expect.stringContaining('DELETE FROM system_configs WHERE `key` IN (\'TRON_SHASTA_FULL_HOST\', \'TRON_DEFAULT_NETWORK\')'),
+          sql: expect.stringContaining(
+            "DELETE FROM system_configs WHERE `key` IN ('TRON_SHASTA_FULL_HOST', 'TRON_DEFAULT_NETWORK')",
+          ),
         }),
         expect.objectContaining({
-          sql: expect.stringContaining('DELETE FROM system_configs WHERE `key` = \'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA\''),
+          sql: expect.stringContaining(
+            "DELETE FROM system_configs WHERE `key` = 'BLOCKCHAIN_WITHDRAW_AUTO_MAX_TRON_SHASTA'",
+          ),
         }),
       ]),
     );

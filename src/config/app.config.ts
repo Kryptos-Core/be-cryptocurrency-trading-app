@@ -434,7 +434,7 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.CORE_DB_PASSWORD || env.DB_PASSWORD || '',
       env.CORE_DB_NAME || env.DB_NAME || '',
     )
-.setMarketTs(
+    .setMarketTs(
       String(env.MARKET_TS_ENABLED || 'false').toLowerCase() === 'true',
       env.MARKET_TS_DRIVER || 'postgres',
       String(env.MARKET_TS_TIMESCALE_ENABLED || 'false').toLowerCase() === 'true',
@@ -464,8 +464,7 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
         .map((pair) => pair.trim())
         .filter(Boolean),
       publicWsSource: env.PUBLIC_WS_SOURCE || 'nestjs',
-      goAggregatorTickerChannel:
-        env.GO_AGGREGATOR_TICKER_CHANNEL || 'trading:external:ticker',
+      goAggregatorTickerChannel: env.GO_AGGREGATOR_TICKER_CHANNEL || 'trading:external:ticker',
       goAggregatorOhlcChannel: env.GO_AGGREGATOR_OHLC_CHANNEL || 'trading:external:ohlc',
       matchingShadowMonitorPairs: (env.MATCHING_SHADOW_MONITOR_PAIRS || '')
         .split(',')
@@ -478,12 +477,8 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
         env.MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS || '0',
       ),
       goRolloutWindowHours: Number(env.GO_ROLLOUT_WINDOW_HOURS || '24'),
-      goRolloutMaxPublicWsDriftPairs: Number(
-        env.GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS || '0',
-      ),
-      goRolloutMinPublicWsComparedPairs: Number(
-        env.GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS || '1',
-      ),
+      goRolloutMaxPublicWsDriftPairs: Number(env.GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS || '0'),
+      goRolloutMinPublicWsComparedPairs: Number(env.GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS || '1'),
       goRolloutRollbackDrillMaxAgeHours: Number(
         env.GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS || '72',
       ),
@@ -496,9 +491,7 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       eventOutboxEnabled: String(env.EVENT_OUTBOX_ENABLED || 'true').toLowerCase() !== 'false',
       eventSchemaFormat: env.EVENT_SCHEMA_FORMAT || 'json',
       eventPublisherDriver: env.EVENT_PUBLISHER_DRIVER || 'noop',
-      eventOutboxAlertMaxDeadLetterRows: Number(
-        env.EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS || '0',
-      ),
+      eventOutboxAlertMaxDeadLetterRows: Number(env.EVENT_OUTBOX_ALERT_MAX_DEAD_LETTER_ROWS || '0'),
       eventOutboxAlertMaxOldestUnpublishedAgeSeconds: Number(
         env.EVENT_OUTBOX_ALERT_MAX_OLDEST_UNPUBLISHED_AGE_SECONDS || '300',
       ),
@@ -594,9 +587,3 @@ export default registerAs('app', (): AppConfig => {
   const env = process.env as unknown as EnvironmentVariables;
   return createAppConfig(env);
 });
-
-
-
-
-
-

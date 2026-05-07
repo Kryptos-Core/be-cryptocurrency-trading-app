@@ -29,7 +29,6 @@ import type {
 } from '../../interfaces';
 import { buildNotFoundTxStatus } from '../../utils/build-not-found-tx.util';
 
-
 type SolanaMessageLike = {
   staticAccountKeys?: Array<{ toBase58?: () => string }>;
   accountKeys?: Array<{ toBase58?: () => string }>;

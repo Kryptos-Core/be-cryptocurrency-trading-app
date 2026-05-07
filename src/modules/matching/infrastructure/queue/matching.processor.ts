@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
 import type { Job } from 'bull';
+import { DataSource } from 'typeorm';
 import { runInSpan } from '@/common/telemetry';
 import { RunMatchCommand, RunMatchUseCase } from '../../application/use-cases';
-import { MATCH_ORDER_JOB, MATCHING_QUEUE, type MatchOrderJobData } from './matching-queue.service';
 import { MatchingEngineRoutingPolicy } from './matching-engine-routing.policy';
+import { MATCH_ORDER_JOB, MATCHING_QUEUE, type MatchOrderJobData } from './matching-queue.service';
 
 @Processor(MATCHING_QUEUE)
 export class MatchingProcessor {
@@ -81,4 +81,3 @@ export class MatchingProcessor {
     );
   }
 }
-

@@ -2,13 +2,13 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
+import { enablePostgresQuestionMarkAdapter } from './common/database/pg-placeholder-adapter';
 import { AllExceptionsFilter } from './common/filters';
 import {
   LoggingInterceptor,
   ResponseInterceptor,
   TelemetryContextInterceptor,
 } from './common/interceptors';
-import { enablePostgresQuestionMarkAdapter } from './common/database/pg-placeholder-adapter';
 import { setupSwagger } from './config/swagger.config';
 
 const logger = new Logger('Bootstrap');

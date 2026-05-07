@@ -1,5 +1,5 @@
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { PublicWsPayloadParityService } from './public-ws-payload-parity.service';
 
 describe('PublicWsPayloadParityService', () => {

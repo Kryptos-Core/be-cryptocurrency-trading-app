@@ -1,9 +1,4 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { OrdersController } from '@/modules/orders/orders.controller';
-import { OrdersService } from '@/modules/orders/orders.service';
-import { FindMyOrdersQuery } from '@/modules/orders/application/queries/find-my-orders.query';
-import { ReconcileMatchingForPairUseCase } from '@/modules/orders/application/use-cases/reconcile-matching-for-pair.use-case';
-import { MarketsController } from '@/modules/markets/markets.controller';
 import {
   GetMarketDepthQuery,
   GetMarketOHLCVQuery,
@@ -16,6 +11,11 @@ import {
   UpdateMarketPairUseCase,
 } from '@/modules/markets/application/use-cases';
 import { MarketReadModelReconciliationService } from '@/modules/markets/market-read-model-reconciliation.service';
+import { MarketsController } from '@/modules/markets/markets.controller';
+import { FindMyOrdersQuery } from '@/modules/orders/application/queries/find-my-orders.query';
+import { ReconcileMatchingForPairUseCase } from '@/modules/orders/application/use-cases/reconcile-matching-for-pair.use-case';
+import { OrdersController } from '@/modules/orders/orders.controller';
+import { OrdersService } from '@/modules/orders/orders.service';
 
 describe('API contract baseline snapshots', () => {
   it('locks markets ticker/trades response shape', async () => {
@@ -62,7 +62,12 @@ describe('API contract baseline snapshots', () => {
       providers: [
         {
           provide: GetMarketPairQuery,
-          useValue: { findAll: jest.fn(), findOne: jest.fn(), findBySymbol: jest.fn(), findActive: jest.fn() },
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            findBySymbol: jest.fn(),
+            findActive: jest.fn(),
+          },
         },
         { provide: GetMarketTickerQuery, useValue: tickerQuery },
         { provide: GetMarketDepthQuery, useValue: depthQuery },

@@ -36,10 +36,18 @@ export class Wallet {
   @UpdateDateColumn()
   updated_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.wallets, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.wallets,
+    { onDelete: 'CASCADE' },
+  )
   user!: User;
 
-  @ManyToOne(() => Currency, (currency) => currency.wallets, { onDelete: 'RESTRICT' })
+  @ManyToOne(
+    () => Currency,
+    (currency) => currency.wallets,
+    { onDelete: 'RESTRICT' },
+  )
   currency!: Currency;
 
   @OneToMany('WalletLedger', 'wallet')

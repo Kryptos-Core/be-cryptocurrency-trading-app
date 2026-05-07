@@ -7,7 +7,6 @@ import {
   type PaymentMethodType,
 } from '@/entities/payment-method-config.entity';
 
-
 @Injectable()
 export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig> {
   constructor(dataSource: DataSource) {
@@ -76,7 +75,16 @@ export class PaymentConfigRepository extends BaseRepository<PaymentMethodConfig>
          $7, $8, $8, NOW(), NOW()
        )
        RETURNING *`,
-      [configId, type, network, displayName, encryptedConfig, gracePeriodMinutes, sortOrder, userId],
+      [
+        configId,
+        type,
+        network,
+        displayName,
+        encryptedConfig,
+        gracePeriodMinutes,
+        sortOrder,
+        userId,
+      ],
     );
     return rows[0] as PaymentMethodConfig;
   }

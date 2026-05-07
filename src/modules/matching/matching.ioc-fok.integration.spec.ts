@@ -30,7 +30,8 @@ async function waitForOrderProcessed(
   throw new Error(`waitForOrderProcessed timed out for order ${orderId}`);
 }
 
-const describeIntegration = process.env.RUN_APP_BOOT_INTEGRATION === 'true' ? describe : describe.skip;
+const describeIntegration =
+  process.env.RUN_APP_BOOT_INTEGRATION === 'true' ? describe : describe.skip;
 
 describeIntegration('Matching IOC/FOK Integration', () => {
   let dataSource: DataSource;
@@ -226,7 +227,10 @@ describeIntegration('Matching IOC/FOK Integration', () => {
 
       expect(ledgerRows.length).toBe(4);
     } finally {
-      await dataSource.query('DELETE FROM wallet_ledger WHERE user_id IN ($1, $2, $3)', testUserIds);
+      await dataSource.query(
+        'DELETE FROM wallet_ledger WHERE user_id IN ($1, $2, $3)',
+        testUserIds,
+      );
 
       if (createdTradeIds.length > 0) {
         await dataSource.query(

@@ -315,6 +315,18 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED', 'true');
       case 'EVENT_OUTBOX_ALERTS_CHANNEL':
         return envOr('EVENT_OUTBOX_ALERTS_CHANNEL', 'outbox:alerts');
+      case 'MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS':
+        return envOr('MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS', '300');
+      case 'MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS':
+        return envOr('MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS', '900');
+      case 'GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS':
+        return envOr('GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS', '1');
+      case 'GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS':
+        return envOr('GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS', '72');
+      case 'BLOCKCHAIN_WITHDRAW_AUTO_MIN_AMOUNT':
+        return envOr('BLOCKCHAIN_WITHDRAW_AUTO_MIN_AMOUNT', '0');
+      case 'BLOCKCHAIN_DEPOSIT_BSC_TO_USDT_RATE':
+        return envOr('BLOCKCHAIN_DEPOSIT_BSC_TO_USDT_RATE', '0');
       default: {
         const rpcDef = EVM_CHAIN_DEFINITIONS.find((d) => d.rpcConfigKey === key);
         if (rpcDef) {
@@ -479,5 +491,3 @@ export class SystemConfigService implements OnModuleInit {
     await this.syncDbToRedis();
   }
 }
-
-

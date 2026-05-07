@@ -47,7 +47,9 @@ export class UsersRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   async findById(userId: string): Promise<User | null> {
-    const rows = await this.dataSource.query('SELECT * FROM users WHERE user_id = $1 LIMIT 1', [userId]);
+    const rows = await this.dataSource.query('SELECT * FROM users WHERE user_id = $1 LIMIT 1', [
+      userId,
+    ]);
     return (rows?.[0] as User | undefined) ?? null;
   }
 
@@ -77,7 +79,9 @@ export class UsersRepository {
       const s = `%${filters.search.trim()}%`;
       params.push(s);
       const idx = params.length;
-      whereClauses.push(`(u.email ILIKE $${idx} OR u.first_name ILIKE $${idx} OR u.last_name ILIKE $${idx})`);
+      whereClauses.push(
+        `(u.email ILIKE $${idx} OR u.first_name ILIKE $${idx} OR u.last_name ILIKE $${idx})`,
+      );
     }
 
     if (filters.email?.trim()) {
@@ -139,11 +143,7 @@ export class UsersRepository {
     };
   }
 
-  async findTestUsersByRole(
-    role: UserRole,
-    search?: string,
-    limit: number = 20,
-  ): Promise<User[]> {
+  async findTestUsersByRole(role: UserRole, search?: string, limit: number = 20): Promise<User[]> {
     const params: Array<string | number> = [role, limit];
     let whereSearch = '';
     if (search?.trim()) {
@@ -251,7 +251,7 @@ export class UsersRepository {
     const params: Array<string | number> = [userId];
 
     if (updates.email !== undefined) {
-      params.push(updates.email ? updates.email.toLowerCase() : null as unknown as string);
+      params.push(updates.email ? updates.email.toLowerCase() : (null as unknown as string));
       setClauses.push(`email = $${params.length}`);
     }
 
@@ -287,7 +287,12 @@ export class UsersRepository {
     this.logger.log(`User deleted (soft): ${userId}`);
   }
 
-  async getStatistics(): Promise<{ total: number; active: number; banned: number; pending: number }> {
+  async getStatistics(): Promise<{
+    total: number;
+    active: number;
+    banned: number;
+    pending: number;
+  }> {
     const rows = await this.dataSource.query(`
       SELECT
         COUNT(*)::int AS total,
@@ -413,13 +418,16 @@ export class UsersRepository {
         [requestId],
       );
 
-      const request = (requestRows?.[0] as {
-        request_id: string;
-        user_id: string;
-        change_type: string;
-        payload_json: string;
-        status: string;
-      } | undefined) ?? null;
+      const request =
+        (requestRows?.[0] as
+          | {
+              request_id: string;
+              user_id: string;
+              change_type: string;
+              payload_json: string;
+              status: string;
+            }
+          | undefined) ?? null;
 
       if (!request) {
         return null;
@@ -429,7 +437,8 @@ export class UsersRepository {
         const payload = JSON.parse(request.payload_json) as Record<string, unknown>;
 
         if (request.change_type === 'EMAIL_CHANGE') {
-          const nextEmail = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+          const nextEmail =
+            typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
           if (nextEmail) {
             await manager.query('UPDATE users SET email = $2 WHERE user_id = $1', [
               request.user_id,

@@ -26,9 +26,11 @@ export class AddOutboxRetryAndDlqMetadata1776590000000 implements MigrationInter
     indexName: string,
     createIndexSql: string,
   ): Promise<void> {
-    const hasIndex = (queryRunner as QueryRunner & {
-      hasIndex?: (table: string, index: string) => Promise<boolean>;
-    }).hasIndex;
+    const hasIndex = (
+      queryRunner as QueryRunner & {
+        hasIndex?: (table: string, index: string) => Promise<boolean>;
+      }
+    ).hasIndex;
     if (typeof hasIndex === 'function') {
       if (await hasIndex.call(queryRunner, tableName, indexName)) {
         return;

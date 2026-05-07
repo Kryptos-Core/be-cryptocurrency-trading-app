@@ -43,7 +43,13 @@ describe('ProcessedIntegrationEventsService', () => {
     const service = moduleRef.get(ProcessedIntegrationEventsService);
     const callback = jest.fn().mockResolvedValue('ok');
 
-    const result = await service.runOnce(em, 'consumer-b', 'event-2', 'wallet.balance_changed', callback);
+    const result = await service.runOnce(
+      em,
+      'consumer-b',
+      'event-2',
+      'wallet.balance_changed',
+      callback,
+    );
 
     expect(result).toEqual({ skipped: false, result: 'ok' });
     expect(callback).toHaveBeenCalledTimes(1);

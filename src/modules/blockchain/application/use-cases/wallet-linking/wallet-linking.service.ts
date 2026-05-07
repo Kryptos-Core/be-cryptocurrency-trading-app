@@ -105,14 +105,17 @@ export class WalletLinkingService {
 
   async getLinkedWallets(userId: string) {
     const cacheKey = this.buildListCacheKey(userId);
-    const cached = await this.cacheService.get<Array<{
-      linkId: string;
-      chain: string;
-      address: string;
-      label: string | null;
-      status: string;
-      linkedAt: string | null;
-    }>>(cacheKey);
+    const cached =
+      await this.cacheService.get<
+        Array<{
+          linkId: string;
+          chain: string;
+          address: string;
+          label: string | null;
+          status: string;
+          linkedAt: string | null;
+        }>
+      >(cacheKey);
     if (cached) return cached;
 
     const rows = await this.linkedWalletRepo.findActiveByUser(userId);

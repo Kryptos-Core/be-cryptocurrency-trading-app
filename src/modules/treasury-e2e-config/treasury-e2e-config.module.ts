@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WalletEncryptionService } from '@/common/services';
-import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
-import { AuthModule } from '@/modules/auth/auth.module';
-import { UsersModule } from '@/modules/users/users.module';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { TreasuryE2EConfig } from '@/entities/treasury-e2e-config.entity';
+import { AuthModule } from '@/modules/auth/auth.module';
+import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
+import { UsersModule } from '@/modules/users/users.module';
 import { GetTreasuryE2EConfigsQuery } from './application/queries';
 import {
   ActivateTreasuryE2EConfigUseCase,
@@ -20,7 +20,12 @@ import { TreasuryE2EConfigController } from './treasury-e2e-config.controller';
 import { TreasuryE2EConfigService } from './treasury-e2e-config.service';
 
 @Module({
-  imports: [AuthModule, UsersModule, BlockchainModule, TypeOrmModule.forFeature([TreasuryE2EConfig, IntegrationOutbox])],
+  imports: [
+    AuthModule,
+    UsersModule,
+    BlockchainModule,
+    TypeOrmModule.forFeature([TreasuryE2EConfig, IntegrationOutbox]),
+  ],
   controllers: [TreasuryE2EConfigController],
   providers: [
     TreasuryE2EConfigRepository,

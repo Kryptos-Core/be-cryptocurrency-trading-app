@@ -1,10 +1,10 @@
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
-import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 import { OutboxAdminService } from './outbox-admin.service';
+import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 
 describe('OutboxAdminService', () => {
   let service: OutboxAdminService;
@@ -21,6 +21,8 @@ describe('OutboxAdminService', () => {
     const execute = jest.fn();
     const qb = {
       update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -268,5 +270,106 @@ describe('OutboxAdminService', () => {
         degraded: true,
       },
     });
+  });
+
+  it('purges abandoned messages older than threshold with max attempts reached', async () => {
+    const oldDate = new Date('2026-04-20T00:00:00.000Z');
+    repository.find.mockResolvedValueOnce([
+      {
+        id: 'abandoned-1',
+        event_type: 'trade.executed',
+        kafka_topic: 'trades.executed',
+        publish_attempts: 5,
+        occurred_at: oldDate,
+      },
+      {
+        id: 'abandoned-2',
+        event_type: 'wallet.balance_changed',
+        kafka_topic: 'wallet.balance',
+        publish_attempts: 5,
+        occurred_at: oldDate,
+      },
+    ]);
+    const qb = repository.createQueryBuilder();
+    qb.execute.mockResolvedValueOnce({ affected: 2 });
+    outboxReplayAuditService.record.mockResolvedValueOnce({
+      auditId: 'audit-purge-1',
+      outputFile: 'reports/outbox-replay/2026-05-07.json',
+    });
+
+    const result = await service.purgeAbandonedMessages(86400, {
+      actorUserId: 'admin-1',
+      actorRole: 'ADMIN',
+      reason: 'cleanup noop driver backlog',
+    });
+
+    expect(result).toEqual({
+      deletedCount: 2,
+      auditId: 'audit-purge-1',
+      auditOutputFile: 'reports/outbox-replay/2026-05-07.json',
+    });
+
+    expect(outboxReplayAuditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'purge_abandoned',
+        actorUserId: 'admin-1',
+        actorRole: 'ADMIN',
+        reason: 'cleanup noop driver backlog',
+        selectedRowCount: 2,
+        requeuedRowCount: 2,
+      }),
+    );
+  });
+
+  it('does not purge messages younger than threshold', async () => {
+    const recentDate = new Date();
+    repository.find.mockResolvedValueOnce([
+      {
+        id: 'recent-1',
+        event_type: 'trade.executed',
+        publish_attempts: 5,
+        occurred_at: recentDate,
+      },
+    ]);
+    outboxReplayAuditService.record.mockResolvedValueOnce({
+      auditId: 'audit-no-purge',
+      outputFile: 'reports/outbox-replay/2026-05-07.json',
+    });
+
+    const result = await service.purgeAbandonedMessages(86400, {
+      actorUserId: 'admin-1',
+      actorRole: 'ADMIN',
+    });
+
+    expect(result.deletedCount).toBe(0);
+    expect(outboxReplayAuditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedRowCount: 0,
+        requeuedRowCount: 0,
+      }),
+    );
+  });
+
+  it('does not purge messages with insufficient attempts even if old', async () => {
+    const oldDate = new Date('2026-04-20T00:00:00.000Z');
+    repository.find.mockResolvedValueOnce([
+      {
+        id: 'retry-1',
+        event_type: 'trade.executed',
+        publish_attempts: 2,
+        occurred_at: oldDate,
+      },
+    ]);
+    outboxReplayAuditService.record.mockResolvedValueOnce({
+      auditId: 'audit-no-purge-attempts',
+      outputFile: 'reports/outbox-replay/2026-05-07.json',
+    });
+
+    const result = await service.purgeAbandonedMessages(86400, {
+      actorUserId: 'admin-1',
+      actorRole: 'ADMIN',
+    });
+
+    expect(result.deletedCount).toBe(0);
   });
 });

@@ -10,7 +10,10 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { BLOCKCHAIN_CHAIN_DB_VALUES, type BlockchainChainDbValue } from '@/common/constants/blockchain-chain-db';
+import {
+  BLOCKCHAIN_CHAIN_DB_VALUES,
+  type BlockchainChainDbValue,
+} from '@/common/constants/blockchain-chain-db';
 
 const DECIMAL_STRING = /^\d+(\.\d+)?$/;
 

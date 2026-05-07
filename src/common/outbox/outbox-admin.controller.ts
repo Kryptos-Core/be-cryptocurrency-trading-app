@@ -27,12 +27,11 @@ export class OutboxAdminController {
   @Get('dead-letter')
   @ApiOperation({
     summary: 'List dead-lettered outbox rows',
-    description: 'Operational endpoint for inspecting unpublished outbox rows moved to dead-letter state.',
+    description:
+      'Operational endpoint for inspecting unpublished outbox rows moved to dead-letter state.',
   })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 100 })
-  async listDeadLetter(
-    @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
-  ) {
+  async listDeadLetter(@Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number) {
     return {
       items: await this.outboxAdminService.listDeadLetterRows(limit),
     };
@@ -83,9 +82,7 @@ export class OutboxAdminController {
       'Returns recent audit trail for dead-letter requeue actions (who, when, reason, selected rows, requeued rows).',
   })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
-  async listReplayAudits(
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ) {
+  async listReplayAudits(@Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
     return {
       items: await this.outboxAdminService.listReplayAudits(limit),
     };
@@ -94,10 +91,29 @@ export class OutboxAdminController {
   @Get('relay-health')
   @ApiOperation({
     summary: 'Outbox relay operational health + age SLO signals',
-    description: 'Returns backlog/retry/dead-letter counts, age signals, warning/critical thresholds, and computed alert severity for relay observability + automation.',
+    description:
+      'Returns backlog/retry/dead-letter counts, age signals, warning/critical thresholds, and computed alert severity for relay observability + automation.',
   })
   async relayHealth() {
     return this.outboxAdminService.getRelayHealth();
   }
-}
 
+  @Post('purge-abandoned')
+  @ApiOperation({
+    summary: 'Purge abandoned outbox rows that exceeded max retries and age threshold',
+    description:
+      'Deletes unpublished rows that have reached max retry attempts and are older than the specified threshold. Use when noop driver or misconfiguration left unrecoverable messages. Writes audit evidence.',
+  })
+  async purgeAbandoned(
+    @Body('maxAgeSeconds', new DefaultValuePipe(86400), ParseIntPipe) maxAgeSeconds: number,
+    @CurrentUser('userId') actorUserId: string,
+    @CurrentUser('role') actorRole: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.outboxAdminService.purgeAbandonedMessages(maxAgeSeconds, {
+      actorUserId,
+      actorRole,
+      reason,
+    });
+  }
+}

@@ -1006,7 +1006,6 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
   return validatedConfig;
 }
 
-
 /** Map legacy DB_* env to CORE_DB_* when CORE_DB_* is omitted. */
 export function applyCoreDbFallbacks(config: EnvironmentVariables): void {
   if (!config.CORE_DB_HOST && config.DB_HOST) config.CORE_DB_HOST = config.DB_HOST;
@@ -1084,10 +1083,3 @@ export function assertOnchainSandboxRpcOrThrow(config: EnvironmentVariables): vo
     }
   }
 }
-
-
-
-
-
-
-

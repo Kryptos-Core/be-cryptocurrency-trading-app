@@ -1,12 +1,12 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { RedisService } from '@/common/services/redis.service';
-import { EXCHANGE_RATE_AUDIT_REPOSITORY } from './domain/ports';
 import { CURRENCY_REPOSITORY } from '@/modules/currencies/domain/ports';
 import { DepositsService } from '@/modules/deposits/deposits.service';
 import { EXCHANGE_RATE_ALERTS_CHANNEL } from '@/modules/exchange-rate/constants';
 import { PaymentConfigService } from '@/modules/payment-config/payment-config.service';
 import { UsersService } from '@/modules/users/users.service';
+import { EXCHANGE_RATE_AUDIT_REPOSITORY } from './domain/ports';
 import { ExchangeRateService } from './exchange-rate.service';
 import { CoinGeckoProvider } from './providers/coingecko.provider';
 import { FiatRateProvider } from './providers/fiat-rate.provider';
@@ -60,7 +60,11 @@ describe('ExchangeRateService', () => {
       publish: jest.fn(),
     } as unknown as jest.Mocked<RedisService>;
 
-    auditRepo = { save: jest.fn(), find: jest.fn(), findLatest: jest.fn().mockResolvedValue([]) } as any;
+    auditRepo = {
+      save: jest.fn(),
+      find: jest.fn(),
+      findLatest: jest.fn().mockResolvedValue([]),
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

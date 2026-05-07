@@ -1,6 +1,6 @@
 import { Global, Inject, Module, OnApplicationShutdown, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { CORE_DB, MARKET_TS_DB, databaseProviders } from './database.providers';
+import { CORE_DB, databaseProviders, MARKET_TS_DB } from './database.providers';
 
 @Global()
 @Module({

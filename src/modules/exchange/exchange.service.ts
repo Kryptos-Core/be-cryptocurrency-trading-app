@@ -26,12 +26,28 @@ export class ExchangeService implements IExchangeProvider {
     }
   }
 
-  getBalance(asset: string) { return this.provider.getBalance(asset); }
-  createOrder(params: ExchangeOrderParams) { return this.provider.createOrder(params); }
-  cancelOrder(orderId: string, symbol: string) { return this.provider.cancelOrder(orderId, symbol); }
-  getOrderStatus(orderId: string, symbol: string) { return this.provider.getOrderStatus(orderId, symbol); }
-  verifyTransaction(txId: string, asset: string) { return this.provider.verifyTransaction(txId, asset); }
-  createWithdrawal(asset: string, amount: Decimal, address: string) { return this.provider.createWithdrawal(asset, amount, address); }
-  getName() { return this.provider.getName(); }
-  ping() { return this.provider.ping(); }
+  getBalance(asset: string) {
+    return this.provider.getBalance(asset);
+  }
+  createOrder(params: ExchangeOrderParams) {
+    return this.provider.createOrder(params);
+  }
+  cancelOrder(orderId: string, symbol: string) {
+    return this.provider.cancelOrder(orderId, symbol);
+  }
+  getOrderStatus(orderId: string, symbol: string) {
+    return this.provider.getOrderStatus(orderId, symbol);
+  }
+  verifyTransaction(txId: string, asset: string) {
+    return this.provider.verifyTransaction(txId, asset);
+  }
+  createWithdrawal(asset: string, amount: Decimal, address: string) {
+    return this.provider.createWithdrawal(asset, amount, address);
+  }
+  getName() {
+    return this.provider.getName();
+  }
+  ping() {
+    return this.provider.ping();
+  }
 }

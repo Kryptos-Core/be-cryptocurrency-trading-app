@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DataSource, Repository } from 'typeorm';
+import { MARKET_TS_DB } from '@/config';
 import { ReadMarketOhlcv } from '@/entities/read-market-ohlcv.entity';
 import { ReadMarketTicker } from '@/entities/read-market-ticker.entity';
 import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
-import { MARKET_TS_DB } from '@/config';
 import type { MarketRecentTradeResponse } from '@/modules/markets/markets.service';
 import type { MarketTickerDto } from '../dto';
 
@@ -20,9 +20,10 @@ export class MarketReadModelRepository {
     this.marketReadSource = (this.configService.get<string>('MARKET_READ_SOURCE') ?? 'postgres')
       .trim()
       .toLowerCase();
-    this.marketTsEnabled = String(this.configService.get<string>('MARKET_TS_ENABLED') ?? 'false')
-      .trim()
-      .toLowerCase() === 'true';
+    this.marketTsEnabled =
+      String(this.configService.get<string>('MARKET_TS_ENABLED') ?? 'false')
+        .trim()
+        .toLowerCase() === 'true';
   }
 
   shouldUseReadModel(): boolean {
@@ -122,18 +123,24 @@ export class MarketReadModelRepository {
     }));
   }
 
-  async getOhlcv(pairId: string, intervalSec: number, limit: number): Promise<Array<{
-    pair_id: string;
-    interval_sec: number;
-    open_time: Date;
-    open: string;
-    high: string;
-    low: string;
-    close: string;
-    volume: string;
-    quote_volume: string;
-    trades_count: number;
-  }>> {
+  async getOhlcv(
+    pairId: string,
+    intervalSec: number,
+    limit: number,
+  ): Promise<
+    Array<{
+      pair_id: string;
+      interval_sec: number;
+      open_time: Date;
+      open: string;
+      high: string;
+      low: string;
+      close: string;
+      volume: string;
+      quote_volume: string;
+      trades_count: number;
+    }>
+  > {
     const repository = this.getRepository(ReadMarketOhlcv);
     const rows = await repository.find({
       where: { pair_id: pairId, interval_sec: intervalSec },

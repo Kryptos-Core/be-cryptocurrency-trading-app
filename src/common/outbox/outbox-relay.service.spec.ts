@@ -1,12 +1,12 @@
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import { RedisService } from '@/common/services/redis.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { MetricsService } from '@/telemetry/metrics.service';
-import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
+import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { OutboxRelayService } from './outbox-relay.service';
 
 jest.mock('@/common/utils/redis-distributed-lock', () => ({
@@ -103,7 +103,9 @@ describe('OutboxRelayService', () => {
           }),
           save: jest.fn(async (_entity: unknown, row: IntegrationOutbox) => {
             if (persistFailureStateInSameTransaction && txIndex === 0 && row.last_publish_error) {
-              throw new Error('current transaction is aborted, commands ignored until end of transaction block');
+              throw new Error(
+                'current transaction is aborted, commands ignored until end of transaction block',
+              );
             }
             savedRows.push({ ...row });
             if (row.published_at) {
@@ -189,8 +191,12 @@ describe('OutboxRelayService', () => {
     expect(savedRows[0].published_at).not.toBeNull();
     expect(metricsService.incrementOutboxRelayPublished).toHaveBeenCalledWith(rowA.event_type);
     expect(metricsService.setOutboxBacklog).toHaveBeenCalledWith('all', expect.any(Number));
-    expect(metricsService.setOutboxOldestUnpublishedAgeSeconds).toHaveBeenCalledWith(expect.any(Number));
-    expect(metricsService.setOutboxOldestDeadLetterAgeSeconds).toHaveBeenCalledWith(expect.any(Number));
+    expect(metricsService.setOutboxOldestUnpublishedAgeSeconds).toHaveBeenCalledWith(
+      expect.any(Number),
+    );
+    expect(metricsService.setOutboxOldestDeadLetterAgeSeconds).toHaveBeenCalledWith(
+      expect.any(Number),
+    );
   });
 
   it('persists retry schedule in a separate transaction when the main transaction is aborted', async () => {

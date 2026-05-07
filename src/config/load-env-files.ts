@@ -1,5 +1,5 @@
-import * as path from 'node:path';
 import { existsSync } from 'node:fs';
+import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
 /**

@@ -18,7 +18,10 @@ export class DomainEventDispatcher {
     return (event as EventWithOptionalType).eventType ?? event.constructor.name;
   }
 
-  register<T extends DomainEvent>(eventClass: DomainEventClass<T>, handler: DomainEventHandler<T>): void {
+  register<T extends DomainEvent>(
+    eventClass: DomainEventClass<T>,
+    handler: DomainEventHandler<T>,
+  ): void {
     let bucket = this.handlers.get(eventClass);
     if (!bucket) {
       bucket = new Set();
@@ -27,7 +30,10 @@ export class DomainEventDispatcher {
     bucket.add(handler as DomainEventHandler);
   }
 
-  unregister<T extends DomainEvent>(eventClass: DomainEventClass<T>, handler: DomainEventHandler<T>): void {
+  unregister<T extends DomainEvent>(
+    eventClass: DomainEventClass<T>,
+    handler: DomainEventHandler<T>,
+  ): void {
     const handlers = this.handlers.get(eventClass);
     if (handlers) {
       handlers.delete(handler as DomainEventHandler);
@@ -53,7 +59,10 @@ export class DomainEventDispatcher {
           handlerPromises.push(result instanceof Promise ? result : Promise.resolve());
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
-          this.logger.error(`Handler error for ${event.constructor.name}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Handler error for ${event.constructor.name}: ${error.message}`,
+            error.stack,
+          );
           handlerPromises.push(Promise.reject(error));
         }
       }
@@ -65,7 +74,9 @@ export class DomainEventDispatcher {
         if (result instanceof Promise) {
           handlerPromises.push(
             result.catch((err: unknown) => {
-              this.logger.error(`Wildcard handler error: ${err instanceof Error ? err.message : String(err)}`);
+              this.logger.error(
+                `Wildcard handler error: ${err instanceof Error ? err.message : String(err)}`,
+              );
             }),
           );
         }

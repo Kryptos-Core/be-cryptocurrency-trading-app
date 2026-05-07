@@ -163,7 +163,9 @@ export class ExchangeInfoSyncService {
         symbolToCurrencyId.set(asset, currency.currency_id);
         result.currenciesCreated += 1;
       } catch (err: unknown) {
-        result.errors.push(`Currency ${asset}: ${err instanceof Error ? err.message : String(err)}`);
+        result.errors.push(
+          `Currency ${asset}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -208,7 +210,9 @@ export class ExchangeInfoSyncService {
         });
         result.pairsCreated += 1;
       } catch (err: unknown) {
-        result.errors.push(`Pair ${pairSymbol}: ${err instanceof Error ? err.message : String(err)}`);
+        result.errors.push(
+          `Pair ${pairSymbol}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 

@@ -23,26 +23,26 @@ import {
   KafkaOutboxEventPublisher,
   KafkaOutboxEventPublisherDriver,
 } from './kafka-outbox-event-publisher.service';
-import { OutboxAdminController } from './outbox-admin.controller';
-import { OutboxAdminService } from './outbox-admin.service';
+import {
+  NoopOutboxEventPublisher,
+  NoopOutboxEventPublisherDriver,
+} from './noop-outbox-event-publisher.service';
 import {
   DEFAULT_OUTBOX_EVENT_PUBLISHER_DRIVER,
   OUTBOX_EVENT_PUBLISHER,
   OUTBOX_RELAY_QUEUE,
 } from './outbox.constants';
-import {
-  NoopOutboxEventPublisher,
-  NoopOutboxEventPublisherDriver,
-} from './noop-outbox-event-publisher.service';
-import type { OutboxEventPublisher } from './outbox-event-publisher.port';
+import { OutboxAdminController } from './outbox-admin.controller';
+import { OutboxAdminService } from './outbox-admin.service';
 import { OutboxAppender } from './outbox-appender.service';
+import type { OutboxEventPublisher } from './outbox-event-publisher.port';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
-import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
 import { OutboxRelayEnqueueScheduler } from './outbox-relay.enqueue.scheduler';
-import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 import { OutboxRelayProcessor } from './outbox-relay.processor';
-import { OutboxRelayAlertingCollectorService } from './outbox-relay-alerting-collector.service';
 import { OutboxRelayService } from './outbox-relay.service';
+import { OutboxRelayAlertingCollectorService } from './outbox-relay-alerting-collector.service';
+import { OutboxReplayAuditService } from './outbox-replay-audit.service';
+import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
 
 @Module({
   imports: [
@@ -83,21 +83,18 @@ import { OutboxRelayService } from './outbox-relay.service';
     KafkaOutboxEventPublisherDriver,
     {
       provide: OUTBOX_EVENT_PUBLISHER,
-      inject: [
-        ConfigService,
-        NoopOutboxEventPublisherDriver,
-        KafkaOutboxEventPublisherDriver,
-      ],
+      inject: [ConfigService, NoopOutboxEventPublisherDriver, KafkaOutboxEventPublisherDriver],
       useFactory: async (
         configService: ConfigService,
         noopDriver: NoopOutboxEventPublisherDriver,
         kafkaDriver: KafkaOutboxEventPublisherDriver,
       ): Promise<OutboxEventPublisher> => {
-        const driverName =
-          (configService.get<string>('EVENT_PUBLISHER_DRIVER') ??
-            DEFAULT_OUTBOX_EVENT_PUBLISHER_DRIVER)
-            .trim()
-            .toLowerCase();
+        const driverName = (
+          configService.get<string>('EVENT_PUBLISHER_DRIVER') ??
+          DEFAULT_OUTBOX_EVENT_PUBLISHER_DRIVER
+        )
+          .trim()
+          .toLowerCase();
 
         const drivers = [noopDriver, kafkaDriver];
         const matched = drivers.find((driver) => driver.supports(driverName));
@@ -113,7 +110,3 @@ import { OutboxRelayService } from './outbox-relay.service';
   exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService],
 })
 export class OutboxModule {}
-
-
-
-

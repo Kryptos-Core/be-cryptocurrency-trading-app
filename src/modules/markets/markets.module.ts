@@ -12,15 +12,15 @@ import {
   GetMarketPairQuery,
   GetMarketTickerQuery,
 } from './application/queries';
-import { MarketReadModelMetricsCollectorService } from './market-read-model-metrics-collector.service';
 import {
   CreateMarketPairUseCase,
   DeleteMarketPairUseCase,
   UpdateMarketPairUseCase,
 } from './application/use-cases';
 import { MARKET_REPOSITORY } from './domain/ports';
-import { MarketsController } from './markets.controller';
+import { MarketReadModelMetricsCollectorService } from './market-read-model-metrics-collector.service';
 import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
+import { MarketsController } from './markets.controller';
 import { MarketsService } from './markets.service';
 import { MarketReadModelRepository, MarketRepository } from './repositories';
 

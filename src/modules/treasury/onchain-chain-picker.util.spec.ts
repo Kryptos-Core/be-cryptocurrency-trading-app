@@ -172,4 +172,3 @@ describe('buildChainPickerOptions', () => {
     expect(dto.networkCatalog[0].capabilities.deposit).toBe(false);
   });
 });
-

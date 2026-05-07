@@ -49,8 +49,9 @@ export class PublicWsPayloadParityService {
   private readonly latestEmittedTickerByPair = new Map<string, TickerMessage>();
 
   constructor(private readonly configService: ConfigService) {
-    this.publicWsSource =
-      (this.configService.get<string>('PUBLIC_WS_SOURCE') ?? 'nestjs').trim().toLowerCase();
+    this.publicWsSource = (this.configService.get<string>('PUBLIC_WS_SOURCE') ?? 'nestjs')
+      .trim()
+      .toLowerCase();
   }
 
   @OnEvent(MARKET_EVENTS.PRICE_UPDATED)
@@ -82,9 +83,11 @@ export class PublicWsPayloadParityService {
     };
   }
 
-  private validateTicker(
-    payload: TickerMessage | null,
-  ): { hasSample: boolean; contractValid: boolean; missingFields: string[] } {
+  private validateTicker(payload: TickerMessage | null): {
+    hasSample: boolean;
+    contractValid: boolean;
+    missingFields: string[];
+  } {
     const requiredFields: Array<keyof TickerMessage> = [
       'pair_id',
       'symbol',
@@ -123,9 +126,11 @@ export class PublicWsPayloadParityService {
     };
   }
 
-  private validateOhlc(
-    payload: OHLCMessage | null,
-  ): { hasSample: boolean; contractValid: boolean; missingFields: string[] } {
+  private validateOhlc(payload: OHLCMessage | null): {
+    hasSample: boolean;
+    contractValid: boolean;
+    missingFields: string[];
+  } {
     const requiredFields: Array<keyof OHLCMessage> = [
       'pair_id',
       'interval',
@@ -176,10 +181,16 @@ export class PublicWsPayloadParityService {
         continue;
       }
 
-      const lastPriceDelta = this.absoluteDelta(externalTicker.last_price, emittedTicker.last_price);
+      const lastPriceDelta = this.absoluteDelta(
+        externalTicker.last_price,
+        emittedTicker.last_price,
+      );
       const bidDelta = this.absoluteDelta(externalTicker.bid, emittedTicker.bid);
       const askDelta = this.absoluteDelta(externalTicker.ask, emittedTicker.ask);
-      const volume24hDelta = this.absoluteDelta(externalTicker.volume_24h, emittedTicker.volume_24h);
+      const volume24hDelta = this.absoluteDelta(
+        externalTicker.volume_24h,
+        emittedTicker.volume_24h,
+      );
 
       const hasDrift =
         this.isNonZero(lastPriceDelta) ||

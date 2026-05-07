@@ -2,8 +2,8 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '@/common/services';
 import type { OHLCMessage, TickerMessage } from '../interfaces/websocket.interface';
-import { TradingPriceStreamService } from './trading-price-stream.service';
 import { PublicWsPayloadParityService } from './public-ws-payload-parity.service';
+import { TradingPriceStreamService } from './trading-price-stream.service';
 
 const DEFAULT_TICKER_CHANNEL = 'trading:external:ticker';
 const DEFAULT_OHLC_CHANNEL = 'trading:external:ohlc';
@@ -37,11 +37,13 @@ export class GoAggregatorPriceFeedService implements OnModuleInit, OnModuleDestr
       .trim()
       .toLowerCase();
     this.tickerChannel =
-      (this.configService.get<string>('GO_AGGREGATOR_TICKER_CHANNEL') ?? DEFAULT_TICKER_CHANNEL)
-        .trim() || DEFAULT_TICKER_CHANNEL;
+      (
+        this.configService.get<string>('GO_AGGREGATOR_TICKER_CHANNEL') ?? DEFAULT_TICKER_CHANNEL
+      ).trim() || DEFAULT_TICKER_CHANNEL;
     this.ohlcChannel =
-      (this.configService.get<string>('GO_AGGREGATOR_OHLC_CHANNEL') ?? DEFAULT_OHLC_CHANNEL).trim() ||
-      DEFAULT_OHLC_CHANNEL;
+      (
+        this.configService.get<string>('GO_AGGREGATOR_OHLC_CHANNEL') ?? DEFAULT_OHLC_CHANNEL
+      ).trim() || DEFAULT_OHLC_CHANNEL;
   }
 
   async onModuleInit(): Promise<void> {

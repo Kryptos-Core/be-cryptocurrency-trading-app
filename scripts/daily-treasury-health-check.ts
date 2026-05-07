@@ -49,16 +49,26 @@ async function main() {
 
   const reportAt = new Date().toISOString();
   const alerts: AlertItem[] = [];
-  const envName = (process.env.TREASURY_E2E_CONFIG_ENV || process.env.NODE_ENV || 'development').trim().toLowerCase();
+  const envName = (process.env.TREASURY_E2E_CONFIG_ENV || process.env.NODE_ENV || 'development')
+    .trim()
+    .toLowerCase();
   const activeConfig = await treasuryE2EConfig.getRunnerConfigForEnvironment(envName);
 
-  const staleManualMinutes = activeConfig?.staleManualMinutes ?? envNumber('TREASURY_ALERT_STALE_MANUAL_MINUTES', 15);
-  const staleConfirmingMinutes = activeConfig?.staleConfirmingMinutes ?? envNumber('TREASURY_ALERT_STALE_CONFIRMING_MINUTES', 30);
-  const failedWithdrawLimit = activeConfig?.failedWithdrawals24h ?? envNumber('TREASURY_ALERT_FAILED_WITHDRAWALS_24H', 10);
-  const reconcileLimit = activeConfig?.reconcilePairLimit ?? envNumber('TREASURY_RECONCILE_PAIR_LIMIT', 100);
-  const discrepancyThreshold = activeConfig?.reconciliationThreshold ?? await systemConfig.getEffectiveString('WALLET_RECONCILIATION_THRESHOLD');
-  const failOnCritical = activeConfig?.healthFailOnCritical ??
-    ((process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true');
+  const staleManualMinutes =
+    activeConfig?.staleManualMinutes ?? envNumber('TREASURY_ALERT_STALE_MANUAL_MINUTES', 15);
+  const staleConfirmingMinutes =
+    activeConfig?.staleConfirmingMinutes ??
+    envNumber('TREASURY_ALERT_STALE_CONFIRMING_MINUTES', 30);
+  const failedWithdrawLimit =
+    activeConfig?.failedWithdrawals24h ?? envNumber('TREASURY_ALERT_FAILED_WITHDRAWALS_24H', 10);
+  const reconcileLimit =
+    activeConfig?.reconcilePairLimit ?? envNumber('TREASURY_RECONCILE_PAIR_LIMIT', 100);
+  const discrepancyThreshold =
+    activeConfig?.reconciliationThreshold ??
+    (await systemConfig.getEffectiveString('WALLET_RECONCILIATION_THRESHOLD'));
+  const failOnCritical =
+    activeConfig?.healthFailOnCritical ??
+    (process.env.TREASURY_HEALTH_FAIL_ON_CRITICAL || 'false').toLowerCase() === 'true';
 
   try {
     const staleManualRows = (await dataSource.query(

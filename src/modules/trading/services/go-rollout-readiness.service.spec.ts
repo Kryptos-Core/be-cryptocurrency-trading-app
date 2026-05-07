@@ -1,11 +1,11 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { MarketReadModelReconciliationService } from '@/modules/markets/market-read-model-reconciliation.service';
-import { PublicWsPayloadParityService } from './public-ws-payload-parity.service';
 import { GoRolloutReadinessService } from './go-rollout-readiness.service';
+import { PublicWsPayloadParityService } from './public-ws-payload-parity.service';
 
 describe('GoRolloutReadinessService', () => {
   it('returns readiness with blockers when thresholds are violated', async () => {
@@ -207,6 +207,5 @@ afterAll(async () => {
   const rollbackFile = path.join(process.cwd(), 'reports', 'go-rollout', 'rollback-drills.json');
   try {
     await fs.unlink(rollbackFile);
-  } catch {
-  }
+  } catch {}
 });

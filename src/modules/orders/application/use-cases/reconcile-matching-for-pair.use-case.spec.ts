@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@/common/exceptions';
 import { MARKET_REPOSITORY } from '@/modules/markets/domain/ports';
 import { MatchingShadowReconciliationUseCase } from '@/modules/matching/application/use-cases';
+import { ReconcileMatchingForPairUseCase } from '@/modules/orders/application/use-cases/reconcile-matching-for-pair.use-case';
 import { ORDER_MATCHING_GATEWAY } from '@/modules/orders/domain/ports';
 import { MetricsService } from '@/telemetry';
-import { ReconcileMatchingForPairUseCase } from '@/modules/orders/application/use-cases/reconcile-matching-for-pair.use-case';
 
 describe('ReconcileMatchingForPairUseCase', () => {
   const marketRepository = {

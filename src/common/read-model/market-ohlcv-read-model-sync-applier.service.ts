@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
+import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import {
   isTradeExecutedOutboxPayloadV1,
   type TradeExecutedOutboxPayloadV1,
 } from '@/common/integration-events/trade-executed-outbox-payload';
-import { unwrapCanonicalIntegrationEventPayload } from '@/common/integration-events/canonical-integration-event-envelope';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ReadMarketOhlcv } from '@/entities/read-market-ohlcv.entity';
 

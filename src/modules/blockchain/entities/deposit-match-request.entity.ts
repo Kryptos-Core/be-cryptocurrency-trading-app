@@ -52,6 +52,6 @@ export class DepositMatchRequest {
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   resolved_at!: Date | null;
 
-  @Column({ type: 'json', default: () => "(JSON_ARRAY())" })
+  @Column({ type: 'json', default: () => '(JSON_ARRAY())' })
   audit_log!: DepositMatchAuditEntry[];
 }

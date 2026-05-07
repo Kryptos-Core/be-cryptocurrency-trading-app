@@ -132,7 +132,10 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
         if (params.type === 'LIMIT') {
           reserveQuote = String(toNumeric(params.amount) * toNumeric(params.price));
         } else {
-          if (params.marketBuyReservedQuote == null || toNumeric(params.marketBuyReservedQuote) <= 0) {
+          if (
+            params.marketBuyReservedQuote == null ||
+            toNumeric(params.marketBuyReservedQuote) <= 0
+          ) {
             return this.createError(
               'INVALID_MARKET_BUY_RESERVE',
               'MARKET BUY requires a positive reserved quote',
@@ -237,7 +240,11 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
 
       const pair = await this.findPair(manager, order.pair_id);
       if (!pair) {
-        return { cancelled: 0, error_code: 'PAIR_NOT_FOUND', error_message: 'Market pair not found' };
+        return {
+          cancelled: 0,
+          error_code: 'PAIR_NOT_FOUND',
+          error_message: 'Market pair not found',
+        };
       }
 
       const releaseAmount = order.side === 'BUY' ? order.reserved_quote : order.reserved_base;
@@ -246,7 +253,11 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
           order.side === 'BUY' ? String(pair.quote_currency_id) : String(pair.base_currency_id);
         const wallet = await this.findWalletForUpdate(manager, order.user_id, releaseCurrencyId);
         if (!wallet) {
-          return { cancelled: 0, error_code: 'WALLET_NOT_FOUND', error_message: 'Wallet not found' };
+          return {
+            cancelled: 0,
+            error_code: 'WALLET_NOT_FOUND',
+            error_message: 'Wallet not found',
+          };
         }
 
         await manager.query(
@@ -350,7 +361,10 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
     return { order_id: null, error_code, error_message };
   }
 
-  private async findActivePairForUpdate(executor: DbExecutor, pairId: string): Promise<MarketPairRow | null> {
+  private async findActivePairForUpdate(
+    executor: DbExecutor,
+    pairId: string,
+  ): Promise<MarketPairRow | null> {
     const rows = await executor.query(
       `SELECT pair_id, base_currency_id, quote_currency_id, min_order_amount, is_active
        FROM market_pairs
@@ -388,7 +402,10 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
     return (rows?.[0] as WalletRow | undefined) ?? null;
   }
 
-  private async findOrderForUpdate(executor: DbExecutor, orderId: string): Promise<OrderRow | null> {
+  private async findOrderForUpdate(
+    executor: DbExecutor,
+    orderId: string,
+  ): Promise<OrderRow | null> {
     const rows = await executor.query(
       `SELECT order_id, user_id, pair_id, side, type, price, amount, filled_amount, avg_price,
               status, time_in_force, reserved_quote, reserved_base, client_order_id, idempotency_key,
@@ -418,7 +435,8 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
     order.reserved_base = String(row.reserved_base ?? '0');
     order.client_order_id = row.client_order_id != null ? String(row.client_order_id) : null;
     order.idempotency_key = String(row.idempotency_key ?? '');
-    order.slippage_tolerance = row.slippage_tolerance != null ? String(row.slippage_tolerance) : null;
+    order.slippage_tolerance =
+      row.slippage_tolerance != null ? String(row.slippage_tolerance) : null;
     order.created_at = row.created_at as Date;
     order.updated_at = row.updated_at as Date;
     return order;

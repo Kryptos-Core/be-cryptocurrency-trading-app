@@ -26,9 +26,11 @@ export class ExpandIntegrationOutboxPublisherMetadata1776570000000 implements Mi
     indexName: string,
     createIndexSql: string,
   ): Promise<void> {
-    const hasIndex = (queryRunner as QueryRunner & {
-      hasIndex?: (table: string, index: string) => Promise<boolean>;
-    }).hasIndex;
+    const hasIndex = (
+      queryRunner as QueryRunner & {
+        hasIndex?: (table: string, index: string) => Promise<boolean>;
+      }
+    ).hasIndex;
     if (typeof hasIndex === 'function') {
       if (await hasIndex.call(queryRunner, tableName, indexName)) {
         return;
@@ -43,9 +45,11 @@ export class ExpandIntegrationOutboxPublisherMetadata1776570000000 implements Mi
     tableName: string,
     indexName: string,
   ): Promise<void> {
-    const hasIndex = (queryRunner as QueryRunner & {
-      hasIndex?: (table: string, index: string) => Promise<boolean>;
-    }).hasIndex;
+    const hasIndex = (
+      queryRunner as QueryRunner & {
+        hasIndex?: (table: string, index: string) => Promise<boolean>;
+      }
+    ).hasIndex;
     if (typeof hasIndex === 'function') {
       if (!(await hasIndex.call(queryRunner, tableName, indexName))) {
         return;
