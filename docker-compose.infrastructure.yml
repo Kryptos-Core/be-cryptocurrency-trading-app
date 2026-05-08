@@ -1,7 +1,5 @@
 # Core infra for local development.
 # Variables are interpolated from .env.development by npm scripts.
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -63,12 +61,85 @@ services:
       retries: 5
       interval: 10s
 
+  # Kafka + Zookeeper (Phase 5d/5e) — start with: docker compose --profile kafka up
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: crypto_trading_zookeeper
+    profiles: ['kafka']
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - crypto_network
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      timeout: 5s
+      retries: 5
+      interval: 10s
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: crypto_trading_kafka
+    profiles: ['kafka']
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      TZ: 'UTC'
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    networks:
+      - crypto_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      timeout: 10s
+      retries: 5
+      interval: 10s
+
+  # ClickHouse (Phase 5c) — start with: docker compose --profile clickhouse up
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.6-alpine
+    container_name: crypto_trading_clickhouse
+    profiles: ['clickhouse']
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-default}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      TZ: 'UTC'
+    ports:
+      - "${CLICKHOUSE_PORT:-8123}:8123"
+      - "${CLICKHOUSE_TCP_PORT:-9000}:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - crypto_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      timeout: 5s
+      retries: 10
+      interval: 10s
+
 volumes:
   postgres_data:
     driver: local
   timescaledb_data:
     driver: local
   redis_data:
+    driver: local
+  clickhouse_data:
     driver: local
 
 networks:
