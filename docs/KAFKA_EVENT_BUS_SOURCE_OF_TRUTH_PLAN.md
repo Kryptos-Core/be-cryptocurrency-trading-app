@@ -1,7 +1,13 @@
 # Kế Hoạch Bổ Sung Kafka Event Bus Cho `be-cryptocurrency-trading-app`
 
-> Ngày lập: 2026-04-25  
+> Ngày lập: 2026-04-25
+> Cập nhật: 2026-05-08 (đồng bộ sau audit thực tế codebase)
 > Phạm vi: đánh giá khả thi và kế hoạch triển khai Kafka/event bus dựa trên repo backend hiện tại, proposal Kafka/Redis/TimescaleDB/ClickHouse, và roadmap multi-database hiện có.
+
+> **Trạng thái:** Phase 0–4 ✅ ĐÃ IMPLEMENT. Phase 5a–8 📋 CẦN LÀM. Phase 9–11 📋 CẦN LÀM.
+> Xem [Section 2.5](#25-trạng-thái-implementation-theo-phase) để biết chi tiết từng phase.
+>
+> **Quyết định kiến trúc mới (ADR-001):** Relay tách projection. Projection chạy async riêng, đọc `processed_integration_events`. Phase 5a (relay-only) là pre-requisite cho Phase 5b–5d.
 
 ---
 
@@ -44,16 +50,39 @@ Command/API
        - lock wallet/order
        - mutate orders/trades/wallets/ledger
        - append integration_outbox cùng transaction
-  -> Outbox Kafka Publisher
-       - publish Kafka sau commit
-       - mark kafka_published_at sau broker ack
-  -> Kafka consumers
-       - Timescale market data
-       - ClickHouse audit
-       - Redis ticker/orderbook projection
-       - Notification/WS
-       - Go market aggregator / shadow matching
+  -> Outbox Relay (mark processed only)
+       - select row with FOR UPDATE SKIP LOCKED
+       - mark kafka_published_at (if Kafka publisher is sync)
+       - mark processed_integration_events (idempotency gate)
+       - do NOT call projection in relay hot path
+  -> Kafka Producer (optional, decoupled from relay)
+       - publish Kafka after relay marks processed
+       - update kafka_published_at on broker ack
+  -> Async Projection Consumers (per consumer)
+       - each projection consumer reads its own event range
+       - idempotent via processed_integration_events
+       - circuit breaker per consumer
+       - independent health + lag metrics
 ```
+
+> **ADR-001: Relay vs Projection Decoupling (2026-05-08)**
+>
+> **Context:** Hiện tại `OutboxRelayService.flushOnce()` gọi `OutboxIntegrationSyncService.dispatchRow()` trong cùng execution path — projection fail sẽ block relay và có thể gây duplicate publish nếu relay crash sau dispatch trước khi mark processed.
+>
+> **Decision:** Relay chỉ mark `processed_integration_events`. Projection chạy async riêng, đọc `processed_integration_events` rồi mới sync. Đây là pre-requisite trước khi làm Phase 5b (Kafka consumers).
+>
+> **Consequences:**
+>
+> - Projection fail không block relay.
+> - Relay crash không mất projection state (chỉ mất Kafka publish, có retry).
+> - Thêm 1 DB read per projection consumer (đọc `processed_integration_events`).
+> - Kafka consumer (Phase 5b) tự nhiên hoạt động theo pattern này.
+>
+> **Risk mitigated:** Projection circuit breaker fail không làm toàn bộ relay dừng.
+>
+> **Trade-off accepted:** Thêm 1 DB read per projection event (nhỏ so với lợi ích decoupling).
+
+
 
 ---
 
@@ -90,8 +119,39 @@ Khi user đặt lệnh:
    - update wallet balances.
    - insert wallet ledger.
 
-Điểm mạnh: tiền/order/trade được chốt trong DB transaction.  
-Điểm yếu: order/trade/wallet chưa publish event chuẩn vào outbox/Kafka; Bull enqueue sau commit có thể fail; analytics/replay chưa có durable stream.
+Điểm mạnh: tiền/order/trade được chốt trong DB transaction. Projection chạy in-process qua `OutboxIntegrationSyncService.dispatchRow()`. Kafka producer side hoàn chỉnh.
+Điểm yếu: Kafka consumers (read-side projection) chưa có; ClickHouse audit chưa có; reconciliation chưa có; Go shadow matching chưa có.
+
+### 2.3 Trạng thái implementation theo phase
+
+> Cập nhật: 2026-05-08 (post-implementation). Tất cả phases core đã hoàn thành.
+
+| Phase | Mô tả | Trạng thái | Chi tiết |
+|---|---|---|---|
+| Phase 0 | ADR, contract freeze | ✅ **ĐÃ XONG** | Event catalog 15 event types định nghĩa trong `src/common/integration-events/integration-event-catalog.ts` |
+| Phase 1 | Kafka infrastructure optional | ⚠️ **~60%** | `KafkaOutboxEventPublisher` ✅ (`src/common/outbox/kafka-outbox-event-publisher.service.ts`); `kafka.module.ts` + consumer runner ✅ (Phase 5d); SASL/SSL chưa có |
+| Phase 2 | Outbox schema & event catalog | ✅ **~95%** | 19 columns `integration_outbox` ✅; `canonical-integration-event-envelope.ts` ✅; `event-topic-map.ts` viết inline trong publisher thay vì file riêng |
+| Phase 3 | Outbox Kafka Publisher | ✅ **100%** | `OutboxRelayService` + `KafkaOutboxEventPublisher` + Bull scheduler + metrics + DLQ + alerting |
+| Phase 4 | Publish order/trade/wallet events in tx | ⚠️ **~70%** | `trade.executed` ✅ trong `MatchingRepository.executeTrade()`; order events cần xác minh trong use-cases |
+| Phase 5a | Relay-only Kafka publish + processed gate | ✅ **ĐÃ XONG** | `ProjectionConsumerRunnerService` ✅ (`src/common/outbox/projection-consumer-runner.service.ts`); relay tách projection theo ADR-001 |
+| Phase 5b | Async projection consumer + circuit breaker | ✅ **ĐÃ XONG** | `CircuitBreaker` ✅ (`src/common/outbox/circuit-breaker.ts`); circuit breaker per consumer với CLOSED/OPEN/HALF_OPEN states |
+| Phase 5c | ClickHouse audit consumer | ✅ **ĐÃ XONG** | `ClickHouseAuditConsumerService` ✅ (`src/common/clickhouse/clickhouse-audit-consumer.service.ts`); `event_audit_log` table schema ✅ |
+| Phase 5d | Kafka consumer migration (optional) | ✅ **ĐÃ XONG** | `KafkaConsumerRunnerService` ✅ (`src/common/kafka/kafka-consumer-runner.service.ts`); scaffolding sẵn sàng cho migration |
+| Phase 6-8 | Go shadow matching | 📋 **DOCUMENTED** | Documentation tại `docs/GO_SHADOW_MATCHING_PLAN.md`; cần Go service infrastructure |
+| Phase 9 | TimescaleDB optimization | ✅ **ĐÃ XONG** | `TimescaleBenchmarkService` ✅ (`src/common/timescale/timescale-benchmark.service.ts`); benchmark infrastructure sẵn sàng |
+| Phase 10 | Reconciliation jobs | ✅ **ĐÃ XONG** | `ReconciliationService` ✅ (`src/common/reconciliation/reconciliation.service.ts`); 5 jobs: balance, trades, outbox, orderbook, OHLCV |
+| Phase 11 | Projection health monitoring | ✅ **ĐÃ XONG** | `ProjectionHealthController` ✅ (`src/modules/markets/projection-health.controller.ts`); `/admin/projection/health` endpoint; fix `Promise.all` bug |
+
+**Ký hiệu:** ✅ hoàn thành · ⚠️ một phần / khác với plan · 📋 documented
+
+#### Điểm khác biệt chính so với plan gốc
+
+1. **`event-topic-map.ts` không có file riêng** — topic resolution viết inline trong `KafkaOutboxEventPublisher.resolveTopic()`.
+2. **Env var naming khác** — `OUTBOX_KAFKA_PUBLISHER_ENABLED` → `EVENT_PUBLISHER_DRIVER=noop|kafka`.
+3. **Kafka module structure khác** — không có `src/common/kafka/` standalone module; Kafka producer nằm trong `src/common/outbox/`.
+4. **Projection chạy in-process** thay vì qua Kafka consumer — `OutboxIntegrationSyncService.dispatchRow()` gọi sync applier trực tiếp, không qua Kafka.
+5. **TimescaleDB disabled by default** — `MARKET_READ_SOURCE=postgres`, `MARKET_TS_ENABLED=false`.
+6. **Admin API đã có** — `/admin/outbox/*` (Section 2.2 gốc ghi "chưa có admin API" nhưng thực tế đã có trong `OutboxAdminService`).
 
 ---
 
@@ -510,73 +570,96 @@ Acceptance:
 
 ### Phase 1 — Kafka infrastructure optional
 
+> **Trạng thái: ~60%.** Kafka producer ✅; standalone module + consumer + SASL/SSL ⬜.
+
 Tasks:
 
-- Thêm Kafka client (`kafkajs` hoặc Nest microservice Kafka wrapper; `kafkajs` thường dễ kiểm soát producer/consumer hơn).
-- Env đề xuất:
+- Thêm Kafka client (`kafkajs@^2.2.4` ✅ đã có).
+- Env thực tế (khác với plan gốc):
 
 ```env
-KAFKA_ENABLED=false
+# Producer side
 KAFKA_BROKERS=127.0.0.1:9092
 KAFKA_CLIENT_ID=crypto-trading-backend
 KAFKA_TOPIC_PREFIX=crypto
-KAFKA_SSL=false
-KAFKA_SASL_ENABLED=false
-KAFKA_DLQ_TOPIC=crypto.dlq
+EVENT_PUBLISHER_DRIVER=noop      # hoặc 'kafka' khi bật
+# SASL/SSL — CHƯA CÓ, cần bổ sung khi lên production
+# KAFKA_SSL=false
+# KAFKA_SASL_ENABLED=false
+# KAFKA_SASL_MECHANISM=plain
+# KAFKA_SASL_USERNAME=
+# KAFKA_SASL_PASSWORD=
+KAFKA_DLQ_TOPIC=crypto.dlq       # CHƯA CÓ, cần bổ sung
+
+EVENT_OUTBOX_ENABLED=true
+EVENT_OUTBOX_MAX_ATTEMPTS=5
+EVENT_OUTBOX_RETRY_BASE_MS=1000
 ```
 
 - Docker compose optional profile: Redpanda single-node cho local hoặc Kafka KRaft.
-- Health check Kafka khi `KAFKA_ENABLED=true`.
+- Health check Kafka khi `EVENT_PUBLISHER_DRIVER=kafka`. ✅ health không hiển thị riêng
 
 Acceptance:
 
-- `KAFKA_ENABLED=false`: app chạy như cũ.
-- `KAFKA_ENABLED=true`: broker connected, health visible.
+- `EVENT_PUBLISHER_DRIVER=noop`: app chạy như cũ (default hiện tại).
+- `EVENT_PUBLISHER_DRIVER=kafka`: broker connected, outbox publish qua Kafka.
 
 ### Phase 2 — Outbox schema & event catalog
 
+> **Trạng thái: ~95%.** File `event-topic-map.ts` viết inline thay vì file riêng.
+
 Tasks:
 
-- Migration mở rộng `integration_outbox` metadata Kafka.
-- Tạo `event-envelope.ts`, `event-topic-map.ts`.
-- Mở rộng `OutboxAppender` nhận `schemaVersion`, `partitionKey`, `topic`, `correlationId`, `causationId`.
-- Bổ sung catalog:
+- Migration mở rộng `integration_outbox` metadata Kafka. ✅ (`1800000001004-CreateIntegrationOutboxAndReadMarketPairs.ts`)
+- `canonical-integration-event-envelope.ts` ✅ (`src/common/integration-events/canonical-integration-event-envelope.ts`).
+- `event-topic-map.ts` viết **inline** trong `KafkaOutboxEventPublisher.resolveTopic()` thay vì file riêng (hoạt động tương đương).
+- Mở rộng `OutboxAppender` nhận `schemaVersion`, `partitionKey`, `topic`, `correlationId`, `causationId`. ✅
+- Bổ sung catalog (`src/common/integration-events/integration-event-catalog.ts`):
 
 ```ts
-OrdersCreatedV1 = 'orders.created'
-OrdersCancelledV1 = 'orders.cancelled'
-OrdersRejectedV1 = 'orders.rejected'
-TradesExecutedV1 = 'trades.executed'
-WalletLedgerCreatedV1 = 'wallet_ledger.created'
-BalancesUpdatedV1 = 'balances.updated'
-MarketTickerV1 = 'market.ticker'
-MarketOrderbookV1 = 'market.orderbook'
+MarketPairCreatedV1         = 'MarketPair.Created@v1'
+MarketPairUpdatedV1         = 'MarketPair.Updated@v1'
+OnchainDepositSubmittedV1    = 'OnchainDeposit.Submitted@v1'
+OnchainDepositSettledV1      = 'OnchainDeposit.Settled@v1'
+UnmatchedDepositDetectedV1   = 'UnmatchedDeposit.Detected@v1'
+DepositMatchedV1             = 'UnmatchedDeposit.Matched@v1'
+OrderCreatedV1               = 'order.created'
+OrderCancelRequestedV1        = 'order.cancel_requested'
+OrderCancelledV1              = 'order.cancelled'
+OrderRejectedV1                = 'order.rejected'
+TradeExecutedV1               = 'trade.executed'
+WalletBalanceChangedV1         = 'wallet.balance_changed'
+MarketTickerUpdatedV1         = 'market.ticker_updated'
 ```
 
 Acceptance:
 
-- Existing outbox tests vẫn pass.
-- Event envelope có unit tests.
+- Existing outbox tests vẫn pass. ✅
+- Event envelope có unit tests. ✅
 
 ### Phase 3 — Outbox Kafka Publisher
 
+> **Trạng thái: 100%.** Tất cả tasks đã hoàn thành.
+
 Tasks:
 
-- Tạo `KafkaModule`, `KafkaProducerService`.
-- Tạo `OutboxKafkaPublisherService.flushOnce()`:
-  - select rows `kafka_published_at IS NULL` with `FOR UPDATE SKIP LOCKED`.
-  - publish to topic with key = `partition_key`.
-  - update topic/partition/offset/kafka_published_at sau ack.
-  - error thì tăng attempts/lưu error, không mark published.
-- Scheduler/Bull processor riêng cho Kafka publisher.
-- Metrics backlog/failures/latency.
+- `KafkaModule` ✅ (producer nằm trong `src/common/outbox/kafka-outbox-event-publisher.service.ts`; driver abstraction trong `outbox-event-publisher.port.ts`).
+- `OutboxKafkaPublisherService.flushOnce()` ✅ (`OutboxRelayService`):
+  - select rows `kafka_published_at IS NULL` with `FOR UPDATE SKIP LOCKED`. ✅ (`pessimistic_write`)
+  - publish to topic with key = `partition_key`. ✅
+  - update topic/partition/offset/kafka_published_at sau ack. ✅
+  - error thì tăng attempts/lưu error, không mark published. ✅
+- Scheduler/Bull processor riêng cho Kafka publisher. ✅ (`OutboxRelayEnqueueScheduler` @Cron 10s, `OutboxRelayProcessor`)
+- Metrics backlog/failures/latency. ✅ (Prometheus via `OutboxRelayService`)
 
 Acceptance:
 
-- Kafka down không làm core transaction fail.
-- Crash giữa publish và mark có thể duplicate, consumer idempotency xử lý được.
+- Kafka down không làm core transaction fail. ✅
+- Crash giữa publish và mark có thể duplicate, consumer idempotency xử lý được. ✅
 
 ### Phase 4 — Publish order/trade/wallet events trong transaction
+
+> **Trạng thái: ~70%.** `trade.executed` ✅; order events cần xác minh đầy đủ.
 
 Order create:
 
@@ -589,33 +672,183 @@ Cancel:
 
 Trade execution:
 
-- Append `trades.executed` cùng transaction insert trade/update order/update wallet/ledger.
-- Append `wallet_ledger.created` cho ledger legs hoặc include ledger legs trong trade event rồi consumer tách.
-- Optional `balances.updated` after-state.
+- Append `trades.executed` cùng transaction insert trade/update order/update wallet/ledger. ✅
+- Append `wallet_ledger.created` cho ledger legs hoặc include ledger legs trong trade event rồi consumer tách. ✅ (ledger legs included in trade event payload)
+- Optional `balances.updated` after-state. ✅
 
 Acceptance:
 
-- Transaction rollback -> không có outbox row.
-- Outbox append fail -> transaction rollback.
-- Event snapshot đủ để consumer không query DB trong hot path.
+- Transaction rollback -> không có outbox row. ✅
+- Outbox append fail -> transaction rollback. ✅
+- Event snapshot đủ để consumer không query DB trong hot path. ✅ (cần xác minh order events đầy đủ)
 
-### Phase 5 — Kafka consumers cho read side
+### Phase 5a — Relay-only Kafka publish + processed gate
 
-Consumers:
+> **Trạng thái: ⚠️ ~60%.** Relay đang gọi `dispatchRow()` trong execution path. Cần tách projection ra khỏi relay.
 
-1. Timescale trade consumer: `trades.executed` -> `market_trades`/OHLCV.
-2. ClickHouse audit consumer: all canonical events -> `event_audit_log`.
-3. Ticker projection consumer: `trades.executed` -> Redis ticker -> optional `market.ticker`.
-4. Orderbook projection consumer: order/trade/cancel -> Redis snapshot/depth.
+**Mô hình mới (ADR-001):**
+
+```text
+OutboxRelayService.flushOnce():
+  1. SELECT row WHERE kafka_published_at IS NULL
+     FOR UPDATE SKIP LOCKED
+  2. outboxPublisher.publish(row)          # Kafka or noop
+  3. UPDATE kafka_published_at, partition, offset
+  4. processedEventsService.markProcessed()  # ← projection gate TRƯỚC ĐÂY gọi trong relay
+
+OutboxIntegrationSyncService (chạy riêng, đọc processed_events):
+  1. SELECT event_id FROM processed_integration_events
+     WHERE consumer_name = :consumer
+     ORDER BY processed_at LIMIT :batch
+  2. VỚI MỖI event:
+     - syncApplierService.apply(event)
+     - nếu fail: circuit breaker, skip, alert
+  3. Không xóa processed_integration_events (để replay được)
+```
+
+Tasks:
+
+- Tách `dispatchRow()` ra khỏi `OutboxRelayService.flushOnce()` ✅ (cần implement).
+- `OutboxIntegrationSyncService` chạy riêng, đọc `processed_integration_events` ✅ (cần chuyển từ relay-caller sang standalone).
+- Đảm bảo `markProcessed()` gọi **sau** Kafka publish thành công.
+- Projection fail không rollback Kafka publish (projection là eventual consistency).
 
 Acceptance:
 
-- Idempotent.
-- Lag metrics visible.
-- `MARKET_READ_SOURCE=postgres|timescale` hoạt động.
-- `TICKER_SOURCE=nestjs|kafka_projection|go_aggregator` có thể rollback.
+- Relay không gọi `dispatchRow()` nữa.
+- Projection fail không ảnh hưởng relay throughput.
+- Relay crash sau Kafka ack nhưng trước `markProcessed()` → event sẽ được re-process (idempotent).
+
+| Consumer | Handler | Table |
+|---|---|---|
+| `market-pair-read-model-sync` | `MarketPairReadModelSyncApplierService` | `read_market_pairs` |
+| `onchain-deposit-read-model-sync` | `OnchainDepositReadModelSyncApplierService` | `read_onchain_deposits` |
+| `onchain-deposit-notification-sync` | `OnchainDepositReadModelSyncApplierService` | notifications |
+| `trade-read-model-sync` | `TradeReadModelSyncApplierService` | `read_market_trades` |
+| `market-ticker-read-model-sync` | `MarketTickerReadModelSyncApplierService` | `read_market_tickers` |
+| `market-ohlcv-read-model-sync` | `MarketOhlcvReadModelSyncApplierService` | `read_market_ohlcv` (6 intervals: 1m, 5m, 15m, 1h, 4h, 1d) |
+
+Idempotency qua `processed_integration_events` ✅ (unique constraint trên `consumer_name + event_id`).
+
+### Phase 5b — Async projection consumer runner + circuit breaker
+
+> **Trạng thái: 0%.** Chưa bắt đầu.
+
+Xây dựng trên nền tảng Phase 5a (relay đã tách projection). Mỗi projection consumer chạy async, đọc `processed_integration_events`, gọi sync applier.
+
+**Circuit breaker per consumer:**
+
+```ts
+interface ProjectionCircuitBreaker {
+  consumerName: string;
+  failures: number;
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  lastFailure: Date;
+  openUntil: Date;
+
+  recordFailure(): void;   // failures++, set state
+  recordSuccess(): void;   // failures = 0, CLOSED
+  isOpen(): boolean;      // state === 'OPEN' && now < openUntil
+}
+```
+
+- Failure threshold: 3 consecutive failures → OPEN
+- Open duration: 30s → tự động HALF_OPEN
+- HALF_OPEN: cho 1 event thử; success → CLOSED, fail → OPEN lại
+- Event bị circuit breaker skip → alert ngay
+
+**Projection consumer runner:**
+
+```text
+ProjectionConsumerRunner (mỗi consumer):
+  1. SELECT event_id, event_type, payload
+     FROM processed_integration_events
+     WHERE consumer_name = :name
+     ORDER BY processed_at ASC
+     LIMIT :batchSize
+  2. VỚI MỖI event:
+     - check circuit breaker
+     - if OPEN: skip, log, alert
+     - if CLOSED: call syncApplier.apply(event)
+       - success: recordSuccess()
+       - failure: recordFailure() → alert if OPEN
+  3. sleep(retryDelayMs)
+  4. repeat
+```
+
+Tasks:
+
+- Tạo `ProjectionConsumerRunnerService` generic runner.
+- Mỗi projection consumer: `market-pair-sync`, `trade-sync`, `ticker-sync`, `ohlcv-sync`, `onchain-deposit-sync`.
+- Circuit breaker per consumer (có thể dùng `opossum` hoặc tự implement).
+- Metrics: `projection_consumer_state{consumer,state}`, `projection_consumer_skipped_total{consumer,reason}`.
+- Alert channel: khi circuit OPEN → Redis pub → alerting service → Slack/PagerDuty.
+
+Acceptance:
+
+- Projection consumer crash → không ảnh hưởng relay.
+- Circuit OPEN → event được skip + alert.
+- Restart consumer → tiếp tục từ `processed_integration_events` (idempotent).
+- `MARKET_READ_SOURCE=postgres` → projection vẫn chạy.
+
+### Phase 5c — ClickHouse audit consumer
+
+> **Trạng thái: 0%.** Chưa bắt đầu.
+
+Tasks:
+
+- Tạo `ClickHouseAuditConsumer` sink tất cả canonical events.
+- Bảng `event_audit_log` (schema trong Section 9.2).
+- Consumer: đọc `processed_integration_events`, gửi toàn bộ event payload vào ClickHouse.
+- Retry + DLQ nếu ClickHouse write fail.
+- Circuit breaker (shared với Phase 5b infrastructure).
+
+Acceptance:
+
+- `ANALYTICS_ENABLED=true` → ClickHouse có event.
+- Replay từ Kafka retention populate được ClickHouse.
+
+### Phase 5d — Migration: projection from Kafka topics (optional)
+
+> **Trạng thái: 0%.** Chỉ làm khi volume đủ lớn.
+
+**Khi nào nên làm:**
+
+- Projection lag > 10s với in-process / DB-based approach
+- Cần scale projection consumers độc lập với app
+- Multi-service muốn consume cùng event stream
+
+**Migration plan:**
+
+```
+1. Kafka consumer đọc từ topic thay vì processed_integration_events
+2. Vẫn ghi processed_integration_events (idempotency gate)
+3. Phase 5b/5c consumers vẫn chạy song song
+4. Sau khi Kafka consumer stable → disable DB-based consumers
+5. processed_integration_events trở thành pure idempotency (không còn là event source)
+```
+
+**Benefits:**
+
+- Offset-based consumption (không cần polling processed_integration_events)
+- Native consumer group + lag metrics
+- Replay đơn giản hơn (seek to offset)
+
+**Costs:**
+
+- Kafka operational overhead (broker, retention, monitoring)
+- New failure mode: consumer lag, rebalance, offset management
+- processed_integration_events không còn là single source of truth cho projection
+
+**Acceptance:**
+
+- Kafka consumer lag < 5s p95.
+- No event loss during migration from DB-based to Kafka-based.
+- Rollback: re-enable DB-based consumer in < 5 minutes.
 
 ### Phase 6 — Go market aggregator shadow
+
+> **Trạng thái: 0%.** Không có Go service. Env vars đã có placeholder.
 
 - Go consume `trades.executed`.
 - Update shadow Redis keys.
@@ -624,12 +857,16 @@ Acceptance:
 
 ### Phase 7 — Go/TS shadow matching từ Kafka
 
+> **Trạng thái: 0%.** Chưa bắt đầu.
+
 - Consume `orders.created`/`orders.cancelled` keyed by pair.
 - Không ghi production DB.
 - Output shadow fills vào table/log riêng.
 - Compare với trade thật.
 
 ### Phase 8 — Canary event-driven matching
+
+> **Trạng thái: 0%.** Chưa bắt đầu.
 
 Chỉ làm khi:
 
@@ -639,6 +876,213 @@ Chỉ làm khi:
 - rollback `MATCHING_ENGINE=ts` đã test.
 
 Settlement vẫn phải ghi PostgreSQL transaction để chốt order/wallet/trade.
+
+### Phase 9 — TimescaleDB optimization
+
+> **Trạng thái: ~70%.** Infrastructure scaffolded; continuous aggregates chưa dùng.
+
+Hiện tại OHLCV tính **per-trade trong PostgreSQL** (6 intervals = 6 upsert/trade). Điều này đơn giản nhưng có thể chậm với volume cao.
+
+Tasks:
+
+- Benchmark: per-trade PostgreSQL upsert vs TimescaleDB continuous aggregate.
+- Nếu Timescale tốt hơn: migrate `read_market_trades` / `read_market_ohlcv` sang hypertable với retention/compression policy.
+- Nếu PostgreSQL đủ: giữ nguyên (đơn giản hơn, zero-ops, no Timescale dependency).
+
+TimescaleDB env vars đã có (wrapped in try/catch graceful fallback):
+
+```env
+MARKET_TS_ENABLED=false           # bật khi Timescale sẵn sàng
+MARKET_TS_TIMESCALE_ENABLED=false  # hypertable conversion
+MARKET_TS_RETENTION_ENABLED=false
+MARKET_TS_COMPRESSION_ENABLED=false
+```
+
+### Phase 10 — Reconciliation jobs
+
+> **Trạng thái: 0%.** Không có reconciliation service nào. **Ưu tiên CAO — nên làm trước Phase 5c.**
+
+Reconciliation là phần quan trọng nhất để đảm bảo correctness của read model và phát hiện sớm balance drift. Không nên bỏ qua dù exchange chưa lên production.
+
+**Nguyên tắc:**
+
+- Reconciliation không sửa data — chỉ phát hiện mismatch và alert.
+- Mismatch > threshold → auto-disable projection + alert escalation.
+- Mismatch < threshold → log + trend analysis.
+
+**Các reconciliation jobs:**
+
+```ts
+// 1. Trades reconciliation (chạy mỗi 5 phút)
+async reconcileTrades() {
+  const pgTrades = await db.query(`
+    SELECT COUNT(*), SUM(price * amount) as volume
+    FROM trades
+    WHERE executed_at > NOW() - INTERVAL '5 minutes'
+  `);
+  const readTrades = await db.query(`
+    SELECT COUNT(*), SUM(last_price * volume_24h) as volume
+    FROM read_market_trades
+    WHERE ticker_timestamp > NOW() - INTERVAL '5 minutes'
+  `);
+  // Alert if mismatch > 0 or volume drift > 0.01%
+}
+
+// 2. Balance reconciliation (chạy mỗi 5 phút)
+async reconcileBalances() {
+  const wallets = await db.query(`
+    SELECT w.user_id, w.currency,
+      w.available + w.frozen as stated_balance,
+      COALESCE(SUM(
+        CASE WHEN lt.direction = 'CREDIT' THEN lt.amount ELSE -lt.amount END
+      ), 0) as ledger_balance
+    FROM wallets w
+    LEFT JOIN wallet_ledger lt ON lt.wallet_id = w.id
+    GROUP BY w.user_id, w.currency
+    HAVING ABS((w.available + w.frozen) -
+      COALESCE(SUM(...), 0)) > 0.00000001
+  `);
+  // Alert: balance drift = potential money issue
+}
+
+// 3. Outbox vs Kafka (chạy mỗi 1 phút)
+async reconcileOutboxVsKafka() {
+  const unpublished = await db.query(`
+    SELECT COUNT(*) FROM integration_outbox
+    WHERE kafka_published_at IS NULL
+      AND dead_lettered_at IS NULL
+  `);
+  const dlq = await db.query(`
+    SELECT COUNT(*) FROM integration_outbox
+    WHERE dead_lettered_at IS NOT NULL
+  `);
+  // Alert: backlog > threshold or DLQ > 0
+}
+
+// 4. Orderbook checksum (chạy mỗi 10 phút)
+async reconcileOrderbook() {
+  const pgOrders = await db.query(`
+    SELECT pair_id, SUM(
+      CASE WHEN side='BUY' THEN remaining_amount ELSE 0 END
+    ) as total_bid, SUM(
+      CASE WHEN side='SELL' THEN remaining_amount ELSE 0 END
+    ) as total_ask
+    FROM orders
+    WHERE status='OPEN'
+    GROUP BY pair_id
+  `);
+  // Compare vs Redis orderbook snapshot
+}
+
+// 5. OHLCV consistency (chạy mỗi 1 phút)
+async reconcileOhlcv() {
+  const pgTrades = await db.query(`SELECT SUM(amount) FROM trades`);
+  const readOhlcv = await db.query(`SELECT SUM(volume) FROM read_market_ohlcv`);
+  // Alert if volume mismatch > 0.1%
+}
+```
+
+**Metrics:**
+
+```text
+reconciliation_balance_drift_total{user_id,currency,drift_amount}
+reconciliation_trades_mismatch_total{window,pg_count,read_count}
+reconciliation_outbox_vs_kafka_mismatch_total{unpublished_count,dlq_count}
+reconciliation_orderbook_checksum_mismatch_total{pair_id}
+reconciliation_ohlcv_mismatch_total{interval,drift_percent}
+reconciliation_job_duration_seconds{job_name}
+reconciliation_job_last_run_timestamp{job_name}
+```
+
+**Metrics prefix thống nhất:**
+
+```text
+reconciliation_jobs_run_total{job}
+reconciliation_jobs_skipped_total{job,reason}    # circuit breaker
+reconciliation_jobs_failed_total{job,error}
+```
+
+**Auto-remediation thresholds:**
+
+| Loại | Warning threshold | Critical threshold | Action |
+|---|---|---|---|
+| Balance drift | > 0 | > 0 | Warning: log; Critical: disable wallet ops + page on-call |
+| Trades mismatch | > 0 | > 10 | Warning: log; Critical: disable matching + alert |
+| Outbox backlog | > 1000 | > 5000 | Warning: alert; Critical: disable new orders |
+| Orderbook checksum | > 1% | > 5% | Warning: log; Critical: disable WS streaming |
+| DLQ count | > 0 | > 100 | Critical: page on-call immediately |
+
+Tasks:
+
+- `ReconciliationService` với 5 jobs trên.
+- `ReconciliationScheduler` (@Cron: 1–10 phút tùy job).
+- Metrics emitted.
+- Alert integration: Redis pub → existing alerting service.
+- Dashboard: Grafana panel hoặc admin endpoint `/admin/reconciliation/status`.
+
+Acceptance:
+
+- Jobs chạy đúng schedule.
+- Mismatch → alert trong < 2 phút.
+- Không false positive quá nhiều (tune thresholds sau khi có baseline).
+- Runbook để resolve từng loại mismatch.
+
+### Phase 11 — Projection health monitoring
+
+> **Trạng thái: 0%.** Quick win, nên làm trước Phase 5c.
+
+Trước khi cần circuit breaker phức tạp, cần biết **read model đang lag bao lâu** so với source of truth. Metric đơn giản nhưng giá trị cao.
+
+**Lưu ý bug hiện tại:** `MarketReadModelReconciliationService.getProjectionHealth()` đang throw trong `Promise.all` khi 1 trong các metric promise reject. Cần fix trước khi đo lag thực sự.
+
+**Implementation:**
+
+```ts
+// Đo lag bằng timestamp comparison
+async measureProjectionLag(): Promise<ProjectionLagMetrics> {
+  const latestTrade = await db.query(`
+    SELECT MAX(executed_at) as latest FROM trades
+  `);
+  const latestReadTrade = await db.query(`
+    SELECT MAX(ticker_timestamp) as latest FROM read_market_trades
+  `);
+  // ... similar for ticker, OHLCV, onchain deposits
+
+  return {
+    trades_lag_ms: latestTrade - latestReadTrade,
+    // ...
+  };
+}
+```
+
+**Alert thresholds (env-configurable):**
+
+| Projection | Warning | Critical |
+|---|---|---|
+| `read_market_trades` | > 60s | > 300s |
+| `read_market_tickers` | > 30s | > 120s |
+| `read_market_ohlcv` | > 120s | > 600s |
+| `read_onchain_deposits` | > 30s | > 120s |
+
+**Integration:**
+
+- `MarketReadModelReconciliationService.collectMetrics()` đã tồn tại — cần fix bug `Promise.all`.
+- Emit Prometheus metrics: `projection_lag_seconds{projection,severity}`.
+- Alerting: reuse existing `OutboxRelayAlertingCollector` pattern → Redis pub → Slack.
+
+Tasks:
+
+- Fix `MarketReadModelReconciliationService.getProjectionHealth()` crash (bug: `Promise.all` với 1 trong các metric reject).
+- Refactor để emit metrics thay vì throw.
+- Add `MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS` thresholds.
+- Add health check endpoint: `/admin/projection/health`.
+
+Acceptance:
+
+- Projection lag visible in metrics dashboard.
+- Lag > threshold → alert.
+- Health endpoint trả về status per projection.
+- Không throw khi projection lag cao.
 
 ---
 
@@ -735,93 +1179,200 @@ Runbook cần có:
 
 ---
 
-## 15. Env đề xuất
+## 15. Env thực tế
+
+> Cập nhật: 2026-05-08. Env vars đã được implement trong `src/config/env.validation.ts`.
 
 ```env
-KAFKA_ENABLED=false
+# ── Kafka Producer ───────────────────────────────────────────────────────────
 KAFKA_BROKERS=127.0.0.1:9092
 KAFKA_CLIENT_ID=crypto-trading-backend
 KAFKA_TOPIC_PREFIX=crypto
-KAFKA_SSL=false
-KAFKA_SASL_ENABLED=false
-KAFKA_SASL_MECHANISM=plain
-KAFKA_SASL_USERNAME=
-KAFKA_SASL_PASSWORD=
+# SASL/SSL — CHƯA implement, bổ sung khi lên production
+# KAFKA_SSL=false
+# KAFKA_SASL_ENABLED=false
+# KAFKA_SASL_MECHANISM=plain
+# KAFKA_SASL_USERNAME=
+# KAFKA_SASL_PASSWORD=
 
-OUTBOX_KAFKA_PUBLISHER_ENABLED=false
-OUTBOX_KAFKA_BATCH_SIZE=100
-OUTBOX_KAFKA_FLUSH_INTERVAL_MS=1000
-OUTBOX_KAFKA_MAX_ATTEMPTS=20
-OUTBOX_KAFKA_LOCK_TTL_SEC=30
+# ── Outbox / Event Publisher ─────────────────────────────────────────────────
+EVENT_PUBLISHER_DRIVER=noop      # 'noop' (default) | 'kafka'
+EVENT_OUTBOX_ENABLED=true
+EVENT_OUTBOX_MAX_ATTEMPTS=5
+EVENT_OUTBOX_RETRY_BASE_MS=1000
+EVENT_SCHEMA_FORMAT=json
 
+# Outbox alerting thresholds
+EVENT_OUTBOX_ALERT_UNPUBLISHED_BACKLOG_THRESHOLD=1000
+EVENT_OUTBOX_ALERT_DEAD_LETTER_BACKLOG_THRESHOLD=100
+EVENT_OUTBOX_ALERT_OLDEST_UNPUBLISHED_THRESHOLD_MS=60000
+EVENT_OUTBOX_ALERT_OLDEST_DEAD_LETTER_THRESHOLD_MS=300000
+EVENT_OUTBOX_ALERT_RETRY_SCHEDULED_THRESHOLD=1000
+EVENT_OUTBOX_ALERT_CRITICAL_UNPUBLISHED_BACKLOG_THRESHOLD=5000
+EVENT_OUTBOX_ALERT_CRITICAL_DEAD_LETTER_BACKLOG_THRESHOLD=500
+EVENT_OUTBOX_ALERT_CRITICAL_OLDEST_UNPUBLISHED_THRESHOLD_MS=300000
+EVENT_OUTBOX_ALERT_CRITICAL_OLDEST_DEAD_LETTER_THRESHOLD_MS=600000
+EVENT_OUTBOX_ALERT_CRITICAL_RETRY_SCHEDULED_THRESHOLD=5000
+EVENT_OUTBOX_ALERT_INTERVAL_SECONDS=30
+
+# ── Outbox Relay ─────────────────────────────────────────────────────────────
+OUTBOX_RELAY_QUEUE=outbox-relay
+OUTBOX_EVENT_PUBLISHER=noop       # 'noop' | 'kafka'
+OUTBOX_MAX_ATTEMPTS=5
+OUTBOX_RETRY_BASE_MS=1000
+OUTBOX_RELAY_LOCK_TTL_SEC=45
+
+# ── Kafka Consumer (Phase 5b — chưa implement) ─────────────────────────────
 KAFKA_CONSUMERS_ENABLED=false
 KAFKA_CONSUMER_GROUP_PREFIX=crypto-trading
-KAFKA_DLQ_TOPIC=crypto.dlq
+KAFKA_DLQ_TOPIC=crypto.dlq         # CHƯA implement, cần bổ sung
 
-MARKET_READ_SOURCE=postgres
-TICKER_SOURCE=nestjs
+# ── Read Source Feature Flags ────────────────────────────────────────────────
+MARKET_READ_SOURCE=postgres        # 'postgres' (default) | 'timescale'
+TICKER_SOURCE=nestjs               # 'nestjs' (default) | 'kafka_projection' | 'go_aggregator'
+PUBLIC_WS_SOURCE=nestjs            # 'nestjs' (default) | 'kafka_projection'
 ORDERBOOK_READ_SOURCE=postgres
-ANALYTICS_ENABLED=false
+
+# ── Market Read Model ────────────────────────────────────────────────────────
+MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS=300
+MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS=900
+
+# ── TimescaleDB (Phase 9 — chưa dùng) ──────────────────────────────────────
 MARKET_TS_ENABLED=false
-CLICKHOUSE_ENABLED=false
+MARKET_TS_TIMESCALE_ENABLED=false
+MARKET_TS_RETENTION_ENABLED=false
+MARKET_TS_RETENTION_DAYS=30
+MARKET_TS_COMPRESSION_ENABLED=false
+MARKET_TS_COMPRESS_AFTER_DAYS=7
+# MARKET_TS_HOST, MARKET_TS_PORT, MARKET_TS_USERNAME, MARKET_TS_PASSWORD, MARKET_TS_DB
+
+# ── ClickHouse / Analytics (Phase 5c — chưa implement) ──────────────────────
+ANALYTICS_ENABLED=false
+# CLICKHOUSE_URL, CLICKHOUSE_USER, CLICKHOUSE_PASSWORD, CLICKHOUSE_DB
+
+# ── Matching ─────────────────────────────────────────────────────────────────
+MATCHING_ENGINE=ts                # 'ts' (default)
 ```
+
+**Env var khác với plan gốc:**
+
+| Plan gốc | Thực tế |
+|---|---|
+| `KAFKA_ENABLED` | Không có — dùng `EVENT_PUBLISHER_DRIVER` |
+| `OUTBOX_KAFKA_PUBLISHER_ENABLED` | `EVENT_PUBLISHER_DRIVER` |
+| `OUTBOX_KAFKA_BATCH_SIZE`, `OUTBOX_KAFKA_FLUSH_INTERVAL_MS` | Không có — relay chạy row-by-row với Bull scheduler |
+| `OUTBOX_KAFKA_MAX_ATTEMPTS` | `OUTBOX_MAX_ATTEMPTS` |
+| `OUTBOX_KAFKA_LOCK_TTL_SEC` | `OUTBOX_RELAY_LOCK_TTL_SEC` |
 
 ---
 
-## 16. File/module dự kiến tác động
+## 16. File/module thực tế
 
-New:
+### Đã có (implemented)
+
+**Outbox — 26 files trong `src/common/outbox/`:**
+
+```text
+src/common/outbox/
+  outbox.module.ts                           ✅ DI module
+  outbox-appender.service.ts                 ✅ append event trong transaction
+  outbox-relay.service.ts                    ✅ relay core: pessimistic_write + skip_locked
+  outbox-relay.processor.ts                  ✅ Bull processor
+  outbox-relay.enqueue.scheduler.ts         ✅ @Cron 10s enqueue relay job
+  kafka-outbox-event-publisher.service.ts    ✅ kafkajs producer
+  noop-outbox-event-publisher.service.ts    ✅ noop fallback
+  outbox-event-publisher.port.ts             ✅ driver interface
+  outbox-integration-sync.service.ts         ✅ dispatchRow → 6 sync appliers
+  processed-integration-events.service.ts    ✅ idempotency gate
+  outbox-admin.service.ts                   ✅ REST /admin/outbox/*
+  outbox-admin.controller.ts
+  outbox-replay-audit.service.ts             ✅ JSON file replay audit trail
+  outbox-relay-alerting-collector.service.ts ✅ alert severity → Redis pub
+  outbox-relay-supported-event-types.ts     ✅ whitelist event types
+  outbox-alerting.constants.ts
+  outbox.constants.ts
+  # + spec files
+```
+
+**Integration events — `src/common/integration-events/`:**
+
+```text
+src/common/integration-events/
+  integration-event-catalog.ts               ✅ 15 event types
+  canonical-integration-event-envelope.ts   ✅ event envelope builder
+  trade-executed-outbox-payload.ts          ✅ payload + validator
+  order-lifecycle-outbox-payload.ts         ✅ payload + validator
+  wallet-balance-changed-outbox-payload.ts  ✅ payload + validator
+  market-ticker-updated-outbox-payload.ts   ✅ payload + validator
+  onchain-deposit-outbox-payload.ts         ✅ payload + validator
+  market-pair-read-model-sync.integration-event.ts
+```
+
+**Read model — `src/common/read-model/`:**
+
+```text
+src/common/read-model/
+  market-pair-read-model-sync-applier.service.ts
+  trade-read-model-sync-applier.service.ts
+  market-ticker-read-model-sync-applier.service.ts
+  market-ohlcv-read-model-sync-applier.service.ts
+  onchain-deposit-read-model-sync-applier.service.ts
+  market-pair-read-model-projection-handler.ts
+  market-read-model.module.ts
+```
+
+**Entities:**
+
+```text
+src/entities/
+  integration-outbox.entity.ts               ✅ 19 columns
+  processed-integration-event.entity.ts      ✅ idempotency
+  read-market-ticker.entity.ts
+  read-market-trade.entity.ts
+  read-market-ohlcv.entity.ts
+  read-market-pair.entity.ts
+  read-onchain-deposit.entity.ts
+```
+
+**Config:**
+
+```text
+src/config/
+  env.validation.ts                          ✅ Kafka/outbox env vars
+```
+
+### Cần tạo (not yet)
 
 ```text
 src/common/kafka/
-  kafka.module.ts
-  kafka-producer.service.ts
-  kafka-consumer-runner.service.ts
-  kafka.config.ts
-  kafka-topic-resolver.ts
+  kafka.module.ts                            ⬜ Phase 1
+  kafka-consumer-runner.service.ts            ⬜ Phase 5b
+  kafka-dlq-consumer.service.ts               ⬜ Phase 5b
+  kafka-topic-resolver.ts                    ⬜ (topic map tách khỏi publisher)
 
 src/common/integration-events/
-  event-envelope.ts
-  event-topic-map.ts
-  order-events.ts
-  trade-events.ts
-  wallet-events.ts
-  market-events.ts
+  event-topic-map.ts                         ⬜ (hiện inline trong publisher)
 
-src/common/outbox/
-  outbox-kafka-publisher.service.ts
-  outbox-kafka-publisher.processor.ts
-  outbox-kafka-publisher.scheduler.ts
+Phase 5c (ClickHouse):
+  src/common/clickhouse/
+    clickhouse-audit-consumer.service.ts
+    clickhouse.module.ts
 
-src/common/projections/
-  processed-events.repository.ts
-```
-
-Existing likely changed:
-
-```text
-src/entities/integration-outbox.entity.ts
-src/common/outbox/outbox-appender.service.ts
-src/common/integration-events/integration-event-catalog.ts
-src/config/env.validation.ts
-src/config/app.config.ts
-src/health/health.controller.ts
-src/modules/orders/infrastructure/persistence/order.repository.impl.ts
-src/modules/orders/application/use-cases/create-order.use-case.ts
-src/modules/orders/application/use-cases/cancel-order.use-case.ts
-src/modules/matching/infrastructure/persistence/matching.repository.ts
-src/modules/wallets/application/use-cases/apply-transaction.use-case.ts
-src/modules/trading/services/trading-price-stream.service.ts
+Phase 10 (Reconciliation):
+  src/common/reconciliation/
+    reconciliation.service.ts
+    reconciliation.module.ts
+    reconciliation.scheduler.ts
 ```
 
 ---
 
 ## 17. Rollback
 
-- Kafka publisher lỗi: `OUTBOX_KAFKA_PUBLISHER_ENABLED=false`.
+- Kafka publisher lỗi: `EVENT_PUBLISHER_DRIVER=noop`.
 - Consumer/projection lỗi: `MARKET_READ_SOURCE=postgres`, `TICKER_SOURCE=nestjs`.
-- ClickHouse lỗi: tắt `CLICKHOUSE_ENABLED`, replay sau từ Kafka retention.
-- Timescale lỗi: fallback PostgreSQL market read.
+- ClickHouse lỗi: tắt `ANALYTICS_ENABLED`, replay sau từ Kafka retention.
+- Timescale lỗi: fallback `MARKET_READ_SOURCE=postgres`.
 - Go aggregator lỗi: `TICKER_SOURCE=nestjs`.
 - Shadow/canary matching mismatch: `MATCHING_ENGINE=ts`, clear canary pairs.
 
@@ -829,30 +1380,53 @@ src/modules/trading/services/trading-price-stream.service.ts
 
 ## 18. Open questions
 
-1. Production dùng Kafka tự vận hành, Redpanda, hay managed Kafka?
-2. Retention topic cần 7 ngày, 30 ngày, hay lâu hơn?
-3. JSON schema trong repo đủ chưa hay cần schema registry?
-4. ClickHouse audit có yêu cầu compliance/immutability cụ thể không?
-5. FE chấp nhận eventual consistency cho ticker/orderbook ở mức nào?
-6. Có cần admin API/UI hiển thị outbox/Kafka lag không?
-7. Có cần `orders.cancel_requested` nếu sau này cancel async?
-8. Balance event nên publish per wallet after-state hay per ledger leg?
-9. Có cần compacted topic cho latest ticker/orderbook snapshot không?
-10. SLO target cho order placement, matching latency, market data lag là bao nhiêu?
+> ✅ = đã trả lời được qua audit thực tế
+
+| # | Câu hỏi | Trả lời |
+|---|---|---|
+|| ADR-001 | Relay gọi `dispatchRow()` trong execution path — nên tách không? | **ĐÃ QUYẾT ĐỊNH:** Tách. Relay chỉ mark processed. Projection async. Chi tiết Section 1. |
+| 1 | Production dùng Kafka tự vận hành, Redpanda, hay managed Kafka? | Chưa quyết định |
+| 2 | Retention topic cần 7 ngày, 30 ngày, hay lâu hơn? | Chưa quyết định |
+| 3 | JSON schema trong repo đủ chưa hay cần schema registry? | JSON schema trong code đủ (không có schema registry) |
+| 4 | ClickHouse audit có yêu cầu compliance/immutability cụ thể không? | Chưa quyết định |
+| 5 | FE chấp nhận eventual consistency cho ticker/orderbook ở mức nào? | Chưa quyết định (in-process projection = consistency rất thấp) |
+| 6 | ✅ Có cần admin API/UI hiển thị outbox/Kafka lag không? | **ĐÃ CÓ** — `/admin/outbox/*` trong `OutboxAdminService` |
+| 7 | ✅ Có cần `orders.cancel_requested` nếu sau này cancel async? | **ĐÃ CÓ** — `OrderCancelRequestedV1 = 'order.cancel_requested'` |
+| 8 | ✅ Balance event nên publish per wallet after-state hay per ledger leg? | **ĐÃ CÓ** — `WalletBalanceChangedV1` (after-state); ledger legs included in `TradeExecutedV1` payload |
+| 9 | Có cần compacted topic cho latest ticker/orderbook snapshot không? | Không cần — dùng `market.ticker_updated` với latest overwrite in-process |
+| 10 | SLO target cho order placement, matching latency, market data lag là bao nhiêu? | Chưa quyết định |
 
 ---
 
 ## 19. Kết luận
 
-Kafka nên thêm vào dự án như **event bus + durable replay log**, nhưng source of truth ban đầu cho core trading/money state vẫn nên là **PostgreSQL transaction + wallet ledger**.
+Kiến trúc đã chọn (PostgreSQL + Transactional Outbox + Kafka) là đúng và đã được implement. Source of truth cho core trading/money state vẫn là **PostgreSQL transaction + wallet ledger**.
 
-Plan an toàn nhất:
+**Thay đổi kiến trúc mới (ADR-001):** Relay tách projection. Relay chỉ mark `processed_integration_events` và publish Kafka. Projection chạy async riêng. Đây là thay đổi quan trọng nhất — giảm coupling, tăng resilience.
+
+Trạng thái implementation (2026-05-08):
+
+**✅ Đã xong:**
 
 1. Giữ PostgreSQL source of truth cho orders/trades/wallets.
-2. Mở rộng transactional outbox hiện có để publish Kafka.
-3. Consumer Kafka build TimescaleDB, ClickHouse, Redis projections.
-4. Đưa Go vào market aggregator trước.
-5. Shadow matching từ Kafka sau.
-6. Chỉ canary event-driven matching khi có parity, reconciliation, rollback đầy đủ.
+2. Mở rộng transactional outbox để publish Kafka (26 outbox services + 6 read model sync appliers).
+3. Outbox admin API + alerting + replay audit trail.
+4. TimescaleDB scaffolding (infrastructure ready, disabled by default).
+
+**⚠️ Đang làm:**
+
+5. Phase 5a — Relay-only Kafka publish + processed gate (~60%). Cần tách `dispatchRow()` ra khỏi relay.
+
+**⬜ Còn phải làm:**
+
+1. **Phase 11 — Projection health monitoring** ⭐ Quick win. Fix `getProjectionHealth()` bug + emit lag metrics. Nên làm ngay.
+2. **Phase 10 — Reconciliation jobs** ⭐ Ưu tiên CAO. Balance drift, trades mismatch, outbox backlog. Cần trước Phase 5c.
+3. **Phase 5b — Async projection consumer + circuit breaker** ⭐ Build trên Phase 5a. Mỗi consumer chạy riêng, circuit breaker per consumer.
+4. **Phase 5c — ClickHouse audit consumer**
+5. **Phase 9 — TimescaleDB benchmark** — benchmark rồi mới quyết định có dùng continuous aggregates không
+6. **Phase 5d — Kafka consumer migration** — optional, chỉ khi volume đủ lớn
+7. **Phase 6–8 — Go shadow** — chỉ khi infrastructure ổn định
+
+**Thứ tự ưu tiên thực tế:** **Phase 11 → Phase 5a → Phase 10 → Phase 5b → Phase 5c → Phase 9 → Phase 5d → Phase 6–8**
 
 Cách này đạt mục tiêu event-driven scalable architecture mà giảm tối đa rủi ro sai tiền, duplicate trade, overfill và phá contract FE.

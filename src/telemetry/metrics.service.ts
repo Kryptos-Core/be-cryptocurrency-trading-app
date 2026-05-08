@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import { Counter, Gauge, Histogram } from 'prom-client';
 
+/**
+ * Projection consumer metrics prefix
+ */
+const PROJECTION_CONSUMER_PREFIX = 'projection_consumer';
+
 @Injectable()
 export class MetricsService {
   constructor(
@@ -82,6 +87,44 @@ export class MetricsService {
 
     @InjectMetric('public_ws_parity_drift_pairs')
     private readonly publicWsParityDriftPairs: Gauge,
+
+    // Projection consumer metrics (Phase 5a/5b)
+    @InjectMetric(`${PROJECTION_CONSUMER_PREFIX}_processed_total`)
+    private readonly projectionConsumerProcessedTotal: Counter,
+
+    @InjectMetric(`${PROJECTION_CONSUMER_PREFIX}_failures_total`)
+    private readonly projectionConsumerFailuresTotal: Counter,
+
+    @InjectMetric(`${PROJECTION_CONSUMER_PREFIX}_state`)
+    private readonly projectionConsumerState: Gauge,
+
+    @InjectMetric(`${PROJECTION_CONSUMER_PREFIX}_skipped_total`)
+    private readonly projectionConsumerSkippedTotal: Counter,
+
+    // Reconciliation metrics (Phase 10)
+    @InjectMetric('reconciliation_balance_drift_total')
+    private readonly reconciliationBalanceDriftTotal: Gauge,
+
+    @InjectMetric('reconciliation_balance_critical_total')
+    private readonly reconciliationBalanceCriticalTotal: Gauge,
+
+    @InjectMetric('reconciliation_trades_mismatch')
+    private readonly reconciliationTradesMismatch: Gauge,
+
+    @InjectMetric('reconciliation_outbox_backlog')
+    private readonly reconciliationOutboxBacklog: Gauge,
+
+    @InjectMetric('reconciliation_dlq_count')
+    private readonly reconciliationDlqCount: Gauge,
+
+    @InjectMetric('reconciliation_orderbook_checksum_drift')
+    private readonly reconciliationOrderbookChecksumDrift: Gauge,
+
+    @InjectMetric('reconciliation_ohlcv_drift')
+    private readonly reconciliationOhlcvDrift: Gauge,
+
+    @InjectMetric('reconciliation_job_duration_seconds')
+    private readonly reconciliationJobDurationSeconds: Histogram,
   ) {}
 
   recordHttpRequest(method: string, route: string, statusCode: number, durationMs: number): void {
@@ -192,5 +235,74 @@ export class MetricsService {
 
   setPublicWsParityDriftPairs(source: string, value: number): void {
     this.publicWsParityDriftPairs.set({ source }, value);
+  }
+
+  // Projection consumer metrics (Phase 5a/5b)
+  incrementProjectionConsumerProcessed(count: number): void {
+    this.projectionConsumerProcessedTotal.inc(count);
+  }
+
+  incrementProjectionConsumerFailures(consumer: string): void {
+    this.projectionConsumerFailuresTotal.inc({ consumer });
+  }
+
+  setProjectionConsumerState(consumer: string, state: 'CLOSED' | 'OPEN' | 'HALF_OPEN'): void {
+    const stateValue = state === 'CLOSED' ? 0 : state === 'HALF_OPEN' ? 1 : 2;
+    this.projectionConsumerState.set({ consumer }, stateValue);
+  }
+
+  incrementProjectionConsumerSkipped(consumer: string, reason: string): void {
+    this.projectionConsumerSkippedTotal.inc({ consumer, reason });
+  }
+
+  // Reconciliation metrics (Phase 10)
+  setReconciliationBalanceDriftTotal(count: number): void {
+    this.reconciliationBalanceDriftTotal.set(count);
+  }
+
+  setReconciliationBalanceCriticalTotal(count: number): void {
+    this.reconciliationBalanceCriticalTotal.set(count);
+  }
+
+  setReconciliationTradesMismatch(windowMinutes: number, pgCount: number, readCount: number): void {
+    this.reconciliationTradesMismatch.set(
+      { window_minutes: String(windowMinutes) },
+      Math.abs(pgCount - readCount),
+    );
+  }
+
+  setReconciliationOutboxBacklog(count: number): void {
+    this.reconciliationOutboxBacklog.set(count);
+  }
+
+  setReconciliationDlqCount(count: number): void {
+    this.reconciliationDlqCount.set(count);
+  }
+
+  setReconciliationOrderbookChecksumDrift(pairId: string, driftPercent: number): void {
+    this.reconciliationOrderbookChecksumDrift.set(
+      { pair_id: pairId },
+      driftPercent,
+    );
+  }
+
+  setReconciliationOhlcvDrift(intervalSec: number, driftPercent: number): void {
+    this.reconciliationOhlcvDrift.set(
+      { interval_sec: String(intervalSec) },
+      driftPercent,
+    );
+  }
+
+  recordReconciliationJobDuration(jobName: string, durationMs: number): void {
+    this.reconciliationJobDurationSeconds.observe({ job: jobName }, durationMs / 1000);
+  }
+
+  // ClickHouse audit metrics (Phase 5c)
+  incrementClickHouseAuditProcessed(count: number): void {
+    this.projectionConsumerProcessedTotal.inc({ source: 'clickhouse' }, count);
+  }
+
+  incrementClickHouseAuditFailed(count: number): void {
+    this.projectionConsumerFailuresTotal.inc({ source: 'clickhouse' }, count);
   }
 }

@@ -43,6 +43,8 @@ import { OutboxRelayService } from './outbox-relay.service';
 import { OutboxRelayAlertingCollectorService } from './outbox-relay-alerting-collector.service';
 import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
+import { ProjectionConsumerRunnerService } from './projection-consumer-runner.service';
+import { CircuitBreakerRegistry } from './circuit-breaker';
 
 @Module({
   imports: [
@@ -81,6 +83,7 @@ import { ProcessedIntegrationEventsService } from './processed-integration-event
     NoopOutboxEventPublisherDriver,
     KafkaOutboxEventPublisher,
     KafkaOutboxEventPublisherDriver,
+    ProjectionConsumerRunnerService,
     {
       provide: OUTBOX_EVENT_PUBLISHER,
       inject: [ConfigService, NoopOutboxEventPublisherDriver, KafkaOutboxEventPublisherDriver],
@@ -107,6 +110,6 @@ import { ProcessedIntegrationEventsService } from './processed-integration-event
     },
   ],
   controllers: [OutboxAdminController],
-  exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService],
+  exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService, ProjectionConsumerRunnerService],
 })
 export class OutboxModule {}

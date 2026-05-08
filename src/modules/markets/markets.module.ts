@@ -21,6 +21,7 @@ import { MARKET_REPOSITORY } from './domain/ports';
 import { MarketReadModelMetricsCollectorService } from './market-read-model-metrics-collector.service';
 import { MarketReadModelReconciliationService } from './market-read-model-reconciliation.service';
 import { MarketsController } from './markets.controller';
+import { ProjectionHealthController } from './projection-health.controller';
 import { MarketsService } from './markets.service';
 import { MarketReadModelRepository, MarketRepository } from './repositories';
 
@@ -52,7 +53,7 @@ import { MarketReadModelRepository, MarketRepository } from './repositories';
     GetMarketDepthQuery,
     GetMarketOHLCVQuery,
   ],
-  controllers: [MarketsController],
+  controllers: [MarketsController, ProjectionHealthController],
   exports: [
     MarketsService,
     MARKET_REPOSITORY,

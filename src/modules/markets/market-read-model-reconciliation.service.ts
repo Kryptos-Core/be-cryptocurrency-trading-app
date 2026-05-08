@@ -242,17 +242,17 @@ export class MarketReadModelReconciliationService {
 
   async getProjectionLagSummary(): Promise<ProjectionHealthSummary['lag']> {
     const [tradeLag, tickerLag, ohlcvLag] = await Promise.all([
-      this.getProjectionLag(
+      this.safelyGetProjectionLag(
         'trades',
         `SELECT MAX(created_at) AS latest_core_at FROM trades`,
         `SELECT MAX(executed_at) AS latest_projection_at FROM read_market_trades`,
       ),
-      this.getProjectionLag(
+      this.safelyGetProjectionLag(
         'tickers',
         `SELECT MAX(created_at) AS latest_core_at FROM trades`,
         `SELECT MAX(ticker_timestamp) AS latest_projection_at FROM read_market_tickers`,
       ),
-      this.getProjectionLag(
+      this.safelyGetProjectionLag(
         'ohlcv',
         `SELECT MAX(created_at) AS latest_core_at FROM trades`,
         `SELECT MAX(open_time) + INTERVAL '1 minute' AS latest_projection_at FROM read_market_ohlcv WHERE interval_sec = 60`,
@@ -264,6 +264,27 @@ export class MarketReadModelReconciliationService {
       tickers: tickerLag,
       ohlcv: ohlcvLag,
     };
+  }
+
+  private async safelyGetProjectionLag(
+    projection: ProjectionLagSummary['projection'],
+    coreQuery: string,
+    projectionQuery: string,
+  ): Promise<ProjectionLagSummary> {
+    try {
+      return await this.getProjectionLag(projection, coreQuery, projectionQuery);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get projection lag for ${projection}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return {
+        projection,
+        lagSeconds: -1,
+        latestCoreAt: null,
+        latestProjectionAt: null,
+      };
+    }
   }
 
   async getProjectionHealth(
@@ -292,8 +313,11 @@ export class MarketReadModelReconciliationService {
       tickers.stalePairs.length > 0 ||
       degradedOhlcv ||
       lag.trades.lagSeconds > 300 ||
+      lag.trades.lagSeconds < 0 || // -1 indicates query failure
       lag.tickers.lagSeconds > 300 ||
-      lag.ohlcv.lagSeconds > 300;
+      lag.tickers.lagSeconds < 0 ||
+      lag.ohlcv.lagSeconds > 300 ||
+      lag.ohlcv.lagSeconds < 0;
 
     const pairDetails = options?.includePairDetails
       ? await this.getProjectionPairDetails(

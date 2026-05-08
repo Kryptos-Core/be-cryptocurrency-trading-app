@@ -142,6 +142,65 @@ import { MetricsService } from './metrics.service';
       labelNames: ['chain', 'method'],
       buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30],
     }),
+    // Projection consumer metrics (Phase 5a/5b)
+    makeCounterProvider({
+      name: 'projection_consumer_processed_total',
+      help: 'Total events successfully processed by projection consumers',
+      labelNames: ['source'],
+    }),
+    makeCounterProvider({
+      name: 'projection_consumer_failures_total',
+      help: 'Total projection consumer processing failures',
+      labelNames: ['consumer', 'source'],
+    }),
+    makeGaugeProvider({
+      name: 'projection_consumer_state',
+      help: 'Circuit breaker state per projection consumer (CLOSED=0, HALF_OPEN=1, OPEN=2)',
+      labelNames: ['consumer'],
+    }),
+    makeCounterProvider({
+      name: 'projection_consumer_skipped_total',
+      help: 'Total events skipped by projection consumers',
+      labelNames: ['consumer', 'reason'],
+    }),
+    // Reconciliation metrics (Phase 10)
+    makeGaugeProvider({
+      name: 'reconciliation_balance_drift_total',
+      help: 'Total user balances with drift above threshold',
+    }),
+    makeGaugeProvider({
+      name: 'reconciliation_balance_critical_total',
+      help: 'Total user balances with critical drift',
+    }),
+    makeGaugeProvider({
+      name: 'reconciliation_trades_mismatch',
+      help: 'Trade count mismatch between PostgreSQL and read model',
+      labelNames: ['window_minutes'],
+    }),
+    makeGaugeProvider({
+      name: 'reconciliation_outbox_backlog',
+      help: 'Unpublished outbox rows',
+    }),
+    makeGaugeProvider({
+      name: 'reconciliation_dlq_count',
+      help: 'Dead-letter queue count',
+    }),
+    makeGaugeProvider({
+      name: 'reconciliation_orderbook_checksum_drift',
+      help: 'Orderbook checksum drift between PostgreSQL and Redis',
+      labelNames: ['pair_id'],
+    }),
+    makeGaugeProvider({
+      name: 'reconciliation_ohlcv_drift',
+      help: 'OHLCV volume drift between PostgreSQL and read model',
+      labelNames: ['interval_sec'],
+    }),
+    makeHistogramProvider({
+      name: 'reconciliation_job_duration_seconds',
+      help: 'Duration of reconciliation jobs in seconds',
+      labelNames: ['job'],
+      buckets: [1, 5, 15, 30, 60, 120, 300],
+    }),
   ],
   exports: [MetricsService],
 })
