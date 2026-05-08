@@ -1,5 +1,5 @@
 import { BullModule } from '@nestjs/bull';
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DepositWatcherCursor } from '@/entities/deposit-watcher-cursor.entity';
 import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.module';
@@ -8,6 +8,7 @@ import { BlockchainModule } from '../blockchain.module';
 import { DEPOSIT_WATCHER_QUEUE } from './deposit-watcher.constants';
 import { DepositWatcherProcessor } from './deposit-watcher.processor';
 import { DepositWatcherScheduler } from './deposit-watcher.scheduler';
+import { DepositWatcherAdminController } from './deposit-watcher-admin.controller';
 import { DepositWatcherConfigService } from './deposit-watcher-config.service';
 import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
 import { DepositWatcherWebhookController } from './deposit-watcher-webhook.controller';
@@ -16,7 +17,7 @@ import { TronDepositObserverService } from './tron-deposit-observer.service';
 
 @Module({
   imports: [
-    BlockchainModule,
+    forwardRef(() => BlockchainModule),
     ManagedWalletsModule,
     SystemConfigModule,
     TypeOrmModule.forFeature([DepositWatcherCursor]),
@@ -30,7 +31,7 @@ import { TronDepositObserverService } from './tron-deposit-observer.service';
       },
     }),
   ],
-  controllers: [DepositWatcherWebhookController],
+  controllers: [DepositWatcherWebhookController, DepositWatcherAdminController],
   providers: [
     DepositWatcherCursorRepository,
     DepositWatcherConfigService,

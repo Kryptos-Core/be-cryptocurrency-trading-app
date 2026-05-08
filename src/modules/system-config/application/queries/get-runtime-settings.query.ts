@@ -4,9 +4,7 @@ import {
   SYSTEM_CONFIG_REPOSITORY,
   type SystemConfigRepositoryPort,
 } from '@/modules/system-config/domain/ports';
-import {
-  RUNTIME_SETTING_SEEDS,
-} from '@/modules/system-config/runtime-settings.definitions';
+import { RUNTIME_SETTING_SEEDS } from '@/modules/system-config/runtime-settings.definitions';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
 
 export interface RuntimeSettingView {

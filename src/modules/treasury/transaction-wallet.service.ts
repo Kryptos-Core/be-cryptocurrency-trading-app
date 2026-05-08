@@ -40,6 +40,8 @@ import {
 } from './domain/ports';
 import type { CreateTransactionWalletDto, ListTreasuryWalletsDto } from './dto';
 import {
+  EVM_DEPOSIT_UI_CHAINS,
+  type EvmDepositUiChain,
   TRON_DEPOSIT_UI_CHAINS,
   type TronDepositUiChain,
 } from './infrastructure/persistence/treasury-transaction-wallet.repository';
@@ -607,9 +609,12 @@ export class TransactionWalletService {
         'TX_WALLET_PURPOSE_NOT_DEPOSIT',
       );
     }
-    if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
+    if (
+      !TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain) &&
+      !EVM_DEPOSIT_UI_CHAINS.includes(wallet.chain as EvmDepositUiChain)
+    ) {
       throw new BadRequestException(
-        'User deposit default is only supported for Tron mainnet (TRC-20)',
+        'User deposit default is only supported for Tron (TRC-20) and EVM (ERC-20) chains',
         'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
       );
     }
@@ -638,9 +643,12 @@ export class TransactionWalletService {
         'TX_WALLET_PURPOSE_NOT_DEPOSIT',
       );
     }
-    if (!TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain)) {
+    if (
+      !TRON_DEPOSIT_UI_CHAINS.includes(wallet.chain as TronDepositUiChain) &&
+      !EVM_DEPOSIT_UI_CHAINS.includes(wallet.chain as EvmDepositUiChain)
+    ) {
       throw new BadRequestException(
-        'User deposit default is only supported for Tron mainnet (TRC-20)',
+        'User deposit default is only supported for Tron (TRC-20) and EVM (ERC-20) chains',
         'TX_WALLET_CHAIN_NOT_SUPPORTED_FOR_DEPOSIT_UI',
       );
     }

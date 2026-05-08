@@ -85,7 +85,9 @@ export class SystemConfigController {
   @Get('runtime/ops')
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.SYSTEM_CONFIG_EDIT_OPS)
-  @ApiOperation({ summary: 'Runtime settings — OPS category (matching, aggregator, outbox, rollout)' })
+  @ApiOperation({
+    summary: 'Runtime settings — OPS category (matching, aggregator, outbox, rollout)',
+  })
   async getRuntimeSettingsOpsHandler() {
     return this._getRuntimeSettingsByCategory(ConfigCategory.OPS);
   }
@@ -106,7 +108,9 @@ export class SystemConfigController {
   @Get('runtime/core')
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.SYSTEM_CONFIG_EDIT_CORE)
-  @ApiOperation({ summary: 'Runtime settings — CORE category (symbols, market sources, wallet config)' })
+  @ApiOperation({
+    summary: 'Runtime settings — CORE category (symbols, market sources, wallet config)',
+  })
   async getRuntimeSettingsCoreHandler() {
     return this._getRuntimeSettingsByCategory(ConfigCategory.CORE);
   }
@@ -128,12 +132,11 @@ export class SystemConfigController {
   @RequireRoles(UserRole.ADMIN, UserRole.FINANCE_MANAGER)
   @RequirePermissions(Permission.PAYMENT_CONFIGS_MANAGE)
   @ApiOperation({ summary: 'Runtime platform settings (all categories, legacy)' })
-  async getRuntimeSettingsHandler(
-    @Query('category') category?: string,
-  ) {
-    const cat = category && Object.values(ConfigCategory).includes(category as ConfigCategory)
-      ? (category as ConfigCategory)
-      : undefined;
+  async getRuntimeSettingsHandler(@Query('category') category?: string) {
+    const cat =
+      category && Object.values(ConfigCategory).includes(category as ConfigCategory)
+        ? (category as ConfigCategory)
+        : undefined;
     return this.getRuntimeSettings.execute(cat);
   }
 

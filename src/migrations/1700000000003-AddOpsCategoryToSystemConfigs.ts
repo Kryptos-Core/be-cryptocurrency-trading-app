@@ -5,8 +5,14 @@ export class AddOpsCategoryToSystemConfigs1700000000003 implements MigrationInte
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      ALTER TYPE system_configs_category_enum
-      ADD VALUE IF NOT EXISTS 'ops';
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'system_configs_category_enum') THEN
+          CREATE TYPE "public"."system_configs_category_enum" AS ENUM('tech', 'finance', 'core', 'ops');
+        ELSE
+          ALTER TYPE "public"."system_configs_category_enum" ADD VALUE IF NOT EXISTS 'ops';
+        END IF;
+      END$$;
     `);
   }
 

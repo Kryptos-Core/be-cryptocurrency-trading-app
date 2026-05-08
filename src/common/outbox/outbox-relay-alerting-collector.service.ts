@@ -24,6 +24,16 @@ export class OutboxRelayAlertingCollectorService {
 
   @Cron(CronExpression.EVERY_30_SECONDS, { name: 'outbox-relay-alerting-collector' })
   async collect(): Promise<void> {
+    const driver =
+      String(this.configService.get<string>('EVENT_PUBLISHER_DRIVER') ?? 'noop')
+        .trim()
+        .toLowerCase() || 'noop';
+
+    // Noop driver means events are not actually published, skip alerting
+    if (driver === 'noop') {
+      return;
+    }
+
     const enabled =
       String(this.configService.get<string>('EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED') ?? 'true')
         .trim()
@@ -35,10 +45,6 @@ export class OutboxRelayAlertingCollectorService {
     try {
       const health = await this.outboxAdminService.getRelayHealth();
       const severity = health.alerts.severity;
-      const driver =
-        String(this.configService.get<string>('EVENT_PUBLISHER_DRIVER') ?? 'noop')
-          .trim()
-          .toLowerCase() || 'noop';
 
       this.metricsService.setOutboxRelayAlertSeverity(this.severityToMetric(severity));
 

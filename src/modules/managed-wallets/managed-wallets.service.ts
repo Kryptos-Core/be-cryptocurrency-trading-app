@@ -22,7 +22,11 @@ import {
   TREASURY_TRANSACTION_WALLET_REPOSITORY,
   type TreasuryTransactionWalletRepositoryPort,
 } from '@/modules/treasury/domain/ports';
-import type { TronDepositUiChain } from '@/modules/treasury/infrastructure/persistence/treasury-transaction-wallet.repository';
+import {
+  EVM_DEPOSIT_UI_CHAINS,
+  type EvmDepositUiChain,
+  type TronDepositUiChain,
+} from '@/modules/treasury/infrastructure/persistence/treasury-transaction-wallet.repository';
 import { OnchainChainPickerService } from '@/modules/treasury/onchain-chain-picker.service';
 import { resolveRecommendedChainForDepositPicker } from '@/modules/treasury/onchain-chain-picker.util';
 import { TransactionWalletService } from '@/modules/treasury/transaction-wallet.service';
@@ -45,6 +49,10 @@ const MANAGED_TRON_CHAINS = [
 ] as const;
 
 type SupportedManagedWalletChain = (typeof MANAGED_TRON_CHAINS)[number];
+
+function isEvmDepositChain(chain: string): chain is EvmDepositUiChain {
+  return (EVM_DEPOSIT_UI_CHAINS as readonly string[]).includes(chain);
+}
 
 type DepositMethodItem = {
   /** API chain code — same universe as GET /treasury/chain-picker-options `onchain_deposit_withdraw`. */
@@ -406,15 +414,16 @@ export class ManagedWalletsService {
 
   /**
    * Operational wallet (ví vận hành) set by operators as default deposit address only.
-   * Only transaction wallets with purpose DEPOSIT|BOTH are returned.
+   * Transaction wallets with purpose DEPOSIT|BOTH are returned.
    *
-   * Tron mainnet: default user-deposit transaction wallet only.
-   * Tron testnets: default user-deposit transaction wallet only.
+   * Tron networks: default user-deposit transaction wallet only.
+   * EVM networks: default user-deposit transaction wallet only.
    * Other chains: NOT supported — no fallback to treasury main wallets.
    */
   private async resolveDepositMethodDisplayAddress(chain: string): Promise<string> {
     const c = chain as BlockchainNetwork;
-    // Only TRON chains support operational wallet defaults set by operators
+
+    // Tron networks
     if (c === BlockchainNetwork.TRON_MAINNET) {
       const tw = await this.transactionWalletService.getDefaultUserDepositWallet(
         BlockchainNetwork.TRON_MAINNET,
@@ -427,8 +436,16 @@ export class ManagedWalletsService {
       );
       return tw?.address ?? '';
     }
-    // Non-TRON chains: operational wallet defaults not supported
-    // Do not fallback to treasury main wallets
+
+    // EVM networks — use same transaction wallet pattern
+    if (isEvmDepositChain(c)) {
+      const tw = await this.transactionWalletService.getDefaultUserDepositWallet(
+        c as unknown as BlockchainChainDbValue,
+      );
+      return tw?.address ?? '';
+    }
+
+    // Other chains: operational wallet defaults not supported
     return '';
   }
 

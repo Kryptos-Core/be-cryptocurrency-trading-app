@@ -25,4 +25,13 @@ export class DepositWatcherCursorRepository {
       ['chain'],
     );
   }
+
+  async deleteByChain(chain: string): Promise<void> {
+    await this.dataSource.getRepository(DepositWatcherCursor).delete({ chain });
+  }
+
+  async deleteAll(): Promise<number> {
+    const result = await this.dataSource.getRepository(DepositWatcherCursor).delete({});
+    return result.affected ?? 0;
+  }
 }
