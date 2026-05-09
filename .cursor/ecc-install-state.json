@@ -2,11 +2,11 @@
   "schemaVersion": "ecc.install.v1",
   "installedAt": "2026-04-06T09:39:38.197Z",
   "target": {
-    "id": "cursor-project",
+    "id": "be-cryptocurrency-trading-app",
     "target": "cursor",
     "kind": "project",
-    "root": "D:\\Sources\\cryptocurrency-trading-app\\.cursor",
-    "installStatePath": "D:\\Sources\\cryptocurrency-trading-app\\.cursor\\ecc-install-state.json"
+    "root": "be-cryptocurrency-trading-app/.cursor",
+    "installStatePath": "be-cryptocurrency-trading-app/.cursor/ecc-install-state.json"
   },
   "request": {
     "profile": null,

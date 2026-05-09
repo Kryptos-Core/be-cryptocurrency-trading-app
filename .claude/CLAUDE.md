@@ -1,89 +1,99 @@
 # Claude Code — Kryptos Core Backend
 
-**Workspace:** `be-cryptocurrency-trading-app/` (NestJS, TypeScript). **Chuẩn team BE.**
+**Workspace:** `be-cryptocurrency-trading-app/` (NestJS, TypeScript). **Chuan team BE.**
 
-Ngữ cảnh session: `.claude/`. **Vibe Code / ECC:** [VIBE_CODE.md](../VIBE_CODE.md) · [AGENTS.md](../AGENTS.md) · [ECC-COMMANDS.md](../ECC-COMMANDS.md). Vận hành: [README.md](../README.md).
+Thu muc `.claude/` la nguon chuan cua BE. Khi mo workspace la root monorepo, BE tu dong duoc nhan dien nhu subdirectory.
+
+## Nguon chi
+
+| File | Ghi chu |
+|------|---------|
+| `VIBE_CODE.md` | Chuẩn AI của team BE |
+| `AGENTS.md` | Danh sach agent ECC cho BE |
+| `ECC-COMMANDS.md` | Lệnh CCG / multi-agent |
+| `docs/ARCHITECTURE.md` | Kiến trúc chi tiet |
+| `README.md` | Setup, chạy local |
 
 ---
 
-## Kiến trúc — Clean Architecture
+## Kien truc — Clean Architecture
 
-Một số module đã áp dụng **Clean Architecture (Onion/Hexagonal)**:
+Mot so module da ap dung **Clean Architecture (Onion/Hexagonal)**:
 
 ```
-domain/ # Ports (interfaces) — không phụ thuộc gì bên ngoài
+domain/ # Ports (interfaces) — khong phu thuoc gi ben ngoai
  ├── ports/
  └── services/ # Domain services, invariants
-application/ # Use-cases, queries, ports implementations (không phụ thuộc infrastructure)
+application/ # Use-cases, queries, ports implementations (khong phu thuoc infrastructure)
  ├── use-cases/
  ├── queries/
- └── ports/ # TokenIssuerPort, PasswordHasherPort (trừu tượng, không có implementation)
+ └── ports/ # TokenIssuerPort, PasswordHasherPort (truu tuong, khong co implementation)
 infrastructure/ # Persistence adapters, external service adapters
  ├── persistence/ # *RepositoryImpl → implement port
  └── providers/ # JwtTokenIssuerAdapter, BcryptPasswordHasher → implement port
-presentation/ # Controllers, DTOs (thường nằm ở root module)
+presentation/ # Controllers, DTOs (thuong nam o root module)
 ```
 
-**Clean Architecture đầy đủ (domain + application + infrastructure):** `auth`, `orders`.
+**Clean Architecture day du (domain + application + infrastructure):** `auth`, `orders`.
 
-**Hybrid** (ports/repository + thường có `BaseRepository` / SP; một số đã có `application/queries` mỏng cho surface đọc): `wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`, `system-config`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`, … và các adapter **`trading`**, **`exchange`**, **`dashboard`**, **`binance-rest`**, **`price-oracle`**, **`metadata`** (logic tập trung service + query handlers đọc, không có domain nặng).
+**Hybrid** (ports/repository + thuong co `BaseRepository` / SP; mot so da co `application/queries` mong cho surface doc): `wallets`, `users`, `markets`, `currencies`, `deposits`, `blockchain`, `treasury`, `matching`, `system-config`, `exchange-rate`, `managed-wallets`, `notifications`, `payment-config`, `market-maker`, … va cac adapter **`trading`**, **`exchange`**, **`dashboard`**, **`binance-rest`**, **`price-oracle`**, **`metadata`** (logic tap trung service + query handlers doc, khong co domain nang).
 
-**Toàn cục:** `src/common/outbox/` (outbox + Bull `outbox-relay` → `OutboxRelayService` / `OutboxIntegrationSyncService`), `src/common/unit-of-work/`, `src/common/application-bus/` (`@nestjs/cqrs`), read model `read_market_pairs` / `read_onchain_deposits`, env `READ_MARKETS_FROM_PROJECTION`, `READ_MODEL_ONCHAIN_DEPOSITS`. [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md), [docs/ARCHITECTURE_FULL_ROLLOUT.md](../docs/ARCHITECTURE_FULL_ROLLOUT.md). `npm run lint:boundaries`.
+**Toan cuc:** `src/common/outbox/` (outbox + Bull `outbox-relay` → `OutboxRelayService` / `OutboxIntegrationSyncService`), `src/common/unit-of-work/`, `src/common/application-bus/` (`@nestjs/cqrs`), read model `read_market_pairs` / `read_onchain_deposits`, env `READ_MARKETS_FROM_PROJECTION`, `READ_MODEL_ONCHAIN_DEPOSITS`. `npm run lint:boundaries`.
 
 ---
 
-## Quy tắc kiến trúc quan trọng
+## Quy tac kien truc quan trọng
 
 ### Dependency Injection Token (Port Pattern)
-Domain **không bao giờ** import trực tiếp implementation. Dùng Symbol token:
+Domain **khong bao gio** import truc tiep implementation. Dung Symbol token:
 
 ```typescript
-// domain/ports — định nghĩa interface
+// domain/ports — dinh nghia interface
 export const TOKEN_ISSUER = Symbol('TOKEN_ISSUER');
 export interface TokenIssuerPort { sign(payload: Record<string, unknown>): string; }
 
 // infrastructure/providers — implementation
 export class JwtTokenIssuerAdapter implements TokenIssuerPort { ... }
 
-// application/use-cases — phụ thuộc port, không implementation
+// application/use-cases — phu thuoc port, khong implementation
 constructor(@Inject(TOKEN_ISSUER) private readonly tokenIssuer: TokenIssuerPort) {}
 
-// auth.module.ts — wire adapter với token
+// *.module.ts — wire adapter voi token
 { provide: TOKEN_ISSUER, useExisting: JwtTokenIssuerAdapter },
 JwtTokenIssuerAdapter,
 ```
 
 ### TransactionContext — Opaque interface
-Domain **không import EntityManager**. Dùng `TransactionContext` (empty interface):
+Domain **khong import EntityManager**. Dung `TransactionContext` (empty interface):
 
 ```typescript
 // src/common/types/transaction-context.ts
 export interface TransactionContext {}
 ```
 
-Infrastructure implementation cast về `EntityManager`:
+Infrastructure implementation cast ve `EntityManager`:
 ```typescript
 function toEntityManager(ctx: TransactionContext): EntityManager {
  return ctx as unknown as EntityManager;
 }
 ```
 
-**Files cần cập nhật khi thêm port mới:**
-- `domain/ports/*.port.ts` — định nghĩa interface
-- `infrastructure/persistence/*.impl.ts` — implement port, dùng `toEntityManager()`
+**Files can cap nhat khi them port moi:**
+- `domain/ports/*.port.ts` — dinh nghia interface
+- `infrastructure/persistence/*.impl.ts` — implement port, dung `toEntityManager()`
 - `application/use-cases/*.ts` — inject qua `@Inject(TOKEN)`
 - `*.module.ts` — wire token → adapter
 
 ---
 
-## Chạy local (tóm tắt)
+## Chay local
 
 ```bash
-# Tạo .env.development từ .env.development.example, chỉnh DB_*, REDIS_*, JWT_*, …
+# Tao .env.development tu .env.development.example, chinh DB_*, REDIS_*, JWT_*, …
 npm run docker:infra:up
 npm install
 npm run migration:run
-# npm run lint:boundaries  # tùy chọn — trước PR lớn
+# npm run lint:boundaries  # tuy chon — truoc PR lon
 npm run db:seed
 npm run start:dev
 ```
@@ -92,41 +102,48 @@ npm run start:dev
 |---|-----|
 | API | `http://127.0.0.1:3000/api/v1` |
 | Health | `GET /api/v1/health` |
-| Swagger | `http://127.0.0.1:3000/api/docs` (thường tắt khi production) |
+| Swagger | `http://127.0.0.1:3000/api/docs` (thuong tat khi production) |
 
-## Module / vùng quan trọng
+## Module / vung quan trọng
 
-| Khu vực | Thư mục / ghi chú |
-|--------|-------------------|
+| Khu vuc | Thu muc / ghi chu |
+|---------|-------------------|
 | Auth & RBAC | `src/modules/auth/` — Clean Architecture ✓ (`domain/`, `application/`, `infrastructure/`) |
-| Thị trường & giá | `markets/`, `exchange/`, `price-oracle/`, `currencies/` |
-| Lệnh & khớp | `orders/` — Clean Architecture ✓; **nhạy cảm**: Redis lock, STP, circuit breaker, audit log |
-| Giao dịch realtime | `trading/` + WebSocket |
-| Ví & số dư | `wallets/` |
-| Blockchain / WC | `blockchain/` (kể cả `wallet-connect/`) |
-| Nạp-rút / PayOS | `deposits/`, `payment-config/` |
-| Treasury / vận hành | `treasury/`, `managed-wallets/` |
+| Thi truong & gia | `markets/`, `exchange/`, `price-oracle/`, `currencies/` |
+| Lenh & khop | `orders/` — Clean Architecture ✓; **nhay cam**: Redis lock, STP, circuit breaker, audit log |
+| Giao dich realtime | `trading/` + WebSocket |
+| Vi & so du | `wallets/` |
+| Blockchain / WC | `blockchain/` (ke ca `wallet-connect/`) |
+| Nap-rut / PayOS | `deposits/`, `payment-config/` |
+| Treasury / van hanh | `treasury/`, `managed-wallets/` |
 | MM batch | `market-maker/` |
 | Queue / cache | `redis/`, Bull theo module; Bull Board: `/admin/queues` (admin-only) |
 
-Cấu trúc chi tiết: [README.md](../README.md).
+Cau truc chi tiet: `README.md`.
 
-## Đừng đụng / cẩn trọng
+## Dong dont / can trong
 
-- **Không** commit `.env*`, khóa ví, RPC secrets, seed credential thật.
-- **`matching/` + `orders/`**: mọi thay đổi luồng khớp cần test + mô tả rủi ro (Redis Lua lock, order book, `CircuitBreakerService`, `AuditTradeVisitor`, slippage…).
-- **Migration & entity**: không xóa migration đã chạy; giữ đồng bộ DB.
-- **Whitelist env**: biến mới → `src/config/env.validation.ts` (cả `EnvironmentVariables` class VÀ mảng `envVarKeys`).
-- **UserRole**: chỉ giá trị trong `src/common/enums`.
+- **Khong** commit `.env*`, khoa vi, RPC secrets, seed credential that.
+- **`matching/` + `orders/`**: moi thay doi luong khop can test + mo ta rui ro (Redis Lua lock, order book, `CircuitBreakerService`, `AuditTradeVisitor`, slippage...).
+- **Migration & entity**: khong xoa migration da chay; giu dong bo DB.
+- **Whitelist env**: bien moi → `src/config/env.validation.ts` (ca `EnvironmentVariables` class VA mang `envVarKeys`).
+- **UserRole**: chi gia tri trong `src/common/enums`.
 
 ## Frontend
 
-App Flutter do **team FE** maintain — **repo Git riêng**; đổi API ở đây thì phối hợp contract / versioning với client.
+App Flutter do **team FE** maintain — **repo Git rieng**; doi API o day thi phoi hop contract / versioning voi client.
 
-## ECC — CCG / lệnh multi-agent
+## Chuan AI — Rules & Skills
+
+| Muc | Duong dan | Ghi chu |
+|-----|-----------|---------|
+| Rules | `.cursor/rules/` | nestjs-api-design, nestjs-database, typescript-*, common-* |
+| Skills | `.cursor/skills/` | nestjs-patterns, backend-patterns, api-design, postgres-patterns, database-migrations, security-review, tdd-workflow, verification-loop |
+
+ECC commands (neu can):
 
 ```bash
 npx ccg-workflow
 ```
 
-Chi tiết: [ECC-COMMANDS.md](../ECC-COMMANDS.md).
+Chi tiet: `ECC-COMMANDS.md`.

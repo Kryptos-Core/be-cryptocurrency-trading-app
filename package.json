@@ -26,6 +26,7 @@
     "db:migrate:ch:status": "docker exec crypto_trading_clickhouse clickhouse-client --host localhost --port 9000 --query \"SHOW TABLES FROM analytics\"",
     "db:clean": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-db-clean.ts",
     "db:reset": "npm run db:seed",
+    "db:seed": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
     "docker:infra:up": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d",
     "docker:infra:up:full": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile timescale --profile kafka --profile clickhouse up -d",
     "docker:infra:down": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development down -v",

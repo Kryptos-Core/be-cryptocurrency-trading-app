@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Connection,
@@ -100,8 +100,17 @@ export interface TreasuryWalletWithBalance
 }
 
 @Injectable()
-export class TransactionWalletService {
+export class TransactionWalletService implements OnModuleInit {
   private readonly logger = new Logger(TransactionWalletService.name);
+
+  /**
+   * Auto-seed deposit wallets for all supported chains on first startup (table empty).
+   * Mirrors the pattern used by TreasuryMainWalletService.onModuleInit().
+   * Private keys are generated fresh — never stored in source code.
+   */
+  async onModuleInit(): Promise<void> {
+    await this.seedDepositWalletsIfEmpty();
+  }
 
   constructor(
     @Inject(TREASURY_TRANSACTION_WALLET_REPOSITORY)
@@ -976,6 +985,44 @@ export class TransactionWalletService {
       );
     } catch (error) {
       this.logger.warn(`Failed to publish treasury event ${event}: ${(error as Error).message}`);
+    }
+  }
+
+  private async seedDepositWalletsIfEmpty(): Promise<void> {
+    const count = await this.treasuryTransactionWalletRecordRepository.countAll();
+    if (count > 0) return;
+
+    const allDepositChains: SupportedTreasuryChain[] = [
+      ...(EVM_DEPOSIT_UI_CHAINS as unknown as SupportedTreasuryChain[]),
+      ...(TRON_DEPOSIT_UI_CHAINS as unknown as SupportedTreasuryChain[]),
+    ];
+
+    this.logger.warn(
+      `TransactionWalletService: ${allDepositChains.length} chains need deposit wallets. Auto-seeding from generated keys...`,
+    );
+
+    for (const chain of allDepositChains) {
+      try {
+        const account = await this.generateAccount(chain);
+        await this.treasuryTransactionWalletRecordRepository.createAndSave({
+          wallet_id: uuidv7(),
+          chain,
+          address: account.address,
+          purpose: 'DEPOSIT',
+          encrypted_private_key: this.walletEncryptionService.encrypt(account.privateKey),
+          label: `${chain} auto-seeded on startup`,
+          is_active: true,
+          is_default_user_deposit: true,
+          default_set_at: new Date(),
+        });
+        this.logger.log(
+          `Seeded deposit wallet: chain=${chain}, address=${account.address}`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Could not seed deposit wallet for ${chain}: ${(error as Error).message}`,
+        );
+      }
     }
   }
 }

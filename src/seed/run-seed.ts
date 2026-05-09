@@ -74,6 +74,7 @@ async function run() {
     await truncateIfExists('deposits');
     await truncateIfExists('withdrawals');
     await truncateIfExists('users');
+    await truncateIfExists('transaction_wallets');
 
     // Optional legacy tables kept for backward-compatible local reset scripts.
     await truncateIfExists('price_alerts');
@@ -105,6 +106,9 @@ async function run() {
       );
     }
     console.log('✅ Users seeded.');
+
+    // Transaction wallets are auto-seeded at runtime via TransactionWalletService.onModuleInit().
+    // Private keys are generated fresh on first startup — no seed file needed.
 
     console.log('\n🎉 Seed done. Users imported.');
     console.log(

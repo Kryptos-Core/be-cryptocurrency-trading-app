@@ -39,6 +39,10 @@ export class TreasuryTransactionWalletRepository
 {
   constructor(private readonly dataSource: DataSource) {}
 
+  async countAll(): Promise<number> {
+    return this.dataSource.getRepository(TransactionWallet).count();
+  }
+
   async createAndSave(partial: DeepPartial<TransactionWallet>): Promise<TransactionWallet> {
     const repo = this.dataSource.getRepository(TransactionWallet);
     return repo.save(repo.create(partial));

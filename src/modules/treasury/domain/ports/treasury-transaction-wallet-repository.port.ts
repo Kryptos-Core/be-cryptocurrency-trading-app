@@ -6,6 +6,7 @@ import type { TransactionWalletRecord } from '@/modules/treasury/contracts';
  * Port: Treasury transaction wallet repository abstraction.
  */
 export interface TreasuryTransactionWalletRepositoryPort {
+  countAll(): Promise<number>;
   createAndSave(partial: DeepPartial<TransactionWalletRecord>): Promise<TransactionWalletRecord>;
   save(wallet: TransactionWalletRecord): Promise<TransactionWalletRecord>;
   findByWalletId(walletId: string): Promise<TransactionWalletRecord | null>;
