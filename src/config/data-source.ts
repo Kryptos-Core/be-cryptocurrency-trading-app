@@ -72,6 +72,7 @@ export const AppDataSource = new DataSource({
   migrations: typeormMigrationFilePaths(__dirname),
   synchronize: false, // Always false for migrations
   logging: true,
+  migrationsTransactionMode: 'each',
   extra: {
     statement_timeout: 60_000,
     idle_in_transaction_session_timeout: 60_000,

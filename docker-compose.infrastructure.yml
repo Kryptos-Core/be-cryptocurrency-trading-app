@@ -72,9 +72,9 @@ services:
     networks:
       - crypto_network
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
+      timeout: 10s
+      retries: 10
       interval: 10s
 
   kafka:

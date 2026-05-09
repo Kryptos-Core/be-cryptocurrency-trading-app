@@ -22,29 +22,44 @@ export class FixProcessedIntegrationEventsIdColumn1800000001006 implements Migra
     // Step 1: add uuid extension (prerequisite for uuid type + gen_random_uuid)
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
 
-    // Step 2: drop the broken PK + UK (they reference the column being altered)
+    // Step 2: rebuild the table to safely convert char(36) -> uuid
+    // The table may contain rows with id = '' (empty string) which cannot be cast
+    // directly via ALTER COLUMN ... TYPE uuid. Solution: rebuild via temp table.
+    // Explicitly cast "id" to text to avoid PostgreSQL inferring uuid type
+    // when rebuilding on a subsequent run (where id might already be uuid).
     await queryRunner.query(`
-      ALTER TABLE "processed_integration_events"
-        DROP CONSTRAINT IF EXISTS "PK_processed_integration_events_id",
-        DROP CONSTRAINT IF EXISTS "UK_processed_integration_events_consumer_event"
+      CREATE TABLE "processed_integration_events_new" AS
+      SELECT
+        COALESCE(
+          NULLIF(TRIM("id"::text), ''),
+          gen_random_uuid()::text
+        )::uuid AS "id",
+        "consumer_name",
+        "event_id",
+        "processed_at"
+      FROM "processed_integration_events"
     `);
 
-    // Step 3: recreate the column with uuid type + gen_random_uuid default
+    // Step 3: drop old table and constraints
     await queryRunner.query(`
-      ALTER TABLE "processed_integration_events"
-        ALTER COLUMN "id" SET DATA TYPE uuid
-          USING NULLIF("id", '')::uuid,
-        ALTER COLUMN "id" SET DEFAULT gen_random_uuid(),
-        ALTER COLUMN "id" SET NOT NULL
+      ALTER TABLE "processed_integration_events" DROP CONSTRAINT IF EXISTS "PK_processed_integration_events_id";
+      ALTER TABLE "processed_integration_events" DROP CONSTRAINT IF EXISTS "UK_processed_integration_events_consumer_event";
+      DROP TABLE "processed_integration_events";
     `);
 
-    // Step 4: restore the PK (PostgreSQL auto-creates a btree index)
+    // Step 4: rename temp table to original name
+    await queryRunner.query(`
+      ALTER TABLE "processed_integration_events_new"
+        RENAME TO "processed_integration_events"
+    `);
+
+    // Step 5: restore PK
     await queryRunner.query(`
       ALTER TABLE "processed_integration_events"
         ADD CONSTRAINT "PK_processed_integration_events_id" PRIMARY KEY ("id")
     `);
 
-    // Step 5: restore the UK
+    // Step 6: restore UK
     await queryRunner.query(`
       ALTER TABLE "processed_integration_events"
         ADD CONSTRAINT "UK_processed_integration_events_consumer_event"
