@@ -555,6 +555,10 @@ export class EnvironmentVariables {
   @IsOptional()
   ONCHAIN_OPERATOR_MODE?: string = 'production';
 
+  @IsString()
+  @IsOptional()
+  TRON_GRID_API_KEY?: string;
+
   @IsUrl()
   @IsOptional()
   TRON_NILE_FULL_HOST?: string;
@@ -907,6 +911,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'BSC_MAINNET_RPC_URL',
     'BSC_MAINNET_CHAIN_ID',
     'ONCHAIN_OPERATOR_MODE',
+    'TRON_GRID_API_KEY',
     'TRON_NILE_FULL_HOST',
     'TRON_SHASTA_FULL_HOST',
     'SOLANA_DEVNET_URL',
