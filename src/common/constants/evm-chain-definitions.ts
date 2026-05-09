@@ -18,7 +18,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'ETH_MAINNET_RPC_URL',
     treasuryChain: 'ETH_MAINNET',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://eth.llamarpc.com',
+    defaultRpcUrl: 'https://ethereum.publicnode.com',
   },
   {
     network: BlockchainNetwork.ETH_SEPOLIA,
@@ -34,7 +34,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'BSC_MAINNET_RPC_URL',
     treasuryChain: 'BSC_MAINNET',
     nativeSymbol: 'BNB',
-    defaultRpcUrl: 'https://bsc-dataseed.binance.org',
+    defaultRpcUrl: 'https://bsc.publicnode.com',
   },
   {
     network: BlockchainNetwork.BSC_CHAPEL,
@@ -42,7 +42,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'BSC_CHAPEL_RPC_URL',
     treasuryChain: 'BSC_CHAPEL',
     nativeSymbol: 'BNB',
-    defaultRpcUrl: 'https://data-seed-prebsc-1-s1.binance.org:8545',
+    defaultRpcUrl: 'https://bsc-testnet.publicnode.com',
   },
   {
     network: BlockchainNetwork.BASE_MAINNET,
@@ -50,7 +50,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'BASE_MAINNET_RPC_URL',
     treasuryChain: 'BASE_MAINNET',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://mainnet.base.org',
+    defaultRpcUrl: 'https://base.publicnode.com',
   },
   {
     network: BlockchainNetwork.BASE_SEPOLIA,
@@ -66,7 +66,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'ARBITRUM_MAINNET_RPC_URL',
     treasuryChain: 'ARBITRUM_MAINNET',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://arb1.arbitrum.io/rpc',
+    defaultRpcUrl: 'https://arbitrum.publicnode.com',
   },
   {
     network: BlockchainNetwork.ARBITRUM_SEPOLIA,
@@ -74,7 +74,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'ARBITRUM_SEPOLIA_RPC_URL',
     treasuryChain: 'ARBITRUM_SEPOLIA',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+    defaultRpcUrl: 'https://arbitrum-sepolia.publicnode.com',
   },
   {
     network: BlockchainNetwork.OPTIMISM_MAINNET,
@@ -82,7 +82,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'OPTIMISM_MAINNET_RPC_URL',
     treasuryChain: 'OPTIMISM_MAINNET',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://mainnet.optimism.io',
+    defaultRpcUrl: 'https://optimism.publicnode.com',
   },
   {
     network: BlockchainNetwork.OPTIMISM_SEPOLIA,
@@ -90,7 +90,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'OPTIMISM_SEPOLIA_RPC_URL',
     treasuryChain: 'OPTIMISM_SEPOLIA',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://sepolia.optimism.io',
+    defaultRpcUrl: 'https://optimism-sepolia.publicnode.com',
   },
   {
     network: BlockchainNetwork.POLYGON_MAINNET,
@@ -98,7 +98,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'POLYGON_MAINNET_RPC_URL',
     treasuryChain: 'POLYGON_MAINNET',
     nativeSymbol: 'POL',
-    defaultRpcUrl: 'https://polygon-rpc.com',
+    defaultRpcUrl: 'https://polygon.publicnode.com',
   },
   {
     network: BlockchainNetwork.POLYGON_AMOY,
@@ -114,7 +114,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'AVALANCHE_MAINNET_RPC_URL',
     treasuryChain: 'AVALANCHE_MAINNET',
     nativeSymbol: 'AVAX',
-    defaultRpcUrl: 'https://api.avax.network/ext/bc/C/rpc',
+    defaultRpcUrl: 'https://avalanche.publicnode.com/ext/bc/C/rpc',
   },
   {
     network: BlockchainNetwork.AVALANCHE_FUJI,
@@ -130,7 +130,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'GNOSIS_MAINNET_RPC_URL',
     treasuryChain: 'GNOSIS_MAINNET',
     nativeSymbol: 'XDAI',
-    defaultRpcUrl: 'https://rpc.gnosischain.com',
+    defaultRpcUrl: 'https://gnosis.publicnode.com',
   },
   {
     network: BlockchainNetwork.GNOSIS_CHIADO,
@@ -138,7 +138,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'GNOSIS_CHIADO_RPC_URL',
     treasuryChain: 'GNOSIS_CHIADO',
     nativeSymbol: 'XDAI',
-    defaultRpcUrl: 'https://rpc.chiadochain.net',
+    defaultRpcUrl: 'https://gnosis-chiado.publicnode.com',
   },
   {
     network: BlockchainNetwork.LINEA_MAINNET,
@@ -146,7 +146,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'LINEA_MAINNET_RPC_URL',
     treasuryChain: 'LINEA_MAINNET',
     nativeSymbol: 'ETH',
-    defaultRpcUrl: 'https://rpc.linea.build',
+    defaultRpcUrl: 'https://linea.publicnode.com',
   },
   {
     network: BlockchainNetwork.LINEA_SEPOLIA,
@@ -162,7 +162,7 @@ export const EVM_CHAIN_DEFINITIONS: readonly EvmChainDefinition[] = [
     rpcConfigKey: 'FANTOM_MAINNET_RPC_URL',
     treasuryChain: 'FANTOM_MAINNET',
     nativeSymbol: 'FTM',
-    defaultRpcUrl: 'https://rpc.ftm.tools',
+    defaultRpcUrl: 'https://fantom.publicnode.com',
   },
   {
     network: BlockchainNetwork.FANTOM_TESTNET,

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Kafka, type Producer } from 'kafkajs';
+import { Kafka, Partitioners, type Producer } from 'kafkajs';
 import type {
   OutboxEventPublisher,
   OutboxEventPublisherDriver,
@@ -89,7 +89,11 @@ export class KafkaOutboxEventPublisher implements OutboxEventPublisher {
       brokers,
     });
 
-    const producer = kafka.producer();
+    const producer = kafka.producer({
+      // Retain KafkaJS v1.x partitioning behavior (round-robin by default).
+      // Remove `createPartitioner` only after the partitioning migration is validated.
+      createPartitioner: Partitioners.DefaultPartitioner,
+    });
     await producer.connect();
     this.logger.log(`Kafka outbox publisher connected brokers=${brokers.join(',')}`);
     return producer;

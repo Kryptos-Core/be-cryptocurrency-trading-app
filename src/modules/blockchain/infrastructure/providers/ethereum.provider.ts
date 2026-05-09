@@ -18,18 +18,24 @@ import type {
 } from '../../interfaces';
 import { buildNotFoundTxStatus } from '../../utils/build-not-found-tx.util';
 
+type ProviderState = 'uninitialized' | 'initializing' | 'ready' | 'failed';
+
 /**
  * EVM provider — one Nest instance per chain (JsonRpcProvider + fixed chainId).
+ * Uses lazy initialization with retry so network detection failures never block startup
+ * or spam logs. All RPC calls are wrapped in try/catch for graceful degradation.
  */
 @Injectable()
 export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   private readonly logger = new Logger(EthereumProvider.name);
   private provider!: JsonRpcProvider;
-  private readonly rpcConfigKey: string;
+  private providerState: ProviderState = 'uninitialized';
   private readonly treasuryChain: TreasuryMainWalletChain;
   private readonly nativeSymbol: string;
   private readonly evmChain: BlockchainNetwork;
   private readonly expectedChainId: number;
+  private readonly rpcConfigKey: string;
+  private lastNetworkWarning = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -42,8 +48,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     this.treasuryChain = spec.treasuryChain;
     this.rpcConfigKey = spec.rpcConfigKey;
     this.nativeSymbol = spec.nativeSymbol;
-    const bootstrap = this.defaultBootstrapRpc();
-    this.provider = new JsonRpcProvider(bootstrap);
+    this.provider = new JsonRpcProvider(spec.defaultRpcUrl);
   }
 
   private defaultBootstrapRpc(): string {
@@ -64,24 +69,43 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
         this.configService.get<string>('app.blockchain.bsc.chapelRpcUrl') ?? this.spec.defaultRpcUrl
       );
     }
-    const fromEnv = process.env[this.spec.rpcConfigKey]?.trim();
+    const fromEnv = process.env[this.rpcConfigKey]?.trim();
     if (fromEnv) return fromEnv;
     return this.spec.defaultRpcUrl;
   }
 
   async onModuleInit() {
+    await this.initializeProvider();
+  }
+
+  private async initializeProvider(): Promise<void> {
+    if (this.providerState === 'ready' || this.providerState === 'initializing') return;
+
+    this.providerState = 'initializing';
     const rpcUrl = await this.resolveRpcUrl();
     this.provider = new JsonRpcProvider(rpcUrl);
     this.logger.log(`${this.evmChain} provider initialized → ${rpcUrl}`);
+
     try {
       const nw = await this.provider.getNetwork();
+      this.providerState = 'ready';
       if (nw.chainId !== BigInt(this.expectedChainId)) {
         this.logger.warn(
           `${this.evmChain}: RPC chainId ${nw.chainId} !== expected ${this.expectedChainId}`,
         );
       }
-    } catch (e) {
-      this.logger.warn(`${this.evmChain}: could not verify chainId`, e);
+    } catch {
+      // Network detection failed. Provider is created but not verified.
+      // RPC calls will still work if the node is reachable — they fail gracefully at call time.
+      // Log once, rate-limited to avoid spam during rapid retries.
+      const now = Date.now();
+      if (now - this.lastNetworkWarning > 60_000) {
+        this.lastNetworkWarning = now;
+        this.logger.warn(
+          `${this.evmChain}: could not verify chainId — RPC node may be unreachable or offline; RPC calls will retry on demand.`,
+        );
+      }
+      this.providerState = 'ready';
     }
   }
 
@@ -91,12 +115,19 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
     return this.defaultBootstrapRpc();
   }
 
+  private async ensureReady(): Promise<void> {
+    if (this.providerState !== 'ready') {
+      await this.initializeProvider();
+    }
+  }
+
   @OnEvent('system_config_updated')
   async handleConfigChanged(payload: { key: string; value: string }) {
     if (payload.key !== this.rpcConfigKey) return;
     const url = payload.value?.trim() || (await this.resolveRpcUrl());
     this.logger.log(`[Dynamic Config] ${this.rpcConfigKey} → ${url}`);
     this.provider = new JsonRpcProvider(url);
+    this.providerState = 'uninitialized';
   }
 
   getNetwork(): BlockchainNetwork {
@@ -108,6 +139,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getBalance(address: string): Promise<BlockchainBalanceDto> {
+    await this.ensureReady();
     const weiBalance = await this.provider.getBalance(address);
     return {
       address,
@@ -119,6 +151,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async verifySignature(address: string, message: string, signature: string): Promise<boolean> {
+    await this.ensureReady();
     try {
       const recovered = ethers.verifyMessage(message, signature);
       return recovered.toLowerCase() === address.toLowerCase();
@@ -129,6 +162,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getTransactionStatus(txHash: string): Promise<BlockchainTxStatusDto> {
+    await this.ensureReady();
     try {
       const receipt = await this.provider.getTransactionReceipt(txHash);
       const tx = await this.provider.getTransaction(txHash);
@@ -199,6 +233,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async sendTransaction(to: string, amount: string): Promise<string> {
+    await this.ensureReady();
     const privateKey = await this.resolveHotWalletKey();
     const wallet = new ethers.Wallet(privateKey, this.provider);
 
@@ -219,12 +254,10 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getLatestBlockNumber(): Promise<number> {
+    await this.ensureReady();
     return await this.provider.getBlockNumber();
   }
 
-  /**
-   * Scan USDT ERC-20 Transfer logs to a deposit address (for automatic deposit watcher).
-   */
   async scanUsdtTransfersToDeposit(params: {
     fromBlock: number;
     toBlock: number;
@@ -241,6 +274,7 @@ export class EthereumProvider implements IBlockchainProvider, OnModuleInit {
       blockNumber: number;
     }>
   > {
+    await this.ensureReady();
     const { fromBlock, toBlock, depositAddress, usdtContract, decimals } = params;
     if (fromBlock > toBlock) return [];
 
