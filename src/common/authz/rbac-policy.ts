@@ -46,6 +46,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.PAYMENT_CONFIGS_MANAGE,
     Permission.TREASURY_E2E_CONFIGS_MANAGE,
     Permission.WITHDRAWALS_APPROVE,
+    Permission.SYSTEM_CONFIG_EDIT_TECH,
     Permission.SYSTEM_CONFIG_EDIT_FINANCE,
   ],
   [UserRole.ADMIN]: [
