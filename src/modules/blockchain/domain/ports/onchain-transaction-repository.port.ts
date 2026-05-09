@@ -17,6 +17,8 @@ export interface OnchainTxRowDto {
   creditedAmount: string | null;
   creditedCurrencyId: string | null;
   conversionRate: string | null;
+  /** Asset type: NATIVE (TRX/ETH/SOL) or USDT_TRC20 (Tron only) */
+  asset?: string;
 }
 
 /** DTO dùng trong admin read-model (getAdminWithdrawals) */

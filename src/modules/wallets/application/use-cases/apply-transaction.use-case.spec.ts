@@ -3,6 +3,7 @@ import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import type { TransactionContext } from '@/common/types/transaction-context';
+import { walletAggregateId } from '@/common/utils/aggregate-id.util';
 import {
   CURRENCY_LOOKUP,
   WALLET_EVENT_PUBLISHER,
@@ -106,7 +107,7 @@ describe('ApplyTransactionUseCase', () => {
         {},
         expect.objectContaining({
           aggregateType: 'wallet',
-          aggregateId: 'uid-1:cid-1',
+          aggregateId: 'e21b803a872872333729c1f7eb008ccd',
           eventType: 'wallet.balance_changed',
           kafkaTopic: 'wallet.balance',
         }),

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BlockchainNetwork } from '@/common/enums';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
@@ -7,6 +7,7 @@ import { TRON_USDT_CONTRACT } from '@/modules/treasury/treasury-tron-usdt-contra
 import { tronContractAddressesEqual } from '../utils/tron-contract-address.util';
 import { DepositIngestionService } from './deposit-ingestion.service';
 import { DepositWatcherCursorRepository } from './deposit-watcher-cursor.repository';
+import { DEPOSIT_INGESTION_SERVICE } from './deposit-ingestion.token';
 
 /** TronGrid endpoints for all networks */
 const TRON_GRID: Partial<Record<BlockchainNetwork, string>> = {
@@ -15,31 +16,15 @@ const TRON_GRID: Partial<Record<BlockchainNetwork, string>> = {
   [BlockchainNetwork.TRON_SHASTA]: 'https://api.shasta.trongrid.io',
 };
 
-/** TronScan API endpoints (fallback for Shasta) */
-const TRON_SCAN: Partial<Record<BlockchainNetwork, string>> = {
-  [BlockchainNetwork.TRON_SHASTA]: 'https://nileapi.tronscan.org',
-};
-
 type TronGridTrc20Row = {
   transaction_id?: string;
   block_timestamp?: number;
   token_info?: { address?: string; symbol?: string };
 };
 
-type TronScanTrc20Row = {
-  transaction_id?: string;
-  block_ts?: number;
-  contract_address?: string;
-  to_address?: string;
-  from_address?: string;
-  confirmed?: boolean;
-  tokenInfo?: { tokenAbbr?: string; tokenDecimal?: number };
-};
-
 /**
- * Poll TronGrid/TronScan for TRC-20 and native TRX transfers for the platform deposit address.
- * - Mainnet and Nile: TronGrid (more reliable)
- * - Shasta: TronScan fallback
+ * Poll TronGrid for TRC-20 and native TRX transfers for the platform deposit address.
+ * All Tron networks (mainnet, Nile, Shasta) use TronGrid API.
  */
 @Injectable()
 export class TronDepositObserverService {
@@ -50,23 +35,14 @@ export class TronDepositObserverService {
     private readonly configService: ConfigService,
     private readonly managedWalletsService: ManagedWalletsService,
     private readonly cursors: DepositWatcherCursorRepository,
-    private readonly ingestion: DepositIngestionService,
+    @Inject(DEPOSIT_INGESTION_SERVICE) private readonly ingestion: DepositIngestionService,
   ) {}
 
   private tronGridApiKey(): string | undefined {
     return this.configService.get<string>('TRON_GRID_API_KEY')?.trim() || undefined;
   }
 
-  /**
-   * TronGrid is preferred for all networks as it's more reliable.
-   * TronScan is only used as fallback for Shasta (which may not have full TronGrid support).
-   */
-  private isTronScan(chain: BlockchainNetwork): boolean {
-    return chain === BlockchainNetwork.TRON_SHASTA;
-  }
-
   private getApiBase(chain: BlockchainNetwork): string | undefined {
-    // TronGrid is preferred for reliability (works for Nile testnet)
     const tronGridBase = TRON_GRID[chain];
     if (tronGridBase) {
       // For mainnet, require API key
@@ -77,11 +53,6 @@ export class TronDepositObserverService {
         return undefined;
       }
       return tronGridBase;
-    }
-    // Fallback to TronScan for networks not supported by TronGrid
-    const tronScanBase = TRON_SCAN[chain];
-    if (tronScanBase) {
-      return tronScanBase;
     }
     return undefined;
   }
@@ -142,9 +113,8 @@ export class TronDepositObserverService {
   }
 
   /**
-   * Scan TRC-20 token transfers with pagination support.
-   * - TronGrid (mainnet/Nile): uses `/v1/accounts/{address}/transactions/trc20`
-   * - TronScan (Shasta fallback): uses `/api/token_trc20/transfers`
+   * Scan TRC-20 token transfers using TronGrid API.
+   * Uses `/v1/accounts/{address}/transactions/trc20` endpoint.
    */
   private async scanTrc20Transfers(
     chain: BlockchainNetwork,
@@ -164,84 +134,23 @@ export class TronDepositObserverService {
 
       const maxPages = 5;
       const pageLimit = 40;
+      let hasMore = true;
+      let currentFingerprint: string | undefined;
 
-      if (this.isTronScan(chain)) {
-        // TronScan API format (for testnets: Nile, Shasta)
-        // Note: TronScan uses 'relatedAddress' not 'address' to filter transfers
-        let hasMore = true;
-        let start = 0;
-
-        while (hasMore) {
-          const url = new URL('/api/token_trc20/transfers', base);
-          url.searchParams.set('relatedAddress', deposit);
-          url.searchParams.set('limit', String(pageLimit));
-          url.searchParams.set('start', String(start));
-          url.searchParams.set('start_timestamp', String(minTs));
-          url.searchParams.set('confirm', 'true');
-
-          this.logger.debug(
-            `tron.deposit.watch.scanning chain=${chain} page=${start / pageLimit + 1}`,
-          );
-
-          const res = await fetch(url.toString(), { headers });
-          if (!res.ok) {
-            this.logger.warn(
-              `tron.deposit.watch.trc20_http_error chain=${chain} status=${res.status}`,
-            );
-            return;
-          }
-
-          const body = (await res.json()) as {
-            token_transfers?: TronScanTrc20Row[];
-            total?: number;
-          };
-          const tronscanData = Array.isArray(body.token_transfers) ? body.token_transfers : [];
-
-          if (tronscanData.length === 0) {
-            this.logger.debug(`tron.deposit.watch.trc20_no_txs chain=${chain} minTs=${minTs}`);
-            return;
-          }
-
-          let pageMaxTs = 0;
-          for (const row of tronscanData) {
-            if (!row.confirmed) continue;
-            if (row.to_address?.toLowerCase() !== deposit.toLowerCase()) continue;
-
-            const txId = row.transaction_id?.trim();
-            const ts = row.block_ts ?? 0;
-            if (!txId || ts <= 0) continue;
-            if (ts > pageMaxTs) pageMaxTs = ts;
-
-            const tokenAddr = row.contract_address?.trim();
-            if (usdtContract && tokenAddr && !tronContractAddressesEqual(tokenAddr, usdtContract)) {
-              continue;
-            }
-
-            try {
-              await this.ingestion.ingestTxHash(chain, txId);
-            } catch (e) {
-              this.logger.warn(
-                `tron.deposit.watch.ingest_failed tx=${txId} ${(e as Error).message}`,
-              );
-            }
-          }
-
-          // Update max timestamp for cursor
-          if (pageMaxTs > this.lastProcessedTimestamp) {
-            this.lastProcessedTimestamp = pageMaxTs;
-          }
-
-          // Check pagination
-          hasMore = tronscanData.length === pageLimit && start / pageLimit < maxPages - 1;
-          start += pageLimit;
-        }
-      } else {
-        // TronGrid API format (for mainnet)
+      while (hasMore) {
         const url = new URL(`/v1/accounts/${encodeURIComponent(deposit)}/transactions/trc20`, base);
         url.searchParams.set('only_confirmed', 'true');
-        url.searchParams.set('limit', '40');
+        url.searchParams.set('limit', String(pageLimit));
         url.searchParams.set('order_by', 'block_timestamp,asc');
         url.searchParams.set('min_timestamp', String(minTs));
+        // Only set fingerprint for subsequent pages
+        if (currentFingerprint) {
+          url.searchParams.set('fingerprint', currentFingerprint);
+        }
+
+        this.logger.debug(
+          `tron.deposit.watch.scanning_trc20 chain=${chain} page=${url.searchParams.get('fingerprint') ? '2+' : '1'}`,
+        );
 
         const res = await fetch(url.toString(), { headers });
         if (!res.ok) {
@@ -251,7 +160,10 @@ export class TronDepositObserverService {
           return;
         }
 
-        const body = (await res.json()) as { data?: TronGridTrc20Row[] };
+        const body = (await res.json()) as {
+          data?: TronGridTrc20Row[];
+          meta?: { fingerprint?: string; page_size?: number };
+        };
         const gridData = Array.isArray(body.data) ? body.data : [];
 
         if (gridData.length === 0) {
@@ -276,6 +188,12 @@ export class TronDepositObserverService {
             this.logger.warn(`tron.deposit.watch.ingest_failed tx=${txId} ${(e as Error).message}`);
           }
         }
+
+        // Pagination via fingerprint
+        const fingerprint = body.meta?.fingerprint;
+        const pageSize = body.meta?.page_size ?? 0;
+        hasMore = Boolean(fingerprint && fingerprint.length > 0 && pageSize === pageLimit);
+        currentFingerprint = fingerprint ?? undefined;
       }
     } catch (e) {
       this.logger.warn(`tron.deposit.watch.trc20_error chain=${chain}: ${(e as Error).message}`);
@@ -283,8 +201,8 @@ export class TronDepositObserverService {
   }
 
   /**
-   * Scan native TRX transfers (TronGrid only, not supported by TronScan).
-   * TronScan fallback for Shasta does not support native TRX transfers, so skip for Shasta.
+   * Scan native TRX transfers using TronGrid API.
+   * Uses `/v1/accounts/{address}/transactions` endpoint.
    */
   private async scanNativeTransfers(
     chain: BlockchainNetwork,
@@ -293,12 +211,6 @@ export class TronDepositObserverService {
     base: string,
     headers: Record<string, string>,
   ): Promise<void> {
-    // TronScan testnets don't support native TRX transfer API, skip
-    if (this.isTronScan(chain)) {
-      this.logger.debug(`tron.deposit.watch.skip_native_testnet chain=${chain}`);
-      return;
-    }
-
     try {
       const nativeUrl = new URL(`/v1/accounts/${encodeURIComponent(deposit)}/transactions`, base);
       nativeUrl.searchParams.set('only_confirmed', 'true');

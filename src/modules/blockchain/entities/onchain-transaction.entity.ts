@@ -48,6 +48,14 @@ export class OnchainTransaction {
   })
   type!: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'SWEEP' | 'FUND';
 
+  /** Asset type: NATIVE (TRX/ETH/SOL) hoặc USDT_TRC20 (Tron networks). Default: NATIVE */
+  @Column({
+    type: 'enum',
+    enum: ['NATIVE', 'USDT_TRC20'],
+    default: 'NATIVE',
+  })
+  asset!: 'NATIVE' | 'USDT_TRC20';
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   tx_hash!: string | null;
 

@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { BlockchainNetwork } from '@/common/enums';
 import { ConflictException } from '@/common/exceptions';
 import { ManagedWalletsService } from '@/modules/managed-wallets/managed-wallets.service';
 import { OnchainDepositService } from '../application/use-cases/deposits/onchain-deposit.service';
 import { WalletLinkingService } from '../application/use-cases/wallet-linking/wallet-linking.service';
 import { BlockchainProviderFactory } from '../blockchain-provider.factory';
+import { DEPOSIT_INGESTION_SERVICE } from './deposit-ingestion.token';
 
 /**
  * Maps observed on-chain activity to linked users and idempotent deposit rows.

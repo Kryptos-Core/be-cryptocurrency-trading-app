@@ -2,6 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { BlockchainNetwork } from '@/common/enums';
 
+/** Asset type for withdrawal: NATIVE (TRX/ETH/SOL) or USDT_TRC20 (Tron only) */
+export enum WithdrawalAsset {
+  NATIVE = 'NATIVE',
+  USDT_TRC20 = 'USDT_TRC20',
+}
+
 /** Yêu cầu rút tiền — gửi coin từ platform về ví liên kết */
 export class RequestWithdrawalDto {
   @ApiProperty({
@@ -30,6 +36,15 @@ export class RequestWithdrawalDto {
     message: 'amount phải là số decimal hợp lệ',
   })
   amount!: string;
+
+  @ApiPropertyOptional({
+    description: 'Loại tài sản rút: NATIVE (TRX/ETH/SOL) hoặc USDT_TRC20 (Tron). Mặc định: NATIVE',
+    enum: WithdrawalAsset,
+    example: WithdrawalAsset.USDT_TRC20,
+  })
+  @IsOptional()
+  @IsEnum(WithdrawalAsset)
+  currency?: WithdrawalAsset;
 
   @ApiPropertyOptional({
     description: 'Idempotency key do client gửi để chống submit trùng',

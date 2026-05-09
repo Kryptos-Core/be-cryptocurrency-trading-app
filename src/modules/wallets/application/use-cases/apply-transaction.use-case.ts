@@ -6,6 +6,7 @@ import { OutboxIntegrationEventType } from '@/common/integration-events/integrat
 import type { WalletBalanceChangedOutboxPayloadV1 } from '@/common/integration-events/wallet-balance-changed-outbox-payload';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import type { TransactionContext } from '@/common/types/transaction-context';
+import { walletAggregateId } from '@/common/utils/aggregate-id.util';
 import {
   CURRENCY_LOOKUP,
   type CurrencyLookupPort,
@@ -158,7 +159,7 @@ export class ApplyTransactionUseCase {
 
     await this.outboxAppender.append(manager as never, {
       aggregateType: 'wallet',
-      aggregateId: `${userId}:${currencyId}`,
+      aggregateId: walletAggregateId(userId, currencyId),
       eventType: OutboxIntegrationEventType.WalletBalanceChangedV1,
       payload: payload as unknown as Record<string, unknown>,
       partitionKey: currencyId,

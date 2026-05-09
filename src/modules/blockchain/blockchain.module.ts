@@ -56,6 +56,7 @@ import {
 } from './blockchain.tokens';
 import { BlockchainProviderFactory } from './blockchain-provider.factory';
 import { DepositIngestionService } from './deposit-watcher/deposit-ingestion.service';
+import { DEPOSIT_INGESTION_SERVICE } from './deposit-watcher/deposit-ingestion.token';
 import {
   DEPOSIT_MATCH_REQUEST_REPOSITORY,
   LINKED_WALLET_REPOSITORY,
@@ -188,6 +189,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     WalletLinkingService,
     OnchainDepositService,
     DepositIngestionService,
+    { provide: DEPOSIT_INGESTION_SERVICE, useExisting: DepositIngestionService },
     DepositMatchService,
     OnchainWithdrawalService,
     OnchainTransferQueryService,

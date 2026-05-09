@@ -7,6 +7,7 @@ import type { WalletBalanceChangedOutboxPayloadV1 } from '@/common/integration-e
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
 import type { TransactionContext } from '@/common/types/transaction-context';
 import { newUuid } from '@/common/utils/uuid.util';
+import { walletAggregateId } from '@/common/utils/aggregate-id.util';
 import {
   ADMIN_ADJUSTMENT_REPOSITORY,
   type AdminAdjustmentRepositoryPort,
@@ -173,7 +174,7 @@ export class AdminAdjustBalanceUseCase {
     await this.walletRepo.transaction(async (manager) => {
       await this.outboxAppender.append(manager as never, {
         aggregateType: 'wallet',
-        aggregateId: `${userId}:${currencyId}`,
+        aggregateId: walletAggregateId(userId, currencyId),
         eventType: OutboxIntegrationEventType.WalletBalanceChangedV1,
         payload: payload as unknown as Record<string, unknown>,
         dedupeKey: `wallet-balance-adjust:${adjustmentId}`,

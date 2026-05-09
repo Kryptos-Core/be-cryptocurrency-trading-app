@@ -827,6 +827,44 @@ export class TransactionWalletService {
     return sent.txid;
   }
 
+  /**
+   * Send USDT (TRC-20) from a transaction wallet to a user destination.
+   * Only supported on Tron networks (TRON_MAINNET, TRON_NILE, TRON_SHASTA).
+   */
+  async sendWithdrawalUsdtTrc20(
+    wallet: TransactionWalletRecord,
+    toAddress: string,
+    amount: string,
+  ): Promise<string> {
+    const chain = this.assertSupportedChain(wallet.chain);
+    if (chain !== 'TRON_MAINNET' && chain !== 'TRON_NILE' && chain !== 'TRON_SHASTA') {
+      throw new BadRequestException(
+        'USDT (TRC-20) withdrawal is only supported on Tron networks',
+        'USDT_WITHDRAWAL_UNSUPPORTED_CHAIN',
+      );
+    }
+
+    const tronNet: TronTreasuryNetwork =
+      chain === 'TRON_MAINNET'
+        ? 'TRON_MAINNET'
+        : chain === 'TRON_SHASTA'
+          ? 'TRON_SHASTA'
+          : 'TRON_NILE';
+
+    const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
+
+    this.logger.log(
+      `Sending USDT withdrawal from wallet ${wallet.wallet_id} to ${toAddress} on ${chain}, amount: ${amount}`,
+    );
+
+    const txHash = await this.transferTronUsdtFromPrivateKey(chain, pk, toAddress, amount);
+
+    this.logger.log(
+      `Withdrawal USDT TRC-20 sent from tx wallet ${wallet.wallet_id}: ${txHash} (${amount} USDT on ${tronNet})`,
+    );
+    return txHash;
+  }
+
   private isTreasuryChain(chain: string): chain is SupportedTreasuryChain {
     return (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(chain);
   }

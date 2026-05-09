@@ -5,6 +5,7 @@ import {
   type CanonicalIntegrationEventEnvelope,
 } from '@/common/integration-events/canonical-integration-event-envelope';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
+import { assertMaxAggregateIdLength } from '@/common/utils/aggregate-id.util';
 
 export interface AppendIntegrationOutboxInput {
   aggregateType: string;
@@ -26,7 +27,30 @@ export interface AppendIntegrationOutboxInput {
  */
 @Injectable()
 export class OutboxAppender {
+  private static readonly MAX_DEDUPE_KEY_LENGTH = 191;
+  private static readonly MAX_VARCHAR_191_LENGTH = 191;
+
   async append(manager: EntityManager, input: AppendIntegrationOutboxInput): Promise<void> {
+    // Validate column constraints to fail fast with descriptive errors instead of DB-level truncation
+    assertMaxAggregateIdLength(input.aggregateId, `${input.aggregateType}::${input.eventType}`);
+
+    if (input.dedupeKey !== undefined && input.dedupeKey !== null && input.dedupeKey.length > OutboxAppender.MAX_DEDUPE_KEY_LENGTH) {
+      throw new Error(
+        `dedupe_key exceeds ${OutboxAppender.MAX_DEDUPE_KEY_LENGTH} chars (got ${input.dedupeKey.length}): "${input.dedupeKey.slice(0, 80)}${input.dedupeKey.length > 80 ? '...' : ''}"`,
+      );
+    }
+
+    for (const [field, value] of [
+      ['correlation_id', input.correlationId],
+      ['causation_id', input.causationId],
+      ['partition_key', input.partitionKey],
+      ['kafka_topic', input.kafkaTopic],
+    ] as const) {
+      if (value !== undefined && value !== null && value.length > OutboxAppender.MAX_VARCHAR_191_LENGTH) {
+        throw new Error(`${field} exceeds ${OutboxAppender.MAX_VARCHAR_191_LENGTH} chars (got ${value.length})`);
+      }
+    }
+
     const envelope = buildCanonicalIntegrationEventEnvelope({
       eventType: input.eventType,
       aggregateType: input.aggregateType,

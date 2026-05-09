@@ -6,6 +6,8 @@ import { ManagedWalletsModule } from '@/modules/managed-wallets/managed-wallets.
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { BlockchainModule } from '../blockchain.module';
 import { DEPOSIT_WATCHER_QUEUE } from './deposit-watcher.constants';
+import { DepositIngestionService } from './deposit-ingestion.service';
+import { DEPOSIT_INGESTION_SERVICE } from './deposit-ingestion.token';
 import { DepositWatcherProcessor } from './deposit-watcher.processor';
 import { DepositWatcherScheduler } from './deposit-watcher.scheduler';
 import { DepositWatcherAdminController } from './deposit-watcher-admin.controller';
@@ -39,6 +41,8 @@ import { TronDepositObserverService } from './tron-deposit-observer.service';
     EvmDepositObserverService,
     DepositWatcherProcessor,
     DepositWatcherScheduler,
+    { provide: DEPOSIT_INGESTION_SERVICE, useExisting: DepositIngestionService },
   ],
+  exports: [DEPOSIT_INGESTION_SERVICE],
 })
 export class BlockchainDepositWatcherModule {}

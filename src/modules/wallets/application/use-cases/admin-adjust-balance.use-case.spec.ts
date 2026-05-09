@@ -126,7 +126,7 @@ describe('AdminAdjustBalanceUseCase', () => {
         {},
         expect.objectContaining({
           aggregateType: 'wallet',
-          aggregateId: 'target-uid:cid-1',
+          aggregateId: 'b811d96cde5574208f7b1c226770e953',
           eventType: 'wallet.balance_changed',
           kafkaTopic: 'wallet.balance',
         }),
