@@ -1,8 +1,10 @@
 -- Phase 5c: ClickHouse event_audit_log table
 -- Run this migration in ClickHouse to create the audit log table
+-- NOTE: TTL on DateTime64 columns is not supported in ClickHouse 24.x.
+-- Partition pruning via PARTITION BY toYYYYMM(occurred_at) handles cleanup instead.
 
 -- Create database if not exists
-CREATE DATABASE IF NOT EXISTS analytics;
+CREATE DATABASE IF NOT EXISTS analytics ENGINE = Atomic;
 
 -- Create event_audit_log table
 CREATE TABLE IF NOT EXISTS analytics.event_audit_log
@@ -22,7 +24,6 @@ CREATE TABLE IF NOT EXISTS analytics.event_audit_log
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (event_type, aggregate_id, occurred_at, event_id)
-TTL occurred_at + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 -- Create ReplacingMergeTree variant for deduplication (optional, use if you want automatic dedup)

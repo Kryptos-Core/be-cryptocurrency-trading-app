@@ -25,15 +25,105 @@ Kiến trúc (outbox relay, read model): [`docs/ARCHITECTURE.md`](docs/ARCHITECT
 - App Nest và CLI (migration, seed) chỉ đọc **`.env.${NODE_ENV}`**. Scripts npm đặt `NODE_ENV` qua `cross-env`; nếu chạy thủ công mà thiếu `NODE_ENV`, mặc định file env là **`.env.development`**.  
 - Không commit file chứa secret thật.
 
-### 2. PostgreSQL + Redis
+### 2. Infrastructure (Docker Compose)
 
-Dùng **cùng file env** với app cho dev (`.env.development` — `CORE_DB_*` / `REDIS_*` khớp Compose):
+**File:** `docker-compose.infrastructure.yml`. Dùng **cùng file env** với app (`.env.development`).
+
+#### Lệnh khởi tạo infrastructure
+
+| Lệnh | Mô tả |
+|------|--------|
+| `npm run docker:infra:up` | PostgreSQL + Redis (default, không cần profile) |
+| `npm run docker:infra:up:full` | Full stack: PostgreSQL + Redis + Kafka + ClickHouse + TimescaleDB |
+| `npm run docker:infra:down` | Tắt toàn bộ infrastructure |
+| `npm run docker:infra:logs` | Xem logs (theo dõi realtime) |
+| `npm run docker:infra:health` | Kiểm tra trạng thái các container |
+
+#### Cách chạy Docker Compose thủ công
+
+Nếu gọi Docker trực tiếp thay vì qua npm script, Compose **không tự đọc `.env.development`**; cần thêm `--env-file`:
 
 ```bash
-npm run docker:infra:up
+# Chỉ PostgreSQL + Redis
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d
+
+# Full stack (Kafka + ClickHouse + TimescaleDB)
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development \
+  --profile kafka --profile clickhouse --profile timescale up -d
+
+# Kiểm tra trạng thái
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development ps
+
+# Xem logs
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f postgres
+
+# Tắt
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development down
+
+# Xoá toàn bộ data (bao gồm volumes)
+docker compose -f docker-compose.infrastructure.yml --env-file .env.development down -v
 ```
 
-Tuỳ chọn: `npm run docker:infra:down` (tắt), `npm run docker:infra:logs` (log). Nếu gọi Docker trực tiếp, Compose **không** tự đọc `.env.development`; cần `--env-file .env.development` (hoặc shell đã export đủ biến).
+#### Services và ports mặc định
+
+| Service | Container | Host Port | Internal Port | Profile |
+|---------|-----------|-----------|---------------|---------|
+| PostgreSQL | `crypto_trading_postgres` | 5432 | 5432 | — |
+| Redis | `crypto_trading_redis` | 6379 | 6379 | — |
+| Kafka | `crypto_trading_kafka` | 9092, 29092 | 9092, 29092 | `kafka` |
+| ClickHouse | `crypto_trading_clickhouse` | 8123, 9000 | 8123, 9000 | `clickhouse` |
+| TimescaleDB | `crypto_trading_timescaledb` | 5433 | 5432 | `timescale` |
+
+- Port 9092 (Kafka): dùng từ **host machine** (Node.js app).
+- Port 29092 (Kafka): dùng từ **Docker network** nội bộ (nếu cần).
+- ClickHouse port 8123: HTTP interface. Port 9000: TCP native interface.
+
+#### Kafka (KRaft mode)
+
+Kafka chạy **KRaft mode** — không cần Zookeeper. Các biến môi trường liên quan:
+
+```env
+EVENT_PUBLISHER_DRIVER=kafka    # Bat Kafka trong app
+KAFKA_BROKERS=localhost:29092   # Broker endpoint
+KAFKAJS_NO_PARTITIONER_WARNING=1
+```
+
+Topics được **tự động tạo** khi app kết nối (với `KAFKA_AUTO_CREATE_TOPICS_ENABLE=true`). Để tạo topics cố định trước, dùng:
+
+```bash
+npm run kafka:topics:list
+```
+
+**Topics mặc định:**
+
+| Topic | Partitions | Mô tả |
+|-------|------------|--------|
+| `crypto-trading.orderplaced` | 6 | Order được đặt |
+| `crypto-trading.ordercancelled` | 6 | Order bị hủy |
+| `crypto-trading.tradeexecuted` | 6 | Trade được khớp |
+| `crypto-trading.depositconfirmed` | 3 | Deposit on-chain confirmed |
+| `crypto-trading.walletbalancechanged` | 6 | Balance ví thay đổi |
+| `crypto-trading.market.ticker` | 3 | Market ticker data |
+
+#### ClickHouse
+
+Schema SQL được Docker auto-run **lần đầu tiên** khi volume rỗng (mount vào `/docker-entrypoint-initdb.d/`). Nếu cần apply lại schema (volume đã có data):
+
+```bash
+# Xem tables hiện tại
+npm run clickhouse:tables:list
+
+# Apply lại schema (idempotent — dùng CREATE ... IF NOT EXISTS)
+npm run db:migrate:ch
+
+# Hoặc trực tiếp
+docker exec -i crypto_trading_clickhouse clickhouse-client \
+  --host 127.0.0.1 --port 9000 --query "$(cat scripts/docker/clickhouse-init.sql)"
+```
+
+#### TimescaleDB
+
+Bật qua `MARKET_TS_ENABLED=true` trong `.env.development`. TimescaleDB là PostgreSQL với TimescaleDB extension — dùng driver `postgres`, port 5433 trên host.
 
 ### 3. Cài đặt, migration, seed, chạy dev
 
@@ -90,6 +180,8 @@ Production: `npm run build` rồi `npm run start:prod`.
 | Script | Ý nghĩa |
 |--------|----------|
 | `npm run docker:infra:up` / `docker:infra:down` | PostgreSQL + Redis (Compose, `--env-file .env.development`) |
+| `npm run docker:infra:up:full` | Full stack (Kafka + ClickHouse + TimescaleDB) |
+| `npm run kafka:topics:list` | Liệt kê Kafka topics |
 | `npm run lint:boundaries` | Kiểm tra import xuyên module (theo script + allowlist) |
 | `npm run test` | Jest unit + integration tests |
 | `npm run test:cov` | Jest với coverage report |

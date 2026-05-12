@@ -140,8 +140,8 @@ export class AdminAdjustBalanceUseCase {
       const msg = err instanceof Error ? err.message : String(err);
       if (
         typeof msg === 'string' &&
-        msg.includes('Duplicate entry') &&
-        msg.includes('uk_ledger_ref')
+        msg.includes('uk_ledger_ref') &&
+        (msg.includes('Duplicate entry') || msg.includes('duplicate key'))
       ) {
         throw new ConflictException(
           'Duplicate transaction reference. Please try again.',

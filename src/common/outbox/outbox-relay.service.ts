@@ -14,6 +14,7 @@ import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-eve
 const OUTBOX_RELAY_LOCK_KEY = 'outbox:relay:lock';
 const OUTBOX_RELAY_LOCK_TTL_SECONDS = 45;
 const MAX_ROWS_PER_FLUSH = 50;
+const DEAD_LETTER_RETRY_PER_FLUSH = 3;
 
 class OutboxRelayRowFailure extends Error {
   constructor(
@@ -156,6 +157,26 @@ export class OutboxRelayService {
       this.logger,
     );
     await this.updateOperationalMetrics();
+
+    let deadLetterRetried = 0;
+    if (published > 0) {
+      for (let i = 0; i < DEAD_LETTER_RETRY_PER_FLUSH; i++) {
+        const candidate = await this.findOldestDeadLetterRow();
+        if (!candidate) break;
+        const reset = await this.resetDeadLetterRow(candidate.id);
+        if (reset) {
+          this.logger.log(
+            `Outbox dead-letter row reset and queued for retry: id=${candidate.id} event_type=${candidate.event_type}`,
+          );
+          deadLetterRetried++;
+        }
+      }
+    }
+
+    if (deadLetterRetried > 0) {
+      await this.updateOperationalMetrics();
+    }
+
     return { published };
   }
 
@@ -189,6 +210,48 @@ export class OutboxRelayService {
         );
       }
       throw error;
+    }
+  }
+
+  /**
+   * Find the oldest dead-lettered row that is eligible for retry.
+   * Only returns rows where event_type is still supported.
+   */
+  private async findOldestDeadLetterRow(): Promise<IntegrationOutbox | null> {
+    return this.dataSource.manager.findOne(IntegrationOutbox, {
+      where: {
+        published_at: IsNull(),
+        dead_lettered_at: MoreThan(new Date('1970-01-01T00:00:00.000Z')),
+      },
+      order: { dead_lettered_at: 'ASC' },
+    });
+  }
+
+  /**
+   * Reset a dead-lettered row so it re-enters the normal relay pipeline.
+   * Resets attempt counter and clears dead-letter metadata.
+   */
+  private async resetDeadLetterRow(rowId: string): Promise<boolean> {
+    try {
+      const result = await this.dataSource
+        .createQueryBuilder()
+        .update(IntegrationOutbox)
+        .set({
+          dead_lettered_at: null,
+          next_retry_at: null,
+          last_publish_error: null,
+          publish_attempts: 0,
+        })
+        .where('id = :id', { id: rowId })
+        .andWhere('published_at IS NULL')
+        .andWhere('dead_lettered_at IS NOT NULL')
+        .execute();
+      return (result.affected ?? 0) > 0;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to reset dead-letter row ${rowId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
     }
   }
 

@@ -1,67 +1,46 @@
-# Core infra for local development.
-# Variables are interpolated from .env.development by npm scripts.
+# Infrastructure services cho local development.
+# Bia duoc interpolate tu .env.development boi npm scripts / docker compose.
+#
+# San co (khong can profile):
+#   docker compose -f docker-compose.infrastructure.yml up -d
+#
+# Kafka + ClickHouse + TimescaleDB (co profile):
+#   docker compose -f docker-compose.infrastructure.yml --profile kafka --profile clickhouse --profile timescale up -d
+#
 services:
   postgres:
     image: postgres:16-alpine
     container_name: crypto_trading_postgres
     environment:
-      POSTGRES_USER: ${CORE_DB_USERNAME:-${DB_USERNAME}}
-      POSTGRES_PASSWORD: ${CORE_DB_PASSWORD:-${DB_PASSWORD}}
-      POSTGRES_DB: ${CORE_DB_NAME:-${DB_NAME}}
+      POSTGRES_USER: ${CORE_DB_USERNAME}
+      POSTGRES_PASSWORD: ${CORE_DB_PASSWORD}
+      POSTGRES_DB: ${CORE_DB_NAME}
       TZ: 'UTC'
     ports:
       - "${CORE_DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - crypto_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CORE_DB_USERNAME:-${DB_USERNAME}} -d ${CORE_DB_NAME:-${DB_NAME}}"]
-      timeout: 10s
-      retries: 10
+      test: ["CMD-SHELL", "pg_isready -U ${CORE_DB_USERNAME} -d ${CORE_DB_NAME}"]
       interval: 10s
-
-  timescaledb:
-    image: timescale/timescaledb:2.17.2-pg16
-    container_name: crypto_trading_timescaledb
-    profiles: ['timescale']
-    environment:
-      POSTGRES_USER: ${MARKET_TS_USERNAME:-${CORE_DB_USERNAME:-${DB_USERNAME}}}
-      POSTGRES_PASSWORD: ${MARKET_TS_PASSWORD:-${CORE_DB_PASSWORD:-${DB_PASSWORD}}}
-      POSTGRES_DB: ${MARKET_TS_DB:-${CORE_DB_NAME:-${DB_NAME}}}
-      TIMESCALEDB_TELEMETRY: 'off'
-      TS_TUNE_MEMORY: 512MB
-      TS_TUNE_MAX_CONNS: 100
-      TZ: 'UTC'
-    ports:
-      - "${MARKET_TS_PORT:-5433}:5432"
-    volumes:
-      - timescaledb_data:/var/lib/postgresql/data
-    networks:
-      - crypto_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${MARKET_TS_USERNAME:-${CORE_DB_USERNAME:-${DB_USERNAME}}} -d ${MARKET_TS_DB:-${CORE_DB_NAME:-${DB_NAME}}}"]
-      timeout: 10s
-      retries: 10
-      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: crypto_trading_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-} --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - crypto_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
       timeout: 5s
       retries: 5
-      interval: 10s
 
-  # Kafka + Zookeeper (Phase 5d/5e) — start with: docker compose --profile kafka up
+  # Zookeeper — required for Kafka < 3.6. For KRaft mode, see docs/kafka-kraft.md
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     container_name: crypto_trading_zookeeper
@@ -69,13 +48,11 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - crypto_network
     healthcheck:
       test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
-      timeout: 10s
-      retries: 10
       interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
@@ -87,24 +64,25 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 168
-      KAFKA_LOG_SEGMENT_BYTES: 1073741824
       TZ: 'UTC'
     ports:
       - "${KAFKA_PORT:-9092}:9092"
-    networks:
-      - crypto_network
+      - "${KAFKA_EXTERNAL_PORT:-29092}:29092"
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 15s
       timeout: 10s
       retries: 5
-      interval: 10s
 
-  # ClickHouse (Phase 5c) — start with: docker compose --profile clickhouse up
+  # ClickHouse — schema SQL trong docker-entrypoint-initdb.d chay tu dong lan dau.
+  # Volume reuse (restart) khong chay lai init SQL; dung npm run db:migrate:ch de apply thu cong.
   clickhouse:
     image: clickhouse/clickhouse-server:24.6-alpine
     container_name: crypto_trading_clickhouse
@@ -120,28 +98,42 @@ services:
       - "${CLICKHOUSE_TCP_PORT:-9000}:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./scripts/docker/clickhouse-init.sql:/docker-entrypoint-initdb.d/clickhouse-init.sql:ro
     ulimits:
       nofile:
         soft: 262144
         hard: 262144
-    networks:
-      - crypto_network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      test: ["CMD", "clickhouse-client", "--host", "127.0.0.1", "--port", "9000", "--query", "SELECT 1"]
+      interval: 10s
       timeout: 5s
       retries: 10
+
+  # TimescaleDB — PostgreSQL with TimescaleDB extension.
+  timescaledb:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: crypto_trading_timescaledb
+    profiles: ['timescale']
+    environment:
+      POSTGRES_USER: ${MARKET_TS_USERNAME}
+      POSTGRES_PASSWORD: ${MARKET_TS_PASSWORD}
+      POSTGRES_DB: ${MARKET_TS_DB}
+      TIMESCALEDB_TELEMETRY: 'off'
+      TS_TUNE_MEMORY: 512MB
+      TS_TUNE_MAX_CONNS: 100
+      TZ: 'UTC'
+    ports:
+      - "${MARKET_TS_PORT:-5433}:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MARKET_TS_USERNAME} -d ${MARKET_TS_DB}"]
       interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
-    driver: local
   timescaledb_data:
-    driver: local
   redis_data:
-    driver: local
   clickhouse_data:
-    driver: local
-
-networks:
-  crypto_network:
-    driver: bridge

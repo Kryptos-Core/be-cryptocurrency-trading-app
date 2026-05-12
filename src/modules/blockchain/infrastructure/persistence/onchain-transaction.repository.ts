@@ -91,6 +91,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     };
 
     if (extra) {
+      if (extra.txHash !== undefined) update.tx_hash = extra.txHash as string;
       if (extra.confirmations !== undefined) update.confirmations = extra.confirmations;
       if (extra.confirmed_at !== undefined) update.confirmed_at = extra.confirmed_at;
       if (extra.credited_currency_id !== undefined)
@@ -113,6 +114,7 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     };
 
     if (extra) {
+      if (extra.txHash !== undefined) update.tx_hash = extra.txHash as string;
       if (extra.confirmations !== undefined) update.confirmations = extra.confirmations;
       if (extra.confirmed_at !== undefined) update.confirmed_at = extra.confirmed_at;
       if (extra.credited_currency_id !== undefined)
@@ -212,6 +214,33 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
       [safeLimit],
     );
     return rows || [];
+  }
+
+  async findConfirmingWithdrawals(limit: number): Promise<OnchainTransaction[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.dataSource.query(
+      pg(`SELECT *
+       FROM onchain_transactions
+       WHERE type = 'WITHDRAWAL' AND status = 'CONFIRMING' AND tx_hash IS NOT NULL
+       ORDER BY created_at ASC
+       LIMIT ?`),
+      [safeLimit],
+    );
+    return rows || [];
+  }
+
+  /**
+   * Mark withdrawals stuck in CONFIRMING without a tx_hash as FAILED.
+   * These are orphaned records where the blockchain tx was never recorded.
+   * Returns the count of updated rows.
+   */
+  async markOrphanConfirmingAsFailed(): Promise<number> {
+    const result = await this.dataSource.query(
+      pg(`UPDATE onchain_transactions
+       SET status = 'FAILED', confirmed_at = NOW()
+       WHERE type = 'WITHDRAWAL' AND status = 'CONFIRMING' AND tx_hash IS NULL`),
+    );
+    return Number(result?.[0]?.affected_rows ?? 0);
   }
 
   async setMatchedUser(

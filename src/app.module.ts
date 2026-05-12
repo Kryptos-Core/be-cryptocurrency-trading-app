@@ -35,6 +35,7 @@ import { MetadataModule } from './modules/metadata/metadata.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentConfigModule } from './modules/payment-config/payment-config.module';
+import { ReconciliationModule } from './common/reconciliation/reconciliation.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
 import { TradingModule } from './modules/trading/trading.module';
@@ -128,6 +129,7 @@ class BullBoardAuthMiddleware {
     NotificationsModule,
     MarketMakerModule,
     PaymentConfigModule,
+    ReconciliationModule,
     TreasuryModule,
     TreasuryE2EConfigModule,
     SystemConfigModule,

@@ -14,8 +14,11 @@ export class CreateNotificationDto {
   @IsNotEmpty()
   body!: string;
 
-  @ApiProperty({ enum: ['system', 'alert', 'promo'], default: 'system' })
-  @IsEnum(['system', 'alert', 'promo'])
+  @ApiProperty({
+    enum: ['system', 'alert', 'promo', 'withdrawal_request', 'withdrawal_approved', 'withdrawal_rejected'],
+    default: 'system',
+  })
+  @IsEnum(['system', 'alert', 'promo', 'withdrawal_request', 'withdrawal_approved', 'withdrawal_rejected'])
   @IsOptional()
   type?: NotificationType = 'system';
 

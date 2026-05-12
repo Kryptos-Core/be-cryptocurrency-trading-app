@@ -10,7 +10,7 @@ import {
 import { User } from './user.entity';
 import { UserNotification } from './user-notification.entity';
 
-export type NotificationType = 'system' | 'alert' | 'promo';
+export type NotificationType = 'system' | 'alert' | 'promo' | 'withdrawal_request' | 'withdrawal_approved' | 'withdrawal_rejected';
 
 @Entity('notifications')
 @Index('idx_notifications_created_at', ['created_at'])
@@ -24,7 +24,11 @@ export class Notification {
   @Column({ type: 'text' })
   body!: string;
 
-  @Column({ type: 'enum', enum: ['system', 'alert', 'promo'], default: 'system' })
+  @Column({
+    type: 'enum',
+    enum: ['system', 'alert', 'promo', 'withdrawal_request', 'withdrawal_approved', 'withdrawal_rejected'],
+    default: 'system',
+  })
   type!: NotificationType;
 
   @Column({ type: 'char', length: 36 })

@@ -16,6 +16,7 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import { TreasuryModule } from '@/modules/treasury/treasury.module';
 import { TreasuryMainWalletService } from '@/modules/treasury/treasury-main-wallet.service';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
+import { UsersModule } from '@/modules/users/users.module';
 import {
   GetAdminUnmatchedDepositsQuery,
   GetAdminWithdrawalByIdQuery,
@@ -85,6 +86,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     PaymentConfigModule,
     forwardRef(() => NotificationsModule),
     SystemConfigModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [BlockchainController, WalletConnectController],
   providers: [
@@ -225,6 +227,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     OnchainTransferService,
     DepositFxService,
     OnchainDepositService,
+    OnchainWithdrawalService,
     DepositIngestionService,
   ],
 })

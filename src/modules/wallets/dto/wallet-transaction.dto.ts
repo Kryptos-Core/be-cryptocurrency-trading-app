@@ -42,11 +42,23 @@ export class WalletTransactionDto {
   @IsEnum(WalletReferenceType)
   refType!: WalletReferenceType;
 
-  @ApiProperty({ description: 'Reference ID (e.g., orderId, tradeId)', example: 1001 })
+  @ApiProperty({ description: 'Reference ID (e.g., orderId, tradeId, txId)', example: 1001 })
   @IsInt()
   @Min(1)
   @IsNotEmpty({ message: 'refId is required' })
-  refId!: number;
+  // Accepts both numeric IDs and string UUIDs (e.g. onchain tx_id)
+  // Ledger stores as VARCHAR so string UUIDs are supported.
+  refId!: number | string;
+
+  @ApiPropertyOptional({
+    description:
+      'Override ref_id written to ledger entries. Use this when the same refId must be used across multiple ledger operations (e.g., UNFREEZE after FREEZE) to avoid unique constraint violations.',
+    example: '019e1234-5678-abcd-0001-unfreeze',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  ledgerRefId?: string;
 
   @ApiPropertyOptional({ description: 'Target user ID (required for TRANSFER)', example: 2 })
   @IsInt()

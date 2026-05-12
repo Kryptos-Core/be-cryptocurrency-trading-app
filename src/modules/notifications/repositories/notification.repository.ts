@@ -194,7 +194,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
     const conflict = idempotent ? ' ON CONFLICT DO NOTHING' : '';
     await em.query(
       `INSERT INTO user_notifications (id, user_id, notification_id, is_read, created_at)
-       VALUES ($1, $2, $3, false, NOW())${conflict}`,
+       VALUES ($1, $2, $3, 0, NOW())${conflict}`,
       [newUuid(), targetUserId, notificationId],
     );
   }

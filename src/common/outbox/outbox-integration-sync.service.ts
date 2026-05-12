@@ -77,6 +77,12 @@ export class OutboxIntegrationSyncService {
         );
         return;
       }
+      case OutboxIntegrationEventType.UnmatchedDepositDetectedV1: {
+        this.logger.log(
+          `Unmatched deposit detected, routing to admin notification: id=${row.id} aggregateId=${row.aggregate_id}`,
+        );
+        return;
+      }
       case OutboxIntegrationEventType.TradeExecutedV1: {
         await this.processedEvents.runOnce(
           em,

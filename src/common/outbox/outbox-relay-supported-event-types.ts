@@ -9,6 +9,7 @@ export const OUTBOX_RELAY_SUPPORTED_EVENT_TYPES: readonly string[] = [
   OutboxIntegrationEventType.MarketPairUpdatedV1,
   OutboxIntegrationEventType.OnchainDepositSubmittedV1,
   OutboxIntegrationEventType.OnchainDepositSettledV1,
+  OutboxIntegrationEventType.UnmatchedDepositDetectedV1,
   OutboxIntegrationEventType.DepositMatchedV1,
   OutboxIntegrationEventType.OrderCreatedV1,
   OutboxIntegrationEventType.OrderCancelRequestedV1,

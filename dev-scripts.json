@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "title": "Dev Scripts",
+  "description": "Các lệnh ít dùng — chạy bằng: node scripts/run-dev-script.mjs <key>",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "format": "biome format --write ./src ./scripts",
+    "format:check": "biome format ./src ./scripts",
+    "lint:boundaries": "node scripts/check-module-boundaries.mjs",
+    "lint:uow": "node scripts/check-uow-policy.mjs",
+    "start:staging": "cross-env NODE_ENV=staging nest start",
+
+    "migration:generate": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:generate -d src/config/data-source.ts --verbose",
+    "migration:create": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:create",
+    "migration:revert": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:revert -d src/config/data-source.ts --verbose",
+    "migration:show": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:show -d src/config/data-source.ts --verbose",
+
+    "db:clean": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-db-clean.ts",
+    "db:outbox:reset": "docker exec crypto_trading_postgres psql -U crypto_user -d crypto_trading_platform -c \"UPDATE integration_outbox SET dead_lettered_at = NULL, publish_attempts = 0, next_retry_at = NULL WHERE dead_lettered_at IS NOT NULL;\"",
+    "db:migrate:ch": "docker exec -i crypto_trading_clickhouse clickhouse-client --host 127.0.0.1 --port 9000 --query \"$(cat scripts/docker/clickhouse-init.sql)\"",
+    "db:migrate:ch:status": "docker exec crypto_trading_clickhouse clickhouse-client --host localhost --port 9000 --query \"SHOW TABLES FROM analytics FORMAT PrettyCompact\"",
+    "clickhouse:tables:list": "docker exec crypto_trading_clickhouse clickhouse-client --host localhost --port 9000 --query \"SHOW TABLES FROM analytics FORMAT PrettyCompact\"",
+
+    "docker:infra:logs": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f",
+    "docker:infra:health": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development ps --format \"table {{.Name}}\\t{{.Health}}\\t{{.Status}}\"",
+    "kafka:topics:create": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile kafka run --rm kafka-init",
+    "clickhouse:init:run": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile clickhouse run --rm clickhouse-init",
+
+    "treasury:e2e": "ts-node -r tsconfig-paths/register scripts/daily-testnet-deposit-withdraw-e2e.ts",
+    "treasury:health": "ts-node -r tsconfig-paths/register scripts/daily-treasury-health-check.ts",
+    "treasury:daily": "npm run treasury:e2e && npm run treasury:health",
+    "treasury:schedule:register": "powershell -ExecutionPolicy Bypass -File scripts/register-treasury-daily-task.ps1",
+    "treasury:schedule:unregister": "powershell -ExecutionPolicy Bypass -File scripts/unregister-treasury-daily-task.ps1",
+
+    "test:watch": "jest --watch"
+  }
+}

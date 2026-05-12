@@ -416,6 +416,56 @@ export class TransactionWalletService {
     return null;
   }
 
+  /** Parse TronWeb/solidity errors and return user-friendly messages. */
+  private parseTronError(error: unknown): {
+    message: string;
+    code: string;
+    details?: Record<string, unknown>;
+  } {
+    const msg = error instanceof Error ? error.message : String(error);
+    const lower = msg.toLowerCase();
+
+    if (lower.includes('revert') || lower.includes('opcode')) {
+      return {
+        message:
+          'Transaction reverted on-chain. Possible causes: destination address has insufficient TRX balance, ' +
+          'contract transfer restriction, or hot wallet authorization issue. ' +
+          'Ensure the destination address has at least 1 TRX.',
+        code: 'TRON_TRANSFER_REVERT',
+        details: { raw: msg },
+      };
+    }
+    if (lower.includes('bandwidth') || lower.includes('energy')) {
+      return {
+        message:
+          'Insufficient bandwidth or energy for the transaction. ' +
+          'Ensure the destination address has at least 1 TRX to cover network fees.',
+        code: 'TRON_BANDWIDTH_ENERGY_INSUFFICIENT',
+        details: { raw: msg },
+      };
+    }
+    if (lower.includes('timeout') || lower.includes('timed out')) {
+      return {
+        message: 'Transaction timed out. The network may be congested. Please retry.',
+        code: 'TRON_TRANSFER_TIMEOUT',
+        details: { raw: msg },
+      };
+    }
+    if (lower.includes('invalid') || lower.includes('address')) {
+      return {
+        message: 'Invalid Tron address provided.',
+        code: 'TRON_INVALID_ADDRESS',
+        details: { raw: msg },
+      };
+    }
+    // Unknown — return generic but include raw for debugging
+    return {
+      message: `Blockchain transaction failed: ${msg}`,
+      code: 'TRON_TRANSFER_UNKNOWN',
+      details: { raw: msg },
+    };
+  }
+
   /**
    * Sweep all TRC-20 USDT from a treasury transaction wallet to the main address.
    */
@@ -852,12 +902,48 @@ export class TransactionWalletService {
           : 'TRON_NILE';
 
     const pk = this.walletEncryptionService.decrypt(wallet.encrypted_private_key);
+    const MIN_TRX_SUN = 50 * 1_000_000; // 50 TRX
+
+    const trxBalanceSun = await this.getTronNativeBalanceSun(tronNet, wallet.address);
+    if (trxBalanceSun < MIN_TRX_SUN) {
+      throw new BusinessException(
+        `Insufficient TRX balance in hot wallet to pay network fees. Current: ${(trxBalanceSun / 1_000_000).toFixed(6)} TRX, minimum required: ~50 TRX. Please fund the hot wallet with TRX.`,
+        'HOT_WALLET_TRX_INSUFFICIENT',
+      );
+    }
+
+    const usdtBalanceHuman = await this.getTronUsdtHumanBalanceOnChain(tronNet, wallet.address);
+    const amountDecimal = new Decimal(amount);
+    const usdtBalanceDecimal = new Decimal(usdtBalanceHuman);
+    if (usdtBalanceDecimal.lt(amountDecimal)) {
+      throw new BusinessException(
+        `Insufficient USDT balance in hot wallet. Current: ${usdtBalanceHuman} USDT, withdrawal amount: ${amount} USDT. Please fund the hot wallet with USDT.`,
+        'HOT_WALLET_USDT_INSUFFICIENT',
+      );
+    }
 
     this.logger.log(
       `Sending USDT withdrawal from wallet ${wallet.wallet_id} to ${toAddress} on ${chain}, amount: ${amount}`,
     );
 
-    const txHash = await this.transferTronUsdtFromPrivateKey(chain, pk, toAddress, amount);
+    let txHash: string;
+    try {
+      txHash = await this.transferTronUsdtFromPrivateKey(chain, pk, toAddress, amount);
+    } catch (blockchainError) {
+      const parsed = this.parseTronError(blockchainError);
+      const trxBalNow = await this.getTronNativeBalanceSun(tronNet, wallet.address);
+      const usdtBalNow = await this.getTronUsdtHumanBalanceOnChain(tronNet, wallet.address);
+      this.logger.error(
+        `[Withdrawal] USDT send failed: ${parsed.message} | ` +
+          `code=${parsed.code} | raw=${blockchainError instanceof Error ? blockchainError.message : String(blockchainError)} | ` +
+          `hotWallet=${wallet.address} | ` +
+          `trxBalance=${trxBalNow} SUN (${(Number(trxBalNow) / 1_000_000).toFixed(6)} TRX) | ` +
+          `usdtBalance=${usdtBalNow} USDT | ` +
+          `withdrawalAmount=${amount} USDT | ` +
+          `minRequiredTrx=${MIN_TRX_SUN} SUN | destination=${toAddress}`,
+      );
+      throw new BusinessException(parsed.message, parsed.code, parsed.details);
+    }
 
     this.logger.log(
       `Withdrawal USDT TRC-20 sent from tx wallet ${wallet.wallet_id}: ${txHash} (${amount} USDT on ${tronNet})`,
@@ -965,6 +1051,20 @@ export class TransactionWalletService {
       throw new BusinessException(
         'Destination Tron account is not activated yet. Fund TRX or activate the address before sending USDT.',
         code,
+      );
+    }
+
+    // Also check TRX balance — destination needs TRX to receive USDT (bandwidth/energy cost)
+    const destTrxSun = await this.retryTronRead(
+      () => tronWeb.trx.getBalance(address),
+      `TRX balance check ${address}`,
+    );
+    if (destTrxSun < 1_000_000) {
+      const destTrx = Number(destTrxSun) / 1_000_000;
+      throw new BusinessException(
+        `Destination address has insufficient TRX balance. Current: ${destTrx.toFixed(6)} TRX, minimum required: 1 TRX to receive USDT transfers. Please fund the destination address with at least 1 TRX.`,
+        'TRON_DESTINATION_TRX_INSUFFICIENT',
+        { address, currentTrx: destTrx },
       );
     }
   }

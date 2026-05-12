@@ -143,7 +143,7 @@ export class ReconciliationService {
                 CASE WHEN lt.direction = 'CREDIT' THEN lt.amount ELSE -lt.amount END
               )::text
               FROM wallet_ledger lt
-              WHERE lt.wallet_id = w.id
+              WHERE lt.wallet_id = w.wallet_id
             ),
             '0'
           ) AS ledger_balance,
@@ -154,7 +154,7 @@ export class ReconciliationService {
                   CASE WHEN lt.direction = 'CREDIT' THEN lt.amount ELSE -lt.amount END
                 )
                 FROM wallet_ledger lt
-                WHERE lt.wallet_id = w.id
+                WHERE lt.wallet_id = w.wallet_id
               ),
               0
             )
@@ -166,7 +166,7 @@ export class ReconciliationService {
               CASE WHEN lt.direction = 'CREDIT' THEN lt.amount ELSE -lt.amount END
             )
             FROM wallet_ledger lt
-            WHERE lt.wallet_id = w.id
+            WHERE lt.wallet_id = w.wallet_id
           ),
           0
         )
@@ -177,7 +177,7 @@ export class ReconciliationService {
                 CASE WHEN lt.direction = 'CREDIT' THEN lt.amount ELSE -lt.amount END
               )
               FROM wallet_ledger lt
-              WHERE lt.wallet_id = w.id
+              WHERE lt.wallet_id = w.wallet_id
             ),
             0
           )
@@ -347,8 +347,8 @@ export class ReconciliationService {
       const pgOrders = (await this.dataSource.query(`
         SELECT
           pair_id,
-          SUM(CASE WHEN side = 'BUY' THEN remaining_amount ELSE 0 END)::text AS total_bid,
-          SUM(CASE WHEN side = 'SELL' THEN remaining_amount ELSE 0 END)::text AS total_ask
+          SUM(CASE WHEN side = 'BUY' THEN (amount - filled_amount) ELSE 0 END)::text AS total_bid,
+          SUM(CASE WHEN side = 'SELL' THEN (amount - filled_amount) ELSE 0 END)::text AS total_ask
         FROM orders
         WHERE status = 'OPEN'
         GROUP BY pair_id

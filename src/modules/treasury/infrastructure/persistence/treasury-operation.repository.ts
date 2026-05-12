@@ -135,6 +135,7 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
 
   /**
    * Atomic persist: new on-chain row + operation completed fields (treasury Fund/Sweep success path).
+   * Idempotent: skips onchain_tx insert if the row already exists (e.g. Bull retry after successful finalize).
    */
   async finalizeSuccessWithOnchainTx(params: {
     operation: TreasuryOperation;
@@ -147,6 +148,26 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
     await this.dataSource.transaction(async (manager) => {
       const onchainRepo = manager.getRepository(OnchainTransaction);
       const opRepo = manager.getRepository(TreasuryOperation);
+
+      const existing = await onchainRepo.findOne({
+        where: { chain: operation.chain, tx_hash: txHash, log_index: 0 },
+        select: ['tx_id'],
+      });
+
+      if (existing) {
+        await opRepo.update(
+          { operation_id: operation.operation_id },
+          {
+            status: 'COMPLETED',
+            amount,
+            tx_hash: txHash,
+            onchain_tx_id: existing.tx_id,
+            completed_at: new Date(),
+            failure_reason: null,
+          },
+        );
+        return;
+      }
 
       const txId = uuidv7();
       const now = new Date();
@@ -162,7 +183,6 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
         from_address: fromAddress,
         to_address: toAddress,
         amount,
-        /** Broadcast + balance wait already succeeded before this row is written. */
         confirmations: 1,
         status: OnchainTxStatus.COMPLETED,
         confirmed_at: now,

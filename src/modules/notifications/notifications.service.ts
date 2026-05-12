@@ -27,9 +27,6 @@ export class NotificationsService {
     @Inject(NOTIFICATION_STRATEGIES) private readonly strategies: INotificationStrategy[],
   ) {}
 
-  /**
-   * Send notification to a specific user (withdrawal status, etc.)
-   */
   async sendToUser(
     targetUserId: string,
     dto: CreateNotificationDto,
@@ -61,6 +58,17 @@ export class NotificationsService {
         strategy.sendToUser(targetUserId, notificationId, dto, token ?? undefined),
       ),
     );
+  }
+
+  /**
+   * Send notification to multiple users at once (e.g., all FINANCE_MANAGER for withdrawal alerts).
+   */
+  async sendToUsers(
+    targetUserIds: string[],
+    dto: CreateNotificationDto,
+    actorUserId: string,
+  ): Promise<void> {
+    await Promise.all(targetUserIds.map((userId) => this.sendToUser(userId, dto, actorUserId)));
   }
 
   async broadcast(dto: CreateNotificationDto, adminId: string) {

@@ -186,7 +186,7 @@ describe('AdminAdjustBalanceUseCase', () => {
       walletRepo.getOrCreateForUpdate.mockResolvedValue(makeWallet('200', '0'));
       walletRepo.applyBalanceDelta.mockResolvedValue(makeWallet('300', '0'));
       ledgerRepo.createEntry.mockRejectedValue(
-        new Error("Duplicate entry for key 'uk_ledger_ref'"),
+        new Error("duplicate key value violates unique constraint \"uk_ledger_ref\""),
       );
 
       await expect(useCase.execute('admin-uid', dto())).rejects.toBeInstanceOf(ConflictException);

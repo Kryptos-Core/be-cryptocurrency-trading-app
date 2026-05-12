@@ -4,8 +4,8 @@
  */
 export class AppException extends Error {
   constructor(
-    public readonly code: string,
     public readonly message: string,
+    public readonly code: string,
     public readonly statusCode: number = 400,
     public readonly context?: Record<string, unknown>,
   ) {
@@ -20,7 +20,7 @@ export class AppException extends Error {
  */
 export class BadRequestException extends AppException {
   constructor(message: string, code: string = 'BAD_REQUEST', context?: Record<string, unknown>) {
-    super(code, message, 400, context);
+    super(message, code, 400, context);
     Object.setPrototypeOf(this, BadRequestException.prototype);
   }
 }
@@ -30,7 +30,7 @@ export class BadRequestException extends AppException {
  */
 export class BusinessException extends AppException {
   constructor(message: string, code: string = 'BUSINESS_ERROR', context?: Record<string, unknown>) {
-    super(code, message, 400, context);
+    super(message, code, 400, context);
     Object.setPrototypeOf(this, BusinessException.prototype);
   }
 }
@@ -47,11 +47,14 @@ export class TreasuryWalletBusyException extends BusinessException {
  * Resource Not Found Exception
  */
 export class NotFoundException extends AppException {
-  constructor(resource: string, identifier?: string | number) {
-    const message = identifier
-      ? `${resource} with id ${identifier} not found`
-      : `${resource} not found`;
-    super('NOT_FOUND', message, 404);
+  constructor(resourceOrMessage: string, identifierOrCode?: string | number) {
+    // Support both old signature: NotFoundException('Resource', 'id') and new: NotFoundException('message', 'code')
+    const isOldSignature = typeof identifierOrCode === 'string' || typeof identifierOrCode === 'number';
+    const message = isOldSignature
+      ? `${resourceOrMessage}${identifierOrCode !== undefined ? ` with id ${identifierOrCode}` : ''} not found`
+      : resourceOrMessage;
+    const code = isOldSignature ? 'NOT_FOUND' : (identifierOrCode ?? 'NOT_FOUND');
+    super(message, code, 404);
     Object.setPrototypeOf(this, NotFoundException.prototype);
   }
 }
@@ -61,7 +64,7 @@ export class NotFoundException extends AppException {
  */
 export class UnauthorizedException extends AppException {
   constructor(message: string = 'Unauthorized') {
-    super('UNAUTHORIZED', message, 401);
+    super(message, 'UNAUTHORIZED', 401);
     Object.setPrototypeOf(this, UnauthorizedException.prototype);
   }
 }
@@ -71,7 +74,7 @@ export class UnauthorizedException extends AppException {
  */
 export class ForbiddenException extends AppException {
   constructor(message: string = 'Forbidden') {
-    super('FORBIDDEN', message, 403);
+    super(message, 'FORBIDDEN', 403);
     Object.setPrototypeOf(this, ForbiddenException.prototype);
   }
 }
@@ -80,8 +83,16 @@ export class ForbiddenException extends AppException {
  * Validation Exception
  */
 export class ValidationException extends AppException {
-  constructor(message: string, errors?: Record<string, unknown>) {
-    super('VALIDATION_ERROR', message, 422, errors);
+  constructor(
+    message: string,
+    codeOrContext?: string | Record<string, unknown>,
+    context?: Record<string, unknown>,
+  ) {
+    // Support both old: ValidationException('msg', {field:'x'}) and new: ValidationException('msg', 'CODE', ctx)
+    const isOldSignature = typeof codeOrContext === 'object' || codeOrContext === undefined;
+    const code = isOldSignature ? 'VALIDATION_ERROR' : (codeOrContext as string);
+    const ctx = isOldSignature ? codeOrContext as Record<string, unknown> | undefined : context;
+    super(message, code, 422, ctx);
     Object.setPrototypeOf(this, ValidationException.prototype);
   }
 }
@@ -91,7 +102,7 @@ export class ValidationException extends AppException {
  */
 export class ConflictException extends AppException {
   constructor(message: string, code: string = 'CONFLICT') {
-    super(code, message, 409);
+    super(message, code, 409);
     Object.setPrototypeOf(this, ConflictException.prototype);
   }
 }
@@ -100,14 +111,22 @@ export class ConflictException extends AppException {
  * Internal Server Exception
  */
 export class InternalServerException extends AppException {
-  constructor(message: string = 'Internal server error', context?: Record<string, unknown>) {
-    super('INTERNAL_SERVER_ERROR', message, 500, context);
+  constructor(
+    message: string = 'Internal server error',
+    codeOrContext?: string | Record<string, unknown>,
+    context?: Record<string, unknown>,
+  ) {
+    // Support both old: InternalServerException('msg', {code:'X'}) and new: InternalServerException('msg', 'CODE')
+    const isOldSignature = typeof codeOrContext === 'object' || codeOrContext === undefined;
+    const code = isOldSignature ? 'INTERNAL_SERVER_ERROR' : (codeOrContext as string);
+    const ctx = isOldSignature ? codeOrContext as Record<string, unknown> | undefined : context;
+    super(message, code, 500, ctx);
     Object.setPrototypeOf(this, InternalServerException.prototype);
   }
 }
 
 /**
- * Service Unavailable (503) – e.g. external API rate limit (Binance IP ban)
+ * Service Unavailable (503) - e.g. external API rate limit (Binance IP ban)
  */
 export class ServiceUnavailableException extends AppException {
   constructor(
@@ -115,7 +134,7 @@ export class ServiceUnavailableException extends AppException {
     code: string = 'SERVICE_UNAVAILABLE',
     context?: Record<string, unknown>,
   ) {
-    super(code, message, 503, context);
+    super(message, code, 503, context);
     Object.setPrototypeOf(this, ServiceUnavailableException.prototype);
   }
 }

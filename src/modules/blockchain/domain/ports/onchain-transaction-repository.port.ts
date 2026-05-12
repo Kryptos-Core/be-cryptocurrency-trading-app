@@ -144,6 +144,12 @@ export interface OnchainTransactionRepositoryPort {
   /** Tìm pending withdrawal chưa có txHash (manual review queue). */
   findPendingManualWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
+  /** Tìm withdrawals đang ở trạng thái CONFIRMING (cần check on-chain confirmations). */
+  findConfirmingWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
+
+  /** Mark withdrawals stuck in CONFIRMING without tx_hash as FAILED. */
+  markOrphanConfirmingAsFailed(): Promise<number>;
+
   /** Gán user_id cho UNMATCHED onchain_transaction (admin match-user flow). */
   setMatchedUser(
     ctx: TransactionContext,

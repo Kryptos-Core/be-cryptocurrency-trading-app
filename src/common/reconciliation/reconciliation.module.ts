@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
 import { ReconciliationController } from './reconciliation.controller';
 import { ReconciliationScheduler } from './reconciliation.scheduler';
 import { ReconciliationService } from './reconciliation.service';
+import { BlockchainConfirmationScheduler } from './blockchain-confirmation.scheduler';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ReadMarketOhlcv } from '@/entities/read-market-ohlcv.entity';
 import { ReadMarketTrade } from '@/entities/read-market-trade.entity';
@@ -21,6 +23,7 @@ import { TelemetryModule } from '@/telemetry';
  * - Outbox/Kafka backlog
  * - Orderbook checksum
  * - OHLCV consistency
+ * - Blockchain confirmations (withdrawals)
  */
 @Module({
   imports: [
@@ -32,9 +35,10 @@ import { TelemetryModule } from '@/telemetry';
       WalletLedger,
     ]),
     TelemetryModule,
+    forwardRef(() => BlockchainModule),
   ],
   controllers: [ReconciliationController],
-  providers: [ReconciliationService, ReconciliationScheduler],
+  providers: [ReconciliationService, ReconciliationScheduler, BlockchainConfirmationScheduler],
   exports: [ReconciliationService],
 })
 export class ReconciliationModule {}

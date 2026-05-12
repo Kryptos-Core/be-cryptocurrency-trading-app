@@ -134,6 +134,13 @@ export class UsersService {
   }
 
   /**
+   * Find all ACTIVE users by role (for notifications to FINANCE_MANAGER, etc.)
+   */
+  async findActiveUsersByRole(role: import('@/common/enums').UserRole): Promise<UserRecord[]> {
+    return this.usersRepository.findTestUsersByRole(role, undefined, 1000);
+  }
+
+  /**
    * Create new user
    */
   async create(email: string, passwordHash: string): Promise<UserRecord> {

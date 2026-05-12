@@ -53,28 +53,19 @@ export class ApplyTransactionUseCase {
     const currencyId = String(dto.currencyId);
 
     try {
-      const runCore = async (manager: TransactionContext) => {
-        switch (dto.action) {
-          case WalletTransactionAction.CREDIT:
-            return this.credit(userId, dto, amount, manager);
-          case WalletTransactionAction.DEBIT:
-            return this.debit(userId, dto, amount, manager);
-          case WalletTransactionAction.FREEZE:
-            return this.freeze(userId, dto, amount, manager);
-          case WalletTransactionAction.UNFREEZE:
-            return this.unfreeze(userId, dto, amount, manager);
-          case WalletTransactionAction.TRANSFER:
-            return this.transfer(userId, dto, amount, manager);
-          default:
-            throw new BadRequestException('Invalid wallet action', 'INVALID_ACTION');
-        }
-      };
-
-      const result = joinTransaction
-        ? await runCore(joinTransaction)
-        : await this.walletRepo.transaction(runCore);
-
+      // Resolve symbol BEFORE transaction — uses raw dataSource.query, no transaction needed.
       const symbol = await this.currencyLookup.getSymbol(currencyId);
+
+      let result: WalletBalanceDto;
+      if (joinTransaction) {
+        result = await this.runCoreActions(dto, userId, currencyId, symbol, amount, joinTransaction);
+      } else {
+        result = await this.walletRepo.transaction(async (manager) => {
+          return this.runCoreActions(dto, userId, currencyId, symbol, amount, manager);
+        });
+      }
+
+      // Redis pub/sub — not DB-bound, safe to run outside transaction.
       await this.eventPublisher.publishBalanceChange({
         userId,
         currencyId,
@@ -83,22 +74,8 @@ export class ApplyTransactionUseCase {
         frozen: result.frozen,
         total: this.balanceCalc.calculateTotal(result.available, result.frozen),
       });
-      await this.appendWalletBalanceChangedEvent(
-        joinTransaction ?? ({} as TransactionContext),
-        userId,
-        currencyId,
-        symbol,
-        result.available,
-        result.frozen,
-      );
 
       if (dto.action === WalletTransactionAction.TRANSFER && dto.targetUserId) {
-        const _targetBalance = this.balanceCalc.buildBalanceSnapshot(
-          String(dto.targetUserId),
-          currencyId,
-          '0',
-          '0',
-        );
         const targetWallet = await this.walletRepo.findByUserCurrency(
           String(dto.targetUserId),
           currencyId,
@@ -126,8 +103,8 @@ export class ApplyTransactionUseCase {
       const msg = err instanceof Error ? err.message : String(err);
       if (
         typeof msg === 'string' &&
-        msg.includes('Duplicate entry') &&
-        msg.includes('uk_ledger_ref')
+        msg.includes('uk_ledger_ref') &&
+        (msg.includes('Duplicate entry') || msg.includes('duplicate key'))
       ) {
         throw new ConflictException(
           'Duplicate transaction reference. Please try again.',
@@ -135,6 +112,34 @@ export class ApplyTransactionUseCase {
         );
       }
       throw err;
+    }
+  }
+
+  /**
+   * Executes core wallet action + outbox append inside the transaction.
+   * All DB writes (wallet update, ledger entry, outbox) are atomic.
+   */
+  private async runCoreActions(
+    dto: WalletTransactionDto,
+    userId: string,
+    currencyId: string,
+    symbol: string,
+    amount: Decimal,
+    manager: TransactionContext,
+  ): Promise<WalletBalanceDto> {
+    switch (dto.action) {
+      case WalletTransactionAction.CREDIT:
+        return this.credit(userId, dto, amount, manager);
+      case WalletTransactionAction.DEBIT:
+        return this.debit(userId, dto, amount, manager);
+      case WalletTransactionAction.FREEZE:
+        return this.freeze(userId, dto, amount, manager);
+      case WalletTransactionAction.UNFREEZE:
+        return this.unfreeze(userId, dto, amount, manager);
+      case WalletTransactionAction.TRANSFER:
+        return this.transfer(userId, dto, amount, manager);
+      default:
+        throw new BadRequestException('Invalid wallet action', 'INVALID_ACTION');
     }
   }
 
@@ -274,12 +279,16 @@ export class ApplyTransactionUseCase {
     const wallet = await this.walletRepo.getOrCreateForUpdate(userId, currencyId, manager);
     const updated = await this.applyDelta(wallet.wallet_id, amount, amount.negated(), manager);
 
+    // Use ledgerRefId if provided (e.g., UNFREEZE after FREEZE) to avoid unique constraint
+    // violation on uk_ledger_ref when the same refId is reused.
+    const ledgerRefId = dto.ledgerRefId ?? dto.refId;
+
     await this.ledgerRepo.createDoubleEntry(
       {
         userId,
         currencyId,
         refType: dto.refType,
-        refId: dto.refId,
+        refId: ledgerRefId,
         amount: amount.toString(),
         balanceAfter: this.balanceCalc.calculateTotal(updated.available, updated.frozen),
       },
