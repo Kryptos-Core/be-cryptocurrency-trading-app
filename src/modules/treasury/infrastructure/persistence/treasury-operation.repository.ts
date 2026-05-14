@@ -118,6 +118,11 @@ export class TreasuryOperationRepository implements TreasuryOperationRepositoryP
       .createQueryBuilder('op')
       .leftJoinAndSelect('op.from_wallet', 'from_wallet')
       .leftJoinAndSelect('op.to_wallet', 'to_wallet')
+      // Operations that have a tx_hash are already shown as on-chain transactions.
+      // Exclude them here to prevent duplicate display between "Operations" and "Transactions" tabs.
+      .where('NOT (op.status = :completedStatus AND op.tx_hash IS NOT NULL)', {
+        completedStatus: 'COMPLETED',
+      })
       .orderBy('op.created_at', 'DESC')
       .skip(offset)
       .take(limit);
