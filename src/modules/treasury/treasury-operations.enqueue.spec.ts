@@ -82,14 +82,14 @@ describe('TreasuryOperationsService enqueue idempotency', () => {
       } as never);
     });
 
-    it('uses deterministic jobId treasury-fund:{walletId}:{asset} (no UUID suffix)', async () => {
+    it('uses deterministic jobId treasury-fund:{walletId}:{asset}:{amount} (no UUID suffix)', async () => {
       await svc.enqueueFund('w1', { amount: '1' }, 'actor-1');
 
       expect(queueAdd).toHaveBeenCalledWith(
         TREASURY_FUND_JOB,
         { operationId: 'new-op' },
         expect.objectContaining({
-          jobId: 'treasury-fund:w1:NATIVE',
+          jobId: 'treasury-fund:w1:NATIVE:1',
         }),
       );
     });

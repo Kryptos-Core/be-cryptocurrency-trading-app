@@ -233,8 +233,11 @@ export class TreasuryOperationsService {
         ? new Decimal(rawAmount).toDecimalPlaces(6, Decimal.ROUND_DOWN).toFixed()
         : rawAmount;
 
-    /** Deterministic jobId per wallet+asset: prevents Bull silent-reject on duplicate ID. */
-    const jobId = this.buildFundJobId(wallet.wallet_id, asset);
+    /**
+     * Deterministic jobId per wallet+asset+amount: prevents Bull silent-reject on duplicate ID.
+     * Adding amount ensures different amounts get different jobs even on same wallet+asset.
+     */
+    const jobId = this.buildFundJobId(wallet.wallet_id, asset, amount);
 
     const fromJob = await this.resolveExistingTreasuryJob(jobId);
     if (fromJob) {
@@ -1227,8 +1230,8 @@ export class TreasuryOperationsService {
     );
   }
 
-  private buildFundJobId(walletId: string, asset: string): string {
-    return `treasury-fund:${walletId}:${asset}`;
+  private buildFundJobId(walletId: string, asset: string, amount: string): string {
+    return `treasury-fund:${walletId}:${asset}:${amount}`;
   }
 
   private buildSweepJobId(
