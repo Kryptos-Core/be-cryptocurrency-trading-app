@@ -31,6 +31,7 @@ import {
 } from './application/queries';
 import { OnchainTransferQueryService } from './application/queries/transactions/onchain-transfer-query.service';
 import {
+  AdminReconcileWithdrawalUseCase,
   ApproveWithdrawalUseCase,
   PreviewDepositUseCase,
   ProcessPendingWithdrawalsUseCase,
@@ -206,6 +207,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     SettleDepositUseCase,
     RequestWithdrawalUseCase,
     ApproveWithdrawalUseCase,
+    AdminReconcileWithdrawalUseCase,
     RejectWithdrawalUseCase,
     ProcessPendingWithdrawalsUseCase,
     GetLinkedWalletsQuery,

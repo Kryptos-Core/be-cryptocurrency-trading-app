@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseCommand, type ICommandHandler } from '@/common/cqrs';
-import { OnchainTxStatus } from '../../domain/entities/onchain-transaction.entity';
+import { OnchainTxStatus } from '@/common/enums';
 import { OnchainWithdrawalService } from './withdrawals/onchain-withdrawal.service';
 
 /**
@@ -33,10 +33,7 @@ export interface AdminReconcileResult {
 @Injectable()
 export class AdminReconcileWithdrawalUseCase
   implements
-    ICommandHandler<
-      AdminReconcileWithdrawalCommand,
-      Promise<AdminReconcileResult>
-    >
+    ICommandHandler<AdminReconcileWithdrawalCommand, AdminReconcileResult>
 {
   constructor(private readonly withdrawalService: OnchainWithdrawalService) {}
 

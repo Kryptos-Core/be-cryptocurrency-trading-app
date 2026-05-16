@@ -107,7 +107,7 @@ export class BlockchainController {
     private readonly settleDepositUc: SettleDepositUseCase,
     private readonly requestWithdrawal: RequestWithdrawalUseCase,
     private readonly approveWithdrawal: ApproveWithdrawalUseCase,
-    private readonly adminReconcileWithdrawal: AdminReconcileWithdrawalUseCase,
+    private readonly adminReconcileWithdrawalUc: AdminReconcileWithdrawalUseCase,
     private readonly rejectWithdrawal: RejectWithdrawalUseCase,
     private readonly processPendingWithdrawals: ProcessPendingWithdrawalsUseCase,
     private readonly getLinkedWalletsQuery: GetLinkedWalletsQuery,
@@ -403,7 +403,7 @@ export class BlockchainController {
     @Param('txId') txId: string,
     @Body() dto: { action: 'settle' | 'force_complete' | 'force_fail' | 'force_refund'; reason?: string },
   ) {
-    return this.adminReconcileWithdrawal.execute(
+    return this.adminReconcileWithdrawalUc.execute(
       new AdminReconcileWithdrawalCommand(actorUserId, txId, dto.action, dto.reason),
     );
   }
