@@ -57,6 +57,8 @@ import {
 import {
   ApproveWithdrawalCommand,
   ApproveWithdrawalUseCase,
+  AdminReconcileWithdrawalCommand,
+  AdminReconcileWithdrawalUseCase,
   PreviewDepositQuery,
   PreviewDepositUseCase,
   ProcessPendingWithdrawalsCommand,
@@ -105,6 +107,7 @@ export class BlockchainController {
     private readonly settleDepositUc: SettleDepositUseCase,
     private readonly requestWithdrawal: RequestWithdrawalUseCase,
     private readonly approveWithdrawal: ApproveWithdrawalUseCase,
+    private readonly adminReconcileWithdrawal: AdminReconcileWithdrawalUseCase,
     private readonly rejectWithdrawal: RejectWithdrawalUseCase,
     private readonly processPendingWithdrawals: ProcessPendingWithdrawalsUseCase,
     private readonly getLinkedWalletsQuery: GetLinkedWalletsQuery,
@@ -375,6 +378,34 @@ export class BlockchainController {
   })
   async getAdminWithdrawalStats() {
     return this.getAdminWithdrawalStatsQuery.execute(new GetAdminWithdrawalStatsRequest());
+  }
+
+  @Post('admin/withdrawals/:txId/reconcile')
+  @UseGuards(RoleGuard, PermissionGuard)
+  @RequireFinanceAccess()
+  @RequirePermissions(Permission.WITHDRAWALS_APPROVE)
+  @ApiOperation({
+    summary: '[Admin] Manual reconciliation for stuck withdrawals',
+    description:
+      'Force settle/fail/refund a withdrawal. ' +
+      'Actions: ' +
+      'settle=re-check blockchain and settle, ' +
+      'force_complete=mark as COMPLETED (admin confirms on-chain), ' +
+      'force_fail=mark as FAILED and refund frozen balance, ' +
+      'force_refund=refund frozen balance without changing tx status.',
+  })
+  @ApiParam({ name: 'txId', description: 'ID giao dịch rút tiền cần xử lý' })
+  @ApiSuccessResponse('Kết quả reconciliation')
+  @ApiBadRequestResponse('Giao dịch không hợp lệ')
+  @ApiUnauthorizedResponse('Chưa đăng nhập')
+  async adminReconcileWithdrawal(
+    @CurrentUser('userId') actorUserId: string,
+    @Param('txId') txId: string,
+    @Body() dto: { action: 'settle' | 'force_complete' | 'force_fail' | 'force_refund'; reason?: string },
+  ) {
+    return this.adminReconcileWithdrawal.execute(
+      new AdminReconcileWithdrawalCommand(actorUserId, txId, dto.action, dto.reason),
+    );
   }
 
   @Get('admin/withdrawals/:txId')

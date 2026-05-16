@@ -100,6 +100,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
       if (extra.conversion_rate !== undefined) update.conversion_rate = extra.conversion_rate;
     }
 
+    // #region agent debug log
+    console.log(`[DEBUG:837714] updateStatus: txId=${txId}, status=${status}, txHash=${extra?.txHash ?? 'N/A'}, confirmations=${extra?.confirmations ?? 'N/A'}`);
+    // #endregion
     await this.dataSource.getRepository(OnchainTransaction).update({ tx_id: txId }, update);
   }
 
@@ -218,6 +221,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
 
   async findConfirmingWithdrawals(limit: number): Promise<OnchainTransaction[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
+    // #region agent debug log
+    console.log(`[DEBUG:837714] findConfirmingWithdrawals called with limit=${safeLimit}`);
+    // #endregion
     const rows = await this.dataSource.query(
       pg(`SELECT *
        FROM onchain_transactions
@@ -226,6 +232,9 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
        LIMIT ?`),
       [safeLimit],
     );
+    // #region agent debug log
+    console.log(`[DEBUG:837714] findConfirmingWithdrawals result: count=${(rows || []).length}`, (rows || []).map((r: any) => ({ tx_id: r.tx_id, status: r.status, tx_hash: r.tx_hash })));
+    // #endregion
     return rows || [];
   }
 

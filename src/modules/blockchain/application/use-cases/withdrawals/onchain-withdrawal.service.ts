@@ -254,6 +254,9 @@ export class OnchainWithdrawalService {
       let txHash: string;
       try {
         txHash = await this.executeWithdrawal(wallet, txRecord.to_address, txRecord.amount, asset);
+        // #region agent debug log
+        console.log(`[DEBUG:837714] executeWithdrawal returned: txHash=${txHash}`);
+        // #endregion
       } catch (blockchainError) {
         const errorMessage = blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
 
@@ -316,22 +319,85 @@ export class OnchainWithdrawalService {
         );
       }
 
-      // Debit the frozen balance permanently — funds have left the platform
+      // #region agent debug log
+      console.log(`[DEBUG:837714] about to call updateStatus(CONFIRMING), txId=${txId}, txHash=${txHash}`);
+      // #endregion
+      let debitWasPerformed = false;
       if (txRecord.user_id) {
         const currencyId = asset === WithdrawalAsset.USDT_TRC20
           ? await this._resolveUsdtCurrencyId()
           : await this._resolveTrxCurrencyId();
-        await this._walletsService.applyTransaction(txRecord.user_id, {
-          currencyId,
-          amount: txRecord.amount,
-          action: WalletTransactionAction.DEBIT,
-          refType: WalletReferenceType.WITHDRAW,
-          refId: txId,
-          ledgerRefId: `${txId.slice(0, 33)}-d`,
-        });
+        // Check if DEBIT succeeded by verifying ledger entry exists
+        try {
+          await this._walletsService.applyTransaction(txRecord.user_id, {
+            currencyId,
+            amount: txRecord.amount,
+            action: WalletTransactionAction.DEBIT,
+            refType: WalletReferenceType.WITHDRAW,
+            refId: txId,
+            ledgerRefId: `${txId.slice(0, 33)}-d`,
+          });
+          debitWasPerformed = true;
+        } catch (debitErr) {
+          const errMsg = debitErr instanceof Error ? debitErr.message : String(debitErr);
+          // #region agent debug log
+          console.log(`[DEBUG:837714] DEBIT FAILED: txId=${txId}, error=${errMsg}`);
+          // #endregion
+          if (
+            errMsg.includes('Duplicate transaction reference') ||
+            errMsg.includes('DUPLICATE_LEDGER_ENTRY')
+          ) {
+            // Already debited from a previous retry/timeout — safe to continue.
+            debitWasPerformed = false; // Not a fresh debit, balance was already reduced
+            this._logger.warn(
+              `[Withdrawal] Debit already recorded for ${txId} (duplicate ledger ref). Proceeding to updateStatus(CONFIRMING).`,
+            );
+          } else {
+            throw debitErr;
+          }
+        }
+        // #region agent debug log
+        if (debitWasPerformed) {
+          console.log(`[DEBUG:837714] DEBIT succeeded: txId=${txId}`);
+        }
+        // #endregion
       }
 
-      await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.CONFIRMING, { txHash });
+      try {
+        await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.CONFIRMING, { txHash });
+      } catch (updateErr) {
+        // #region agent debug log
+        console.log(`[DEBUG:837714] updateStatus(CONFIRMING) FAILED: txId=${txId}, error=${updateErr}`);
+        // #endregion
+        // CRITICAL: If updateStatus fails but DEBIT succeeded, we MUST refund the user.
+        if (debitWasPerformed && txRecord.user_id) {
+          const currencyId = asset === WithdrawalAsset.USDT_TRC20
+            ? await this._resolveUsdtCurrencyId()
+            : await this._resolveTrxCurrencyId();
+          try {
+            await this._walletsService.applyTransaction(txRecord.user_id, {
+              currencyId,
+              amount: txRecord.amount,
+              action: WalletTransactionAction.CREDIT,
+              refType: WalletReferenceType.WITHDRAW,
+              refId: txId,
+              ledgerRefId: `${txId.slice(0, 33)}-rc`,
+            });
+            this._logger.error(
+              `[Withdrawal] CRITICAL: updateStatus(CONFIRMING) failed after DEBIT. Refunded ${txRecord.amount} to user ${txRecord.user_id} for txId=${txId}. Manual review required.`,
+            );
+          } catch (refundErr) {
+            this._logger.error(
+              `[Withdrawal] CRITICAL: Failed to refund user ${txRecord.user_id} for txId=${txId}. Manual intervention required immediately!`,
+              refundErr instanceof Error ? refundErr.stack : undefined,
+            );
+          }
+        }
+        throw updateErr;
+      }
+      // #region agent debug log
+      console.log(`[DEBUG:837714] approveManualWithdrawal: after updateStatus(CONFIRMING), txId=${txId}, txHash=${txHash}`);
+      // #endregion
 
       if (txRecord.user_id) {
         const assetSymbol = asset === WithdrawalAsset.USDT_TRC20 ? 'USDT' : 'TRX';
@@ -521,8 +587,16 @@ export class OnchainWithdrawalService {
     const chain = tx.chain as BlockchainNetwork;
     const provider = this._providerFactory.getProvider(chain);
 
+    // #region agent debug log
+    console.log(`[DEBUG:837714] settleWithdrawalByTxId: txId=${txId}, status=${tx.status}, tx_hash=${tx.tx_hash}, chain=${chain}`);
+    // #endregion
+
     // Check on-chain status
     const chainStatus = await provider.getTransactionStatus(String(tx.tx_hash));
+
+    // #region agent debug log
+    console.log(`[DEBUG:837714] settleWithdrawalByTxId: chainStatus.status=${chainStatus.status}, confirmations=${chainStatus.confirmations}`);
+    // #endregion
 
     if (chainStatus.status === 'FAILED') {
       // Restore frozen balance — the blockchain tx did not succeed
@@ -673,5 +747,102 @@ export class OnchainWithdrawalService {
 
   async processPendingManualWithdrawals(actorUserId: string, limit: number) {
     return { actorUserId, processed: 0, limit };
+  }
+
+  /**
+   * Force mark a withdrawal as FAILED and refund frozen balance to user.
+   * Admin manual reconciliation action.
+   */
+  async forceFailWithdrawal(txId: string, reason: string): Promise<void> {
+    const tx = await this.onchainTxRepo.findById(txId);
+    if (!tx) {
+      throw new Error(`Transaction not found: ${txId}`);
+    }
+
+    // Mark as FAILED
+    await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.FAILED, {});
+
+    // Refund frozen balance if user exists
+    if (tx.user_id) {
+      const asset = (tx as { asset?: WithdrawalAsset }).asset ?? WithdrawalAsset.NATIVE;
+      const currencyId = asset === WithdrawalAsset.USDT_TRC20
+        ? await this._resolveUsdtCurrencyId()
+        : await this._resolveTrxCurrencyId();
+      try {
+        await this._walletsService.applyTransaction(tx.user_id, {
+          currencyId,
+          amount: tx.amount,
+          action: WalletTransactionAction.UNFREEZE,
+          refType: WalletReferenceType.WITHDRAW,
+          refId: txId,
+          ledgerRefId: `${txId.slice(0, 33)}-ff`,
+        });
+        this._logger.warn(
+          `[AdminForceFail] Force-failed withdrawal ${txId}: ${reason}. Refunded ${tx.amount} to user ${tx.user_id}`,
+        );
+      } catch (err) {
+        this._logger.error(
+          `[AdminForceFail] Failed to refund user ${tx.user_id} for txId=${txId}. Manual intervention required!`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        throw err;
+      }
+    }
+  }
+
+  /**
+   * Force mark a withdrawal as COMPLETED without checking blockchain.
+   * Admin manual reconciliation action.
+   */
+  async forceCompleteWithdrawal(txId: string): Promise<void> {
+    const tx = await this.onchainTxRepo.findById(txId);
+    if (!tx) {
+      throw new Error(`Transaction not found: ${txId}`);
+    }
+
+    await this.onchainTxRepo.updateStatus(txId, OnchainTxStatus.COMPLETED, {
+      confirmations: 1,
+      confirmed_at: new Date(),
+    });
+
+    this._logger.warn(`[AdminForceComplete] Force-completed withdrawal ${txId}`);
+  }
+
+  /**
+   * Force refund frozen balance without changing tx status.
+   * Use when user was debited but TX was never recorded properly.
+   * Admin manual reconciliation action.
+   */
+  async forceRefundWithdrawal(txId: string, reason: string): Promise<void> {
+    const tx = await this.onchainTxRepo.findById(txId);
+    if (!tx) {
+      throw new Error(`Transaction not found: ${txId}`);
+    }
+
+    if (tx.user_id) {
+      const asset = (tx as { asset?: WithdrawalAsset }).asset ?? WithdrawalAsset.NATIVE;
+      const currencyId = asset === WithdrawalAsset.USDT_TRC20
+        ? await this._resolveUsdtCurrencyId()
+        : await this._resolveTrxCurrencyId();
+      try {
+        await this._walletsService.applyTransaction(tx.user_id, {
+          currencyId,
+          amount: tx.amount,
+          action: WalletTransactionAction.UNFREEZE,
+          refType: WalletReferenceType.WITHDRAW,
+          refId: txId,
+          ledgerRefId: `${txId.slice(0, 33)}-fr`,
+        });
+        this._logger.warn(
+          `[AdminForceRefund] Refunded ${tx.amount} to user ${tx.user_id} for txId=${txId}: ${reason}`,
+        );
+      } catch (err) {
+        this._logger.error(
+          `[AdminForceRefund] Failed to refund user ${tx.user_id} for txId=${txId}. Manual intervention required!`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        throw err;
+      }
+    }
   }
 }

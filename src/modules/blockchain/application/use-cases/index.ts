@@ -19,3 +19,7 @@ export {
   RequestWithdrawalCommand,
   RequestWithdrawalUseCase,
 } from './withdrawal.use-case';
+export {
+  AdminReconcileWithdrawalCommand,
+  AdminReconcileWithdrawalUseCase,
+} from './admin-reconcile-withdrawal.use-case';

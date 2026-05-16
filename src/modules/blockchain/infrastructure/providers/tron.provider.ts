@@ -115,9 +115,15 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
   }
 
   async getTransactionStatus(txHash: string): Promise<BlockchainTxStatusDto> {
+    // #region agent debug log
+    console.log(`[DEBUG:837714] TronProvider.getTransactionStatus called for txHash=${txHash}`);
+    // #endregion
     try {
       const tx = await this.tronWeb.trx.getTransaction(txHash);
       if (!tx?.txID) {
+        // #region agent debug log
+        console.log(`[DEBUG:837714] TronProvider.getTransactionStatus: tx not found for ${txHash}`);
+        // #endregion
         return buildNotFoundTxStatus(txHash, this.bindings.network);
       }
       const receipt = await this.tronWeb.trx.getTransactionInfo(txHash);
@@ -136,6 +142,9 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
         status = ok ? 'CONFIRMED' : 'FAILED';
       }
 
+      // #region agent debug log
+      console.log(`[DEBUG:837714] TronProvider.getTransactionStatus result: status=${status}, confirmed=${confirmed}, blockNumber=${receipt?.blockNumber}, rawResult=${receipt?.result}`);
+      // #endregion
       return {
         txHash,
         network: this.bindings.network,
@@ -148,6 +157,9 @@ export class TronProvider implements IBlockchainProvider, OnModuleInit {
       };
     } catch (error) {
       this.logger.error(`Error getting TRON tx: ${txHash}`, error);
+      // #region agent debug log
+      console.log(`[DEBUG:837714] TronProvider.getTransactionStatus ERROR: ${error}`);
+      // #endregion
       return buildNotFoundTxStatus(txHash, this.bindings.network);
     }
   }
