@@ -13,6 +13,18 @@ export const OutboxIntegrationEventType = {
   TradeExecutedV1: 'trade.executed',
   WalletBalanceChangedV1: 'wallet.balance_changed',
   MarketTickerUpdatedV1: 'market.ticker_updated',
+  // PHAN 1: Wallet dedup
+  WalletLinkDuplicateBlockedV1: 'WalletLink.DuplicateBlocked@v1',
+  // PHAN 2: Email change security
+  EmailChangeRequestedV1: 'EmailChange.Requested@v1',
+  EmailChangeCompletedV1: 'EmailChange.Completed@v1',
+  EmailChangeFailedV1: 'EmailChange.Failed@v1',
+  // PHAN 3: Withdrawal fraud flags
+  WithdrawalHighRiskFlaggedV1: 'Withdrawal.HighRiskFlagged@v1',
+  WithdrawalBlockedV1: 'Withdrawal.Blocked@v1',
+  // PHAN 4: Trading price manipulation
+  TradePriceManipulationSuspectedV1: 'Trade.PriceManipulationSuspected@v1',
+  TradingCircuitBreakerTrippedV1: 'Trading.CircuitBreakerTripped@v1',
 } as const;
 
 export type OutboxIntegrationEventTypeName =

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { OutboxModule } from '@/common/outbox/outbox.module';
@@ -19,7 +19,7 @@ import { TradingGateway } from './websocket/trading.gateway';
 @Module({
   imports: [
     OutboxModule,
-    MarketsModule,
+    forwardRef(() => MarketsModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

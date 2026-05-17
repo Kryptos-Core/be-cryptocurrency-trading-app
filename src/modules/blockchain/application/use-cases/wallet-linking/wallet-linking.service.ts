@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { type BlockchainNetwork, LinkedWalletStatus } from '@/common/enums';
 import { BadRequestException, ConflictException } from '@/common/exceptions';
@@ -14,6 +14,7 @@ export class WalletLinkingService {
   private static readonly NONCE_TTL = 300;
   private static readonly LINKED_CACHE_TTL = 600;
   private static readonly TEST_SIGNATURE_PREFIX = 'TEST_SIG::';
+  private readonly logger = new Logger(WalletLinkingService.name);
 
   constructor(
     @Inject(LINKED_WALLET_REPOSITORY)
@@ -86,6 +87,18 @@ export class WalletLinkingService {
       if (!verified) {
         throw new BadRequestException('Chu ky khong hop le.', 'INVALID_SIGNATURE');
       }
+    }
+
+    // CRITICAL: Block linking if another user already has this wallet verified (global uniqueness).
+    const globallyLinked = await this.linkedWalletRepo.findVerifiedByChainAndAddress(dto.chain, address);
+    if (globallyLinked && globallyLinked.user_id !== userId) {
+      this.logger.warn(
+        `[WalletLinking] Blocked: wallet ${address} on ${dto.chain} already linked to userId=${globallyLinked.user_id}; reject request from userId=${userId}`,
+      );
+      throw new ConflictException(
+        'Dia chi vi nay da duoc lien ket voi tai khoan khac tren cung mang blockchain.',
+        'WALLET_ALREADY_LINKED_BY_ANOTHER_USER',
+      );
     }
 
     const linkId = await this.linkedWalletRepo.upsertVerified({

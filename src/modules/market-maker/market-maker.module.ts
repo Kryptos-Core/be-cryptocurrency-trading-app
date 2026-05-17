@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
 import { MarketsModule } from '@/modules/markets/markets.module';
@@ -20,7 +20,7 @@ import { MmOrderStrategyService } from './services/mm-order-strategy.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([MarketMakerConfig]),
-    MarketsModule,
+    forwardRef(() => MarketsModule),
     OrdersModule,
     SystemConfigModule,
   ],

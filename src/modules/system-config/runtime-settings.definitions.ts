@@ -472,6 +472,47 @@ const EXTRA_FINANCE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Fallback rate BSC → USDT',
     description: 'Used when price oracle unavailable; 1 BNB = X USDT.',
   },
+  // PHAN 3: Withdrawal fraud detection config
+  {
+    key: 'fraud.withdrawal_daily_limit_usd',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'Withdrawal daily limit (USD)',
+    description:
+      'Maximum total withdrawal amount per user per day before requiring additional review.',
+  },
+  {
+    key: 'fraud.recent_wallet_link_hours',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.FINANCE,
+    name: 'Recent wallet link threshold (hours)',
+    description:
+      'Withdrawals from wallets linked within this window are flagged as high-risk.',
+  },
+  {
+    key: 'fraud.high_amount_threshold_usd',
+    type: ConfigDataType.FLOAT,
+    category: ConfigCategory.FINANCE,
+    name: 'High-amount threshold (USD)',
+    description: 'Withdrawal amounts above this value trigger high-risk flagging.',
+  },
+  // PHAN 4: Trading price manipulation config
+  {
+    key: 'trading.max_slippage_pct',
+    type: ConfigDataType.STRING,
+    category: ConfigCategory.FINANCE,
+    name: 'Max slippage percentage',
+    description:
+      'Maximum allowed deviation between trade price and market price (as percentage). Trades exceeding this are flagged.',
+  },
+  {
+    key: 'trading.price_stale_threshold_ms',
+    type: ConfigDataType.INTEGER,
+    category: ConfigCategory.FINANCE,
+    name: 'Price stale threshold (ms)',
+    description:
+      'Market price age in milliseconds beyond which price is considered stale for validation.',
+  },
 ];
 
 /** Full seed list: core + every `*_RPC_URL` from evm-chain-definitions + per-chain auto max (no duplicates). */

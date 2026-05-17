@@ -4,11 +4,12 @@ import * as bcrypt from 'bcryptjs';
 import { getPermissionsForRole } from '@/common/authz/rbac-policy';
 import { normalizeUserRole } from '@/common/authz/user-role.util';
 import type { BlockchainNetwork, Permission } from '@/common/enums';
-import { BadRequestException, BusinessException } from '@/common/exceptions';
+import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import { BlockchainProviderFactory } from '@/modules/blockchain/blockchain-provider.factory';
+import { LINKED_WALLET_REPOSITORY, type LinkedWalletRepositoryPort } from '@/modules/blockchain/domain/ports';
 import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 
@@ -27,7 +28,7 @@ export interface WalletAuthResult {
 export class WalletAuthService {
   private readonly logger = new Logger(WalletAuthService.name);
 
-  private static readonly NONCE_TTL = 300; // 5 phút
+  private static readonly NONCE_TTL = 300; // 5 phut
   private static readonly AUTH_NONCE_PREFIX = 'wallet:auth:nonce:';
 
   constructor(
@@ -38,10 +39,12 @@ export class WalletAuthService {
     private readonly cacheService: CacheService,
     private readonly providerFactory: BlockchainProviderFactory,
     private readonly jwtService: JwtService,
+    @Inject(LINKED_WALLET_REPOSITORY)
+    private readonly linkedWalletRepo: LinkedWalletRepositoryPort,
   ) {}
 
   /**
-   * Bước 1: Tạo nonce challenge cho wallet auth (chưa đăng nhập)
+   * Buoc 1: Tao nonce challenge cho wallet auth (chua dang nhap)
    */
   async requestNonce(
     chain: BlockchainNetwork,
@@ -55,13 +58,13 @@ export class WalletAuthService {
     );
     if (!isValid) {
       throw new BadRequestException(
-        `Địa chỉ ví không hợp lệ trên mạng ${chain}`,
+        `Dia chi vi khong hop le tren mang ${chain}`,
         'INVALID_ADDRESS',
       );
     }
 
     const nonce = newUuid();
-    const message = `Crypto Trading Platform - Xác thực đăng nhập\n\nNonce: ${nonce}\nChain: ${chain}\nAddress: ${address}\n\nKý message này để xác minh quyền sở hữu ví.`;
+    const message = `Crypto Trading Platform - Xac thuc dang nhap\n\nNonce: ${nonce}\nChain: ${chain}\nAddress: ${address}\n\nKy message nay de xac minh quyen so huu vi.`;
 
     const cacheKey = this.nonceKey(chain, address);
     await this.cacheService.set(cacheKey, { nonce, message }, WalletAuthService.NONCE_TTL);
@@ -75,7 +78,7 @@ export class WalletAuthService {
   }
 
   /**
-   * Bước 2: Xác minh chữ ký và đăng nhập hoặc đăng ký
+   * Buoc 2: Xac minh chu ky va dang nhap hoac dang ky
    */
   async verifyAndAuthenticate(
     chain: BlockchainNetwork,
@@ -89,7 +92,7 @@ export class WalletAuthService {
 
     if (!cached) {
       throw new BadRequestException(
-        'Nonce đã hết hạn hoặc không tồn tại. Vui lòng yêu cầu đăng nhập lại.',
+        'Nonce da het han hoac khong ton tai. Vui long yeu cau dang nhap lai.',
         'NONCE_EXPIRED',
       );
     }
@@ -97,7 +100,7 @@ export class WalletAuthService {
     const isValid = await provider.verifySignature(address, cached.message, signature);
     if (!isValid) {
       throw new BadRequestException(
-        'Chữ ký không hợp lệ. Vui lòng ký lại bằng ví đúng.',
+        'Chu ky khong hop le. Vui long ky lai bang vi dung.',
         'INVALID_SIGNATURE',
       );
     }
@@ -108,8 +111,8 @@ export class WalletAuthService {
   }
 
   /**
-   * Đăng nhập/đăng ký khi đã có message + chữ ký hợp lệ (không dùng nonce Redis),
-   * ví dụ flow WalletConnect public: message lưu trong session wc:auth:*.
+   * Dang nhap/dang ky khi da co message + chu ky hop le (khong dung nonce Redis),
+   * vi du flow WalletConnect public: message luu trong session wc:auth:*.
    */
   async verifyAndAuthenticateWithMessage(
     chain: BlockchainNetwork,
@@ -121,7 +124,7 @@ export class WalletAuthService {
 
     if (!provider.isValidAddress(address)) {
       throw new BadRequestException(
-        `Địa chỉ ví không hợp lệ trên mạng ${chain}`,
+        `Dia chi vi khong hop le tren mang ${chain}`,
         'INVALID_ADDRESS',
       );
     }
@@ -129,7 +132,7 @@ export class WalletAuthService {
     const isValid = await provider.verifySignature(address, message, signature);
     if (!isValid) {
       throw new BadRequestException(
-        'Chữ ký không hợp lệ. Vui lòng ký lại bằng ví đúng.',
+        'Chu ky khong hop le. Vui long ky lai bang vi dung.',
         'INVALID_SIGNATURE',
       );
     }
@@ -145,7 +148,7 @@ export class WalletAuthService {
 
     if (user) {
       if (user.status === 'BANNED') {
-        throw new BusinessException('Tài khoản đã bị khoá', 'ACCOUNT_BANNED');
+        throw new BusinessException('Tai khoan da bi khoa', 'ACCOUNT_BANNED');
       }
       const full = await this.usersRepository.findById(user.user_id);
       if (full) {
@@ -158,6 +161,22 @@ export class WalletAuthService {
         user: this.sanitizeUser(user),
         isNewUser: false,
       };
+    }
+
+    // CRITICAL: Check if this wallet is already linked to another user (global uniqueness).
+    // This prevents the bug where User A and User B both link the same wallet address,
+    // enabling double-withdrawal attacks.
+    const globallyLinked = await this.linkedWalletRepo.findVerifiedByChainAndAddress(chain, address);
+    if (globallyLinked) {
+      this.logger.warn(
+        `[WalletAuth] Duplicate wallet blocked: chain=${chain} address=${address} ` +
+          `already linked to userId=${globallyLinked.user_id}`,
+      );
+      throw new ConflictException(
+        'Dia chi vi nay da duoc lien ket voi tai khoan khac tren cung mang blockchain. ' +
+          'Vui long su dung dia chi vi khac hoac lien he ho tro.',
+        'WALLET_ALREADY_LINKED_BY_ANOTHER_USER',
+      );
     }
 
     const placeholderEmail = this.placeholderEmail(address, chain);

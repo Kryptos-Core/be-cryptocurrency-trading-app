@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ExchangeRateAuditLog } from '@/entities/exchange-rate-audit-log.entity';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
@@ -18,10 +18,10 @@ import { FiatRateProvider } from './providers/fiat-rate.provider';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ExchangeRateAuditLog]),
-    CurrenciesModule,
+    forwardRef(() => CurrenciesModule),
     DepositsModule,
     PaymentConfigModule,
-    UsersModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [ExchangeRateController],
   providers: [
@@ -39,6 +39,6 @@ import { FiatRateProvider } from './providers/fiat-rate.provider';
     SyncExchangeRateUseCase,
     UpdateExchangeRateConfigUseCase,
   ],
-  exports: [ExchangeRateService],
+  exports: [ExchangeRateService, CoinGeckoProvider],
 })
 export class ExchangeRateModule {}

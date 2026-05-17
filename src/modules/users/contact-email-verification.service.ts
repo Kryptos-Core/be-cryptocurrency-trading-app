@@ -3,11 +3,17 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
+import { ONCHAIN_TRANSACTION_REPOSITORY, type OnchainTransactionRepositoryPort } from '@/modules/blockchain/domain/ports';
 import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 
 /**
- * OTP gửi thẳng tới email mới để gắn email liên hệ cho tài khoản đăng nhập ví (email @*.wallet).
+ * OTP gui thang toi email moi de gan email lien he cho tai khoan dang nhap vi (email @*.wallet).
+ * Bao gom:
+ *   - OTP brute-force protection (5 attempts / 15 phut)
+ *   - Kiem tra withdrawal pending truoc khi cho doi email
+ *   - Gui thong bao toi email cu khi doi thanh cong
+ *   - Audit log cho compliance
  */
 @Injectable()
 export class ContactEmailVerificationService {
@@ -15,11 +21,17 @@ export class ContactEmailVerificationService {
   private readonly otpTtlSeconds = 300;
   private readonly cooldownSeconds = 30;
 
+  // OTP brute-force protection
+  private static readonly OTP_MAX_ATTEMPTS = 5;
+  private static readonly OTP_ATTEMPT_WINDOW_SEC = 15 * 60; // 15 phut
+
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: UsersRepositoryPort,
     private readonly cacheService: CacheService,
     private readonly mailService: MailService,
+    @Inject(ONCHAIN_TRANSACTION_REPOSITORY)
+    private readonly onchainTxRepo: OnchainTransactionRepositoryPort,
   ) {}
 
   private otpKey(userId: string, emailNormalized: string): string {
@@ -28,6 +40,10 @@ export class ContactEmailVerificationService {
 
   private cooldownKey(userId: string, emailNormalized: string): string {
     return `contact-email:cooldown:${userId}:${emailNormalized}`;
+  }
+
+  private otpAttemptKey(userId: string, emailNormalized: string): string {
+    return `contact-email:otp:attempts:${userId}:${emailNormalized}`;
   }
 
   private createOtpCode(): string {
@@ -41,18 +57,29 @@ export class ContactEmailVerificationService {
     }
     if (!isWalletPlaceholderEmail(user.email)) {
       throw new BadRequestException(
-        'Chỉ tài khoản đăng nhập ví (email tạm) mới dùng được bước này. Hãy dùng đổi email có xét duyệt trong Cài đặt.',
+        'Chi tai khoan dang nhap vi (email tam) moi dung duoc buoc nay. Hay dung doi email co xet duyet trong Cai dat.',
         'NOT_WALLET_PLACEHOLDER',
       );
     }
 
     const newEmail = newEmailRaw.toLowerCase().trim();
     if (isWalletPlaceholderEmail(newEmail)) {
-      throw new BadRequestException('Email không hợp lệ', 'INVALID_EMAIL');
+      throw new BadRequestException('Email khong hop le', 'INVALID_EMAIL');
     }
     const exists = await this.usersRepository.emailExists(newEmail, userId);
     if (exists) {
       throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
+    }
+
+    // Check OTP attempt counter for brute-force protection
+    const attemptKey = this.otpAttemptKey(userId, newEmail);
+    const attemptCount = await this.cacheService.get<number>(attemptKey);
+    if (attemptCount !== null && attemptCount >= ContactEmailVerificationService.OTP_MAX_ATTEMPTS) {
+      const ttl = await this.cacheService.getTtl(attemptKey);
+      throw new BadRequestException(
+        `Qua nhieu lan thu OTP. Vui long thu lai sau ${ttl > 0 ? ttl : ContactEmailVerificationService.OTP_ATTEMPT_WINDOW_SEC} giay.`,
+        'OTP_ATTEMPT_LIMIT_EXCEEDED',
+      );
     }
 
     const otpKey = this.otpKey(userId, newEmail);
@@ -70,7 +97,7 @@ export class ContactEmailVerificationService {
     if (cooldown) {
       const cooldownTtl = await this.cacheService.getTtl(cdKey);
       throw new BadRequestException(
-        `Vui lòng đợi ${cooldownTtl > 0 ? cooldownTtl : this.cooldownSeconds} giây trước khi gửi lại OTP.`,
+        `Vui long cho ${cooldownTtl > 0 ? cooldownTtl : this.cooldownSeconds} giay truoc khi gui lai OTP.`,
         'OTP_COOLDOWN',
       );
     }
@@ -89,32 +116,58 @@ export class ContactEmailVerificationService {
     userId: string,
     newEmailRaw: string,
     otpCode: string,
-  ): Promise<UserRecord> {
+  ): Promise<{ user: UserRecord; forceRelogin: boolean }> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
     }
     if (!isWalletPlaceholderEmail(user.email)) {
       throw new BadRequestException(
-        'Chỉ tài khoản đăng nhập ví (email tạm) mới dùng được bước này.',
+        'Chi tai khoan dang nhap vi (email tam) moi dung duoc buoc nay.',
         'NOT_WALLET_PLACEHOLDER',
       );
     }
 
     const newEmail = newEmailRaw.toLowerCase().trim();
     if (isWalletPlaceholderEmail(newEmail)) {
-      throw new BadRequestException('Email không hợp lệ', 'INVALID_EMAIL');
+      throw new BadRequestException('Email khong hop le', 'INVALID_EMAIL');
+    }
+
+    // Block email change if user has pending withdrawals (security: prevent address change during withdrawal)
+    const pendingWithdrawals = await this.onchainTxRepo.findPendingWithdrawals(999);
+    const userPendingWithdrawals = pendingWithdrawals.filter((w) => w.user_id === userId);
+    if (userPendingWithdrawals.length > 0) {
+      throw new ConflictException(
+        `Khong the thay doi email khi co ${userPendingWithdrawals.length} yeu cau rut tien dang cho xu ly. Vui long doi hoac huy yeu cau rut tien truoc.`,
+        'WITHDRAWAL_PENDING_EXISTS',
+      );
     }
 
     const otpKey = this.otpKey(userId, newEmail);
+
+    // Increment attempt counter for brute-force protection
+    const attemptKey = this.otpAttemptKey(userId, newEmail);
+    const attemptCount = ((await this.cacheService.get<number>(attemptKey)) ?? 0) + 1;
+    await this.cacheService.set(attemptKey, attemptCount, ContactEmailVerificationService.OTP_ATTEMPT_WINDOW_SEC);
+
+    if (attemptCount > ContactEmailVerificationService.OTP_MAX_ATTEMPTS) {
+      throw new BadRequestException(
+        `Qua nhieu lan thu OTP. Vui long cho 15 phut truoc khi thu lai.`,
+        'OTP_ATTEMPT_LIMIT_EXCEEDED',
+      );
+    }
+
     const cached = await this.cacheService.get<string | number>(otpKey);
     if (cached == null) {
-      throw new BadRequestException('Mã OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+      throw new BadRequestException('Ma OTP khong hop le hoac da het han', 'INVALID_OTP');
     }
     const cachedStr = String(cached).trim();
     const codeStr = String(otpCode).trim();
     if (cachedStr !== codeStr) {
-      throw new BadRequestException('Mã OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+      this.logger.warn(
+        `[ContactEmail] Invalid OTP attempt ${attemptCount}/${ContactEmailVerificationService.OTP_MAX_ATTEMPTS} for user=${userId} email=${newEmail}`,
+      );
+      throw new BadRequestException('Ma OTP khong hop le hoac da het han', 'INVALID_OTP');
     }
 
     const exists = await this.usersRepository.emailExists(newEmail, userId);
@@ -122,15 +175,38 @@ export class ContactEmailVerificationService {
       throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
     }
 
+    const oldEmail = user.email;
+
+    // Clear OTP and attempt counter after successful verification
     await this.cacheService.delete(otpKey);
+    await this.cacheService.delete(attemptKey);
     await this.cacheService.delete(this.cooldownKey(userId, newEmail));
 
     await this.usersRepository.update(userId, { email: newEmail });
     await this.usersRepository.setEmailVerified(userId, true);
+
+    // Send notification to old email (security best practice: alert user of account change)
+    try {
+      await this.mailService.sendEmailChangeNotification(oldEmail, newEmail, userId);
+    } catch (err) {
+      // Non-blocking: email notification failure should not roll back the email change
+      this.logger.warn(
+        `Failed to send email-change notification to old email ${oldEmail} for user=${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    this.logger.log(
+      `[ContactEmail] Email changed for user=${userId}: ${oldEmail} -> ${newEmail}`,
+    );
+
     const updated = await this.usersRepository.findById(userId);
     if (!updated) {
       throw new NotFoundException('User', userId);
     }
-    return updated;
+
+    // User must re-login to get a JWT with the new email claim
+    return { user: updated, forceRelogin: true };
   }
 }

@@ -368,6 +368,13 @@ export class SystemConfigService implements OnModuleInit {
         if (/^BLOCKCHAIN_DEPOSIT_[A-Z0-9]+_TO_USDT_RATE$/.test(key)) {
           return envOr(key, '0');
         }
+        // PHAN 3: Fraud config keys
+        if (key === 'fraud.withdrawal_daily_limit_usd') return envOr('FRAUD_WITHDRAWAL_DAILY_LIMIT_USD', '50000');
+        if (key === 'fraud.recent_wallet_link_hours') return envOr('FRAUD_RECENT_WALLET_LINK_HOURS', '24');
+        if (key === 'fraud.high_amount_threshold_usd') return envOr('FRAUD_HIGH_AMOUNT_THRESHOLD_USD', '10000');
+        // PHAN 4: Trading price manipulation keys
+        if (key === 'trading.max_slippage_pct') return envOr('TRADING_MAX_SLIPPAGE_PCT', '0.01');
+        if (key === 'trading.price_stale_threshold_ms') return envOr('TRADING_PRICE_STALE_THRESHOLD_MS', '300000');
         return '';
       }
     }

@@ -6,6 +6,7 @@ import { Wallet } from '@/entities/wallet.entity';
 import { WalletLedger } from '@/entities/wallet-ledger.entity';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { ExchangeModule } from '@/modules/exchange/exchange.module';
+import { PriceOracleModule } from '@/modules/price-oracle/price-oracle.module';
 import {
   GetAdminAdjustmentHistoryQuery,
   GetBalanceQuery,
@@ -45,8 +46,9 @@ import { WalletsService } from './wallets.service';
   imports: [
     TypeOrmModule.forFeature([Wallet, WalletLedger, AdminWalletAdjustment]),
     forwardRef(() => OutboxModule),
-    CurrenciesModule,
+    forwardRef(() => CurrenciesModule),
     ExchangeModule,
+    PriceOracleModule,
   ],
   providers: [
     { provide: WALLET_REPOSITORY, useClass: WalletRepositoryImpl },

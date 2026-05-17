@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { PaymentConfigModule } from '@/modules/payment-config/payment-config.module';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
@@ -27,7 +27,7 @@ import { FiatDepositRepository } from './repositories/fiat-deposit.repository';
  * until Phase 4.2 fully decomposes the service into atomic use-cases.
  */
 @Module({
-  imports: [WalletsModule, CurrenciesModule, PaymentConfigModule],
+  imports: [forwardRef(() => WalletsModule), forwardRef(() => CurrenciesModule), PaymentConfigModule],
   controllers: [DepositsController, PayosRedirectController],
   providers: [
     FiatDepositRepository,

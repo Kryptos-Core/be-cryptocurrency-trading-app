@@ -17,7 +17,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     const config = getRedisConfig(this.configService);
 
     // Main client for general operations
@@ -113,23 +113,38 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get Redis client for general operations
+   * Get Redis client for general operations (lazy-initialized on first access).
    */
   getClient(): Redis {
+    if (!this.client) {
+      const config = getRedisConfig(this.configService);
+      this.client = new Redis(config);
+      this.setupEventHandlers(this.client, 'Client');
+    }
     return this.client;
   }
 
   /**
-   * Get subscriber client for pub/sub
+   * Get subscriber client for pub/sub (lazy-initialized on first access).
    */
   getSubscriber(): Redis {
+    if (!this.subscriber) {
+      const config = getRedisConfig(this.configService);
+      this.subscriber = new Redis(config);
+      this.setupEventHandlers(this.subscriber, 'Subscriber');
+    }
     return this.subscriber;
   }
 
   /**
-   * Get publisher client for pub/sub
+   * Get publisher client for pub/sub (lazy-initialized on first access).
    */
   getPublisher(): Redis {
+    if (!this.publisher) {
+      const config = getRedisConfig(this.configService);
+      this.publisher = new Redis(config);
+      this.setupEventHandlers(this.publisher, 'Publisher');
+    }
     return this.publisher;
   }
 

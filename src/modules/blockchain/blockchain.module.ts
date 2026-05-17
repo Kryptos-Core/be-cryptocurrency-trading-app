@@ -81,7 +81,7 @@ import { WalletConnectSessionManager } from './wallet-connect/wallet-connect-ses
     TypeOrmModule.forFeature([LinkedWallet, OnchainTransaction, DepositMatchRequest]),
     forwardRef(() => OutboxModule),
     forwardRef(() => WalletsModule),
-    CurrenciesModule,
+    forwardRef(() => CurrenciesModule),
     ManagedWalletsModule,
     TreasuryModule,
     PaymentConfigModule,

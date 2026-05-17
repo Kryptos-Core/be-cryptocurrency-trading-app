@@ -17,7 +17,7 @@ export const getRedisConfig = (configService: ConfigService): RedisOptions => {
     },
     maxRetriesPerRequest: 3,
     enableReadyCheck: true,
-    enableOfflineQueue: false,
+    enableOfflineQueue: true,
     connectTimeout: 10000,
     lazyConnect: false, // Auto-connect on instantiation
   };

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RedisModule } from '@/modules/redis/redis.module';
 import { SystemConfig } from '@/entities/system-config.entity';
 import { GetAllConfigsQuery, GetRuntimeSettingsQuery } from './application/queries';
 import { UpdateConfigsBulkUseCase, UpdateConfigUseCase } from './application/use-cases';
@@ -9,7 +10,7 @@ import { SystemConfigController } from './system-config.controller';
 import { SystemConfigService } from './system-config.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SystemConfig])],
+  imports: [TypeOrmModule.forFeature([SystemConfig]), RedisModule],
   controllers: [SystemConfigController],
   providers: [
     // Infrastructure

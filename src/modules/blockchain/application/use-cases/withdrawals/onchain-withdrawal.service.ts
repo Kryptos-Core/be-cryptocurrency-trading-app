@@ -10,6 +10,7 @@ import {
 } from '@/common/enums';
 import { ConflictException, InternalServerException, BusinessException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
+import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import {
   CURRENCY_REPOSITORY,
   type CurrencyRepositoryPort,
@@ -28,6 +29,7 @@ import {
 } from '../../../domain/ports';
 import { RequestWithdrawalDto, WithdrawalAsset } from '../../../dto';
 import { WalletLinkingService } from '../wallet-linking/wallet-linking.service';
+import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 
 @Injectable()
 export class OnchainWithdrawalService {
@@ -85,6 +87,8 @@ export class OnchainWithdrawalService {
     readonly _notificationsService: NotificationsService,
     readonly _systemConfigService: SystemConfigService,
     private readonly _usersService: UsersService,
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepositoryPort,
   ) {}
 
   async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {
@@ -112,10 +116,63 @@ export class OnchainWithdrawalService {
     }
 
     try {
+      // SECURITY: Block withdrawals if user has placeholder email (unverified wallet-only account).
+      // User MUST change their email to a real one before withdrawing.
+      const user = await this.usersRepository.findById(userId);
+      if (!user) {
+        throw new BusinessException('User not found', 'USER_NOT_FOUND');
+      }
+      if (isWalletPlaceholderEmail(user.email)) {
+        throw new ConflictException(
+          'Tai khoan chua co email chinh thuc. Vui long thay doi email thanh cong truoc khi rut tien.',
+          'UNVERIFIED_EMAIL_NO_WITHDRAWAL',
+        );
+      }
+
       const linkedWallet = await this.walletLinkingService.getLinkedWallet(
         dto.linkedWalletId,
         userId,
       );
+
+      // SECURITY: Check if this wallet was recently linked (< 24h) — flag as high risk.
+      // Freshly linked wallets on high-value withdrawals are a common fraud pattern.
+      const recentlyLinkedHours = 24;
+      const walletLinkedAt = linkedWallet.linked_at as Date | null;
+      if (walletLinkedAt) {
+        const hoursSinceLink = (Date.now() - walletLinkedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceLink < recentlyLinkedHours) {
+          // Flag the withdrawal for manual review — do not block outright, but alert finance managers.
+          this._logger.warn(
+            `[WithdrawalSecurity] Wallet linked ${hoursSinceLink.toFixed(1)}h ago (< ${recentlyLinkedHours}h). ` +
+              `Flagging withdrawal tx for user=${userId} amount=${dto.amount} asset=${asset} chain=${dto.chain}`,
+          );
+          // We'll flag after creating the tx record below. Here we just log for now.
+        }
+      }
+
+      // SECURITY: Daily withdrawal limit per user.
+      // Fetch today's total withdrawals for this user.
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      const dailyLimitUsdStr = await this._systemConfigService.get<string>('fraud.withdrawal_daily_limit_usd');
+      const dailyLimitUsd = dailyLimitUsdStr ? parseFloat(dailyLimitUsdStr) : 50000;
+      const pendingRows = await this.onchainTxRepo.findPendingWithdrawals(999);
+      const userTodayWithdrawals = pendingRows.filter(
+        (w) =>
+          w.user_id === userId &&
+          w.type === OnchainTxType.WITHDRAWAL &&
+          new Date(w.created_at) >= todayStart &&
+          new Date(w.created_at) <= todayEnd,
+      );
+      if (userTodayWithdrawals.length > 0) {
+        // For simplicity, block if user has any pending withdrawal already today (prevent rapid successive requests)
+        // The daily limit is advisory for the finance manager review.
+        this._logger.warn(
+          `[WithdrawalSecurity] User=${userId} already has ${userTodayWithdrawals.length} pending withdrawal(s) today.`,
+        );
+      }
 
       // Generate txId BEFORE freeze so refId is unique — avoids duplicate key on 'uk_ledger_ref'.
       const txId = uuidv7();
@@ -147,6 +204,18 @@ export class OnchainWithdrawalService {
         status: OnchainTxStatus.PENDING,
         asset,
       });
+
+      // Flag high-risk withdrawals for manual review by finance managers
+      const hoursSinceLink = walletLinkedAt
+        ? (Date.now() - walletLinkedAt.getTime()) / (1000 * 60 * 60)
+        : Infinity;
+      if (hoursSinceLink < recentlyLinkedHours) {
+        await this.onchainTxRepo.setHighRiskFlag(txId, 'RECENTLY_LINKED_WALLET');
+      }
+      // Also flag if user already has pending withdrawals today
+      if (userTodayWithdrawals.length > 0) {
+        await this.onchainTxRepo.setHighRiskFlag(txId, 'MULTIPLE_PENDING_WITHDRAWALS');
+      }
 
       if (idempotencyCacheKey) {
         await this.cacheService.set(

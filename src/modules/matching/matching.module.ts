@@ -3,7 +3,9 @@ import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule } from '@/common/outbox/outbox.module';
 import { TradeAuditLog } from '@/entities/trade-audit-log.entity';
+import { ExchangeRateModule } from '@/modules/exchange-rate/exchange-rate.module';
 import { ORDER_MATCHING_GATEWAY } from '@/modules/orders/domain/ports/order-matching-gateway.port';
+import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import {
   EnqueueMatchUseCase,
   MatchingShadowReconciliationUseCase,
@@ -20,6 +22,7 @@ import {
   OrderBookService,
   PriceTimePriorityStrategy,
   SellQueueService,
+  TradingPriceValidatorService,
 } from './domain/services';
 import { OrderMatchingGatewayAdapter } from './infrastructure/adapters';
 import { AuditTradeVisitor, MetricsTradeVisitor } from './infrastructure/observers';
@@ -31,6 +34,8 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
     TypeOrmModule.forFeature([TradeAuditLog]),
     forwardRef(() => OutboxModule),
     BullModule.registerQueue({ name: MATCHING_QUEUE }),
+    SystemConfigModule,
+    ExchangeRateModule,
   ],
   providers: [
     BuyQueueService,
@@ -43,6 +48,7 @@ import { MATCHING_QUEUE, MatchingProcessor, MatchingQueueService } from './infra
     AuditTradeVisitor,
     MetricsTradeVisitor,
     CircuitBreakerService,
+    TradingPriceValidatorService,
     MatchingService,
     MatchingQueueService,
     EnqueueMatchUseCase,

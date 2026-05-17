@@ -79,4 +79,25 @@ export class MailService {
 
     await this.sendEmailWithDevFallback(toEmail, subject, text, 'OTP');
   }
+
+  /**
+   * Gui thong bao toi email cu khi nguoi dung thay doi email thanh cong.
+   * Tien trinh bao mat: nguoi dung biet ngay lap tuc neu co ai do dang thay doi tai khoan.
+   */
+  async sendEmailChangeNotification(
+    oldEmail: string,
+    newEmail: string,
+    userId: string,
+  ): Promise<void> {
+    const subject = 'Thong bao thay doi email / Email Change Notification';
+    const text =
+      `Email tai khoan Crypto Trading Platform cua ban da duoc thay doi.\n\n` +
+      `Email cu: ${oldEmail}\n` +
+      `Email moi: ${newEmail}\n\n` +
+      `Neu ban khong thuc hien thay doi nay, vui long lien he ho tro ngay lap tuc de bao mat tai khoan.\n\n` +
+      `--\n` +
+      `Crypto Trading Platform`;
+
+    await this.sendEmailWithDevFallback(oldEmail, subject, text, 'Email-change notification');
+  }
 }

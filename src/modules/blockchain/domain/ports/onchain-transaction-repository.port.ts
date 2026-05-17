@@ -1,7 +1,6 @@
 import type { TransactionContext } from '@/common/types/transaction-context';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain/contracts';
 
-/** DTO dùng trong read-model của user (getTransactions, getTransactionById) */
 export interface OnchainTxRowDto {
   txId: string;
   chain: string;
@@ -17,11 +16,9 @@ export interface OnchainTxRowDto {
   creditedAmount: string | null;
   creditedCurrencyId: string | null;
   conversionRate: string | null;
-  /** Asset type: NATIVE (TRX/ETH/SOL) or USDT_TRC20 (Tron only) */
   asset?: string;
 }
 
-/** DTO dùng trong admin read-model (getAdminWithdrawals) */
 export interface AdminWithdrawalRowDto extends OnchainTxRowDto {
   userId: string;
   userEmail: string | null;
@@ -29,20 +26,17 @@ export interface AdminWithdrawalRowDto extends OnchainTxRowDto {
   userLastName: string | null;
 }
 
-/** DTO admin single withdrawal detail (getAdminWithdrawalById) */
 export interface AdminWithdrawalDetailDto extends AdminWithdrawalRowDto {
   linkedWalletId: string | null;
   userWalletBalance: string | null;
 }
 
-/** DTO dùng trong admin read-model (getAdminUnmatchedDeposits) — user_id có thể null */
 export interface AdminUnmatchedDepositRowDto extends OnchainTxRowDto {
   userId: string | null;
   pendingMatchId: string | null;
   pendingMatchRequestedUserId: string | null;
 }
 
-/** Bộ lọc cho admin withdrawal list */
 export interface AdminWithdrawalFilters {
   userId?: string;
   status?: string;
@@ -54,7 +48,6 @@ export interface AdminWithdrawalFilters {
   limit?: number;
 }
 
-/** Bộ lọc cho admin unmatched deposits list */
 export interface AdminUnmatchedDepositFilters {
   chain?: string;
   search?: string;
@@ -64,10 +57,6 @@ export interface AdminUnmatchedDepositFilters {
   limit?: number;
 }
 
-/**
- * Port: Onchain Transaction Repository
- * Domain-level abstraction for on-chain transaction persistence.
- */
 export interface OnchainTransactionRepositoryPort {
   findByChainAndTxHash(
     chain: string,
@@ -91,7 +80,6 @@ export interface OnchainTransactionRepositoryPort {
     data: Partial<BlockchainOnchainTransactionRecord>,
   ): Promise<BlockchainOnchainTransactionRecord>;
 
-  /** Insert onchain row inside an existing DB transaction (same connection as outbox / wallet). */
   createWithinTransaction(
     ctx: TransactionContext,
     data: Partial<BlockchainOnchainTransactionRecord>,
@@ -110,13 +98,10 @@ export interface OnchainTransactionRepositoryPort {
 
   findPendingWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
-  /** Cập nhật thông tin credit sau khi ví được nạp thành công. */
   updateCreditInfo(txId: string, creditTxId: string, creditedAt: Date): Promise<void>;
 
-  /** Tìm transaction theo txId (không cần userId — dùng cho internal/admin flow). */
   findById(txId: string): Promise<BlockchainOnchainTransactionRecord | null>;
 
-  /** Cập nhật thông tin quy đổi (credited_currency_id, credited_amount, conversion_rate). */
   updateCreditConversion(
     txId: string,
     creditCurrencyId: string,
@@ -132,7 +117,6 @@ export interface OnchainTransactionRepositoryPort {
     conversionRate: string,
   ): Promise<void>;
 
-  /** Cập nhật sau khi admin approve manual withdrawal (gán txHash, fromAddress, status). */
   updateAfterManualApproval(
     txId: string,
     txHash: string | null,
@@ -141,16 +125,12 @@ export interface OnchainTransactionRepositoryPort {
     confirmedAt: Date | null,
   ): Promise<void>;
 
-  /** Tìm pending withdrawal chưa có txHash (manual review queue). */
   findPendingManualWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
-  /** Tìm withdrawals đang ở trạng thái CONFIRMING (cần check on-chain confirmations). */
   findConfirmingWithdrawals(limit: number): Promise<BlockchainOnchainTransactionRecord[]>;
 
-  /** Mark withdrawals stuck in CONFIRMING without tx_hash as FAILED. */
   markOrphanConfirmingAsFailed(): Promise<number>;
 
-  /** Gán user_id cho UNMATCHED onchain_transaction (admin match-user flow). */
   setMatchedUser(
     ctx: TransactionContext,
     txId: string,
@@ -158,32 +138,27 @@ export interface OnchainTransactionRepositoryPort {
     status: string,
   ): Promise<void>;
 
-  // ─── Read-model queries (cho OnchainTransferQueryService) ─────────────
-
-  /** Lấy lịch sử giao dịch on-chain của user (read-model, không có pagination đầy đủ) */
   listByUser(userId: string, limit: number): Promise<OnchainTxRowDto[]>;
 
-  /** Lấy chi tiết 1 giao dịch theo txId + userId */
   getByIdAndUser(userId: string, txId: string): Promise<OnchainTxRowDto | null>;
 
-  /** Danh sách withdrawal cho admin (có join user, filter) */
   listAdminWithdrawals(
     filters: AdminWithdrawalFilters,
   ): Promise<{ data: AdminWithdrawalRowDto[]; total: number; page: number; limit: number }>;
 
-  /** Chi tiết 1 withdrawal cho admin (có join user, có wallet balance) */
   getAdminWithdrawalDetail(txId: string): Promise<AdminWithdrawalDetailDto | null>;
 
-  /** Thống kê pending withdrawal theo chain */
   getWithdrawalStats(): Promise<{
     pendingCount: number;
     pendingTotalByChain: Record<string, string>;
   }>;
 
-  /** Danh sách UNMATCHED deposits cho admin (có join pending match request) */
   listAdminUnmatchedDeposits(
     filters: AdminUnmatchedDepositFilters,
   ): Promise<{ data: AdminUnmatchedDepositRowDto[]; total: number; page: number; limit: number }>;
+
+  /** Dat high-risk flag tren mot giao dich (fraud detection). */
+  setHighRiskFlag(txId: string, flag: string): Promise<void>;
 }
 
 export const ONCHAIN_TRANSACTION_REPOSITORY = Symbol('ONCHAIN_TRANSACTION_REPOSITORY');

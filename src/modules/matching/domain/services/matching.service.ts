@@ -16,6 +16,7 @@ import { marketOrderCanFullyFillRemaining } from '../../utils/market-fok-fill.ut
 import { MATCHING_REPOSITORY, type MatchingRepositoryPort } from '../ports';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { OrderBookService } from './orderbook';
+import { TradingPriceValidatorService } from './trading-price-validator.service';
 import { MarketOrderStrategy } from './strategies/market-order.strategy';
 import { PriceTimePriorityStrategy } from './strategies/price-time-priority.strategy';
 
@@ -55,6 +56,7 @@ export class MatchingService implements OnModuleInit {
     private readonly metricsVisitor: MetricsTradeVisitor,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly configService: ConfigService,
+    private readonly priceValidator: TradingPriceValidatorService,
   ) {}
 
   onModuleInit(): void {
@@ -144,6 +146,25 @@ export class MatchingService implements OnModuleInit {
       };
 
       const executeTrade: TradeExecutor = async (makerOrder, fillAmount, price) => {
+        // SECURITY: Validate trade price against real-time market to prevent manipulation.
+        // This guards against an attacker placing stale limit orders to trap market orders
+        // at manipulated prices far from the real market rate.
+        const priceValidation = await this.priceValidator.validate(pairId, price, takerOrder.side);
+        if (!priceValidation.valid) {
+          this.logger.warn(
+            `[MatchingService] Trade blocked: price deviation too high. ` +
+              `pair=${pairId} price=${price} market=${priceValidation.marketPrice} ` +
+              `deviation=${priceValidation.deviationPct}% max=${priceValidation.maxAllowedPct}%`,
+          );
+          return null;
+        }
+        if (priceValidation.stale) {
+          this.logger.warn(
+            `[MatchingService] Trade with stale market price: pair=${pairId} ` +
+              `market=${priceValidation.marketPrice} price=${price} staleMs=${priceValidation.staleMs}`,
+          );
+        }
+
         const SCALE = 10n ** BigInt(DEFAULT_SCALE);
         const fillBu = toBaseUnits(fillAmount, DEFAULT_SCALE);
         const priceBu = toBaseUnits(price, DEFAULT_SCALE);

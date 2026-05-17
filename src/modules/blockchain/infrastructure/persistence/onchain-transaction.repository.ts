@@ -515,6 +515,13 @@ export class OnchainTransactionRepository implements OnchainTransactionRepositor
     return { data, total, page, limit };
   }
 
+  async setHighRiskFlag(txId: string, flag: string): Promise<void> {
+    await this.dataSource.query(
+      pg(`UPDATE onchain_transactions SET high_risk_flag = ?, risk_flags_set_at = NOW() WHERE tx_id = ?`),
+      [flag, txId],
+    );
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────
 
   private mapTxRow(r: Record<string, unknown>): OnchainTxRowDto {

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CurrenciesModule } from '@/modules/currencies/currencies.module';
 import { MarketsModule } from '@/modules/markets/markets.module';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
@@ -12,7 +12,7 @@ import { DashboardService } from './dashboard.service';
  * RedisService is globally available via @Global() RedisModule — no explicit import needed.
  */
 @Module({
-  imports: [CurrenciesModule, MarketsModule, WalletsModule],
+  imports: [forwardRef(() => CurrenciesModule), forwardRef(() => MarketsModule), forwardRef(() => WalletsModule)],
   controllers: [DashboardController],
   providers: [DashboardService, GetDashboardSummaryQuery],
 })

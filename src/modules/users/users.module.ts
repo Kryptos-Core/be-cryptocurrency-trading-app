@@ -18,13 +18,15 @@ import { UploadAvatarUseCase } from './application/use-cases/upload-avatar.use-c
 import { ContactEmailVerificationService } from './contact-email-verification.service';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
+import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
     forwardRef(() => AuthModule),
     forwardRef(() => OrdersModule),
-    WalletsModule,
+    forwardRef(() => WalletsModule),
+    forwardRef(() => BlockchainModule),
   ],
   providers: [
     UsersService,

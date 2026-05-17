@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WalletEncryptionService } from '@/common/services';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
@@ -21,9 +21,9 @@ import { TreasuryE2EConfigService } from './treasury-e2e-config.service';
 
 @Module({
   imports: [
-    AuthModule,
-    UsersModule,
-    BlockchainModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => UsersModule),
+    forwardRef(() => BlockchainModule),
     TypeOrmModule.forFeature([TreasuryE2EConfig, IntegrationOutbox]),
   ],
   controllers: [TreasuryE2EConfigController],
