@@ -6,8 +6,9 @@ import { RedisService } from '@/common/services/redis.service';
 import { withDistributedLock } from '@/common/utils/redis-distributed-lock';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { MetricsService } from '@/telemetry/metrics.service';
-import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
+import { OUTBOX_DLQ_PUBLISHER, OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
 import type { OutboxEventPublisher } from './outbox-event-publisher.port';
+import { OutboxDlqPublisher } from './kafka-outbox-dlq-publisher.service';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { OUTBOX_RELAY_SUPPORTED_EVENT_TYPES } from './outbox-relay-supported-event-types';
 
@@ -40,6 +41,8 @@ export class OutboxRelayService {
     @Inject(OUTBOX_EVENT_PUBLISHER)
     private readonly outboxPublisher: OutboxEventPublisher,
     private readonly metricsService: MetricsService,
+    @Inject(OUTBOX_DLQ_PUBLISHER)
+    private readonly dlqPublisher: OutboxDlqPublisher,
   ) {
     this.maxAttempts = Math.max(
       1,
@@ -53,6 +56,7 @@ export class OutboxRelayService {
 
   async flushOnce(): Promise<{ published: number }> {
     const tracer = trace.getTracer('be-cryptocurrency-trading-app');
+    const startMs = Date.now();
     let published = 0;
     await withDistributedLock(
       this.redisService,
@@ -64,6 +68,9 @@ export class OutboxRelayService {
       async () => {
         published = await tracer.startActiveSpan('OutboxRelay.flushOnce', async (span) => {
           try {
+            span.setAttribute('outbox.lock_ttl_seconds', OUTBOX_RELAY_LOCK_TTL_SECONDS);
+            span.setAttribute('outbox.max_rows_per_flush', MAX_ROWS_PER_FLUSH);
+
             for (let i = 0; i < MAX_ROWS_PER_FLUSH; i++) {
               try {
                 const step = await this.dataSource.transaction(async (em) => {
@@ -113,9 +120,6 @@ export class OutboxRelayService {
                     row.next_retry_at = null;
                     row.dead_lettered_at = null;
                     this.metricsService.incrementOutboxRelayPublished(row.event_type);
-                    // this.logger.debug(
-                    //   `Outbox relayed id=${row.id} event_type=${row.event_type} attempts=${row.publish_attempts}`,
-                    // );
                   } catch (err) {
                     throw new OutboxRelayRowFailure(row, err as Error);
                   }
@@ -132,8 +136,13 @@ export class OutboxRelayService {
               } catch (err) {
                 if (err instanceof OutboxRelayRowFailure) {
                   const error = err.causeError;
-                  this.applyFailureMetadata(err.row, error);
+                  const deadLettered = this.applyFailureMetadata(err.row, error);
                   await this.persistFailureState(err.row);
+
+                  if (deadLettered) {
+                    await this.publishToDlq(err.row, error);
+                  }
+
                   this.logger.error(
                     `Outbox sync/publish failed id=${err.row.id} event_type=${err.row.event_type}: ${error.message}`,
                     error.stack,
@@ -148,6 +157,8 @@ export class OutboxRelayService {
                 break;
               }
             }
+
+            span.setAttribute('outbox.rows_published', published);
             return published;
           } finally {
             span.end();
@@ -177,10 +188,17 @@ export class OutboxRelayService {
       await this.updateOperationalMetrics();
     }
 
+    const durationMs = Date.now() - startMs;
+    this.metricsService.recordOutboxFlushDuration(durationMs);
+
     return { published };
   }
 
-  private applyFailureMetadata(row: IntegrationOutbox, error: Error): void {
+  /**
+   * Apply failure metadata to a row after a publish/sync failure.
+   * @returns true if the row was moved to dead-letter state
+   */
+  private applyFailureMetadata(row: IntegrationOutbox, error: Error): boolean {
     row.last_publish_error = error.message;
     this.metricsService.incrementOutboxRelayFailure(row.event_type);
 
@@ -188,12 +206,28 @@ export class OutboxRelayService {
       row.dead_lettered_at = new Date();
       row.next_retry_at = null;
       this.metricsService.incrementOutboxRelayDeadLettered(row.event_type);
-      return;
+      return true;
     }
 
     row.dead_lettered_at = null;
     row.next_retry_at = new Date(Date.now() + this.computeRetryDelayMs(row.publish_attempts));
     this.metricsService.incrementOutboxRelayRetryScheduled(row.event_type);
+    return false;
+  }
+
+  /**
+   * Publish a dead-lettered row to the Kafka DLQ topic.
+   * Errors are logged but never re-thrown — DLQ publish failure must not
+   * block the normal relay loop.
+   */
+  private async publishToDlq(row: IntegrationOutbox, error: Error): Promise<void> {
+    try {
+      await this.dlqPublisher.publishDlq(row, error);
+    } catch (dlqError) {
+      this.logger.error(
+        `DLQ publish failed for row=${row.id} event_type=${row.event_type}: ${(dlqError as Error).message}`,
+      );
+    }
   }
 
   private async persistFailureState(row: IntegrationOutbox): Promise<void> {

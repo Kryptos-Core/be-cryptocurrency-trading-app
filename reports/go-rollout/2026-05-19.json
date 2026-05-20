@@ -1,0 +1,108 @@
+[
+  {
+    "reportAt": "2026-05-19T16:22:05.325Z",
+    "actorUserId": "tester",
+    "report": {
+      "checkedAt": "2026-05-19T16:22:05.325Z",
+      "windowHours": 24,
+      "flags": {
+        "tickerSource": "nestjs",
+        "matchingEngine": "ts",
+        "publicWsSource": "nestjs",
+        "canaryPairs": [],
+        "monitorPairs": []
+      },
+      "thresholds": {
+        "minMatchRatePercent": 99.9,
+        "maxUnmatchedRuns": 0,
+        "maxPublicWsDriftPairs": 0,
+        "minPublicWsComparedPairs": 0,
+        "rollbackDrillMaxAgeHours": 10000
+      },
+      "marketReadModel": {
+        "status": "up",
+        "lag": {
+          "trades": 0,
+          "tickers": 0,
+          "ohlcv": 0
+        }
+      },
+      "publicWs": {
+        "contractValid": true,
+        "comparedPairs": 0,
+        "driftPairs": 0
+      },
+      "phase5ParityGate": {
+        "pass": true,
+        "comparedPairs": 0,
+        "driftPairs": 0,
+        "minComparedPairs": 0,
+        "maxDriftPairs": 0
+      },
+      "rollbackDrill": {
+        "latest": null,
+        "withinSla": false
+      },
+      "matchingShadow": {
+        "pairResults": []
+      },
+      "ready": false,
+      "blockers": [
+        "rollback_drill_stale_or_missing"
+      ]
+    }
+  },
+  {
+    "reportAt": "2026-05-19T16:28:35.990Z",
+    "actorUserId": "tester",
+    "report": {
+      "checkedAt": "2026-05-19T16:28:35.990Z",
+      "windowHours": 24,
+      "flags": {
+        "tickerSource": "nestjs",
+        "matchingEngine": "ts",
+        "publicWsSource": "nestjs",
+        "canaryPairs": [],
+        "monitorPairs": []
+      },
+      "thresholds": {
+        "minMatchRatePercent": 99.9,
+        "maxUnmatchedRuns": 0,
+        "maxPublicWsDriftPairs": 0,
+        "minPublicWsComparedPairs": 0,
+        "rollbackDrillMaxAgeHours": 10000
+      },
+      "marketReadModel": {
+        "status": "up",
+        "lag": {
+          "trades": 0,
+          "tickers": 0,
+          "ohlcv": 0
+        }
+      },
+      "publicWs": {
+        "contractValid": true,
+        "comparedPairs": 0,
+        "driftPairs": 0
+      },
+      "phase5ParityGate": {
+        "pass": true,
+        "comparedPairs": 0,
+        "driftPairs": 0,
+        "minComparedPairs": 0,
+        "maxDriftPairs": 0
+      },
+      "rollbackDrill": {
+        "latest": null,
+        "withinSla": false
+      },
+      "matchingShadow": {
+        "pairResults": []
+      },
+      "ready": false,
+      "blockers": [
+        "rollback_drill_stale_or_missing"
+      ]
+    }
+  }
+]

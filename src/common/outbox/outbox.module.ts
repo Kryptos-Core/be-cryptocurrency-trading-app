@@ -1,5 +1,5 @@
 import { BullModule } from '@nestjs/bull';
-import { forwardRef, Module } from '@nestjs/common';
+import { forwardRef, Inject, Module, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketOhlcvReadModelSyncApplierService } from '@/common/read-model/market-ohlcv-read-model-sync-applier.service';
@@ -18,17 +18,23 @@ import { ReadOnchainDeposit } from '@/entities/read-onchain-deposit.entity';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { RedisModule } from '@/modules/redis/redis.module';
 import { SystemConfigModule } from '@/modules/system-config/system-config.module';
-import { TelemetryModule } from '@/telemetry';
+import { MetricsService, TelemetryModule } from '@/telemetry';
 import {
   KafkaOutboxEventPublisher,
   KafkaOutboxEventPublisherDriver,
 } from './kafka-outbox-event-publisher.service';
+import { KafkaProducerCircuitBreakerService } from './kafka-producer-circuit-breaker.service';
+import {
+  KafkaOutboxDlqPublisher,
+  NoopOutboxDlqPublisher,
+} from './kafka-outbox-dlq-publisher.service';
 import {
   NoopOutboxEventPublisher,
   NoopOutboxEventPublisherDriver,
 } from './noop-outbox-event-publisher.service';
 import {
   DEFAULT_OUTBOX_EVENT_PUBLISHER_DRIVER,
+  OUTBOX_DLQ_PUBLISHER,
   OUTBOX_EVENT_PUBLISHER,
   OUTBOX_RELAY_QUEUE,
 } from './outbox.constants';
@@ -44,7 +50,9 @@ import { OutboxRelayAlertingCollectorService } from './outbox-relay-alerting-col
 import { OutboxReplayAuditService } from './outbox-replay-audit.service';
 import { ProcessedIntegrationEventsService } from './processed-integration-events.service';
 import { ProjectionConsumerRunnerService } from './projection-consumer-runner.service';
-import { CircuitBreakerRegistry } from './circuit-breaker';
+
+/** Internal token: raw inner publisher before circuit breaker wrapping. */
+const OUTBOX_INNER_PUBLISHER = Symbol('OUTBOX_INNER_PUBLISHER');
 
 @Module({
   imports: [
@@ -79,13 +87,14 @@ import { CircuitBreakerRegistry } from './circuit-breaker';
     OutboxRelayEnqueueScheduler,
     OutboxReplayAuditService,
     MarketPairReadModelProjectionHandler,
+    // Publisher drivers
     NoopOutboxEventPublisher,
     NoopOutboxEventPublisherDriver,
     KafkaOutboxEventPublisher,
     KafkaOutboxEventPublisherDriver,
-    ProjectionConsumerRunnerService,
+    // OUTBOX_INNER_PUBLISHER: factory selects raw publisher by driver name (no CB yet)
     {
-      provide: OUTBOX_EVENT_PUBLISHER,
+      provide: OUTBOX_INNER_PUBLISHER,
       inject: [ConfigService, NoopOutboxEventPublisherDriver, KafkaOutboxEventPublisherDriver],
       useFactory: async (
         configService: ConfigService,
@@ -108,8 +117,46 @@ import { CircuitBreakerRegistry } from './circuit-breaker';
         return matched.create();
       },
     },
+    // OUTBOX_EVENT_PUBLISHER: wraps inner publisher with circuit breaker (breaks circular dep)
+    {
+      provide: OUTBOX_EVENT_PUBLISHER,
+      inject: [MetricsService, OUTBOX_INNER_PUBLISHER as symbol],
+      useFactory: (
+        metricsService: MetricsService,
+        innerPublisher: OutboxEventPublisher,
+      ): OutboxEventPublisher => {
+        return new KafkaProducerCircuitBreakerService(innerPublisher, metricsService);
+      },
+    },
+    // DLQ publishers (Phase 6)
+    KafkaOutboxDlqPublisher,
+    NoopOutboxDlqPublisher,
+    // OUTBOX_DLQ_PUBLISHER: factory selects Kafka or noop based on KAFKA_DLQ_TOPIC_ENABLED
+    {
+      provide: OUTBOX_DLQ_PUBLISHER,
+      inject: [ConfigService, KafkaOutboxDlqPublisher, NoopOutboxDlqPublisher],
+      useFactory: (
+        configService: ConfigService,
+        kafkaDlq: KafkaOutboxDlqPublisher,
+        noopDlq: NoopOutboxDlqPublisher,
+      ) => {
+        const enabled =
+          String(configService.get<string>('KAFKA_DLQ_TOPIC_ENABLED') ?? 'true')
+            .trim()
+            .toLowerCase() !== 'false';
+        return enabled ? kafkaDlq : noopDlq;
+      },
+    },
+    ProjectionConsumerRunnerService,
   ],
   controllers: [OutboxAdminController],
-  exports: [OutboxAppender, OutboxRelayService, OUTBOX_EVENT_PUBLISHER, OutboxAdminService, ProjectionConsumerRunnerService],
+  exports: [
+    OutboxAppender,
+    OutboxRelayService,
+    OUTBOX_EVENT_PUBLISHER,
+    OUTBOX_DLQ_PUBLISHER,
+    OutboxAdminService,
+    ProjectionConsumerRunnerService,
+  ],
 })
 export class OutboxModule {}

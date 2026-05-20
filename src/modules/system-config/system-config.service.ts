@@ -73,7 +73,7 @@ export class SystemConfigService implements OnModuleInit {
           exists.type = seed.type;
           try {
             await this.configRepo.save(exists);
-          } catch (err) {
+          } catch (_err) {
             this.logger.warn(
               `Could not sync category for "${seed.key}" — enum may not include "${seed.category}" yet. Run migrations.`,
             );
@@ -345,6 +345,9 @@ export class SystemConfigService implements OnModuleInit {
         return envOr('EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED', 'true');
       case 'EVENT_OUTBOX_ALERTS_CHANNEL':
         return envOr('EVENT_OUTBOX_ALERTS_CHANNEL', 'outbox:alerts');
+      // Phase 6: Kafka DLQ settings
+      case 'KAFKA_DLQ_TOPIC_ENABLED':
+        return envOr('KAFKA_DLQ_TOPIC_ENABLED', 'true');
       case 'MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS':
         return envOr('MARKET_READ_MODEL_ALERT_MAX_LAG_SECONDS', '300');
       case 'MARKET_READ_MODEL_ALERT_CRITICAL_MAX_LAG_SECONDS':

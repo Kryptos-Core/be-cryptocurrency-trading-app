@@ -419,6 +419,15 @@ const EXTRA_OUTBOX_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     name: 'Outbox alerts pubsub channel',
     description: 'Redis pub/sub channel for outbox relay alert state-change events.',
   },
+  // Phase 6: Kafka DLQ settings
+  {
+    key: 'KAFKA_DLQ_TOPIC_ENABLED',
+    type: ConfigDataType.BOOLEAN,
+    category: ConfigCategory.OPS,
+    name: 'Enable Kafka DLQ topic publishing',
+    description:
+      'When true, dead-lettered outbox rows are also published to a dedicated Kafka DLQ topic alongside DB storage.',
+  },
 ];
 
 const EXTRA_MARKET_READ_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [

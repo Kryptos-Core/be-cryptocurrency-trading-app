@@ -211,6 +211,18 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  KAFKA_DLQ_TOPIC_ENABLED?: string = 'true';
+
+  @IsString()
+  @IsOptional()
+  KAFKA_REQUEST_TIMEOUT_MS?: string = '30000';
+
+  @IsString()
+  @IsOptional()
+  KAFKA_CONNECTION_TIMEOUT_MS?: string = '10000';
+
+  @IsString()
+  @IsOptional()
   KAFKA_BROKERS?: string;
 
   @IsString()
@@ -834,6 +846,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'EVENT_OUTBOX_ALERT_CRITICAL_MAX_OLDEST_DEAD_LETTER_AGE_SECONDS',
     'EVENT_OUTBOX_ALERT_AUTOMATION_ENABLED',
     'EVENT_OUTBOX_ALERTS_CHANNEL',
+    'KAFKA_DLQ_TOPIC_ENABLED',
     'KAFKA_BROKERS',
     'KAFKA_CLIENT_ID',
     'KAFKA_TOPIC_PREFIX',

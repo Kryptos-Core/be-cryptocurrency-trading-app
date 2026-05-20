@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { Producer } from 'kafkajs';
+import { MetricsService as MetricsServiceToken } from '@/telemetry/metrics.service';
 import {
   KafkaOutboxEventPublisher,
   KafkaOutboxEventPublisherDriver,
@@ -45,6 +46,12 @@ describe('Outbox publisher drivers', () => {
         KafkaOutboxEventPublisher,
         KafkaOutboxEventPublisherDriver,
         {
+          provide: MetricsServiceToken,
+          useValue: {
+            recordKafkaPublishDuration: jest.fn(),
+          },
+        },
+        {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
@@ -55,6 +62,10 @@ describe('Outbox publisher drivers', () => {
                   return 'test-client';
                 case 'KAFKA_TOPIC_PREFIX':
                   return 'trading';
+                case 'KAFKA_REQUEST_TIMEOUT_MS':
+                  return '30000';
+                case 'KAFKA_CONNECTION_TIMEOUT_MS':
+                  return '10000';
                 default:
                   return undefined;
               }

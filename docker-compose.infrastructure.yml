@@ -29,16 +29,16 @@ services:
   redis:
     image: redis:7-alpine
     container_name: crypto_trading_redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    command: >
+      sh -c 'if [ -z "$REDIS_PASSWORD" ]; then redis-server --appendonly yes; else redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"; fi'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "redis-cli ping"]
 
   # Zookeeper — required for Kafka < 3.6. For KRaft mode, see docs/kafka-kraft.md
   zookeeper:
@@ -48,6 +48,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_txn:/var/lib/zookeeper/log
     healthcheck:
       test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
       interval: 10s
@@ -71,7 +74,10 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_DATA_DIRS: /var/lib/kafka/data
       TZ: 'UTC'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     ports:
       - "${KAFKA_PORT:-9092}:9092"
       - "${KAFKA_EXTERNAL_PORT:-29092}:29092"
@@ -137,3 +143,6 @@ volumes:
   timescaledb_data:
   redis_data:
   clickhouse_data:
+  zookeeper_data:
+  zookeeper_txn:
+  kafka_data:

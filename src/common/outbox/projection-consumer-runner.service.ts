@@ -20,7 +20,6 @@ import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { ProcessedIntegrationEventsService } from '@/common/outbox/processed-integration-events.service';
 import { DataSource } from 'typeorm';
 import {
-  CircuitBreaker,
   CircuitBreakerRegistry,
   CircuitBreakerState,
 } from './circuit-breaker';

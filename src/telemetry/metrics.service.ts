@@ -125,6 +125,24 @@ export class MetricsService {
 
     @InjectMetric('reconciliation_job_duration_seconds')
     private readonly reconciliationJobDurationSeconds: Histogram,
+
+    @InjectMetric('circuit_breaker_state')
+    private readonly circuitBreakerState: Gauge,
+
+    @InjectMetric('circuit_breaker_tripped_total')
+    private readonly circuitBreakerTrippedTotal: Counter,
+
+    @InjectMetric('outbox_dlq_published_total')
+    private readonly outboxDlqPublishedTotal: Counter,
+
+    @InjectMetric('outbox_dlq_publish_failures_total')
+    private readonly outboxDlqPublishFailuresTotal: Counter,
+
+    @InjectMetric('kafka_publish_duration_seconds')
+    private readonly kafkaPublishDurationSeconds: Histogram,
+
+    @InjectMetric('outbox_flush_duration_seconds')
+    private readonly outboxFlushDurationSeconds: Histogram,
   ) {}
 
   recordHttpRequest(method: string, route: string, statusCode: number, durationMs: number): void {
@@ -295,6 +313,35 @@ export class MetricsService {
 
   recordReconciliationJobDuration(jobName: string, durationMs: number): void {
     this.reconciliationJobDurationSeconds.observe({ job: jobName }, durationMs / 1000);
+  }
+
+  // Circuit breaker metrics
+  setCircuitBreakerState(name: string, state: 'CLOSED' | 'OPEN' | 'HALF_OPEN'): void {
+    const stateValue = state === 'CLOSED' ? 0 : state === 'HALF_OPEN' ? 1 : 2;
+    this.circuitBreakerState.set({ name }, stateValue);
+  }
+
+  incrementCircuitBreakerTripped(name: string, reason: string): void {
+    this.circuitBreakerTrippedTotal.inc({ name, reason });
+  }
+
+  // DLQ metrics
+  incrementOutboxDlqPublished(eventType: string): void {
+    this.outboxDlqPublishedTotal.inc({ event_type: eventType });
+  }
+
+  incrementOutboxDlqPublishFailure(eventType: string): void {
+    this.outboxDlqPublishFailuresTotal.inc({ event_type: eventType });
+  }
+
+  // Kafka publish duration
+  recordKafkaPublishDuration(topic: string, eventType: string, durationMs: number): void {
+    this.kafkaPublishDurationSeconds.observe({ topic, event_type: eventType }, durationMs / 1000);
+  }
+
+  // Outbox flush duration
+  recordOutboxFlushDuration(durationMs: number): void {
+    this.outboxFlushDurationSeconds.observe(durationMs / 1000);
   }
 
   // ClickHouse audit metrics (Phase 5c)

@@ -201,6 +201,38 @@ import { MetricsService } from './metrics.service';
       labelNames: ['job'],
       buckets: [1, 5, 15, 30, 60, 120, 300],
     }),
+    // Circuit breaker metrics for Kafka producer (Phase 6)
+    makeGaugeProvider({
+      name: 'circuit_breaker_state',
+      help: 'Circuit breaker state per target (CLOSED=0, HALF_OPEN=1, OPEN=2)',
+      labelNames: ['name'],
+    }),
+    makeCounterProvider({
+      name: 'circuit_breaker_tripped_total',
+      help: 'Total circuit breaker state transitions to OPEN',
+      labelNames: ['name', 'reason'],
+    }),
+    makeCounterProvider({
+      name: 'outbox_dlq_published_total',
+      help: 'Total outbox rows published to Kafka DLQ topic',
+      labelNames: ['event_type'],
+    }),
+    makeCounterProvider({
+      name: 'outbox_dlq_publish_failures_total',
+      help: 'Total failures publishing outbox rows to Kafka DLQ topic',
+      labelNames: ['event_type'],
+    }),
+    makeHistogramProvider({
+      name: 'kafka_publish_duration_seconds',
+      help: 'Duration of Kafka publish operations in seconds',
+      labelNames: ['topic', 'event_type'],
+      buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
+    }),
+    makeHistogramProvider({
+      name: 'outbox_flush_duration_seconds',
+      help: 'Duration of outbox flush cycles in seconds',
+      buckets: [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
+    }),
   ],
   exports: [MetricsService],
 })

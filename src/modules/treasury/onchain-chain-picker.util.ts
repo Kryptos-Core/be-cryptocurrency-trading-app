@@ -16,7 +16,9 @@ export type ChainPickerContextKey =
   | 'withdrawal_admin_filter'
   | 'managed_wallets'
   /** User-facing on-chain deposit / withdraw + recent-tx network filters (Flutter tabs). */
-  | 'onchain_deposit_withdraw';
+  | 'onchain_deposit_withdraw'
+  /** Treasury E2E config form — chain picker for E2E integration test setup. */
+  | 'treasury_e2e';
 
 export interface ChainPickerEnvInput {
   onchainOperatorMode?: string;
@@ -113,6 +115,7 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
       /** Same universe as [onchain_deposit_withdraw] — admin “Nạp tiền & ví quản lý” vs user deposit tab. */
       managed_wallets: [...actionable],
       onchain_deposit_withdraw: [...actionable],
+      treasury_e2e: [...treasuryOpsList],
     },
   };
 }

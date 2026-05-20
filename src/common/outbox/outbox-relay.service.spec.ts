@@ -5,7 +5,7 @@ import { OutboxIntegrationEventType } from '@/common/integration-events/integrat
 import { RedisService } from '@/common/services/redis.service';
 import { IntegrationOutbox } from '@/entities/integration-outbox.entity';
 import { MetricsService } from '@/telemetry/metrics.service';
-import { OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
+import { OUTBOX_DLQ_PUBLISHER, OUTBOX_EVENT_PUBLISHER } from './outbox.constants';
 import { OutboxIntegrationSyncService } from './outbox-integration-sync.service';
 import { OutboxRelayService } from './outbox-relay.service';
 
@@ -60,7 +60,9 @@ describe('OutboxRelayService', () => {
     setOutboxRetryScheduledRows: jest.Mock;
     setOutboxOldestUnpublishedAgeSeconds: jest.Mock;
     setOutboxOldestDeadLetterAgeSeconds: jest.Mock;
+    recordOutboxFlushDuration: jest.Mock;
   };
+  let dlqPublisher: { isEnabled: () => boolean; publishDlq: jest.Mock };
 
   const buildDataSource = (rowsSequence: IntegrationOutbox[][]) => {
     queryCall = 0;
@@ -77,6 +79,7 @@ describe('OutboxRelayService', () => {
 
     return {
       getRepository: jest.fn(() => backlogRepository),
+      manager: { findOne: jest.fn().mockResolvedValue(null) },
       transaction: jest.fn(async (fn: (em: unknown) => Promise<number>) => {
         const seq = rowsSequence[queryCall] ?? [];
         const txIndex = queryCall;
@@ -138,6 +141,11 @@ describe('OutboxRelayService', () => {
       setOutboxRetryScheduledRows: jest.fn(),
       setOutboxOldestUnpublishedAgeSeconds: jest.fn(),
       setOutboxOldestDeadLetterAgeSeconds: jest.fn(),
+      recordOutboxFlushDuration: jest.fn(),
+    };
+    dlqPublisher = {
+      isEnabled: () => true,
+      publishDlq: jest.fn().mockResolvedValue(undefined),
     };
   });
 
@@ -170,6 +178,7 @@ describe('OutboxRelayService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
         { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
       ],
     }).compile();
 
@@ -217,6 +226,7 @@ describe('OutboxRelayService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
         { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
       ],
     }).compile();
 
@@ -252,6 +262,7 @@ describe('OutboxRelayService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
         { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
       ],
     }).compile();
 
@@ -287,6 +298,7 @@ describe('OutboxRelayService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
         { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
       ],
     }).compile();
 
@@ -313,6 +325,7 @@ describe('OutboxRelayService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
         { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
       ],
     }).compile();
 

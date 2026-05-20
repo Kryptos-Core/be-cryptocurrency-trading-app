@@ -36,12 +36,16 @@ export interface CircuitBreakerMetrics {
  * CircuitBreaker
  *
  * Phase 5b: Circuit Breaker per Projection Consumer
+ * Phase 6: Extended for Kafka producer circuit breaker with state-change callback
  *
  * Prevents cascading failures by stopping requests to a failing service.
  * States:
  * - CLOSED: Normal operation, requests pass through
  * - OPEN: Circuit tripped, requests fail immediately without attempting
  * - HALF_OPEN: Testing if service recovered, limited requests allowed
+ *
+ * @param onStateChange - Optional callback invoked on every state transition.
+ *                        Useful for metrics updates and logging.
  */
 @Injectable()
 export class CircuitBreaker {
@@ -57,6 +61,10 @@ export class CircuitBreaker {
     private readonly name: string,
     private readonly config: CircuitBreakerConfig,
     private readonly logger: Logger,
+    private readonly onStateChange?: (
+      oldState: CircuitBreakerState,
+      newState: CircuitBreakerState,
+    ) => void,
   ) {}
 
   /**
@@ -159,8 +167,10 @@ export class CircuitBreaker {
    * Force state transition (for testing/admin)
    */
   forceState(state: CircuitBreakerState): void {
+    const oldState = this.state;
     this.state = state;
     this.logger.warn(`Circuit breaker ${this.name} forced to ${state}`);
+    this.onStateChange?.(oldState, state);
   }
 
   private shouldTransitionToHalfOpen(): boolean {
@@ -169,24 +179,29 @@ export class CircuitBreaker {
   }
 
   private transitionToOpen(): void {
+    const oldState = this.state;
     this.state = CircuitBreakerState.OPEN;
     this.openUntil = new Date(Date.now() + this.config.openDurationMs);
     this.halfOpenAttempts = 0;
     this.logger.error(
       `Circuit breaker ${this.name} OPENED: failures=${this.failures} threshold=${this.config.failureThreshold} openUntil=${this.openUntil.toISOString()}`,
     );
+    this.onStateChange?.(oldState, CircuitBreakerState.OPEN);
   }
 
   private transitionToHalfOpen(): void {
+    const oldState = this.state;
     this.state = CircuitBreakerState.HALF_OPEN;
     this.openUntil = null;
     this.halfOpenAttempts = 0;
     this.logger.warn(
       `Circuit breaker ${this.name} transitioned to HALF_OPEN: testing recovery`,
     );
+    this.onStateChange?.(oldState, CircuitBreakerState.HALF_OPEN);
   }
 
   private transitionToClosed(): void {
+    const oldState = this.state;
     this.state = CircuitBreakerState.CLOSED;
     this.failures = 0;
     this.openUntil = null;
@@ -194,6 +209,7 @@ export class CircuitBreaker {
     this.logger.log(
       `Circuit breaker ${this.name} CLOSED: service recovered after ${this.successes} successes`,
     );
+    this.onStateChange?.(oldState, CircuitBreakerState.CLOSED);
   }
 
   /**
