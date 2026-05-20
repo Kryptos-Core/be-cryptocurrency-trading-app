@@ -49,14 +49,22 @@ export class FcmService implements OnModuleInit {
   /**
    * Send a multicast push notification to a list of FCM device tokens.
    * Silently skips if Firebase is not initialized or tokens list is empty.
+   *
+   * @param notificationType  Maps to a custom sound asset:
+   *                          'withdrawal_request' | 'withdrawal_approved' | 'withdrawal_rejected'
+   *                          | 'alert' | 'promo' | 'system' (default system sound).
    */
   async sendToTokens(
     tokens: string[],
     title: string,
     body: string,
     data?: Record<string, string>,
+    notificationType?: string,
   ): Promise<void> {
     if (!this.initialized || tokens.length === 0) return;
+
+    const iosSound = this._resolveIosSound(notificationType);
+    const androidSound = this._resolveAndroidSound(notificationType);
 
     const chunks = this.chunkArray(tokens, 500); // FCM max 500 per multicast
 
@@ -66,8 +74,17 @@ export class FcmService implements OnModuleInit {
           tokens: chunk,
           notification: { title, body },
           data,
-          android: { priority: 'high' },
-          apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+          android: {
+            priority: 'high',
+            notification: androidSound
+              ? { channelId: 'crypto_notifications', sound: androidSound }
+              : undefined,
+          },
+          apns: {
+            payload: {
+              aps: { sound: iosSound, badge: 1 },
+            },
+          },
         };
         const response = await admin.messaging().sendEachForMulticast(message);
         this.logger.log(
@@ -76,6 +93,40 @@ export class FcmService implements OnModuleInit {
       } catch (error) {
         this.logger.error('FCM multicast error', error);
       }
+    }
+  }
+
+  private _resolveIosSound(notificationType?: string): string {
+    switch (notificationType) {
+      case 'withdrawal_request':
+        return 'withdrawal_request.wav';
+      case 'withdrawal_approved':
+        return 'withdrawal_approved.wav';
+      case 'withdrawal_rejected':
+        return 'withdrawal_rejected.wav';
+      case 'alert':
+        return 'alert.wav';
+      case 'promo':
+        return 'promo.wav';
+      default:
+        return 'default';
+    }
+  }
+
+  private _resolveAndroidSound(notificationType?: string): string | undefined {
+    switch (notificationType) {
+      case 'withdrawal_request':
+        return 'withdrawal_request';
+      case 'withdrawal_approved':
+        return 'withdrawal_approved';
+      case 'withdrawal_rejected':
+        return 'withdrawal_rejected';
+      case 'alert':
+        return 'alert';
+      case 'promo':
+        return 'promo';
+      default:
+        return undefined; // use channel default
     }
   }
 

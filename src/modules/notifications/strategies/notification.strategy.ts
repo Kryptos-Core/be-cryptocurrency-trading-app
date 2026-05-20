@@ -74,11 +74,17 @@ export class PushNotificationStrategy implements INotificationStrategy {
   ): Promise<void> {
     if (!fcmToken) return;
     try {
-      await this.fcmService.sendToTokens([fcmToken], dto.title, dto.body, {
-        notification_id: notificationId,
-        type: dto.type ?? 'system',
-        ...dto.data,
-      });
+      await this.fcmService.sendToTokens(
+        [fcmToken],
+        dto.title,
+        dto.body,
+        {
+          notification_id: notificationId,
+          type: dto.type ?? 'system',
+          ...dto.data,
+        },
+        dto.type,
+      );
     } catch (error) {
       this.logger.error('FCM push to user failed (non-critical)', error);
     }
@@ -91,10 +97,16 @@ export class PushNotificationStrategy implements INotificationStrategy {
   ): Promise<void> {
     if (!tokens || tokens.length === 0) return;
     try {
-      await this.fcmService.sendToTokens(tokens, dto.title, dto.body, {
-        notification_id: notificationId,
-        type: dto.type ?? 'system',
-      });
+      await this.fcmService.sendToTokens(
+        tokens,
+        dto.title,
+        dto.body,
+        {
+          notification_id: notificationId,
+          type: dto.type ?? 'system',
+        },
+        dto.type,
+      );
     } catch (error) {
       this.logger.error('FCM broadcast failed (non-critical)', error);
     }
