@@ -7,6 +7,21 @@
 # Kafka + ClickHouse + TimescaleDB (co profile):
 #   docker compose -f docker-compose.infrastructure.yml --profile kafka --profile clickhouse --profile timescale up -d
 #
+# ─── Kafka troubleshooting ────────────────────────────────────────────────────
+# Neu Kafka die voi loi NodeExistsException (vi du sau khi restart Docker):
+#   .\scripts\docker\cleanup-kafka-volumes.ps1       # Windows PowerShell
+#   ./scripts/docker/cleanup-kafka-volumes.sh -y    # Linux / macOS
+#
+# Hoac thu cach thu cong:
+#   1. docker stop crypto_trading_kafka crypto_trading_zookeeper
+#   2. docker volume ls | findstr crypto
+#   3. docker volume rm be-cryptocurrency-trading-app_zookeeper_data
+#                              be-cryptocurrency-trading-app_zookeeper_txn
+#                              be-cryptocurrency-trading-app_kafka_data
+#   4. docker compose -f docker-compose.infrastructure.yml --profile kafka up -d
+#   5. docker logs crypto_trading_kafka --tail 50
+# ─────────────────────────────────────────────────────────────────────────────
+#
 services:
   postgres:
     image: postgres:16-alpine
@@ -45,6 +60,7 @@ services:
     image: confluentinc/cp-zookeeper:7.6.1
     container_name: crypto_trading_zookeeper
     profiles: ['kafka']
+    restart: "no"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -55,12 +71,13 @@ services:
       test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: crypto_trading_kafka
     profiles: ['kafka']
+    restart: "no"
     depends_on:
       zookeeper:
         condition: service_healthy
