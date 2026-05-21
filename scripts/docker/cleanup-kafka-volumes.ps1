@@ -44,13 +44,24 @@ if (-not $AutoConfirm) {
 
 # Step 1: Stop containers first
 Write-Host "[1/4] Stopping Kafka and Zookeeper containers..." -ForegroundColor Yellow
-docker stop crypto_trading_kafka crypto_trading_zookeeper 2>$null
-docker rm crypto_trading_kafka crypto_trading_zookeeper 2>$null
+$prevErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'SilentlyContinue'
+docker stop crypto_trading_kafka crypto_trading_zookeeper -t 5 2>&1 | Out-Null
+docker rm crypto_trading_kafka crypto_trading_zookeeper -f 2>&1 | Out-Null
+$ErrorActionPreference = $prevErrorAction
 Write-Host "      Containers stopped and removed." -ForegroundColor Green
 
 # Step 2: Backup volumes
 Write-Host "[2/4] Backing up volumes to .\$BackupDir..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
+
+# Ensure alpine image is available for backup
+Write-Host "      Pulling alpine image for backup..." -ForegroundColor Cyan
+docker pull alpine:latest 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "      WARNING: Could not pull alpine image. Skipping backup." -ForegroundColor Yellow
+    Write-Host "      (This is non-fatal - volumes will still be removed)" -ForegroundColor Cyan
+}
 
 $backupOk = $true
 foreach ($vol in $TargetVolumes) {
@@ -61,7 +72,7 @@ foreach ($vol in $TargetVolumes) {
         docker run --rm `
             -v "${vol}:/src:ro" `
             -v "$(Get-Location):/dst" `
-            alpine tar czf "/dst/$BackupDir/$tarName" -C /src . 2>$null
+            alpine tar czf "/dst/$BackupDir/$tarName" -C /src . 2>`$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "      WARNING: Failed to backup $vol" -ForegroundColor Red
             $backupOk = $false
