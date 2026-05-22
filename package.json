@@ -44,7 +44,17 @@
     "treasury:health": "ts-node -r tsconfig-paths/register scripts/daily-treasury-health-check.ts",
     "treasury:daily": "npm run treasury:e2e && npm run treasury:health",
     "treasury:schedule:register": "powershell -ExecutionPolicy Bypass -File scripts/register-treasury-daily-task.ps1",
-    "treasury:schedule:unregister": "powershell -ExecutionPolicy Bypass -File scripts/unregister-treasury-daily-task.ps1"
+    "treasury:schedule:unregister": "powershell -ExecutionPolicy Bypass -File scripts/unregister-treasury-daily-task.ps1",
+    "deploy:prod:up": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d",
+    "deploy:prod:build": "docker compose -f docker-compose.prod.yml --env-file .env.production build --pull",
+    "deploy:prod:start": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build",
+    "deploy:prod:stop": "docker compose -f docker-compose.prod.yml --env-file .env.production down",
+    "deploy:prod:restart": "npm run deploy:prod:stop && npm run deploy:prod:start",
+    "deploy:prod:logs": "docker compose -f docker-compose.prod.yml --env-file .env.production logs -f",
+    "deploy:prod:status": "docker compose -f docker-compose.prod.yml --env-file .env.production ps",
+    "deploy:prod:migrate": "docker compose -f docker-compose.prod.yml --env-file .env.production exec app npm run db:migrate:prod",
+    "deploy:prod:migrate:ch": "docker compose -f docker-compose.prod.yml --env-file .env.production exec clickhouse clickhouse-client --host 127.0.0.1 --port 9000 --query \"$(cat scripts/docker/clickhouse-init.sql)\"",
+    "deploy:prod:full": "npm run deploy:prod:start && npm run deploy:prod:migrate && npm run deploy:prod:migrate:ch"
   },
   "dependencies": {
     "@bull-board/express": "^7.0.0",
