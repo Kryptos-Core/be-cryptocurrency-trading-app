@@ -32,6 +32,21 @@ WORKDIR /app
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/tsconfig*.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/src/modules/treasury/workers ./src/modules/treasury/workers
+
+# Compile worker TypeScript separately (webpack bundles everything except dynamic imports)
+RUN npm install --no-save typescript && \
+    npx tsc --outDir dist/modules/treasury/workers \
+        --module commonjs \
+        --target ES2021 \
+        --esModuleInterop \
+        --resolveJsonModule \
+        --skipLibCheck \
+        --moduleResolution node \
+        src/modules/treasury/workers/crypto-account.worker.ts && \
+    npm uninstall typescript && \
+    rm -rf src/modules/treasury/workers
 
 # Set production environment
 ENV NODE_ENV=production

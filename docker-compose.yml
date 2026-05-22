@@ -91,7 +91,6 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.production
     environment:
       NODE_ENV: production
       CORE_DB_HOST: postgres

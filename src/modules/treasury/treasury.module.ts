@@ -10,7 +10,7 @@ import { RedisModule } from '@/modules/redis/redis.module';
 const isDev = process.env.NODE_ENV !== 'production';
 const cryptoWorkerFile = isDev
   ? path.resolve(process.cwd(), 'src', 'modules', 'treasury', 'workers', 'crypto-account.worker.ts')
-  : path.resolve(__dirname, 'workers', 'crypto-account.worker.js');
+  : path.resolve(process.cwd(), 'dist', 'modules', 'treasury', 'workers', 'crypto-account.worker.js');
 const workerExecArgv = isDev ? ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register'] : [];
 
 import { TransactionWallet } from '@/entities/transaction-wallet.entity';
