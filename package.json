@@ -20,6 +20,7 @@
     "test:cov": "jest --coverage",
     "test:watch": "jest --watch",
     "db:migrate": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-migrations.ts",
+    "db:migrate:prod": "node -r tsconfig-paths/register dist/seed/run-migrations.js",
     "db:migrate:generate": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:generate -d src/config/data-source.ts --verbose",
     "db:migrate:create": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:create",
     "db:migrate:revert": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:revert -d src/config/data-source.ts --verbose",

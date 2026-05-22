@@ -5,7 +5,7 @@
 #
 # Options:
 #   -b, --backup       Create database backup before deploy
-#   -m, --migrate      Run database migrations
+#   --no-migrate       Skip database migrations
 #   -s, --skip-health  Skip health check after deploy
 #   -h, --help         Show this help message
 # ============================================================
@@ -26,7 +26,7 @@ NC='\033[0m' # No Color
 
 # Default options
 SKIP_BACKUP=false
-RUN_MIGRATIONS=false
+RUN_MIGRATIONS=true
 SKIP_HEALTH_CHECK=false
 
 # Parse arguments
@@ -42,6 +42,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -m|--migrate)
             RUN_MIGRATIONS=true
+            shift
+            ;;
+        --no-migrate)
+            RUN_MIGRATIONS=false
             shift
             ;;
         -s|--skip-health)
@@ -161,10 +165,10 @@ docker compose stop app
 log_info "Starting containers..."
 docker compose up -d --build app
 
-# Run migrations if requested
+# Run migrations (runs by default on production deploy)
 if [ "$RUN_MIGRATIONS" = true ]; then
     log_info "Running database migrations..."
-    docker compose exec -T app npm run db:migrate || log_warning "Migrations completed or no migrations to run"
+    docker compose exec -T app npm run db:migrate:prod || log_warning "Migrations completed or no migrations to run"
 fi
 
 # Health check
