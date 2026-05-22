@@ -149,9 +149,9 @@ if [ "$SKIP_BACKUP" = false ]; then
     fi
 fi
 
-# Pull latest images
+# Pull only external images (postgres, redis) — backend is built locally
 log_info "Pulling latest images..."
-docker compose pull
+docker compose pull postgres redis
 
 # Stop current containers
 log_info "Stopping current containers..."
