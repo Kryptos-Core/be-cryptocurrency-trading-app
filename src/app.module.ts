@@ -20,6 +20,8 @@ import { getTypeOrmConfig } from './config/typeorm.config';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BinanceRestModule } from './modules/binance-rest/binance-rest.module';
+import { BinanceProxyModule } from './modules/binance-proxy/binance-proxy.module';
+import { UserBinanceCredentialsModule } from './modules/user-binance-credentials/user-binance-credentials.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
 import { BlockchainDepositWatcherModule } from './modules/blockchain/deposit-watcher/blockchain-deposit-watcher.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
@@ -110,6 +112,8 @@ class BullBoardAuthMiddleware {
     OutboxModule,
     BullBoardModule, // mounts Bull Board UI at /admin/queues (admin-only)
     BinanceRestModule,
+    BinanceProxyModule,
+    UserBinanceCredentialsModule,
     AuthModule,
     UsersModule,
     CurrenciesModule,

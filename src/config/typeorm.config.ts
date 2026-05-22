@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import type { LogLevel } from 'typeorm/logger/Logger';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 import { AdminWalletAdjustment } from '../entities/admin-wallet-adjustment.entity';
@@ -29,6 +30,7 @@ import { TreasuryE2EConfig } from '../entities/treasury-e2e-config.entity';
 import { TreasuryMainWallet } from '../entities/treasury-main-wallet.entity';
 import { TreasuryOperation } from '../entities/treasury-operation.entity';
 import { User } from '../entities/user.entity';
+import { UserBinanceCredentials } from '../entities/user-binance-credentials.entity';
 import { UserNotification } from '../entities/user-notification.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { WalletLedger } from '../entities/wallet-ledger.entity';
@@ -74,6 +76,7 @@ const ALL_ENTITIES = [
   TreasuryE2EConfig,
   TreasuryOperation,
   SystemConfig,
+  UserBinanceCredentials,
 ];
 
 export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOptions => {
@@ -103,7 +106,7 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     migrations: typeormMigrationFilePaths(__dirname),
     migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
     synchronize: false,
-    logging: debugSql ? (['query', 'error'] as const) : false,
+    logging: debugSql ? (['query', 'error'] as LogLevel[]) : false,
     extra: {
       max: 10,
       statement_timeout: 30000,

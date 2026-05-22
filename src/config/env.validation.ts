@@ -787,6 +787,11 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   WALLETCONNECT_WEBHOOK_SECRET?: string;
+
+  /** Encryption key for user Binance API credentials (AES-256-GCM) */
+  @IsString()
+  @IsOptional()
+  BINANCE_CREDENTIALS_ENCRYPTION_KEY?: string;
 }
 
 /**
@@ -979,6 +984,7 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'REOWN_PROJECT_ID',
     'WALLETCONNECT_RELAY_URL',
     'WALLETCONNECT_WEBHOOK_SECRET',
+    'BINANCE_CREDENTIALS_ENCRYPTION_KEY',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

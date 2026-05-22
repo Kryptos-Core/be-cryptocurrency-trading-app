@@ -6,10 +6,13 @@ import type { RedisOptions } from 'ioredis';
  * Singleton Pattern: Single Redis connection instance
  */
 export const getRedisConfig = (configService: ConfigService): RedisOptions => {
+  const rawPassword = configService.get<string>('REDIS_PASSWORD');
+  const password = rawPassword && rawPassword.trim().length > 0 ? rawPassword : undefined;
+
   return {
     host: configService.get<string>('REDIS_HOST', 'localhost'),
     port: configService.get<number>('REDIS_PORT', 6379),
-    password: configService.get<string>('REDIS_PASSWORD'),
+    password,
     db: configService.get<number>('REDIS_DB', 0),
     retryStrategy: (times: number) => {
       const delay = Math.min(times * 50, 2000);

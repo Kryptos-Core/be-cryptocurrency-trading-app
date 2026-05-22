@@ -128,6 +128,7 @@ export interface AppConfig {
         apiSecret: string;
         baseUrl: string;
       };
+      credentialsEncryptionKey?: string;
     };
   };
   wallet: {
@@ -288,6 +289,7 @@ export class AppConfigBuilder {
     binanceMainnetApiKey: string,
     binanceMainnetApiSecret: string,
     binanceMainnetBaseUrl: string,
+    binanceCredentialsEncryptionKey?: string,
     mockExchangeBalance: string = '10000',
     mockExchangeOrderStatusPrice: string = '50000',
   ): this {
@@ -311,6 +313,7 @@ export class AppConfigBuilder {
           apiSecret: binanceMainnetApiSecret,
           baseUrl: binanceMainnetBaseUrl,
         },
+        credentialsEncryptionKey: binanceCredentialsEncryptionKey,
       },
     };
     return this;
@@ -544,6 +547,7 @@ export function createAppConfig(env: EnvironmentVariables): AppConfig {
       env.BINANCE_MAINNET_API_KEY || '',
       env.BINANCE_MAINNET_API_SECRET || '',
       env.BINANCE_MAINNET_BASE_URL || 'https://fapi.binance.com',
+      env.BINANCE_CREDENTIALS_ENCRYPTION_KEY,
       env.MOCK_EXCHANGE_BALANCE ?? '10000',
       env.MOCK_EXCHANGE_ORDER_STATUS_PRICE ?? '50000',
     )

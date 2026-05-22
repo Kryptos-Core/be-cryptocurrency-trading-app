@@ -4,6 +4,7 @@ import { Deposit } from './deposit.entity';
 import { ManagedWallet } from './managed-wallet.entity';
 import { Order } from './order.entity';
 import { TreasuryOperation } from './treasury-operation.entity';
+import { UserBinanceCredentials } from './user-binance-credentials.entity';
 import { Wallet } from './wallet.entity';
 import { WalletLedger } from './wallet-ledger.entity';
 import { Withdrawal } from './withdrawal.entity';
@@ -98,4 +99,10 @@ export class User {
     (operation) => operation.actor_user,
   )
   treasury_operations!: TreasuryOperation[];
+
+  @OneToMany(
+    () => UserBinanceCredentials,
+    (cred) => cred.user,
+  )
+  binance_credentials!: UserBinanceCredentials[];
 }
