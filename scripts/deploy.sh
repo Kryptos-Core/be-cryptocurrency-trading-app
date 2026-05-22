@@ -15,6 +15,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$APP_DIR/.env.production"
+DOTENV_FILE="$APP_DIR/.env"
 
 # Colors for output
 RED='\033[0;31m'
@@ -86,8 +87,46 @@ cd "$APP_DIR"
 
 log_info "Starting deployment..."
 
-# Load environment variables
-source "$ENV_FILE"
+# ─── Step 1: Sync .env from .env.production ───────────────────────────────────
+# Docker Compose chỉ đọc biến từ file .env (không phải .env.production).
+# Script này trích xuất các biến cần thiết từ .env.production sang .env.
+log_info "Syncing environment variables from .env.production to .env..."
+
+# Các biến bắt buộc cho docker-compose interpolation
+REQUIRED_VARS=(
+    "CORE_DB_NAME"
+    "CORE_DB_USERNAME"
+    "CORE_DB_PASSWORD"
+    "REDIS_PASSWORD"
+    "APP_PORT"
+)
+
+# Tạo .env mới từ .env.production
+# Giữ lại các biến có trong .env.production
+grep -E '^[A-Z_]+=' "$ENV_FILE" > "$DOTENV_FILE.tmp"
+
+# Verify tất cả biến bắt buộc đều có trong .env.production
+MISSING_VARS=()
+for VAR in "${REQUIRED_VARS[@]}"; do
+    if ! grep -q "^${VAR}=" "$DOTENV_FILE.tmp"; then
+        MISSING_VARS+=("$VAR")
+    fi
+done
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+    log_error "Missing required environment variables in .env.production:"
+    for VAR in "${MISSING_VARS[@]}"; do
+        echo -e "  ${RED}  - $VAR${NC}"
+    done
+    echo ""
+    log_info "Please add these variables to .env.production"
+    rm -f "$DOTENV_FILE.tmp"
+    exit 1
+fi
+
+mv "$DOTENV_FILE.tmp" "$DOTENV_FILE"
+chmod 600 "$DOTENV_FILE"
+log_success "Environment variables synced to .env"
 
 # Backup database if requested
 if [ "$SKIP_BACKUP" = false ]; then

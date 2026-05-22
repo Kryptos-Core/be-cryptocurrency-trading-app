@@ -5,7 +5,6 @@ dist
 *.md
 .env*
 !.env.production.example
-node_modules
 coverage
 .nyc_output
 .DS_Store
@@ -28,7 +27,6 @@ Dockerfile*
 *.spec.ts
 *.test.ts
 jest.config.*
-tsconfig*.json
 tslint.json
 .eslintrc*
 .eslintignore
@@ -36,9 +34,6 @@ tslint.json
 .prettierignore
 biome.json
 .editorconfig
-.env.development
-.env.staging
-.env.production
 test
 tests
 scripts
@@ -46,6 +41,7 @@ docs
 docs/
 .arch-builder
 .arch-builder*
-node_modules
-.vscode
-.idea
+# Build configs — được include vào Docker context
+!tsconfig.json
+!tsconfig.build.json
+!nest-cli.json
