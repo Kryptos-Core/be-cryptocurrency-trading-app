@@ -157,9 +157,9 @@ docker compose pull postgres redis
 log_info "Stopping current containers..."
 docker compose stop app
 
-# Start containers
+# Start containers (with --build to ensure image is built from Dockerfile, not pulled)
 log_info "Starting containers..."
-docker compose up -d app
+docker compose up -d --build app
 
 # Run migrations if requested
 if [ "$RUN_MIGRATIONS" = true ]; then
