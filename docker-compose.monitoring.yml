@@ -3,6 +3,9 @@ version: "3.9"
 networks:
   monitoring-network:
     driver: bridge
+  backend-network:
+    external: true
+    name: crypto-trading-prod_backend-network
 
 volumes:
   prometheus_data:
@@ -32,6 +35,7 @@ services:
       - prometheus_data:/prometheus
     networks:
       - monitoring-network
+      - backend-network
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s

@@ -38,7 +38,13 @@ function isPaginatedEnvelope(
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    // Bypass JSON wrapping for Prometheus metrics endpoint
+    const request = context.switchToHttp().getRequest<{ url?: string }>();
+    if (request?.url?.includes('/metrics')) {
+      return next.handle();
+    }
+
     return next.handle().pipe(
       map((data: unknown) => {
         const envelope = isObjectRecord(data) ? data : undefined;
