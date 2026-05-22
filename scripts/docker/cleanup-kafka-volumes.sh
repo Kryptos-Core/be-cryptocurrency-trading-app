@@ -12,92 +12,96 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VOLUME_PREFIX="be-cryptocurrency-trading-app"
-
 TARGET_VOLUMES=(
     "${VOLUME_PREFIX}_zookeeper_data"
     "${VOLUME_PREFIX}_zookeeper_txn"
     "${VOLUME_PREFIX}_kafka_data"
 )
-
-BACKUP_DIR="kafka-volume-backup-$(date +%Y%m%d%H%M%S)"
-
-# Parse flags
+BACKUP_DIR="kafka-volume-backup-$(date +'%Y%m%d%H%M%S')"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 AUTO_CONFIRM=false
-if [[ "$1" == "-y" ]] || [[ "$1" == "--yes" ]]; then
+
+if [[ "${1:-}" == "-y" ]] || [[ "${1:-}" == "--yes" ]]; then
     AUTO_CONFIRM=true
 fi
 
 echo ""
-echo "=== Kafka/Zookeeper Volume Cleanup ===" 
+echo -e "\033[1;36m=== Kafka/Zookeeper Volume Cleanup ===\033[0m"
 echo ""
 
 if [[ "$AUTO_CONFIRM" == "false" ]]; then
-    echo "The following volumes will be REMOVED:"
+    echo -e "\033[1;33mThe following volumes will be REMOVED:\033[0m"
     for vol in "${TARGET_VOLUMES[@]}"; do
         echo "  - $vol"
     done
     echo ""
-    echo "A backup archive will be created at: $BACKUP_DIR"
+    echo -e "\033[1;36mA backup archive will be created at: $BACKUP_DIR\033[0m"
     echo ""
-    read -p "Proceed? (y/N) " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[yY]$ ]]; then
-        echo "Aborted."
+    echo -n "Proceed? (y/N): "
+    read -r confirmation
+    if [[ "$confirmation" != "y" ]] && [[ "$confirmation" != "Y" ]]; then
+        echo -e "\033[1;31mAborted.\033[0m"
         exit 0
     fi
 fi
 
-# Step 1: Stop containers
-echo "[1/4] Stopping Kafka and Zookeeper containers..."
+# Step 1: Stop containers first
+echo -e "\033[1;33m[1/4] Stopping Kafka and Zookeeper containers...\033[0m"
 docker stop crypto_trading_kafka crypto_trading_zookeeper 2>/dev/null || true
 docker rm crypto_trading_kafka crypto_trading_zookeeper 2>/dev/null || true
-echo "      Containers stopped and removed."
+echo -e "\033[1;32m      Containers stopped and removed.\033[0m"
 
 # Step 2: Backup volumes
-echo "[2/4] Backing up volumes to ./$BACKUP_DIR..."
+echo -e "\033[1;33m[2/4] Backing up volumes to ./$BACKUP_DIR...\033[0m"
 mkdir -p "$BACKUP_DIR"
+
+# Ensure alpine image is available for backup
+echo -e "\033[1;36m      Pulling alpine image for backup...\033[0m"
+if ! docker pull alpine:latest 2>/dev/null; then
+    echo -e "\033[1;33m      WARNING: Could not pull alpine image. Skipping backup.\033[0m"
+    echo -e "\033[1;36m      (This is non-fatal - volumes will still be removed)\033[0m"
+fi
 
 backup_ok=true
 for vol in "${TARGET_VOLUMES[@]}"; do
-    if docker volume ls -q | grep -q "^${vol}$"; then
-        tar_name="$(echo "$vol" | sed "s/${VOLUME_PREFIX}_//").tar.gz"
-        echo "      Backing up $vol -> $tar_name"
-        docker run --rm \
+    if docker volume ls -q | grep -qE "^${vol}$"; then
+        tar_name="${vol#${VOLUME_PREFIX}_}.tar.gz"
+        echo -e "\033[1;36m      Backing up $vol -> $tar_name\033[0m"
+        if ! docker run --rm \
             -v "${vol}:/src:ro" \
-            -v "$(pwd)/$BACKUP_DIR:/dst" \
-            alpine tar czf "/dst/$tar_name" -C /src . 2>/dev/null || {
-            echo "      WARNING: Failed to backup $vol"
+            -v "$(pwd):/dst" \
+            alpine tar czf "/dst/$BACKUP_DIR/$tar_name" -C /src . 2>/dev/null; then
+            echo -e "\033[1;31m      WARNING: Failed to backup $vol\033[0m"
             backup_ok=false
-        }
+        fi
     else
-        echo "      Skipping $vol (not found)"
+        echo -e "\033[1;90m      Skipping $vol (not found)\033[0m"
     fi
 done
 
 if [[ "$backup_ok" == "true" ]]; then
-    echo "      Backup complete: ./$BACKUP_DIR"
+    echo -e "\033[1;32m      Backup complete: ./$BACKUP_DIR\033[0m"
 else
-    echo "      Backup had warnings. Check $BACKUP_DIR."
+    echo -e "\033[1;31m      Backup had warnings. Check $BACKUP_DIR.\033[0m"
 fi
 
 # Step 3: Remove volumes
-echo "[3/4] Removing stale volumes..."
+echo -e "\033[1;33m[3/4] Removing stale volumes...\033[0m"
 for vol in "${TARGET_VOLUMES[@]}"; do
-    echo "      Removing $vol..."
+    echo -e "\033[1;36m      Removing $vol...\033[0m"
     docker volume rm "$vol" 2>/dev/null || true
 done
-echo "      Volumes removed."
+echo -e "\033[1;32m      Volumes removed.\033[0m"
 
 # Step 4: Restart Kafka
-echo "[4/4] Starting Kafka stack..."
-cd "$COMPOSE_DIR"
+echo -e "\033[1;33m[4/4] Starting Kafka stack...\033[0m"
+cd "$REPO_ROOT"
 docker compose -f docker-compose.infrastructure.yml --profile kafka up -d
 
 echo ""
-echo "=== Done ==="
-echo "Run the following to check Kafka logs:"
-echo "  docker logs crypto_trading_kafka --tail 50"
+echo -e "\033[1;36m=== Done ===\033[0m"
+echo -e "Run the following to check Kafka logs:"
+echo -e "  \033[1;90mdocker logs crypto_trading_kafka --tail 50\033[0m"
 echo ""

@@ -35,7 +35,7 @@
     "docker:infra:down": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development down",
     "docker:infra:logs": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f",
     "docker:infra:health": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development ps --format \"table {{.Name}}\\t{{.Health}}\\t{{.Status}}\"",
-    "docker:kafka:cleanup": "powershell -ExecutionPolicy Bypass -File scripts/docker/cleanup-kafka-volumes.ps1",
+    "docker:kafka:cleanup": "node scripts/docker/cleanup-kafka-volumes.js",
     "kafka:topics:create": "node scripts/create-kafka-topics.js",
     "kafka:topics:list": "docker exec crypto_trading_kafka kafka-topics --bootstrap-server localhost:9092 --list",
     "clickhouse:init:run": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile clickhouse run --rm clickhouse-init",

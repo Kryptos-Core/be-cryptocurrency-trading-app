@@ -10,8 +10,10 @@
 #   .\scripts\docker\cleanup-kafka-volumes.ps1 -AutoConfirm   # Non-interactive
 
 param(
-    [switch]$AutoConfirm
+    [switch]$AutoConfirm,
+    [switch]$y
 )
+if ($y) { $AutoConfirm = $true }
 
 $ErrorActionPreference = 'Stop'
 
@@ -57,8 +59,12 @@ New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 
 # Ensure alpine image is available for backup
 Write-Host "      Pulling alpine image for backup..." -ForegroundColor Cyan
-docker pull alpine:latest 2>$null
-if ($LASTEXITCODE -ne 0) {
+$prevErrorActionDocker = $ErrorActionPreference
+$ErrorActionPreference = 'SilentlyContinue'
+$null = docker pull alpine:latest 2>&1
+$dockerPullExitCode = $LASTEXITCODE
+$ErrorActionPreference = $prevErrorActionDocker
+if ($dockerPullExitCode -ne 0) {
     Write-Host "      WARNING: Could not pull alpine image. Skipping backup." -ForegroundColor Yellow
     Write-Host "      (This is non-fatal - volumes will still be removed)" -ForegroundColor Cyan
 }
@@ -69,11 +75,15 @@ foreach ($vol in $TargetVolumes) {
     if ($volExists) {
         $tarName = ($vol -replace "${VolumePrefix}_", "") + ".tar.gz"
         Write-Host "      Backing up $vol -> $tarName" -ForegroundColor Cyan
-        docker run --rm `
+        $prevErrorActionRun = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        $null = docker run --rm `
             -v "${vol}:/src:ro" `
             -v "$(Get-Location):/dst" `
-            alpine tar czf "/dst/$BackupDir/$tarName" -C /src . 2>`$null | Out-Null
-        if ($LASTEXITCODE -ne 0) {
+            alpine tar czf "/dst/$BackupDir/$tarName" -C /src . 2>&1
+        $dockerRunExitCode = $LASTEXITCODE
+        $ErrorActionPreference = $prevErrorActionRun
+        if ($dockerRunExitCode -ne 0) {
             Write-Host "      WARNING: Failed to backup $vol" -ForegroundColor Red
             $backupOk = $false
         }
