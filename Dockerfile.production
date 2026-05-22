@@ -35,8 +35,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/tsconfig*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/src/modules/treasury/workers ./src/modules/treasury/workers
 
-# Copy seed scripts for migrations (required for db:migrate:prod)
+# Copy seed scripts for migrations (required for db:migrate:prod and db:seed:prod)
 COPY --from=builder --chown=nestjs:nodejs /app/src/seed ./dist/seed
+COPY --from=builder --chown=nestjs:nodejs /app/src/config ./dist/config
 COPY --from=builder --chown=nestjs:nodejs /app/src/config ./dist/config
 
 # Compile worker TypeScript separately (webpack bundles everything except dynamic imports)
