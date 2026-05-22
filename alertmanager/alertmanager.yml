@@ -1,6 +1,3 @@
-# Alertmanager configuration for Crypto Trading Platform
-# Routes alerts to Telegram
-
 global:
   resolve_timeout: 5m
 
@@ -27,56 +24,40 @@ route:
       repeat_interval: 1h
 
 receivers:
+  - name: 'null'
+
   - name: 'telegram'
     telegram_configs:
-      - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+      - bot_token: '8772731855:AAEjht_FEmzDv-IislUQ4QC4QBnb4HoYx-E'
+        chat_id: 8619556399
         message: |
           *Alert: {{ .GroupLabels.alertname }}*
-
           *Status:* {{ .Status }}
           *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
-          *Annotations:*
-          {{ range .Annotations }}{{ .Key }}: {{ .Value }}
-          {{ end }}
-
-          *Details:* {{ .GroupLabels.alertname }}
+          {{ range .Alerts }}{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}{{ end }}
         parse_mode: Markdown
-        disable_notifications: false
         send_resolved: true
 
   - name: 'telegram-critical'
     telegram_configs:
-      - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+      - bot_token: '8772731855:AAEjht_FEmzDv-IislUQ4QC4QBnb4HoYx-E'
+        chat_id: 8619556399
         message: |
-          *CRITICAL ALERT*
-
+          🚨 *CRITICAL ALERT*
           *{{ .GroupLabels.alertname }}*
-
           *Status:* {{ .Status }}
-          *Severity:* Critical
-
-          {{ range .Alerts }}{{ if eq .Status "firing" }}*Firing:* {{ .Annotations.summary }}{{ end }}{{ end }}
-
+          {{ range .Alerts }}{{ if eq .Status "firing" }}{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}{{ end }}{{ end }}
           *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
         parse_mode: Markdown
-        disable_notifications: false
         send_resolved: true
 
   - name: 'telegram-warning'
     telegram_configs:
-      - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+      - bot_token: '8772731855:AAEjht_FEmzDv-IislUQ4QC4QBnb4HoYx-E'
+        chat_id: 8619556399
         message: |
-          *WARNING ALERT*
-
-          *{{ .GroupLabels.alertname }}*
-
+          ⚠️ *WARNING: {{ .GroupLabels.alertname }}*
           *Status:* {{ .Status }}
-          *Severity:* Warning
+          *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
         parse_mode: Markdown
-        disable_notifications: false
         send_resolved: true
-
-  - name: 'null'
