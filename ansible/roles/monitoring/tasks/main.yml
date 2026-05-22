@@ -1,0 +1,115 @@
+# Monitoring Role
+# Deploys Prometheus, Grafana, and Alertmanager stack
+
+---
+- name: Create monitoring directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ app_deploy_path }}/prometheus"
+    - "{{ app_deploy_path }}/grafana/provisioning/datasources"
+    - "{{ app_deploy_path }}/grafana/provisioning/dashboards"
+    - "{{ app_deploy_path }}/grafana/dashboards"
+    - "{{ app_deploy_path }}/alertmanager"
+
+- name: Deploy Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ app_deploy_path }}/prometheus/prometheus.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Reload Prometheus
+
+- name: Deploy Prometheus alert rules
+  ansible.builtin.copy:
+    src: alerts.yml
+    dest: "{{ app_deploy_path }}/prometheus/alerts.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Reload Prometheus
+
+- name: Deploy Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ app_deploy_path }}/alertmanager/alertmanager.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+  no_log: true
+  notify: Reload Alertmanager
+
+- name: Deploy Telegram notification template
+  ansible.builtin.copy:
+    src: telegram.tmpl
+    dest: "{{ app_deploy_path }}/alertmanager/telegram.tmpl"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Deploy Grafana datasources configuration
+  ansible.builtin.copy:
+    src: datasources.yml
+    dest: "{{ app_deploy_path }}/grafana/provisioning/datasources/prometheus.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Deploy Grafana dashboard provisioning
+  ansible.builtin.copy:
+    src: dashboard.yml
+    dest: "{{ app_deploy_path }}/grafana/provisioning/dashboards/dashboards.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Create default Grafana dashboard
+  ansible.builtin.copy:
+    src: default-dashboard.json
+    dest: "{{ app_deploy_path }}/grafana/dashboards/default.json"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Copy monitoring docker-compose
+  ansible.builtin.copy:
+    src: ../../docker-compose.monitoring.yml
+    dest: "{{ app_deploy_path }}/docker-compose.monitoring.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Start Monitoring Stack
+
+- name: Ensure monitoring services are running
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_deploy_path }}"
+    project_name: monitoring
+    files:
+      - docker-compose.monitoring.yml
+    state: present
+    pull: yes
+  register: monitoring_status
+
+- name: Display monitoring services status
+  ansible.builtin.debug:
+    msg: |
+      Monitoring stack deployed!
+      Prometheus: http://{{ ansible_host }}:{{ monitoring_port }}
+      Grafana: http://{{ ansible_host }}:{{ grafana_port }}
+      Alertmanager: http://{{ ansible_host }}:{{ alertmanager_port }}
+
+handlers:
+  - name: Reload Prometheus
+    ansible.builtin.shell: |
+      docker exec prometheus prometheus --web.enable-lifecycle reload || true
+    changed_when: false
+
+  - name: Reload Alertmanager
+    ansible.builtin.shell: |
+      docker exec alertmanager amtool reload-config || true
+    changed_when: false
+
+  - name: Start Monitoring Stack
+    community.docker.docker_compose_v2:
+      project_src: "{{ app_deploy_path }}"
+      project_name: monitoring
+      files:
+        - docker-compose.monitoring.yml
+      state: present
+      pull: yes

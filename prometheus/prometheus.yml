@@ -1,0 +1,50 @@
+# Prometheus configuration for Crypto Trading Platform
+# Scrape targets: Prometheus, Alertmanager, Node Exporter, and Backend
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: production
+    cluster: crypto-trading
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: prometheus
+
+  # Alertmanager
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+        labels:
+          service: alertmanager
+
+  # Node Exporter (host metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: node-exporter
+
+  # Crypto Trading Backend
+  - job_name: 'crypto-backend'
+    static_configs:
+      - targets: ['app:3000']
+        labels:
+          service: crypto-backend
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s

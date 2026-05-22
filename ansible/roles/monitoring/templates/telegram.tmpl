@@ -1,0 +1,22 @@
+{{ .Alerts | len }} alert(s) firing
+
+{{ range .Alerts }}
+🚨 ALERT: {{ .Labels.alertname }}
+
+Status: {{ .Status }}
+{{ if eq .Status "firing" }}🔴 FIRING{{ else }}✅ RESOLVED{{ end }}
+
+{{ if .Annotations.summary }}📋 Summary: {{ .Annotations.summary }}{{ end }}
+{{ if .Annotations.description }}📝 Description: {{ .Annotations.description }}{{ end }}
+
+Labels:
+{{ range .Labels }}  {{ .Key }}: {{ .Value }}
+{{ end }}
+{{ if .Annotations }}Annotations:
+{{ range .Annotations }}  {{ .Key }}: {{ .Value }}
+{{ end }}{{ end }}
+{{ if .StartsAt }}Started: {{ .StartsAt }}
+{{ end }}{{ if .EndsAt }}Ended: {{ .EndsAt }}
+{{ end }}
+---
+{{ end }}

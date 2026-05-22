@@ -1,0 +1,48 @@
+# Ansible Playbook for Crypto Trading Platform Deployment
+# Usage:
+#   ansible-playbook -i inventory.yml playbook.yml
+#   ansible-playbook -i inventory.yml playbook.yml --tags docker-setup
+#   ansible-playbook -i inventory.yml playbook.yml --tags deploy
+#   ansible-playbook -i inventory.yml playbook.yml --tags monitoring
+
+---
+- name: Setup Docker on production servers
+  hosts: production
+  become: true
+  gather_facts: true
+  roles:
+    - role: docker-setup
+      tags: [docker, setup]
+  vars:
+    docker_users:
+      - deployer
+
+- name: Deploy Crypto Trading Backend
+  hosts: production
+  become: false
+  gather_facts: true
+  roles:
+    - role: app-deploy
+      tags: [deploy, app, backend]
+  vars:
+    app_env: production
+
+- name: Deploy Monitoring Stack
+  hosts: production
+  become: false
+  gather_facts: true
+  roles:
+    - role: monitoring
+      tags: [monitoring, prometheus, grafana, alertmanager]
+  vars:
+    app_env: production
+
+- name: Staging Deployment
+  hosts: staging
+  become: false
+  gather_facts: true
+  roles:
+    - role: app-deploy
+      tags: [deploy, staging]
+  vars:
+    app_env: staging

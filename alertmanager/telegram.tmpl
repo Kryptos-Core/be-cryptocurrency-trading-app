@@ -1,0 +1,16 @@
+{{ .Alerts | len }} alert(s)
+
+{{ range .Alerts }}
+ALERT: {{ .Labels.alertname }}
+
+Status: {{ .Status }}
+{{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}
+
+{{ if .Annotations.summary }}Summary: {{ .Annotations.summary }}{{ end }}
+{{ if .Annotations.description }}Description: {{ .Annotations.description }}{{ end }}
+
+Labels:
+{{ range .Labels }}  {{ .Key }}: {{ .Value }}
+{{ end }}
+{{ if .StartsAt }}Started: {{ .StartsAt }}{{ end }}
+{{ end }}

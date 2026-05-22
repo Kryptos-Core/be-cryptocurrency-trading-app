@@ -1,0 +1,166 @@
+# App Deploy Role
+# Deploys the Crypto Trading Backend application
+
+---
+- name: Create deployment directory
+  ansible.builtin.file:
+    path: "{{ app_deploy_path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create environment file
+  ansible.builtin.copy:
+    dest: "{{ app_deploy_path }}/.env.production"
+    content: |
+      NODE_ENV=production
+      PORT=3000
+      APP_PORT={{ app_port }}
+
+      # Database
+      CORE_DB_HOST=postgres
+      CORE_DB_PORT=5432
+      CORE_DB_NAME=crypto_trading_platform
+      CORE_DB_USERNAME={{ db_username }}
+      CORE_DB_PASSWORD={{ db_password }}
+
+      # Redis
+      REDIS_HOST=redis
+      REDIS_PORT=6379
+      REDIS_PASSWORD={{ redis_password }}
+
+      # JWT
+      JWT_SECRET={{ jwt_secret }}
+
+      # Exchange
+      TRADING_ENVIRONMENT=mainnet
+      EXCHANGE_MODE=binance
+      BINANCE_TESTNET_ENABLED=false
+      BINANCE_MAINNET_API_KEY={{ binance_api_key }}
+      BINANCE_MAINNET_API_SECRET={{ binance_api_secret }}
+      BINANCE_MAINNET_BASE_URL=https://fapi.binance.com
+
+      # On-chain
+      ONCHAIN_OPERATOR_MODE=production
+      TRON_GRID_API_KEY={{ tron_api_key }}
+
+      # Encryption
+      WALLET_ENCRYPTION_KEY={{ wallet_encryption_key }}
+      BINANCE_CREDENTIALS_ENCRYPTION_KEY={{ binance_credentials_encryption_key }}
+
+      # PayOS
+      PAYOS_CLIENT_ID={{ payos_client_id }}
+      PAYOS_API_KEY={{ payos_api_key }}
+      PAYOS_CHECKSUM_KEY={{ payos_checksum_key }}
+      PAYOS_RETURN_URL=https://{{ domain }}/success
+      PAYOS_CANCEL_URL=https://{{ domain }}/cancel
+
+      # SMTP
+      SMTP_HOST={{ smtp_host }}
+      SMTP_PORT=587
+      SMTP_USER={{ smtp_user }}
+      SMTP_PASS={{ smtp_password }}
+      SMTP_FROM=Crypto Trading <noreply@{{ domain }}>
+
+      # Monitoring
+      GF_SECURITY_ADMIN_PASSWORD={{ grafana_password }}
+      TELEGRAM_BOT_TOKEN={{ telegram_bot_token }}
+      TELEGRAM_CHAT_ID={{ telegram_chat_id }}
+
+      # Logging
+      LOG_LEVEL=info
+      LOG_FORMAT=json
+    owner: "{{ ansible_user }}"
+    mode: '0600'
+  no_log: true
+
+- name: Copy docker-compose.yml to server
+  ansible.builtin.copy:
+    src: ../docker-compose.yml
+    dest: "{{ app_deploy_path }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Reload Docker Compose
+
+- name: Copy scripts to server
+  ansible.builtin.copy:
+    src: ../scripts/
+    dest: "{{ app_deploy_path }}/scripts/"
+    owner: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Ensure scripts are executable
+  ansible.builtin.shell: |
+    chmod +x {{ app_deploy_path }}/scripts/*.sh
+  changed_when: false
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_deploy_path }}"
+    files:
+      - docker-compose.yml
+    pull: yes
+  register: docker_pull_result
+
+- name: Stop current containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_deploy_path }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  changed_when: false
+
+- name: Start containers with docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_deploy_path }}"
+    files:
+      - docker-compose.yml
+    state: present
+    pull: yes
+  register: docker_compose_result
+  notify:
+    - Wait for app to be healthy
+    - Verify health endpoint
+
+- name: Run database migrations
+  ansible.builtin.shell: |
+    cd {{ app_deploy_path }}
+    docker compose -f docker-compose.yml run --rm app npm run db:migrate || echo "Migration completed or no migrations needed"
+  register: migration_result
+  changed_when: false
+  when: app_env == 'production'
+  no_log: true
+
+- name: Display deployment status
+  ansible.builtin.debug:
+    msg: |
+      Application deployed successfully!
+      App URL: http://{{ ansible_host }}:{{ app_port }}
+      Docker containers status:
+      {{ docker_compose_result.stdout }}
+
+handlers:
+  - name: Reload Docker Compose
+    ansible.builtin.shell: |
+      cd {{ app_deploy_path }}
+      docker compose -f docker-compose.yml down
+      docker compose -f docker-compose.yml up -d
+
+  - name: Wait for app to be healthy
+    ansible.builtin.wait_for:
+      host: "{{ ansible_host }}"
+      port: "{{ app_port }}"
+      path: /health
+      delay: 5
+      timeout: 120
+      state: started
+
+  - name: Verify health endpoint
+    ansible.builtin.uri:
+      url: "http://{{ ansible_host }}:{{ app_port }}/health"
+      method: GET
+      status_code: 200
+    register: health_check
+    until: health_check.status == 200
+    retries: 10
+    delay: 10

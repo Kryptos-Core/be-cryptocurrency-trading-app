@@ -1,0 +1,42 @@
+# Ansible Inventory Configuration
+# Production environment
+
+all:
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_user: deployer
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    env_type: production
+
+  children:
+    production:
+      vars:
+        app_deploy_path: /opt/crypto-trading
+        docker_compose_version: "2.24.0"
+
+      hosts:
+        prod-server-01:
+          ansible_host: 192.168.1.100
+          server_name: crypto-trading-prod-01
+          app_port: 3000
+          monitoring_port: 9090
+          grafana_port: 3001
+          alertmanager_port: 9093
+          node_exporter_port: 9100
+
+        # Add more production servers as needed
+        # prod-server-02:
+        #   ansible_host: 192.168.1.101
+        #   server_name: crypto-trading-prod-02
+
+    staging:
+      vars:
+        app_deploy_path: /opt/crypto-trading-staging
+        docker_compose_version: "2.24.0"
+
+      hosts:
+        staging-server:
+          ansible_host: 192.168.1.200
+          server_name: crypto-trading-staging
+          app_port: 3000

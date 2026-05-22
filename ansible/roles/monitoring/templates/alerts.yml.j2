@@ -1,0 +1,173 @@
+# Prometheus Alert Rules for Crypto Trading Platform
+
+groups:
+  - name: crypto-trading-backend
+    interval: 30s
+    rules:
+      # Backend Availability
+      - alert: BackendDown
+        expr: up{job="crypto-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is down"
+          description: "Crypto Trading Backend has been down for more than 1 minute."
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{job="crypto-backend", status=~"5.."}[5m]))
+          / sum(rate(http_requests_total{job="crypto-backend"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for the last 5 minutes."
+
+      # High Latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="crypto-backend"}[5m])) by (le))
+          > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency"
+          description: "95th percentile latency is above 2 seconds."
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (container_memory_usage_bytes{job="crypto-backend", container="app"}
+          / container_spec_memory_limit_bytes{job="crypto-backend", container="app"}) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 85%."
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          (rate(container_cpu_usage_seconds_total{job="crypto-backend", container="app"}[5m])
+          / container_spec_cpu_quota{job="crypto-backend", container="app"}) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for more than 5 minutes."
+
+  - name: crypto-trading-database
+    interval: 30s
+    rules:
+      # Database Down
+      - alert: DatabaseDown
+        expr: |
+          up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database is not responding."
+
+      # Database Connection Pool Exhausted
+      - alert: DatabaseConnectionsHigh
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connections high"
+          description: "Database connection usage is above 80%."
+
+      # Slow Queries
+      - alert: SlowQueries
+        expr: |
+          pg_stat_activity_max_tx_duration > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow queries detected"
+          description: "There are queries running for more than 30 seconds."
+
+  - name: crypto-trading-redis
+    interval: 30s
+    rules:
+      # Redis Down
+      - alert: RedisDown
+        expr: |
+          up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache server is not responding."
+
+      # Redis Memory High
+      - alert: RedisMemoryHigh
+        expr: |
+          (redis_memory_used_bytes / redis_memory_max_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage is above 80%."
+
+  - name: infrastructure
+    interval: 30s
+    rules:
+      # Host Down
+      - alert: HostDown
+        expr: |
+          up{job="node-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host is down"
+          description: "Server is not responding to ping."
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk space is low"
+          description: "Disk space on root partition is below 10%."
+
+      # Load Average High
+      - alert: LoadAverageHigh
+        expr: |
+          node_load1 / count(node_cpu_seconds_total{mode="idle"}) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Load average is high"
+          description: "System load average is above 80% of CPU count."
+
+  - name: deadmansswitch
+    interval: 60s
+    rules:
+      # DeadMansSwitch
+      - alert: DeadMansSwitch
+        expr: vector(1)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead Man's Switch"
+          description: "This is a Dead Man's Switch alert that fires every minute. If you see this, Prometheus is still running."

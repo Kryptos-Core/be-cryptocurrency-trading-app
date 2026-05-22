@@ -1,0 +1,82 @@
+# Alertmanager configuration template
+# Configures Telegram notifications
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'telegram'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'telegram-critical'
+      group_wait: 0s
+      repeat_interval: 1h
+
+    - match:
+        severity: warning
+      receiver: 'telegram-warning'
+
+    - match:
+        alertname: DeadMansSwitch
+      receiver: 'telegram-critical'
+      repeat_interval: 1h
+
+receivers:
+  - name: 'telegram'
+    telegram_configs:
+      - bot_token: '{{ telegram_bot_token }}'
+        chat_id: {{ telegram_chat_id }}
+        message: |
+          🔔 *Alert: {{ .GroupLabels.alertname }}*
+
+          📊 *Status:* {{ .Status }}
+          🏷️ *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
+          📝 *Annotations:*
+          {{ range .Annotations }}{{ .Key }}: {{ .Value }}
+          {{ end }}
+
+          🔗 *Details:* {{ .GroupLabels.alertname }}
+        parse_mode: Markdown
+        disable_notifications: false
+        send_resolved: true
+
+  - name: 'telegram-critical'
+    telegram_configs:
+      - bot_token: '{{ telegram_bot_token }}'
+        chat_id: {{ telegram_chat_id }}
+        message: |
+          🚨 *CRITICAL ALERT*
+
+          ⚠️ *{{ .GroupLabels.alertname }}*
+
+          📊 *Status:* {{ .Status }}
+          🔴 *Severity:* Critical
+
+          {{ range .Alerts }}{{ if eq .Status "firing" }}*Firing:* {{ .Annotations.summary }}{{ end }}{{ end }}
+
+          🏷️ *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
+        parse_mode: Markdown
+        disable_notifications: false
+        send_resolved: true
+
+  - name: 'telegram-warning'
+    telegram_configs:
+      - bot_token: '{{ telegram_bot_token }}'
+        chat_id: {{ telegram_chat_id }}
+        message: |
+          ⚠️ *WARNING ALERT*
+
+          🔶 *{{ .GroupLabels.alertname }}*
+
+          📊 *Status:* {{ .Status }}
+          🟡 *Severity:* Warning
+        parse_mode: Markdown
+        disable_notifications: false
+        send_resolved: true
+
+  - name: 'null'
