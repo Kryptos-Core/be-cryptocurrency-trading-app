@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic guard for bad egress DNAT rules
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1min
+Unit=fix-egress-dnat.service
+
+[Install]
+WantedBy=timers.target
