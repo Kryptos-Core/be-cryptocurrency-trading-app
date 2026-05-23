@@ -17,14 +17,19 @@ groups:
       # High Error Rate
       - alert: HighErrorRate
         expr: |
-          sum(rate(http_requests_total{job="crypto-backend", status=~"5.."}[5m]))
-          / sum(rate(http_requests_total{job="crypto-backend"}[5m])) > 0.05
+          (
+            sum(rate(http_requests_total{job="crypto-backend", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="crypto-backend"}[5m]))
+          ) > 0.05
+          and
+          sum(rate(http_requests_total{job="crypto-backend"}[5m])) > 1
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "High error rate detected"
-          description: "Error rate is above 5% for the last 5 minutes."
+          description: "Error rate is above 5% for the last 5 minutes with request volume above 1 req/s."
 
       # High Latency
       - alert: HighLatency
@@ -140,7 +145,11 @@ groups:
       # Disk Space Low
       - alert: DiskSpaceLow
         expr: |
-          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+          (
+            node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay|squashfs|ramfs", device!~"rootfs"}
+            /
+            node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay|squashfs|ramfs", device!~"rootfs"}
+          ) < 0.1
         for: 5m
         labels:
           severity: critical
@@ -167,7 +176,7 @@ groups:
         expr: vector(1)
         for: 0m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "Dead Man's Switch"
           description: "This is a Dead Man's Switch alert that fires every minute. If you see this, Prometheus is still running."

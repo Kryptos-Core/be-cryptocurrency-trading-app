@@ -1,0 +1,11 @@
+FROM python:3.12-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY alertmanager/telegram-bridge.py /app/telegram-bridge.py
+
+EXPOSE 9095
+CMD ["python3", "/app/telegram-bridge.py"]

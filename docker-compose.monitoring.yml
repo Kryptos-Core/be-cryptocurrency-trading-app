@@ -10,7 +10,6 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
-  alertmanager_data:
   node_exporter_data:
 
 services:
@@ -83,34 +82,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  alertmanager:
-    image: prom/alertmanager:v0.27.0
-    container_name: alertmanager
-    restart: unless-stopped
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
-      - '--web.route-prefix=/'
-    ports:
-      - "127.0.0.1:9093:9093"
-    volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - ./alertmanager/telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro
-      - alertmanager_data:/alertmanager
-    networks:
-      - monitoring-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9093/-/healthy || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   node-exporter:
     image: prom/node-exporter:v1.8.2
     container_name: node_exporter
@@ -131,7 +102,7 @@ services:
       - monitoring-network
     pid: host
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9100/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9100/metrics || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

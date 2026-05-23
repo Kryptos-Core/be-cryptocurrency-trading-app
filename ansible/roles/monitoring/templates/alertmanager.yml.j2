@@ -7,10 +7,16 @@ global:
 route:
   group_by: ['alertname', 'severity', 'cluster', 'service']
   group_wait: 10s
-  group_interval: 10s
+  group_interval: 30s
   repeat_interval: 12h
   receiver: 'telegram'
   routes:
+    - match:
+        alertname: DeadMansSwitch
+      receiver: 'telegram-deadman'
+      group_wait: 0s
+      repeat_interval: 1h
+
     - match:
         severity: critical
       receiver: 'telegram-critical'
@@ -20,11 +26,6 @@ route:
     - match:
         severity: warning
       receiver: 'telegram-warning'
-
-    - match:
-        alertname: DeadMansSwitch
-      receiver: 'telegram-critical'
-      repeat_interval: 1h
 
 receivers:
   - name: 'telegram'
@@ -77,6 +78,18 @@ receivers:
           🟡 *Severity:* Warning
         parse_mode: Markdown
         disable_notifications: false
+        send_resolved: true
+
+  - name: 'telegram-deadman'
+    telegram_configs:
+      - bot_token: '{{ telegram_bot_token }}'
+        chat_id: {{ telegram_chat_id }}
+        message: |
+          ❤️ *DeadMansSwitch*
+          *Status:* {{ .Status }}
+          Prometheus heartbeat is alive.
+        parse_mode: Markdown
+        disable_notifications: true
         send_resolved: true
 
   - name: 'null'

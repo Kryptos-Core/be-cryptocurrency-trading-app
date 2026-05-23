@@ -4,60 +4,30 @@ global:
 route:
   group_by: ['alertname', 'severity', 'cluster', 'service']
   group_wait: 10s
-  group_interval: 10s
+  group_interval: 30s
   repeat_interval: 12h
-  receiver: 'telegram'
+  receiver: 'telegram-bridge'
   routes:
     - match:
+        alertname: DeadMansSwitch
+      receiver: 'telegram-bridge'
+      group_wait: 0s
+      repeat_interval: 1h
+
+    - match:
         severity: critical
-      receiver: 'telegram-critical'
+      receiver: 'telegram-bridge'
       group_wait: 0s
       repeat_interval: 1h
 
     - match:
         severity: warning
-      receiver: 'telegram-warning'
-
-    - match:
-        alertname: DeadMansSwitch
-      receiver: 'telegram-critical'
-      repeat_interval: 1h
+      receiver: 'telegram-bridge'
 
 receivers:
   - name: 'null'
 
-  - name: 'telegram'
-    telegram_configs:
-      - bot_token: '8772731855:AAEjht_FEmzDv-IislUQ4QC4QBnb4HoYx-E'
-        chat_id: 8619556399
-        message: |
-          *Alert: {{ .GroupLabels.alertname }}*
-          *Status:* {{ .Status }}
-          *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
-          {{ range .Alerts }}{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}{{ end }}
-        parse_mode: Markdown
-        send_resolved: true
-
-  - name: 'telegram-critical'
-    telegram_configs:
-      - bot_token: '8772731855:AAEjht_FEmzDv-IislUQ4QC4QBnb4HoYx-E'
-        chat_id: 8619556399
-        message: |
-          🚨 *CRITICAL ALERT*
-          *{{ .GroupLabels.alertname }}*
-          *Status:* {{ .Status }}
-          {{ range .Alerts }}{{ if eq .Status "firing" }}{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}{{ end }}{{ end }}
-          *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
-        parse_mode: Markdown
-        send_resolved: true
-
-  - name: 'telegram-warning'
-    telegram_configs:
-      - bot_token: '8772731855:AAEjht_FEmzDv-IislUQ4QC4QBnb4HoYx-E'
-        chat_id: 8619556399
-        message: |
-          ⚠️ *WARNING: {{ .GroupLabels.alertname }}*
-          *Status:* {{ .Status }}
-          *Labels:* {{ range .Labels }}{{ .Key }}={{ .Value }} {{ end }}
-        parse_mode: Markdown
+  - name: 'telegram-bridge'
+    webhook_configs:
+      - url: 'http://172.20.0.1:19095/alert'
         send_resolved: true
