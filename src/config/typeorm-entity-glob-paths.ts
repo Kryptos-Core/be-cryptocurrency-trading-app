@@ -7,9 +7,12 @@ import * as path from 'node:path';
  * `@Entity` lives outside `src/entities/`, add its path here and to `ALL_ENTITIES`.
  */
 export function typeormEntityGlobPaths(callerDirname: string): string[] {
+  const compiledSrcDir = path.resolve(callerDirname, '../../src');
   return [
-    path.join(callerDirname, '../entities/*.entity{.ts,.js}'),
-    path.join(callerDirname, '../modules/blockchain/entities/*.entity{.ts,.js}'),
+    // Use the compiled src tree so relation decorators that import through @/*
+    // resolve to the same module identity as the entity registry.
+    path.join(compiledSrcDir, 'entities/*.entity{.ts,.js}'),
+    path.join(compiledSrcDir, 'modules/blockchain/entities/*.entity{.ts,.js}'),
   ];
 }
 

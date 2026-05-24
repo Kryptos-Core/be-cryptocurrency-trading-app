@@ -33,25 +33,24 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/tsconfig*.json ./
-COPY --from=builder --chown=nestjs:nodejs /app/src/modules/treasury/workers ./src/modules/treasury/workers
+# Copy source files needed by runtime helper scripts (required for db:migrate:prod and db:seed:prod)
+COPY --from=builder --chown=nestjs:nodejs /app/src ./src
 
-# Copy seed scripts for migrations (required for db:migrate:prod and db:seed:prod)
-COPY --from=builder --chown=nestjs:nodejs /app/src/seed ./dist/seed
-COPY --from=builder --chown=nestjs:nodejs /app/src/config ./dist/config
-COPY --from=builder --chown=nestjs:nodejs /app/src/config ./dist/config
-
-# Compile worker TypeScript separately (webpack bundles everything except dynamic imports)
+# Compile TypeScript files used at runtime outside webpack bundle without replacing bundled app dist
 RUN npm install --no-save typescript && \
-    npx tsc --outDir dist/modules/treasury/workers \
-        --module commonjs \
-        --target ES2021 \
-        --esModuleInterop \
-        --resolveJsonModule \
-        --skipLibCheck \
-        --moduleResolution node \
-        src/modules/treasury/workers/crypto-account.worker.ts && \
+    npx tsc --project tsconfig.json --outDir /tmp/compiled && \
+    rm -rf src && \
+    cp -R /tmp/compiled ./src && \
+    cp -R /tmp/compiled/seed dist/seed && \
+    cp -R /tmp/compiled/config dist/config && \
+    cp -R /tmp/compiled/entities dist/entities && \
+    cp -R /tmp/compiled/migrations dist/migrations && \
+    mkdir -p dist/modules/blockchain/entities && \
+    cp -R /tmp/compiled/modules/blockchain/entities/* dist/modules/blockchain/entities/ && \
+    mkdir -p dist/modules/treasury/workers && \
+    cp -R /tmp/compiled/modules/treasury/workers/* dist/modules/treasury/workers/ && \
     npm uninstall typescript && \
-    rm -rf src/modules/treasury/workers
+    rm -rf /tmp/compiled
 
 # Set production environment
 ENV NODE_ENV=production

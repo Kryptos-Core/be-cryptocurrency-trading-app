@@ -1,5 +1,4 @@
 import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
-import { LinkedWallet, OnchainTransaction } from '@/modules/blockchain';
 import { Deposit } from './deposit.entity';
 import { ManagedWallet } from './managed-wallet.entity';
 import { Order } from './order.entity';
@@ -8,6 +7,8 @@ import { UserBinanceCredentials } from './user-binance-credentials.entity';
 import { Wallet } from './wallet.entity';
 import { WalletLedger } from './wallet-ledger.entity';
 import { Withdrawal } from './withdrawal.entity';
+import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
+import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
 
 @Entity('users')
 @Index('uk_users_email', ['email'], { unique: true })
