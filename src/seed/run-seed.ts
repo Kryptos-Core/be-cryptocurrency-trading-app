@@ -17,11 +17,15 @@ import {
   typeormMigrationFilePaths,
 } from '@/config/typeorm-entity-glob-paths';
 import { parseAndValidateSeedUsers } from '@/seed/seed-users-json.util';
-import { resolveSeedUsersJsonPath } from '@/seed/seed-users-path.util';
+import {
+  isEncryptedSeedPath,
+  resolveSeedUsersJsonPath,
+} from '@/seed/seed-users-path.util';
+import { SeedEncryptionService } from '@/seed/seed-encryption.service';
 
 loadEnvFilesForCli();
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 function resolveCoreDb() {
   return {
@@ -83,9 +87,16 @@ async function run() {
     console.log('✅ Cleared.');
 
     const usersPath = resolveSeedUsersJsonPath({ cwd: process.cwd() });
-    const usersData = parseAndValidateSeedUsers(fs.readFileSync(usersPath, 'utf-8'));
+    let usersRaw: string;
+    if (isEncryptedSeedPath(usersPath)) {
+      console.log('   (seed file is encrypted — decrypting with SEED_DATA_ENCRYPTION_KEY)');
+      const encryptionService = new SeedEncryptionService();
+      usersRaw = encryptionService.decrypt(fs.readFileSync(usersPath, 'utf8'));
+    } else {
+      usersRaw = fs.readFileSync(usersPath, 'utf8');
+    }
+    const usersData = parseAndValidateSeedUsers(usersRaw);
     console.log(`📄 Seed users file: ${usersPath}`);
-
     console.log(`📥 Seeding ${usersData.length} users...`);
     for (const u of usersData) {
       const userId = newUuid();

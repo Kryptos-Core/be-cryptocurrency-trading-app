@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { resolveSeedUsersJsonPath } from './seed-users-path.util';
+import { isEncryptedSeedPath, resolveSeedUsersJsonPath } from './seed-users-path.util';
 
 describe('resolveSeedUsersJsonPath', () => {
   const cwd = path.join(__dirname, 'fixture-resolve');
@@ -24,7 +24,17 @@ describe('resolveSeedUsersJsonPath', () => {
     ).toThrow(/SEED_USERS_JSON/);
   });
 
-  it('prefers src/seed/data/users.json when present', () => {
+  it('prefers users.json.enc over users.json when both exist', () => {
+    const encPath = path.join(cwd, 'src', 'seed', 'data', 'users.json.enc');
+    const jsonPath = path.join(cwd, 'src', 'seed', 'data', 'users.json');
+    const p = resolveSeedUsersJsonPath({
+      cwd,
+      existsSync: (f) => f === encPath || f === jsonPath,
+    });
+    expect(p).toBe(encPath);
+  });
+
+  it('prefers users.json when users.json.enc is absent', () => {
     const local = path.join(cwd, 'src', 'seed', 'data', 'users.json');
     const p = resolveSeedUsersJsonPath({
       cwd,
@@ -33,7 +43,7 @@ describe('resolveSeedUsersJsonPath', () => {
     expect(p).toBe(local);
   });
 
-  it('falls back to users.json.example when users.json missing', () => {
+  it('falls back to users.json.example when users.json and users.json.enc missing', () => {
     const example = path.join(cwd, 'src', 'seed', 'data', 'users.json.example');
     const p = resolveSeedUsersJsonPath({
       cwd,
@@ -48,6 +58,18 @@ describe('resolveSeedUsersJsonPath', () => {
         cwd,
         existsSync: () => false,
       }),
-    ).toThrow(/users\.json\.example/);
+    ).toThrow(/users\.json/);
+  });
+});
+
+describe('isEncryptedSeedPath', () => {
+  it('returns true for .enc files', () => {
+    expect(isEncryptedSeedPath('users.json.enc')).toBe(true);
+    expect(isEncryptedSeedPath('/absolute/path/users.json.enc')).toBe(true);
+  });
+
+  it('returns false for .json files', () => {
+    expect(isEncryptedSeedPath('users.json')).toBe(false);
+    expect(isEncryptedSeedPath('users.json.example')).toBe(false);
   });
 });

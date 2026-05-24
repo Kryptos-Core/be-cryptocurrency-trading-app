@@ -1,17 +1,17 @@
-# Monitoring Stack Deployment Notes
+# Ghi Chú Triển Khai Monitoring Stack
 
-This document records the monitoring/alerting hardening applied to the crypto-trading stack so the same setup can be reproduced on a new server with fewer mistakes.
+Tài liệu này ghi lại quá trình tăng cường monitoring/alerting cho crypto-trading stack, để có thể tái tạo setup trên server mới với ít lỗi sai hơn.
 
-## Scope
+## Phạm vi
 
-Stack covered here:
+Stack được cover:
 - Prometheus
 - Alertmanager
 - Node Exporter
 - Grafana
-- Telegram alert delivery
+- Gửi cảnh báo qua Telegram
 
-Primary files changed:
+Các file chính đã thay đổi:
 - `docker-compose.monitoring.yml`
 - `prometheus/alerts.yml`
 - `alertmanager/alertmanager.yml`
@@ -21,47 +21,47 @@ Primary files changed:
 - `alertmanager/host-tcp-forward.py`
 - `alertmanager/Dockerfile.telegram-bridge`
 
-## What was hardened
+## Những gì đã được tăng cường
 
-### 1) Alertmanager routing tuned to reduce noise
+### 1) Alertmanager routing đã được tinh chỉnh để giảm noise
 
 File:
 - `alertmanager/alertmanager.yml`
 - `ansible/roles/monitoring/templates/alertmanager.yml.j2`
 
-Applied changes:
-- Kept `critical` alerts repeating every `1h`
-- Kept `warning` alerts repeating every `12h`
-- Increased top-level `group_interval` from `10s` to `30s` to batch related alerts better
-- Added a dedicated `DeadMansSwitch` route before severity routes
-- Added a dedicated receiver path for deadman and other alerts
+Thay đổi đã áp dụng:
+- Giữ `critical` alerts lặp mỗi `1h`
+- Giữ `warning` alerts lặp mỗi `12h`
+- Tăng `group_interval` top-level từ `10s` lên `30s` để batch các alerts liên quan tốt hơn
+- Thêm route `DeadMansSwitch` riêng trước các severity routes
+- Thêm receiver path riêng cho deadman và các alerts khác
 
-Why:
-- Avoids noisy bursts from related alerts
-- Prevents the deadman alert from being mixed into the normal critical stream
-- Keeps production-critical incidents fast while warning alerts stay calmer
+Lý do:
+- Tránh burst noise từ các alerts liên quan
+- Ngăn deadman alert bị trộn vào stream critical bình thường
+- Giữ incidents quan trọng trên production diễn ra nhanh trong khi warning alerts giữ nhẹ nhàng hơn
 
-### 2) High error rate alert protected against low-traffic false positives
+### 2) Cảnh báo high error rate đã được bảo vệ chống false positives ở low-traffic
 
 File:
 - `prometheus/alerts.yml`
 - `ansible/roles/monitoring/templates/alerts.yml.j2`
 
-Applied changes:
-- Changed `HighErrorRate` expression to require both:
+Thay đổi đã áp dụng:
+- Đổi biểu thức `HighErrorRate` yêu cầu cả hai:
   - error ratio > 5%
-  - request volume > 1 req/s over the same 5-minute window
+  - request volume > 1 req/s trong cùng 5 phút window
 
-### 3) Disk space alert made safer for containerized hosts
+### 3) Cảnh báo disk space đã được làm an toàn hơn cho containerized hosts
 
 File:
 - `prometheus/alerts.yml`
 - `ansible/roles/monitoring/templates/alerts.yml.j2`
 
-Applied changes:
-- Tightened `DiskSpaceLow` expression to exclude transient/container filesystems
+Thay đổi đã áp dụng:
+- Siết `DiskSpaceLow` expression để loại trừ các filesystem tạm thời/container
 
-### 4) DeadMansSwitch severity and delivery adjusted
+### 4) DeadMansSwitch severity và delivery đã được điều chỉnh
 
 File:
 - `prometheus/alerts.yml`
@@ -69,22 +69,22 @@ File:
 - `alertmanager/alertmanager.yml`
 - `ansible/roles/monitoring/templates/alertmanager.yml.j2`
 
-Applied changes:
-- Changed `DeadMansSwitch` severity from `warning` to `critical`
-- Routed it through the bridge path
-- Kept a dedicated delivery path so deadman stays visually distinct
+Thay đổi đã áp dụng:
+- Đổi `DeadMansSwitch` severity từ `warning` sang `critical`
+- Route qua bridge path
+- Giữ delivery path riêng để deadman giữ visual distinct
 
-### 5) Fixed Node Exporter healthcheck
+### 5) Đã fix Node Exporter healthcheck
 
 File:
 - `docker-compose.monitoring.yml`
 
-Applied changes:
-- Changed Node Exporter healthcheck endpoint from `/health` to `/metrics`
+Thay đổi đã áp dụng:
+- Đổi Node Exporter healthcheck endpoint từ `/health` sang `/metrics`
 
-## Validation performed before deployment
+## Validation đã thực hiện trước khi deploy
 
-### YAML parse check
+### Kiểm tra parse YAML
 ```bash
 python3 - <<'PY'
 import yaml
@@ -95,7 +95,7 @@ for p in ['prometheus/alerts.yml', 'alertmanager/alertmanager.yml']:
 PY
 ```
 
-Observed result:
+Kết quả quan sát được:
 - `YAML_OK prometheus/alerts.yml`
 - `YAML_OK alertmanager/alertmanager.yml`
 
@@ -104,41 +104,41 @@ Observed result:
 TELEGRAM_BOT_TOKEN=*** GF_SECURITY_ADMIN_PASSWORD=*** docker compose -f docker-compose.monitoring.yml config
 ```
 
-Observed result:
+Kết quả quan sát được:
 - Compose validation passed
-- Docker emitted only a warning that the `version` field is obsolete
+- Docker chỉ emit warning rằng field `version` đã obsolete
 
-## Real deployment and runtime verification performed
+## Xác minh deployment thực tế và runtime đã thực hiện
 
-### 1) Brought the monitoring stack up
+### 1) Đưa monitoring stack lên
 
-Command used:
+Lệnh đã dùng:
 ```bash
 docker compose --env-file .env.production -f docker-compose.monitoring.yml up -d
 ```
 
-### 2) Found and fixed Alertmanager crash-loop from unsupported env expansion approach
+### 2) Tìm và fix Alertmanager crash-loop từ unsupported env expansion
 
-Root cause confirmed from logs:
+Root cause đã xác nhận từ logs:
 ```text
 alertmanager: error: unknown long flag '--config.expand-env', try --help
 ```
 
-Compatibility check confirmed `prom/alertmanager:v0.27.0` does not support `--config.expand-env`.
+Compatibility check xác nhận `prom/alertmanager:v0.27.0` không hỗ trợ `--config.expand-env`.
 
-Fix applied:
-- removed `--config.expand-env`
-- stopped relying on direct env expansion inside Alertmanager config for this runtime
+Fix đã áp dụng:
+- Loại bỏ `--config.expand-env`
+- Không còn dựa vào direct env expansion bên trong Alertmanager config cho runtime này
 
-### 3) Verified container health after fix
+### 3) Đã xác minh container health sau fix
 
-Observed healthy components:
+Các thành phần healthy:
 - `prometheus`
 - `grafana`
 - `node_exporter`
-- `alertmanager` (when run in Compose path before host-network workaround)
+- `alertmanager` (khi chạy qua Compose path trước host-network workaround)
 
-Endpoint checks passed:
+Các endpoint checks đã pass:
 ```bash
 curl -fsS http://127.0.0.1:9093/-/healthy
 curl -fsS http://127.0.0.1:9090/-/healthy
@@ -146,30 +146,30 @@ curl -fsS http://127.0.0.1:9100/metrics >/dev/null
 curl -fsS http://127.0.0.1:3001/api/health
 ```
 
-### 4) Verified Prometheus rule state at runtime
+### 4) Đã xác minh Prometheus rule state tại runtime
 
-Checked via Prometheus API after reload:
+Kiểm tra qua Prometheus API sau reload:
 - `BackendDown` -> `inactive`, `health=ok`
 - `HighErrorRate` -> `inactive`, `health=ok`
 - `DiskSpaceLow` -> `inactive`, `health=ok`
 - `DeadMansSwitch` -> `firing`, `health=ok`
 
-Observed active alert set:
+Tập alert active đã quan sát:
 - `DeadMansSwitch firing critical`
 
-### 5) Investigated built-in Telegram notifier failure deeply
+### 5) Đã điều tra sâu về lỗi built-in Telegram notifier
 
-Observed failures:
-- Alertmanager built-in Telegram notifier failed TLS verification to `api.telegram.org`
-- Node-based bridge inside container failed with `self-signed certificate`
-- Alpine runtime package fetch also failed TLS trust
-- container-to-host reachability was unreliable enough to break a simple host-bridge path from the Compose Alertmanager container
+Các lỗi đã quan sát:
+- Alertmanager built-in Telegram notifier không verify được TLS tới `api.telegram.org`
+- Node-based bridge bên trong container lỗi với `self-signed certificate`
+- Alpine runtime package fetch cũng không verify được TLS trust
+- container-to-host reachability không đáng tin cậy đủ để break một simple host-bridge path từ Compose Alertmanager container
 
-Practical conclusion:
-- the runtime/container environment has trust/network inconsistencies
-- the cleanest working fix on this machine was to move Alertmanager itself to a host-network runtime path and use a host-side Telegram webhook bridge
+Kết luận thực tế:
+- Runtime/container environment có trust/network inconsistencies
+- Fix workaround sạch nhất trên máy này là chuyển Alertmanager sang host-network runtime path và dùng host-side Telegram webhook bridge
 
-## Final working workaround used
+## Final working workaround đã sử dụng
 
 ### Host-side Telegram bridge
 
@@ -177,17 +177,17 @@ Bridge file:
 - `alertmanager/telegram-bridge.py`
 
 Runtime behavior:
-- listens on host port `9095`
-- accepts Alertmanager webhook payloads at `/alert`
-- sends Telegram messages via host `curl`
+- Listen trên host port `9095`
+- Accept Alertmanager webhook payloads tại `/alert`
+- Gửi Telegram messages qua host `curl`
 
-Important finding:
-- `.env.production` did **not** actually contain the real Telegram token at verification time; it held `***`
-- end-to-end Telegram succeeded only after restarting the host bridge with the explicit real token supplied during debugging
+Phát hiện quan trọng:
+- `.env.production` **không** chứa real Telegram token tại thời điểm verify; nó giữ `***`
+- Telegram end-to-end chỉ thành công sau khi restart host bridge với real token được cung cấp trong quá trình debug
 
 ### Host-side Alertmanager
 
-Instead of relying on the containerized Alertmanager-to-host bridge path, Alertmanager was run directly with host networking:
+Thay vì dựa vào containerized Alertmanager-to-host bridge path, Alertmanager chạy trực tiếp với host networking:
 ```bash
 docker run --rm --name alertmanager-host \
   --network host \
@@ -201,70 +201,70 @@ docker run --rm --name alertmanager-host \
   --web.route-prefix=/
 ```
 
-This host-network Alertmanager successfully loaded config and served health checks.
+Alertmanager host-network này đã load config thành công và serve health checks.
 
-## End-to-end evidence
+## Bằng chứng end-to-end
 
-### Direct bridge Telegram send verified
-Observed log:
+### Direct bridge Telegram send đã verify
+Log quan sát được:
 ```text
 telegram_send_ok {"ok":true,...}
 ```
 
-### Full firing path verified
-Verified path:
+### Full firing path đã verify
+Path đã verify:
 - Alertmanager (host-network)
 - webhook to host bridge
-- host bridge sends Telegram
+- host bridge gửi Telegram
 
-Observed logs:
+Log quan sát được:
 ```text
 webhook_received {"status": "firing", ... "alertname": "AMHostNetFinal..."}
 telegram_send_ok {"ok":true,...}
 ```
 
-This confirms a real Telegram delivery for the firing alert path.
+Điều này xác nhận real Telegram delivery cho firing alert path.
 
 ### Resolved path
-A resolved alert payload was also injected during testing, but the captured evidence in the final log excerpt only shows the firing delivery. So the firing path is verified with hard evidence; resolved delivery was attempted but is not claimed as proven in the final captured log snippet.
+Một resolved alert payload cũng đã được inject trong testing, nhưng captured evidence trong final log excerpt chỉ show firing delivery. Vậy firing path đã verify với bằng chứng cứng; resolved delivery đã attempt nhưng không claim proven trong final captured log snippet.
 
-## What is still imperfect / operational caveats
+## Những gì vẫn chưa hoàn hảo / operational caveats
 
-1. The current proven working path on this host is **host-side Alertmanager + host-side bridge**, not pure Compose-to-Compose Telegram delivery.
-2. `.env.production` should be corrected to contain the real Telegram bot token if this is meant to be reproducible without manual runtime injection.
-3. The in-repo Compose bridge experiments should be treated as intermediate/debugging artifacts until the Docker/container trust environment is cleaned up.
-4. `version` in Compose is still obsolete and can be removed.
+1. Current proven working path trên host này là **host-side Alertmanager + host-side bridge**, không phải pure Compose-to-Compose Telegram delivery.
+2. `.env.production` nên được sửa để chứa real Telegram bot token nếu muốn reproducible mà không cần manual runtime injection.
+3. Các Compose bridge experiments trong repo nên được coi là intermediate/debugging artifacts cho đến khi Docker/container trust environment được dọn dẹp.
+4. `version` trong Compose vẫn obsolete và có thể remove.
 
-## Recommended next hardening steps
+## Các bước tăng cường tiếp theo được khuyến nghị
 
-1. Persist the host-side Alertmanager and host-side bridge cleanly
-   - systemd units or another supervised host service model
-   - do not rely on ad-hoc `nohup` in production
+1. **Persist host-side Alertmanager và host-side bridge cleanly**
+   - systemd units hoặc another supervised host service model
+   - Không dựa vào ad-hoc `nohup` trên production
 
-2. Fix `.env.production`
-   - replace placeholder `***` with the real bot token in the intended secure deployment path
+2. **Sửa `.env.production`**
+   - Replace placeholder `***` bằng real bot token trong intended secure deployment path
 
-3. Clean up Compose bridge experiments
-   - either remove them or finish a stable Docker-native bridge after container trust/network issues are resolved
+3. **Dọn dẹp Compose bridge experiments**
+   - Hoặc remove hoặc finish stable Docker-native bridge sau khi container trust/network issues được resolve
 
-4. Investigate Docker/container trust path separately
-   - container TLS trust to Telegram and package repositories is inconsistent on this machine
-   - this is a host/runtime issue worth fixing independently of monitoring config
+4. **Investigate Docker/container trust path riêng**
+   - Container TLS trust tới Telegram và package repositories không nhất quán trên máy này
+   - Đây là host/runtime issue đáng fix độc lập với monitoring config
 
-## Quick summary
+## Tóm tắt nhanh
 
-This pass completed real deployment and runtime verification, not just repo edits:
-- monitoring config hardening applied
-- Alertmanager incompatibility with `--config.expand-env` identified and corrected
-- runtime rules verified
-- built-in Telegram notifier failure isolated to runtime TLS/trust behavior
-- host-side Telegram bridge implemented
-- host-network Alertmanager path used as pragmatic workaround
-- real Telegram firing alert delivery verified end-to-end
+Pass này hoàn thành real deployment và runtime verification, không chỉ repo edits:
+- Monitoring config hardening đã apply
+- Alertmanager incompatibility với `--config.expand-env` đã identified và corrected
+- Runtime rules đã verify
+- Built-in Telegram notifier failure đã isolated tới runtime TLS/trust behavior
+- Host-side Telegram bridge đã implement
+- Host-network Alertmanager path đã dùng như pragmatic workaround
+- Real Telegram firing alert delivery đã verify end-to-end
 
-## Persistent setup completed (systemd)
+## Persistent setup đã hoàn thành (systemd)
 
-To make alerting survive reboots and avoid ad-hoc nohup runs, two host-level systemd services are installed and enabled.
+Để alerting survive reboots và tránh ad-hoc nohup runs, hai host-level systemd services đã được install và enable.
 
 ### Service 1: Telegram bridge
 
@@ -292,8 +292,8 @@ WantedBy=multi-user.target
 
 Exec script:
 - `alertmanager/run-telegram-bridge.sh`
-- Reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` from `.env.production`
-- Starts `python3 alertmanager/telegram-bridge.py`
+- Đọc `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID` từ `.env.production`
+- Start `python3 alertmanager/telegram-bridge.py`
 
 ### Service 2: Host-network Alertmanager
 
@@ -323,13 +323,13 @@ WantedBy=multi-user.target
 
 Exec script:
 - `alertmanager/run-alertmanager-host.sh`
-- Runs `prom/alertmanager:v0.27.0` with `--network host`
+- Chạy `prom/alertmanager:v0.27.0` với `--network host`
 - Mounts:
   - `alertmanager/alertmanager.yml`
   - `alertmanager/telegram.tmpl`
   - `alertmanager_data` Docker volume
 
-### Activation steps used
+### Các bước activation đã dùng
 
 ```bash
 sudo chmod +x /home/ubuntu/crypto-trading/alertmanager/run-telegram-bridge.sh
@@ -339,24 +339,24 @@ sudo systemctl enable --now crypto-telegram-bridge.service
 sudo systemctl enable --now crypto-alertmanager-host.service
 ```
 
-### Verified runtime state
+### Đã verify runtime state
 
-At deployment completion both services were:
+Tại deployment completion cả hai services đều:
 - `enabled`
 - `active (running)`
 
-Quick verification commands:
+Các lệnh verify nhanh:
 ```bash
 sudo systemctl is-enabled crypto-telegram-bridge.service crypto-alertmanager-host.service
 sudo systemctl is-active crypto-telegram-bridge.service crypto-alertmanager-host.service
 sudo systemctl status --no-pager crypto-telegram-bridge.service crypto-alertmanager-host.service
 ```
 
-## Monitoring compose ownership after hardening
+## Monitoring compose ownership sau hardening
 
-`docker-compose.monitoring.yml` now intentionally excludes experimental Alertmanager/bridge containers.
+`docker-compose.monitoring.yml` hiện có chủ đích loại trừ experimental Alertmanager/bridge containers.
 
-Current Compose-managed monitoring services:
+Các Compose-managed monitoring services hiện tại:
 - `prometheus`
 - `grafana`
 - `node-exporter`
@@ -365,32 +365,32 @@ Host-managed (systemd + host runtime):
 - Alertmanager (`crypto-alertmanager-host.service`)
 - Telegram bridge (`crypto-telegram-bridge.service`)
 
-This split is deliberate for reliability on this host until container TLS/trust behavior is fixed.
+Split này có chủ đích để reliability trên host này cho đến khi container TLS/trust behavior được fix.
 
 ## Production environment requirements
 
-Required keys in `/home/ubuntu/crypto-trading/.env.production`:
+Required keys trong `/home/ubuntu/crypto-trading/.env.production`:
 - `TELEGRAM_BOT_TOKEN` (real production bot token)
 - `TELEGRAM_CHAT_ID`
 - `GF_SECURITY_ADMIN_PASSWORD`
 
 Notes:
-- Do not commit real tokens/passwords into Git.
-- If Telegram delivery silently fails after reboot, first confirm token/chat id are present and non-placeholder values.
+- Không commit real tokens/passwords vào Git.
+- Nếu Telegram delivery silently fail sau reboot, trước tiên confirm token/chat id có present và non-placeholder values.
 
 ## Fast rebuild checklist (new server / disaster recovery)
 
-1. Clone repo to `/home/ubuntu/crypto-trading`
-2. Prepare `.env.production` with real secrets
+1. Clone repo tới `/home/ubuntu/crypto-trading`
+2. Chuẩn bị `.env.production` với real secrets
 3. Start Compose monitoring baseline:
    ```bash
    docker compose --env-file .env.production -f docker-compose.monitoring.yml up -d
    ```
-4. Ensure scripts are executable:
+4. Ensure scripts executable:
    ```bash
    chmod +x alertmanager/run-telegram-bridge.sh alertmanager/run-alertmanager-host.sh
    ```
-5. Install the two systemd unit files from this document
+5. Install hai systemd unit files từ tài liệu này
 6. Enable/start services:
    ```bash
    sudo systemctl daemon-reload
@@ -404,11 +404,11 @@ Notes:
    curl -fsS http://127.0.0.1:9100/metrics >/dev/null
    curl -fsS http://127.0.0.1:3001/api/health
    ```
-8. Send one test alert and confirm Telegram receive path end-to-end
+8. Gửi một test alert và confirm Telegram receive path end-to-end
 
 ## Known limitations (track for future cleanup)
 
-- Alertmanager is not running as a Compose service in final setup.
-- Host-network mode is used as a pragmatic workaround.
-- Duplicate `After=` lines in `crypto-alertmanager-host.service` are harmless but can be tidied later.
-- Docker/container TLS trust path to Telegram/package repos still deserves root-cause fix.
+- Alertmanager không chạy như Compose service trong final setup.
+- Host-network mode được dùng như pragmatic workaround.
+- Duplicate `After=` lines trong `crypto-alertmanager-host.service` harmless nhưng có thể tidy later.
+- Docker/container TLS trust path tới Telegram/package repos vẫn deserves root-cause fix.
