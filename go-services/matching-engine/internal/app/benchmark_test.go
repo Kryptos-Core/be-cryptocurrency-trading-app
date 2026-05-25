@@ -250,7 +250,6 @@ func BenchmarkConcurrentMatching(b *testing.B) {
 		}
 	}
 
-	var wg sync.WaitGroup
 	var totalProcessed atomic.Int64
 
 	b.ResetTimer()
@@ -349,6 +348,7 @@ func BenchmarkMemoryUsageOrderBook(b *testing.B) {
 			runtime.ReadMemStats(&m1)
 
 			ob := orderbook.NewOrderBook("BTC/USDT")
+			_ = ob
 
 			runtime.ReadMemStats(&m2)
 			b.ReportMetric(float64(m2.Mallocs-m1.Mallocs), "allocs/op")
@@ -455,8 +455,8 @@ func BenchmarkMultipleTradingPairs(b *testing.B) {
 // BenchmarkMatchingStrategiesComparison compares different matching strategies.
 func BenchmarkMatchingStrategiesComparison(b *testing.B) {
 	pairs := []struct {
-		name    string
-		tif     domain.TIF
+		name string
+		tif  domain.TIF
 	}{
 		{"GTC", domain.TIFGTC},
 		{"IOC", domain.TIFIOC},
@@ -521,6 +521,7 @@ func BenchmarkLockAcquisitionRelease(b *testing.B) {
 		acquired = false
 		mu.Unlock()
 	}
+	_ = acquired
 }
 
 // BenchmarkContextCreation benchmarks context creation overhead.
@@ -530,7 +531,9 @@ func BenchmarkContextCreation(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_ = context.Background()
-		_ = context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_ = ctx
+		cancel()
 	}
 }
 
@@ -541,21 +544,21 @@ func BenchmarkContextCreation(b *testing.B) {
 // PerformanceComparisonResult holds results from comparing Go vs NestJS performance.
 type PerformanceComparisonResult struct {
 	OperationName      string
-	GoNsPerOp         float64
-	NestJSNsPerOp     float64
-	GoOrdersPerSecond float64
+	GoNsPerOp          float64
+	NestJSNsPerOp      float64
+	GoOrdersPerSecond  float64
 	NestJSOrdersPerSec float64
-	SpeedupFactor     float64
+	SpeedupFactor      float64
 }
 
 // CompareWithNestJS provides a framework for comparing with NestJS implementation.
 // Actual comparison requires running both implementations and collecting metrics.
 func CompareWithNestJS(goResult, nestJSResult float64) PerformanceComparisonResult {
 	return PerformanceComparisonResult{
-		OperationName:   "matching",
-		GoNsPerOp:       goResult,
-		NestJSNsPerOp:   nestJSResult,
-		SpeedupFactor:   nestJSResult / goResult,
+		OperationName: "matching",
+		GoNsPerOp:     goResult,
+		NestJSNsPerOp: nestJSResult,
+		SpeedupFactor: nestJSResult / goResult,
 	}
 }
 

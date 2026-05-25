@@ -15,7 +15,6 @@ func newBenchOrder(orderID, userID, pairID string, side domain.Side, price *big.
 
 // BenchmarkOrderBookAddOrders measures the performance of adding orders to the order book.
 func BenchmarkOrderBookAddOrders(b *testing.B) {
-	ob := orderbook.NewOrderBook("BTC/USDT")
 	prices := make([]*big.Int, 100)
 	for i := 0; i < 100; i++ {
 		prices[i] = big.NewInt(int64(50000 + i))
@@ -179,14 +178,14 @@ func BenchmarkMatchingConcurrent(b *testing.B) {
 		ob := orderbook.NewOrderBook(pair)
 		for j := 0; j < 50; j++ {
 			_ = ob.AddOrder(domain.NewOrder(
-			pair+"-maker-"+string(rune(j)),
-			pair, "maker-user-"+string(rune(j)),
-			domain.SideSell,
-			domain.OrderTypeLimit,
-			big.NewInt(int64(50000+j*10)),
-			*big.NewInt(10),
-			domain.TIFGTC,
-		))
+				pair+"-maker-"+string(rune(j)),
+				pair, "maker-user-"+string(rune(j)),
+				domain.SideSell,
+				domain.OrderTypeLimit,
+				big.NewInt(int64(50000+j*10)),
+				*big.NewInt(10),
+				domain.TIFGTC,
+			))
 		}
 		pairOBs[pair] = ob
 	}

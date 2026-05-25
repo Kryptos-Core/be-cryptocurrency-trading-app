@@ -1,8 +1,13 @@
 package handlers
 
 import (
+	"net"
+	"net/http"
+	"net/url"
 	"sync"
 	"testing"
+
+	socketio "github.com/googollee/go-socket.io"
 )
 
 // TestParseRoom tests the parseRoom function.
@@ -10,7 +15,7 @@ func TestParseRoom(t *testing.T) {
 	tests := []struct {
 		room       string
 		wantPairID string
-		wantCh    string
+		wantCh     string
 	}{
 		{"BTC/USDT:ticker", "BTC/USDT", ChannelTicker},
 		{"ETH/USDT:orderbook", "ETH/USDT", ChannelOrderbook},
@@ -174,11 +179,33 @@ type MockConn struct {
 	mu    sync.Mutex
 }
 
+var _ socketio.Conn = (*MockConn)(nil)
+
 func NewMockConn(id string) *MockConn {
 	return &MockConn{id: id, rooms: make(map[string]bool)}
 }
 
-func (c *MockConn) ID() string                       { return c.id }
+func (c *MockConn) ID() string                              { return c.id }
+func (c *MockConn) Close() error                            { return nil }
+func (c *MockConn) Context() interface{}                    { return nil }
+func (c *MockConn) SetContext(ctx interface{})              {}
+func (c *MockConn) Namespace() string                       { return "/trading" }
+func (c *MockConn) Emit(eventName string, v ...interface{}) {}
+func (c *MockConn) Join(room string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.rooms[room] = true
+}
+func (c *MockConn) Leave(room string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.rooms, room)
+}
+func (c *MockConn) LeaveAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.rooms = make(map[string]bool)
+}
 func (c *MockConn) Rooms() []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -188,16 +215,10 @@ func (c *MockConn) Rooms() []string {
 	}
 	return result
 }
-func (c *MockConn) JoinRoom(room string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.rooms[room] = true
-}
-func (c *MockConn) LeaveRoom(room string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.rooms, room)
-}
+func (c *MockConn) URL() url.URL              { return url.URL{} }
+func (c *MockConn) LocalAddr() net.Addr       { return nil }
+func (c *MockConn) RemoteAddr() net.Addr      { return nil }
+func (c *MockConn) RemoteHeader() http.Header { return http.Header{} }
 
 func TestSubscriptionManager_WithMockConn(t *testing.T) {
 	mgr := NewSubscriptionManager()
@@ -223,8 +244,8 @@ func TestMockConn_ID(t *testing.T) {
 func TestMockConn_Rooms(t *testing.T) {
 	conn := NewMockConn("test")
 
-	conn.JoinRoom("room1")
-	conn.JoinRoom("room2")
+	conn.Join("room1")
+	conn.Join("room2")
 
 	rooms := conn.Rooms()
 	if len(rooms) != 2 {
@@ -235,8 +256,8 @@ func TestMockConn_Rooms(t *testing.T) {
 func TestMockConn_LeaveRoom(t *testing.T) {
 	conn := NewMockConn("test")
 
-	conn.JoinRoom("room1")
-	conn.LeaveRoom("room1")
+	conn.Join("room1")
+	conn.Leave("room1")
 
 	rooms := conn.Rooms()
 	if len(rooms) != 0 {

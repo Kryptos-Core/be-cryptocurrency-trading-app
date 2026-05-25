@@ -59,7 +59,7 @@ func TestServerHealthz(t *testing.T) {
 
 // TestServerReadyz tests the readyz handler.
 func TestServerReadyz(t *testing.T) {
-	srv := &Server{cfg: Config{RedisAddr: "localhost:6379", KafkaBrokers: "localhost:9092"}}
+	srv := &Server{cfg: Config{ServiceName: "test-service", RedisAddr: "localhost:6379", KafkaBrokers: "localhost:9092"}}
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	w := httptest.NewRecorder()
@@ -221,7 +221,7 @@ func TestSplitCSV(t *testing.T) {
 		input    string
 		expected []string
 	}{
-		{"", nil},
+		{"", []string{}},
 		{"single", []string{"single"}},
 		{"a,b,c", []string{"a", "b", "c"}},
 		{"a, b, c", []string{"a", "b", "c"}},

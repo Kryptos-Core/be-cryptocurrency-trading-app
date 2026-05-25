@@ -72,8 +72,12 @@ type mockLockClient struct {
 }
 
 func newMockLock(pairID, owner string) *mockLockClient {
+	return newMockLockWithRedis(newMockRedis(), pairID, owner)
+}
+
+func newMockLockWithRedis(client *mockRedisClient, pairID, owner string) *mockLockClient {
 	return &mockLockClient{
-		client: newMockRedis(),
+		client: client,
 		key:    "matching:lock:" + pairID,
 		owner:  owner,
 	}
@@ -124,8 +128,9 @@ func TestMockLock_Acquire(t *testing.T) {
 }
 
 func TestMockLock_Acquire_AlreadyHeld(t *testing.T) {
-	ml1 := newMockLock("BTC/USDT", "owner-1")
-	ml2 := newMockLock("BTC/USDT", "owner-2")
+	redis := newMockRedis()
+	ml1 := newMockLockWithRedis(redis, "BTC/USDT", "owner-1")
+	ml2 := newMockLockWithRedis(redis, "BTC/USDT", "owner-2")
 	ctx := context.Background()
 
 	ok1, _ := ml1.acquire(ctx)
@@ -153,7 +158,8 @@ func TestMockLock_Acquire_DifferentPairs(t *testing.T) {
 }
 
 func TestMockLock_Release(t *testing.T) {
-	ml := newMockLock("BTC/USDT", "owner-release")
+	redis := newMockRedis()
+	ml := newMockLockWithRedis(redis, "BTC/USDT", "owner-release")
 	ctx := context.Background()
 
 	_, _ = ml.acquire(ctx)
@@ -162,7 +168,7 @@ func TestMockLock_Release(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ml2 := newMockLock("BTC/USDT", "owner-new")
+	ml2 := newMockLockWithRedis(redis, "BTC/USDT", "owner-new")
 	ok, _ := ml2.acquire(ctx)
 	if !ok {
 		t.Error("expected new owner to acquire after release")
@@ -170,8 +176,9 @@ func TestMockLock_Release(t *testing.T) {
 }
 
 func TestMockLock_Release_WrongOwner(t *testing.T) {
-	ml1 := newMockLock("BTC/USDT", "owner-1")
-	ml2 := newMockLock("BTC/USDT", "owner-2")
+	redis := newMockRedis()
+	ml1 := newMockLockWithRedis(redis, "BTC/USDT", "owner-1")
+	ml2 := newMockLockWithRedis(redis, "BTC/USDT", "owner-2")
 	ctx := context.Background()
 
 	_, _ = ml1.acquire(ctx)

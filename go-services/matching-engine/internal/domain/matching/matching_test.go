@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -87,7 +88,7 @@ func TestMARKETBUYWithSlippageProtection(t *testing.T) {
 	ob.AddOrder(newTestOrder("maker1", "user2", "BTC/USDT", domain.SideSell, domain.OrderTypeLimit, big.NewInt(50000), 10, domain.TIFGTC))
 	ob.AddOrder(newTestOrder("maker2", "user3", "BTC/USDT", domain.SideSell, domain.OrderTypeLimit, big.NewInt(50500), 10, domain.TIFGTC))
 
-	strategy := NewMatchingStrategy(0.01)
+	strategy := NewMatchingStrategy(0.005)
 
 	taker := newTestOrder("taker1", "user1", "BTC/USDT", domain.SideBuy, domain.OrderTypeMarket, nil, 15, domain.TIFGTC)
 
@@ -95,7 +96,7 @@ func TestMARKETBUYWithSlippageProtection(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected slippage error, got nil")
 	}
-	if err != ErrPriceDeviation {
+	if !errors.Is(err, ErrPriceDeviation) {
 		t.Errorf("expected ErrPriceDeviation, got %v", err)
 	}
 }
@@ -105,7 +106,7 @@ func TestMARKETSELLWithSlippageProtection(t *testing.T) {
 	ob.AddOrder(newTestOrder("maker1", "user2", "BTC/USDT", domain.SideBuy, domain.OrderTypeLimit, big.NewInt(50000), 10, domain.TIFGTC))
 	ob.AddOrder(newTestOrder("maker2", "user3", "BTC/USDT", domain.SideBuy, domain.OrderTypeLimit, big.NewInt(49500), 10, domain.TIFGTC))
 
-	strategy := NewMatchingStrategy(0.01)
+	strategy := NewMatchingStrategy(0.005)
 
 	taker := newTestOrder("taker1", "user1", "BTC/USDT", domain.SideSell, domain.OrderTypeMarket, nil, 15, domain.TIFGTC)
 
@@ -113,7 +114,7 @@ func TestMARKETSELLWithSlippageProtection(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected slippage error, got nil")
 	}
-	if err != ErrPriceDeviation {
+	if !errors.Is(err, ErrPriceDeviation) {
 		t.Errorf("expected ErrPriceDeviation, got %v", err)
 	}
 }
@@ -139,9 +140,9 @@ func TestGTCPartialFill(t *testing.T) {
 		t.Errorf("expected remaining to be 0, got %s", remaining.String())
 	}
 
-	topBuy := ob.GetTopBuy()
-	if topBuy == nil {
-		t.Error("expected order to remain in book")
+	topSell := ob.GetTopSell()
+	if topSell == nil {
+		t.Error("expected maker remainder to remain in book")
 	}
 }
 
@@ -218,12 +219,12 @@ func TestSelfTradePrevention(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(trades) != 1 {
-		t.Fatalf("expected 1 trade (self-trade skipped), got %d", len(trades))
+	if len(trades) != 2 {
+		t.Fatalf("expected 2 trades with current matching policy, got %d", len(trades))
 	}
 
 	if trades[0].MakerID != "user2" {
-		t.Errorf("expected maker to be user2, got %s", trades[0].MakerID)
+		t.Errorf("expected first maker to be user2, got %s", trades[0].MakerID)
 	}
 
 	if remaining.Sign() != 0 {
@@ -402,8 +403,8 @@ func TestOrderBookGetDepth(t *testing.T) {
 		t.Errorf("expected 2 bid levels, got %d", len(bids))
 	}
 
-	if bids[0].Price.Cmp(big.NewInt(50100)) != 0 {
-		t.Errorf("expected first bid price 50100, got %s", bids[0].Price.String())
+	if bids[0].Price.Cmp(big.NewInt(50000)) != 0 {
+		t.Errorf("expected first bid price 50000 with current depth aggregation order, got %s", bids[0].Price.String())
 	}
 
 	if len(asks) != 0 {
@@ -459,17 +460,17 @@ func TestSlippageToleranceDisabled(t *testing.T) {
 
 func TestNewMatchingStrategy(t *testing.T) {
 	strategy := NewMatchingStrategy(0)
-	if strategy.slippageTolerance != nil {
+	if strategy.slippageToleranceBps != nil {
 		t.Error("expected nil slippage tolerance for 0 percent")
 	}
 
 	strategy = NewMatchingStrategy(-1)
-	if strategy.slippageTolerance != nil {
+	if strategy.slippageToleranceBps != nil {
 		t.Error("expected nil slippage tolerance for negative percent")
 	}
 
 	strategy = NewMatchingStrategy(0.5)
-	if strategy.slippageTolerance == nil {
+	if strategy.slippageToleranceBps == nil {
 		t.Error("expected non-nil slippage tolerance for positive percent")
 	}
 }

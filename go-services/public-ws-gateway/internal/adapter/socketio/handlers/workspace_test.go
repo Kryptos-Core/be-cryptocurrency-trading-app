@@ -2,7 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"net"
+	"net/http"
+	"net/url"
 	"testing"
+
+	socketio "github.com/googollee/go-socket.io"
 )
 
 func TestWorkspaceState_Empty(t *testing.T) {
@@ -95,10 +100,37 @@ func TestEmitWorkspaceRestored_NilState(t *testing.T) {
 
 type mockConnForEmit struct {
 	id    string
-	emits []struct{ event string; data any }
+	emits []struct {
+		event string
+		data  any
+	}
 }
 
-func (c *mockConnForEmit) ID() string { return c.id }
+var _ socketio.Conn = (*mockConnForEmit)(nil)
+
+func (c *mockConnForEmit) ID() string                 { return c.id }
+func (c *mockConnForEmit) Close() error               { return nil }
+func (c *mockConnForEmit) Context() interface{}       { return nil }
+func (c *mockConnForEmit) SetContext(ctx interface{}) {}
+func (c *mockConnForEmit) Namespace() string          { return "/trading" }
+func (c *mockConnForEmit) Emit(event string, v ...interface{}) {
+	var data any
+	if len(v) > 0 {
+		data = v[0]
+	}
+	c.emits = append(c.emits, struct {
+		event string
+		data  any
+	}{event: event, data: data})
+}
+func (c *mockConnForEmit) Join(room string)          {}
+func (c *mockConnForEmit) Leave(room string)         {}
+func (c *mockConnForEmit) LeaveAll()                 {}
+func (c *mockConnForEmit) Rooms() []string           { return nil }
+func (c *mockConnForEmit) URL() url.URL              { return url.URL{} }
+func (c *mockConnForEmit) LocalAddr() net.Addr       { return nil }
+func (c *mockConnForEmit) RemoteAddr() net.Addr      { return nil }
+func (c *mockConnForEmit) RemoteHeader() http.Header { return http.Header{} }
 
 func TestWorkspaceState_MultipleSubscriptions(t *testing.T) {
 	ws := &WorkspaceState{

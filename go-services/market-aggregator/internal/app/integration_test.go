@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +20,7 @@ func TestHealthzEndpoint(t *testing.T) {
 	srv := &Server{
 		cfg: Config{
 			ServiceName: "market-aggregator",
-			HTTPAddr:   ":8080",
+			HTTPAddr:    ":8080",
 		},
 		started: time.Now().UTC(),
 	}
@@ -307,7 +308,7 @@ func TestHandleKafkaMessage(t *testing.T) {
 		Value: []byte(`{"eventType":"ticker","payload":{"payload":{"pairId":"BTC/USDT","symbol":"BTCUSDT","lastPrice":"50000","timestamp":"` + time.Now().Format(time.RFC3339Nano) + `"}}}`),
 	}
 
-	err := srv.handleKafkaMessage(msg)
+	err := srv.handleKafkaMessage(context.Background(), msg)
 	assert.NoError(t, err)
 }
 
@@ -347,7 +348,7 @@ func TestServerIndex(t *testing.T) {
 	srv := &Server{
 		cfg: Config{
 			ServiceName: "market-aggregator",
-			Env:        "production",
+			Env:         "production",
 		},
 	}
 
@@ -399,6 +400,6 @@ func TestTickerEnvelopeParsing(t *testing.T) {
 		Value: []byte(validMsg),
 	}
 
-	err := srv.handleKafkaMessage(msg)
+	err := srv.handleKafkaMessage(context.Background(), msg)
 	assert.NoError(t, err)
 }
