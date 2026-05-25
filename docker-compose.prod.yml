@@ -251,3 +251,180 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+
+  # ─── Go Services (Shadow/Canary by default) ──────────────────────────────────
+  market-aggregator:
+    build:
+      context: ./go-services/market-aggregator
+      dockerfile: Dockerfile
+    container_name: crypto_market_aggregator
+    image: crypto-trading-market-aggregator:latest
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      SERVICE_NAME: market-aggregator
+      SERVICE_ENV: production
+      HTTP_ADDR: ":8080"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP: "${MARKET_AGGREGATOR_KAFKA_GROUP:-market-aggregator-prod-v2}"
+      KAFKA_TOPICS: "${MARKET_AGGREGATOR_KAFKA_TOPICS:-crypto-trading.tradeexecuted,crypto-trading.market.ticker,market.ticker}"
+      REDIS_ADDR: "redis:6379"
+      POSTGRES_HOST: "postgres"
+      SHADOW_MODE: "${MARKET_AGGREGATOR_SHADOW_MODE:-true}"
+      READ_ONLY_MODE: "${MARKET_AGGREGATOR_READ_ONLY_MODE:-true}"
+      MUTATIONS_ENABLED: "false"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "/app/market-aggregator", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - backend-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  matching-engine:
+    build:
+      context: ./go-services/matching-engine
+      dockerfile: Dockerfile
+    container_name: crypto_matching_engine
+    image: crypto-trading-matching-engine:latest
+    restart: unless-stopped
+    profiles:
+      - go-risky
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      SERVICE_NAME: matching-engine
+      SERVICE_ENV: production
+      HTTP_ADDR: ":8081"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP: "${MATCHING_ENGINE_KAFKA_GROUP:-matching-engine-shadow-prod-v1}"
+      KAFKA_TOPICS: "${MATCHING_ENGINE_KAFKA_TOPICS:-crypto-trading.orderplaced,crypto-trading.ordercancelled,crypto-trading.tradeexecuted}"
+      REDIS_ADDR: "redis:6379"
+      POSTGRES_HOST: "postgres"
+      SHADOW_MODE: "${MATCHING_ENGINE_SHADOW_MODE:-true}"
+      READ_ONLY_MODE: "true"
+      MUTATIONS_ENABLED: "${MATCHING_ENGINE_MUTATIONS_ENABLED:-false}"
+    expose:
+      - "8081"
+    healthcheck:
+      test: ["CMD", "/app/matching-engine", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - backend-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  public-ws-gateway:
+    build:
+      context: ./go-services/public-ws-gateway
+      dockerfile: Dockerfile
+    container_name: crypto_public_ws_gateway
+    image: crypto-trading-public-ws-gateway:latest
+    restart: unless-stopped
+    profiles:
+      - go-canary
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      SERVICE_NAME: public-ws-gateway
+      SERVICE_ENV: production
+      HTTP_ADDR: ":8082"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP: "${PUBLIC_WS_GATEWAY_KAFKA_GROUP:-public-ws-gateway-prod-v1}"
+      REDIS_ADDR: "redis:6379"
+      POSTGRES_HOST: "postgres"
+      SHADOW_MODE: "${PUBLIC_WS_GATEWAY_SHADOW_MODE:-true}"
+      READ_ONLY_MODE: "true"
+      MUTATIONS_ENABLED: "false"
+      CANARY_PERCENT: "${PUBLIC_WS_GATEWAY_CANARY_PERCENT:-0}"
+    expose:
+      - "8082"
+    healthcheck:
+      test: ["CMD", "/app/public-ws-gateway", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - backend-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+

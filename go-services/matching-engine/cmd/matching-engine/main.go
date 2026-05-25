@@ -1,9 +1,15 @@
 package main
 
 import (
+    "context"
     "log"
+
+    "github.com/kryptos/go-services/matching-engine/internal/app"
 )
 
 func main() {
-    log.Println("matching-engine shadow scaffold is ready")
+    cfg := app.LoadConfig("matching-engine", "8081")
+    if err := app.New(cfg).Run(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 }
