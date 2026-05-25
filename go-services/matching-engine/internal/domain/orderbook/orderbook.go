@@ -71,7 +71,7 @@ func (ob *OrderBook) CancelOrder(orderID string) error {
 	}
 
 	order.Status = domain.StatusCancelled
-	delete(ob.ordersByID, orderID)
+	ob.removeFromQueue(order)
 
 	return nil
 }
@@ -79,13 +79,22 @@ func (ob *OrderBook) CancelOrder(orderID string) error {
 func (ob *OrderBook) GetTopBuy() *domain.Order {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
-	return ob.buyOrders.Peek()
+	return ob.peekActive(ob.buyOrders.orders)
 }
 
 func (ob *OrderBook) GetTopSell() *domain.Order {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
-	return ob.sellOrders.Peek()
+	return ob.peekActive(ob.sellOrders.orders)
+}
+
+func (ob *OrderBook) peekActive(orders []*domain.Order) *domain.Order {
+	for _, order := range orders {
+		if order != nil && !order.IsFilled() && order.Status != domain.StatusCancelled {
+			return order
+		}
+	}
+	return nil
 }
 
 func (ob *OrderBook) GetOrder(orderID string) *domain.Order {
@@ -97,7 +106,17 @@ func (ob *OrderBook) GetOrder(orderID string) *domain.Order {
 func (ob *OrderBook) Size() (buys, sells int) {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
-	return ob.buyOrders.Len(), ob.sellOrders.Len()
+	return ob.countActive(ob.buyOrders.orders), ob.countActive(ob.sellOrders.orders)
+}
+
+func (ob *OrderBook) countActive(orders []*domain.Order) int {
+	count := 0
+	for _, order := range orders {
+		if order != nil && !order.IsFilled() && order.Status != domain.StatusCancelled {
+			count++
+		}
+	}
+	return count
 }
 
 func (ob *OrderBook) GetDepth(levels int) (bids, asks []domain.PriceLevel) {
@@ -158,13 +177,23 @@ func (ob *OrderBook) aggregateLevels(orders []*domain.Order, levels int) []domai
 func (ob *OrderBook) GetBuyOrders() []*domain.Order {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
-	return ob.buyOrders.GetAll()
+	return ob.activeOrders(ob.buyOrders.GetAll())
 }
 
 func (ob *OrderBook) GetSellOrders() []*domain.Order {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
-	return ob.sellOrders.GetAll()
+	return ob.activeOrders(ob.sellOrders.GetAll())
+}
+
+func (ob *OrderBook) activeOrders(orders []*domain.Order) []*domain.Order {
+	active := orders[:0]
+	for _, order := range orders {
+		if order != nil && !order.IsFilled() && order.Status != domain.StatusCancelled {
+			active = append(active, order)
+		}
+	}
+	return active
 }
 
 func (ob *OrderBook) RemoveOrder(orderID string) error {
@@ -176,20 +205,23 @@ func (ob *OrderBook) RemoveOrder(orderID string) error {
 		return ErrOrderNotFound
 	}
 
-	orders := ob.buyOrders.orders
+	ob.removeFromQueue(order)
+	delete(ob.ordersByID, orderID)
+	return nil
+}
+
+func (ob *OrderBook) removeFromQueue(order *domain.Order) {
+	queue := ob.buyOrders
 	if order.Side == domain.SideSell {
-		orders = ob.sellOrders.orders
+		queue = ob.sellOrders
 	}
 
-	for i, o := range orders {
-		if o.OrderID == orderID {
-			heap.Remove(ob.buyOrders, i)
+	for i, o := range queue.orders {
+		if o.OrderID == order.OrderID {
+			heap.Remove(queue, i)
 			break
 		}
 	}
-
-	delete(ob.ordersByID, orderID)
-	return nil
 }
 
 func (ob *OrderBook) UpdateOrder(order *domain.Order) error {

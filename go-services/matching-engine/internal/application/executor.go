@@ -20,7 +20,6 @@ import (
 	"github.com/kryptos/go-services/matching-engine/internal/domain"
 	"github.com/kryptos/go-services/matching-engine/internal/domain/matching"
 	"github.com/kryptos/go-services/matching-engine/internal/domain/orderbook"
-	"github.com/kryptos/go-services/matching-engine/internal/infrastructure/lock"
 	"github.com/kryptos/go-services/matching-engine/internal/infrastructure/persistence"
 )
 

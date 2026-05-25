@@ -33,8 +33,8 @@ const (
 
 // TickerCacheEntry represents a cached ticker with timestamp for TTL eviction.
 type TickerCacheEntry struct {
-	Data      string
-	CachedAt  time.Time
+	Data     string
+	CachedAt time.Time
 }
 
 const (
@@ -61,21 +61,21 @@ type Config struct {
 }
 
 type Server struct {
-	cfg      Config
-	logger   *slog.Logger
-	started  time.Time
-	consumed uint64
-	logged   uint64
-	errors   uint64
-	lastKafkaUnix    atomic.Int64
-	redisClient      *redis.Client
-	published        uint64
+	cfg           Config
+	logger        *slog.Logger
+	started       time.Time
+	consumed      uint64
+	logged        uint64
+	errors        uint64
+	lastKafkaUnix atomic.Int64
+	redisClient   *redis.Client
+	published     uint64
 
 	tickerCache sync.Map
 
 	// Eviction tracking
 	lastEvictionUnix atomic.Int64
-	evictedCount atomic.Int64
+	evictedCount     atomic.Int64
 
 	draining atomic.Bool
 
@@ -293,7 +293,7 @@ func (s *Server) consumeKafka(ctx context.Context, topic string) {
 				return
 			}
 
-			if s.isConnectionError(err) {
+			if isTransientKafkaError(err) {
 				s.kafkaReconnects.Add(1)
 				s.logger.Warn("kafka.consumer.reconnecting",
 					"topic", topic, "error", err.Error(), "backoff_sec", backoff.Seconds())
@@ -347,15 +347,16 @@ func (s *Server) reportKafkaStats(ctx context.Context, reader *kafka.Reader, top
 		case <-ticker.C:
 			stats := reader.Stats()
 			s.kafkaLag.Store(stats.Lag)
-			// Report per-partition lag if available, otherwise aggregate
-			if stats.Partition >= 0 {
-				metrics.KafkaConsumerLag.WithLabelValues(topic, fmt.Sprintf("%d", stats.Partition)).Set(float64(stats.Lag))
-			} else {
-				metrics.KafkaConsumerLag.WithLabelValues(topic, "all").Set(float64(stats.Lag))
+			partition := stats.Partition
+			if partition == "" {
+				partition = "all"
 			}
+			metrics.KafkaConsumerLag.WithLabelValues(topic, partition).Set(float64(stats.Lag))
 		}
 	}
 }
+
+func isTransientKafkaError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -444,17 +445,19 @@ func (s *Server) handleKafkaMessageWithCache(ctx context.Context, msg kafka.Mess
 
 	s.tickerCache.Store(t.PairID, TickerCacheEntry{Data: string(encoded), CachedAt: time.Now()})
 
-	pipe := s.redisClient.Pipeline()
-	pipe.Set(ctx, "shadow:go:market:ticker:"+t.PairID, encoded, 10*time.Minute)
+	if s.redisClient != nil {
+		pipe := s.redisClient.Pipeline()
+		pipe.Set(ctx, "shadow:go:market:ticker:"+t.PairID, encoded, 10*time.Minute)
 
-	channel := getenv("GO_AGGREGATOR_TICKER_CHANNEL", "trading:external:ticker")
+		channel := getenv("GO_AGGREGATOR_TICKER_CHANNEL", "trading:external:ticker")
 
-	pubStart := time.Now()
-	pipe.Publish(ctx, channel, encoded)
-	s.redisPublishLatencyMs.Store(time.Since(pubStart).Milliseconds())
+		pubStart := time.Now()
+		pipe.Publish(ctx, channel, encoded)
+		s.redisPublishLatencyMs.Store(time.Since(pubStart).Milliseconds())
 
-	if _, err := pipe.Exec(ctx); err != nil {
-		return err
+		if _, err := pipe.Exec(ctx); err != nil {
+			return err
+		}
 	}
 	atomic.AddUint64(&s.published, 1)
 	return nil
@@ -472,7 +475,7 @@ func (s *Server) isFreshTicker(raw string) bool {
 	if err != nil {
 		return false
 	}
-	maxAge := time.Duration(getenvInt("MARKET_AGGREGATOR_MAX_TICKER_AGE_SECONDS", 30) * time.Second
+	maxAge := time.Duration(getenvInt("MARKET_AGGREGATOR_MAX_TICKER_AGE_SECONDS", 30)) * time.Second
 	if maxAge <= 0 {
 		maxAge = 30 * time.Second
 	}

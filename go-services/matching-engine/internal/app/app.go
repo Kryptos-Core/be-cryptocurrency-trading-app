@@ -49,23 +49,23 @@ type Config struct {
 
 	CanaryPairsCSV            string
 	ShadowMinMatchRate        float64
-	ShadowMaxUnmatchedRuns   int
+	ShadowMaxUnmatchedRuns    int
 	ReconciliationIntervalSec int
 }
 
 type Server struct {
-	cfg          Config
-	logger       *slog.Logger
-	started      time.Time
-	consumed     uint64
-	logged       uint64
-	errors       uint64
+	cfg           Config
+	logger        *slog.Logger
+	started       time.Time
+	consumed      uint64
+	logged        uint64
+	errors        uint64
 	lastKafkaUnix atomic.Int64
-	pool         *pgxpool.Pool
-	redisClient  *redis.Client
-	shadowEngine *application.ShadowEngine
-	canaryConfig *canary.CanaryConfig
-	reconcileSvc *application.ReconciliationService
+	pool          *pgxpool.Pool
+	redisClient   *redis.Client
+	shadowEngine  *application.ShadowEngine
+	canaryConfig  *canary.CanaryConfig
+	reconcileSvc  *application.ReconciliationService
 }
 
 func LoadConfig(defaultServiceName, defaultPort string) Config {
@@ -98,28 +98,28 @@ func LoadConfig(defaultServiceName, defaultPort string) Config {
 	}
 
 	return Config{
-		ServiceName:      getenv("SERVICE_NAME", defaultServiceName),
-		Env:              getenv("SERVICE_ENV", getenv("NODE_ENV", "production")),
-		HTTPAddr:         getenv("HTTP_ADDR", ":"+defaultPort),
-		ShadowMode:       getenvBool("SHADOW_MODE", true),
-		ReadOnlyMode:     getenvBool("READ_ONLY_MODE", true),
-		MutationsEnabled: getenvBool("MUTATIONS_ENABLED", false),
-		KafkaBrokers:     getenv("KAFKA_BROKERS", "kafka:9092"),
-		KafkaGroup:       getenv("KAFKA_GROUP", defaultServiceName+"-prod-v1"),
-		KafkaTopics:      splitCSV(getenv("KAFKA_TOPICS", defaultTopics(defaultServiceName))),
-		RedisAddr:        getenv("REDIS_ADDR", "redis:6379"),
-		PostgresHost:     getenv("POSTGRES_HOST", "postgres"),
-		PostgresPort:     getenv("POSTGRES_PORT", "5432"),
-		PostgresUser:     getenv("POSTGRES_USER", "postgres"),
-		PostgresPassword: os.Getenv("POSTGRES_PASSWORD"),
-		PostgresDatabase: getenv("POSTGRES_DATABASE", "crypto_trading"),
-		PostgresPoolMax:  poolMax,
-		BuildVersion:     getenv("BUILD_VERSION", "dev"),
-		BuildCommit:     getenv("BUILD_COMMIT", "unknown"),
-		CanaryPairsCSV:             getenv("MATCHING_GO_CANARY_PAIRS", ""),
-		ShadowMinMatchRate:         minMatchRate,
-		ShadowMaxUnmatchedRuns:     maxUnmatched,
-		ReconciliationIntervalSec:   reconciliationInterval,
+		ServiceName:               getenv("SERVICE_NAME", defaultServiceName),
+		Env:                       getenv("SERVICE_ENV", getenv("NODE_ENV", "production")),
+		HTTPAddr:                  getenv("HTTP_ADDR", ":"+defaultPort),
+		ShadowMode:                getenvBool("SHADOW_MODE", true),
+		ReadOnlyMode:              getenvBool("READ_ONLY_MODE", true),
+		MutationsEnabled:          getenvBool("MUTATIONS_ENABLED", false),
+		KafkaBrokers:              getenv("KAFKA_BROKERS", "kafka:9092"),
+		KafkaGroup:                getenv("KAFKA_GROUP", defaultServiceName+"-prod-v1"),
+		KafkaTopics:               splitCSV(getenv("KAFKA_TOPICS", defaultTopics(defaultServiceName))),
+		RedisAddr:                 getenv("REDIS_ADDR", "redis:6379"),
+		PostgresHost:              getenv("POSTGRES_HOST", "postgres"),
+		PostgresPort:              getenv("POSTGRES_PORT", "5432"),
+		PostgresUser:              getenv("POSTGRES_USER", "postgres"),
+		PostgresPassword:          os.Getenv("POSTGRES_PASSWORD"),
+		PostgresDatabase:          getenv("POSTGRES_DATABASE", "crypto_trading"),
+		PostgresPoolMax:           poolMax,
+		BuildVersion:              getenv("BUILD_VERSION", "dev"),
+		BuildCommit:               getenv("BUILD_COMMIT", "unknown"),
+		CanaryPairsCSV:            getenv("MATCHING_GO_CANARY_PAIRS", ""),
+		ShadowMinMatchRate:        minMatchRate,
+		ShadowMaxUnmatchedRuns:    maxUnmatched,
+		ReconciliationIntervalSec: reconciliationInterval,
 	}
 }
 
@@ -156,7 +156,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	if s.pool != nil {
 		shadowRepo := persistence.NewShadowRepository(s.pool)
-		s.shadowEngine = application.NewShadowEngine(shadowRepo, &lockClientAdapter{srv}, s.logger)
+		s.shadowEngine = application.NewShadowEngine(shadowRepo, &lockClientAdapter{s}, s.logger)
 		s.reconcileSvc = application.NewReconciliationService(
 			shadowRepo,
 			s.logger,
@@ -268,7 +268,7 @@ func (s *Server) closePostgresPool(ctx context.Context) {
 func (s *Server) Pool() *pgxpool.Pool { return s.pool }
 
 func (s *Server) initRedisClient(ctx context.Context) error {
-	s.redisClient = redis.NewClient(&redis.Options{Addr: s.cfg.RedisAddr})
+	s.redisClient = redis.NewClient(&redis.Options{Addr: s.cfg.RedisAddr, Password: getenv("REDIS_PASSWORD", "")})
 	if err := s.redisClient.Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("failed to ping redis: %w", err)
 	}
@@ -337,10 +337,10 @@ func (s *Server) updateMetrics() {
 		metrics.ServiceUptimeSeconds.WithLabelValues(s.cfg.ServiceName).Set(time.Since(s.started).Seconds())
 		if s.pool != nil {
 			stats := s.pool.Stat()
-			metrics.PostgresPoolIdleConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.IdleConns()))
-			metrics.PostgresPoolAcquiredConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.AcquiredConns()))
-			metrics.PostgresPoolTotalConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.TotalConns()))
-			metrics.PostgresPoolMaxConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.MaxConns()))
+			metrics.PostgresPoolIdleConns.Set(float64(stats.IdleConns()))
+			metrics.PostgresPoolAcquiredConns.Set(float64(stats.AcquiredConns()))
+			metrics.PostgresPoolTotalConns.Set(float64(stats.TotalConns()))
+			metrics.PostgresPoolMaxConns.Set(float64(stats.MaxConns()))
 		}
 	}
 }

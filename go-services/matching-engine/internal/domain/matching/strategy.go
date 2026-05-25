@@ -12,11 +12,11 @@ import (
 
 var (
 	ErrInsufficientLiquidity = errors.New("insufficient liquidity")
-	ErrSelfTrade            = errors.New("self-trade prevention")
-	ErrPriceDeviation       = errors.New("price deviation exceeds tolerance")
-	ErrFOKNotFillable       = errors.New("FOK order could not be fully filled")
+	ErrSelfTrade             = errors.New("self-trade prevention")
+	ErrPriceDeviation        = errors.New("price deviation exceeds tolerance")
+	ErrFOKNotFillable        = errors.New("FOK order could not be fully filled")
 	ErrNilTaker              = errors.New("taker order is nil")
-	ErrNilBook                = errors.New("order book is nil")
+	ErrNilBook               = errors.New("order book is nil")
 )
 
 type fill struct {
@@ -29,13 +29,13 @@ type fill struct {
 }
 
 type MatchingStrategy struct {
-	slippageTolerance *big.Int
+	slippageToleranceBps *big.Int
 }
 
 func NewMatchingStrategy(tolerancePercent float64) *MatchingStrategy {
 	if tolerancePercent <= 0 {
 		return &MatchingStrategy{
-			slippageTolerance: nil,
+			slippageToleranceBps: nil,
 		}
 	}
 
@@ -43,7 +43,7 @@ func NewMatchingStrategy(tolerancePercent float64) *MatchingStrategy {
 	slippageTolerance := new(big.Int).SetInt64(toleranceBasisPoints)
 
 	return &MatchingStrategy{
-		slippageTolerance: slippageTolerance,
+		slippageToleranceBps: slippageTolerance,
 	}
 }
 
@@ -98,11 +98,35 @@ func (s *MatchingStrategy) matchGTC(taker *domain.Order, takerRemaining *big.Int
 				break
 			}
 
-			if maker.UserID == taker.UserID {
+			if maker.IsFilled() || maker.Status == domain.StatusCancelled {
 				continue
 			}
 
-			if maker.IsFilled() || maker.Status == domain.StatusCancelled {
+			if !isMarketTaker {
+				if taker.IsBuy() && taker.Price.Cmp(maker.Price) < 0 {
+					continue
+				}
+				if taker.Side == domain.SideSell && taker.Price.Cmp(maker.Price) > 0 {
+					continue
+				}
+			}
+
+			if isMarketTaker && s.slippageToleranceBps != nil {
+				if firstFillPrice == nil {
+					firstFillPrice = new(big.Int).Set(maker.Price)
+				} else {
+					priceDeviation := new(big.Int).Abs(new(big.Int).Sub(maker.Price, firstFillPrice))
+					maxDeviation := new(big.Int).Mul(firstFillPrice, s.slippageToleranceBps)
+					maxDeviation.Div(maxDeviation, big.NewInt(10000))
+					if priceDeviation.Cmp(maxDeviation) > 0 {
+						return nil, nil, fmt.Errorf("%w: price deviated from %s to %s", ErrPriceDeviation, firstFillPrice.String(), maker.Price.String())
+					}
+				}
+			}
+
+			if maker.UserID == taker.UserID {
+				book.RemoveOrder(maker.OrderID)
+				matched = true
 				continue
 			}
 
@@ -115,18 +139,6 @@ func (s *MatchingStrategy) matchGTC(taker *domain.Order, takerRemaining *big.Int
 
 			if fillAmount.Sign() <= 0 {
 				continue
-			}
-
-			if isMarketTaker && s.slippageTolerance != nil {
-				if firstFillPrice == nil {
-					firstFillPrice = new(big.Int).Set(maker.Price)
-				} else {
-					priceDeviation := new(big.Int).Abs(new(big.Int).Sub(maker.Price, firstFillPrice))
-					maxDeviation := new(big.Int).Mul(firstFillPrice, s.slippageTolerance)
-					if priceDeviation.Cmp(maxDeviation) > 0 {
-						return nil, nil, fmt.Errorf("%w: price deviated from %s to %s", ErrPriceDeviation, firstFillPrice.String(), maker.Price.String())
-					}
-				}
 			}
 
 			f := &fill{

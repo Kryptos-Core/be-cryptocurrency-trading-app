@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"math/big"
 	"sync/atomic"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/kryptos/go-services/matching-engine/internal/domain"

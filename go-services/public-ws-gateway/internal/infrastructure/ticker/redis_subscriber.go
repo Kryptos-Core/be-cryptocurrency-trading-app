@@ -135,7 +135,7 @@ func (s *RedisSubscriber) IsSubscribed(ctx context.Context) bool {
 		return false
 	}
 
-	result, err := s.redis.PubsubChannels(ctx, s.channel).Result()
+	result, err := s.redis.PubSubChannels(ctx, s.channel).Result()
 	if err != nil {
 		s.logger.Warn("redis_subscriber.check_failed", "error", err.Error())
 		return false

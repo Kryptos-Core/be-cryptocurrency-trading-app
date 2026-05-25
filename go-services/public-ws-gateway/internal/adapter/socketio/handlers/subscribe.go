@@ -8,14 +8,14 @@ import (
 )
 
 var (
-	ErrInvalidPairID    = errors.New("invalid pair ID")
-	ErrInvalidChannel   = errors.New("invalid channel")
+	ErrInvalidPairID     = errors.New("invalid pair ID")
+	ErrInvalidChannel    = errors.New("invalid channel")
 	ErrAlreadySubscribed = errors.New("already subscribed to this channel")
 )
 
 const (
-	ChannelTicker     = "ticker"
-	ChannelOrderbook  = "orderbook"
+	ChannelTicker    = "ticker"
+	ChannelOrderbook = "orderbook"
 	ChannelTrades    = "trades"
 	ChannelDashboard = "dashboard"
 )
@@ -54,7 +54,6 @@ func (sm *SubscriptionManager) Subscribe(conn socketio.Conn, pairID, channel str
 	}
 
 	sm.subscriptions[connID][room] = true
-	conn.JoinRoom(room)
 
 	return nil
 }
@@ -79,7 +78,6 @@ func (sm *SubscriptionManager) Unsubscribe(conn socketio.Conn, pairID, channel s
 
 	if sm.subscriptions[connID][room] {
 		delete(sm.subscriptions[connID], room)
-		conn.LeaveRoom(room)
 	}
 
 	return nil
@@ -100,7 +98,6 @@ func (sm *SubscriptionManager) JoinDashboard(conn socketio.Conn) error {
 	}
 
 	sm.subscriptions[connID][room] = true
-	conn.JoinRoom(room)
 
 	return nil
 }
@@ -117,7 +114,6 @@ func (sm *SubscriptionManager) LeaveDashboard(conn socketio.Conn) error {
 	room := ChannelDashboard
 	if sm.subscriptions[connID][room] {
 		delete(sm.subscriptions[connID], room)
-		conn.LeaveRoom(room)
 	}
 
 	return nil
@@ -199,8 +195,8 @@ func parseRoom(room string) (pairID string, channel string) {
 		if len(room) > 8 && room[len(room)-7:] == ":"+ChannelTicker {
 			return room[:len(room)-7], ChannelTicker
 		}
-		if len(room) > 10 && room[len(room)-9:] == ":"+ChannelOrderbook {
-			return room[:len(room)-9], ChannelOrderbook
+		if len(room) > 11 && room[len(room)-10:] == ":"+ChannelOrderbook {
+			return room[:len(room)-10], ChannelOrderbook
 		}
 		if len(room) > 7 && room[len(room)-7:] == ":"+ChannelTrades {
 			return room[:len(room)-7], ChannelTrades

@@ -6,11 +6,13 @@ WORKDIR /src
 
 RUN apk add --no-cache ca-certificates git tzdata
 
-COPY go.mod ./
+COPY metrics/go.mod ../metrics/go.mod
+COPY matching-engine/go.mod ./
 RUN go mod download
 
-COPY . .
-RUN go mod tidy
+COPY metrics ../metrics
+COPY matching-engine .
+RUN go mod tidy -e
 
 ARG SERVICE_NAME=matching-engine
 ARG BUILD_VERSION=dev

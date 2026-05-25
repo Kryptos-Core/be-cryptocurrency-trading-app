@@ -8,21 +8,15 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	socketio "github.com/googollee/go-socket.io"
-	"github.com/googollee/go-socket.io/engineio"
-	"github.com/googollee/go-socket.io/engineio/transport"
-	"github.com/googollee/go-socket.io/engineio/transport/polling"
-	"github.com/googollee/go-socket.io/engineio/transport/websocket"
-
 	"github.com/kryptos/go-services/public-ws-gateway/internal/adapter/socketio/handlers"
 )
 
 const (
-	NamespaceTrading  = "/trading"
-	RoomDashboard     = "dashboard"
-	TickerChannel     = "ticker"
+	NamespaceTrading = "/trading"
+	RoomDashboard    = "dashboard"
+	TickerChannel    = "ticker"
 )
 
 type TickerMessage struct {
@@ -42,10 +36,10 @@ type TickerMessage struct {
 }
 
 type Server struct {
-	srv     *socketio.Server
-	logger  *slog.Logger
-	mu      sync.RWMutex
-	subMgr  *handlers.SubscriptionManager
+	srv    *socketio.Server
+	logger *slog.Logger
+	mu     sync.RWMutex
+	subMgr *handlers.SubscriptionManager
 
 	tradingConns atomic.Int64
 
@@ -59,21 +53,7 @@ func NewServer(logger *slog.Logger) (*Server, error) {
 		return nil, errors.New("logger is required")
 	}
 
-	transports := []transport.Transport{
-		polling.Default(),
-		websocket.Default(),
-	}
-
-	engineIOConfig := &engineio.Config{
-		PingInterval: 30 * time.Second,
-		PingTimeout:  60 * time.Second,
-		Transports:   transports,
-	}
-
-	srv, err := socketio.NewServer(engineIOConfig)
-	if err != nil {
-		return nil, err
-	}
+	srv := socketio.NewServer(nil)
 
 	s := &Server{
 		srv:      srv,
@@ -91,21 +71,19 @@ func NewServer(logger *slog.Logger) (*Server, error) {
 }
 
 func (s *Server) setupHandlers() error {
-	trading := s.srv.OnNamespace("/trading")
-	trading.OnConnect("/", s.onConnect)
-	trading.OnDisconnect("/", s.onDisconnect)
-	trading.OnEvent("/", "auth", s.onAuth)
-	trading.OnEvent("/", "subscribe", s.onSubscribe)
-	trading.OnEvent("/", "unsubscribe", s.onUnsubscribe)
-	trading.OnEvent("/", "join_dashboard", s.onJoinDashboard)
-	trading.OnEvent("/", "leave_dashboard", s.onLeaveDashboard)
-	trading.OnEvent("/", "pong", s.onPong)
+	s.srv.OnConnect(NamespaceTrading, s.onConnect)
+	s.srv.OnDisconnect(NamespaceTrading, s.onDisconnect)
+	s.srv.OnEvent(NamespaceTrading, "auth", s.onAuth)
+	s.srv.OnEvent(NamespaceTrading, "subscribe", s.onSubscribe)
+	s.srv.OnEvent(NamespaceTrading, "unsubscribe", s.onUnsubscribe)
+	s.srv.OnEvent(NamespaceTrading, "join_dashboard", s.onJoinDashboard)
+	s.srv.OnEvent(NamespaceTrading, "leave_dashboard", s.onLeaveDashboard)
+	s.srv.OnEvent(NamespaceTrading, "pong", s.onPong)
 
 	return nil
 }
 
-func (s *Server) onConnect(ns socketio.Namespace) {
-	conn := ns.(socketio.Conn)
+func (s *Server) onConnect(conn socketio.Conn) error {
 	s.logger.Info("socketio.connect",
 		"namespace", conn.Namespace(),
 		"conn_id", conn.ID(),
@@ -115,6 +93,7 @@ func (s *Server) onConnect(ns socketio.Namespace) {
 
 	initialState := handlers.BuildWorkspaceState(s.subMgr, conn.ID())
 	handlers.EmitWorkspaceRestored(conn, initialState)
+	return nil
 }
 
 func (s *Server) onDisconnect(conn socketio.Conn, msg string) {
@@ -317,8 +296,6 @@ func (s *Server) onPong(conn socketio.Conn, _ map[string]any) {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	s.srv.Start()
-
 	s.wg.Add(1)
 	go s.broadcastTickerLoop(ctx)
 
@@ -329,9 +306,6 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) Stop() error {
 	close(s.done)
 	s.wg.Wait()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	s.srv.Close()
 	s.logger.Info("socketio.server_stopped")

@@ -6,10 +6,13 @@ WORKDIR /src
 
 RUN apk add --no-cache ca-certificates git tzdata
 
-COPY go.mod ./
+COPY metrics/go.mod ../metrics/go.mod
+COPY public-ws-gateway/go.mod ./
 RUN go mod download
 
-COPY . .
+COPY metrics ../metrics
+COPY public-ws-gateway .
+RUN go mod tidy -e
 
 ARG SERVICE_NAME=public-ws-gateway
 ARG BUILD_VERSION=dev

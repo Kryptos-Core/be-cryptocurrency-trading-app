@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 
@@ -37,16 +38,16 @@ type Config struct {
 }
 
 type Server struct {
-	cfg           Config
-	logger        *slog.Logger
-	started       time.Time
-	redisClient   *redis.Client
+	cfg            Config
+	logger         *slog.Logger
+	started        time.Time
+	redisClient    *redis.Client
 	socketIOServer *socketio.Server
-	tickerSub     *ticker.RedisSubscriber
-	metricsMu     sync.RWMutex
-	connections   int64
-	messagesSent  int64
-	authFailures  int64
+	tickerSub      *ticker.RedisSubscriber
+	metricsMu      sync.RWMutex
+	connections    int64
+	messagesSent   int64
+	authFailures   int64
 }
 
 func LoadConfig(defaultServiceName, defaultPort string) Config {
@@ -59,7 +60,7 @@ func LoadConfig(defaultServiceName, defaultPort string) Config {
 		KafkaTopics:   splitCSV(getenv("KAFKA_TOPICS", "crypto-trading.market.ticker,market.ticker")),
 		RedisAddr:     getenv("REDIS_ADDR", "redis:6379"),
 		BuildVersion:  getenv("BUILD_VERSION", "dev"),
-		BuildCommit:  getenv("BUILD_COMMIT", "unknown"),
+		BuildCommit:   getenv("BUILD_COMMIT", "unknown"),
 		TickerChannel: getenv("TICKER_CHANNEL", "trading:external:ticker"),
 	}
 }
@@ -91,25 +92,24 @@ func (s *Server) Run(ctx context.Context) error {
 		"kafka_topics", strings.Join(s.cfg.KafkaTopics, ","),
 	)
 
-	s.redisClient = redis.NewClient(&redis.Options{Addr: s.cfg.RedisAddr, PoolSize: 10})
+	s.redisClient = redis.NewClient(&redis.Options{Addr: s.cfg.RedisAddr, Password: getenv("REDIS_PASSWORD", ""), PoolSize: 10})
 	if err := s.redisClient.Ping(ctx).Err(); err != nil {
 		s.logger.Warn("redis.ping.failed", "error", err.Error())
 	} else {
 		s.logger.Info("redis.connected", "addr", s.cfg.RedisAddr)
 	}
 
-	tickerHandler := socketio.NewTickerHandler(s.logger)
-	s.tickerSub = ticker.NewRedisSubscriber(s.redisClient, s.cfg.TickerChannel, tickerHandler, s.logger)
-	if err := s.tickerSub.Start(ctx); err != nil {
-		s.logger.Warn("ticker.subscriber.start.failed", "error", err.Error())
+	var err error
+	s.socketIOServer, err = socketio.NewServer(s.logger)
+	if err != nil {
+		return err
+	}
+	if err := s.socketIOServer.Start(ctx); err != nil {
+		return err
 	}
 
-	s.socketIOServer = socketio.NewServer(s.logger, s.cfg.ServiceName, s.cfg.Env)
-	go func() {
-		if err := s.socketIOServer.Run(ctx, s.cfg.HTTPAddr); err != nil {
-			s.logger.Error("socketio.server.error", "error", err.Error())
-		}
-	}()
+	s.tickerSub = ticker.NewRedisSubscriber(s.redisClient, s.cfg.TickerChannel, &socketTickerHandler{srv: s.socketIOServer}, s.logger)
+	go s.tickerSub.Start(ctx)
 
 	go s.consumeKafka(ctx)
 
@@ -117,7 +117,7 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("/healthz", s.healthz)
 	mux.HandleFunc("/readyz", s.readyz)
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/", s.index)
+	mux.HandleFunc("/", s.index)
 
 	srv := &http.Server{Addr: s.cfg.HTTPAddr, Handler: s.logRequests(mux), ReadHeaderTimeout: 5 * time.Second}
 
@@ -126,9 +126,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		addr := ":" + strconv.Itoa(portFromAddr(s.cfg.HTTPAddr)+1)
-		srv.Addr = addr
-		s.logger.Info("http.server.starting", "addr", addr)
+		s.logger.Info("http.server.starting", "addr", s.cfg.HTTPAddr)
 		errCh <- srv.ListenAndServe()
 	}()
 
@@ -142,7 +140,7 @@ func (s *Server) Run(ctx context.Context) error {
 			s.tickerSub.Stop()
 		}
 		if s.socketIOServer != nil {
-			s.socketIOServer.Shutdown()
+			_ = s.socketIOServer.Stop()
 		}
 		s.closeRedisClient()
 		return srv.Shutdown(shutdownCtx)
@@ -173,8 +171,8 @@ func (s *Server) updateMetrics() {
 		msgs := s.messagesSent
 		authFails := s.authFailures
 		s.metricsMu.RUnlock()
-		metrics.WSConnectionsCurrent.WithLabelValues(s.cfg.ServiceName, "/trading").Set(float64(conns))
-		metrics.WSMessagesSentTotal.WithLabelValues(s.cfg.ServiceName, "ticker").Add(0)
+		metrics.WSConnectionsCurrent.WithLabelValues("/trading").Set(float64(conns))
+		metrics.WSMessagesSent.WithLabelValues("/trading", "ticker").Add(0)
 		_ = msgs
 		_ = authFails
 	}
@@ -206,7 +204,7 @@ func (s *Server) consumeKafka(ctx context.Context) {
 						time.Sleep(time.Second)
 						continue
 					}
-					metrics.KafkaMessagesConsumed.WithLabelValues(s.cfg.ServiceName, t).Inc()
+					metrics.KafkaMessagesConsumed.WithLabelValues(t).Inc()
 					s.handleKafkaMessage(msg)
 				}
 			}
@@ -215,7 +213,7 @@ func (s *Server) consumeKafka(ctx context.Context) {
 }
 
 func (s *Server) handleKafkaMessage(msg kafka.Message) {
-	metrics.KafkaMessagesConsumed.WithLabelValues(s.cfg.ServiceName, msg.Topic).Inc()
+	metrics.KafkaMessagesConsumed.WithLabelValues(msg.Topic).Inc()
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
@@ -228,8 +226,8 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":        "ok",
-		"service":       s.cfg.ServiceName,
+		"status":         "ok",
+		"service":        s.cfg.ServiceName,
 		"uptime_seconds": int(time.Since(s.started).Seconds()),
 	})
 }
@@ -335,4 +333,29 @@ func BuildInfo() (string, string) {
 		return info.Main.Version, "unknown"
 	}
 	return "dev", "unknown"
+}
+
+type socketTickerHandler struct {
+	srv *socketio.Server
+}
+
+func (h *socketTickerHandler) OnTicker(_ context.Context, data *ticker.TickerData) {
+	if h == nil || h.srv == nil || data == nil {
+		return
+	}
+	h.srv.BroadcastTicker(&socketio.TickerMessage{
+		PairID:           data.PairID,
+		Symbol:           data.Symbol,
+		LastPrice:        data.LastPrice,
+		Bid:              data.Bid,
+		Ask:              data.Ask,
+		Volume24h:        data.Volume24h,
+		Volume24hUsd:     data.Volume24hUsd,
+		Change24h:        data.Change24h,
+		ChangePercent24h: data.ChangePercent24h,
+		High24h:          data.High24h,
+		Low24h:           data.Low24h,
+		Open24h:          data.Open24h,
+		Timestamp:        data.Timestamp,
+	})
 }

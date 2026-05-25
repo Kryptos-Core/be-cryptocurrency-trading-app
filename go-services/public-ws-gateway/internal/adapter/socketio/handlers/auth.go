@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const (
-	ErrInvalidToken       = errors.New("invalid token format")
-	ErrMalformedToken     = errors.New("malformed token")
-	ErrTokenExpired       = errors.New("token expired")
-	ErrInvalidClaims      = errors.New("invalid claims")
+var (
+	ErrInvalidToken  = errors.New("invalid token format")
+	ErrMalformedToken = errors.New("malformed token")
+	ErrTokenExpired  = errors.New("token expired")
+	ErrInvalidClaims = errors.New("invalid claims")
 )
 
 type JWTPayload struct {
