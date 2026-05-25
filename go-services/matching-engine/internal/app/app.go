@@ -16,7 +16,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kryptos/go-services/matching-engine/internal/application"
+	"github.com/kryptos/go-services/matching-engine/internal/application/canary"
+	"github.com/kryptos/go-services/matching-engine/internal/infrastructure/persistence"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+
+	"github.com/kryptos/go-services/metrics"
 )
 
 type Config struct {
@@ -31,21 +39,64 @@ type Config struct {
 	KafkaTopics      []string
 	RedisAddr        string
 	PostgresHost     string
+	PostgresPort     string
+	PostgresUser     string
+	PostgresPassword string
+	PostgresDatabase string
+	PostgresPoolMax  int
 	BuildVersion     string
 	BuildCommit      string
+
+	CanaryPairsCSV            string
+	ShadowMinMatchRate        float64
+	ShadowMaxUnmatchedRuns   int
+	ReconciliationIntervalSec int
 }
 
 type Server struct {
-	cfg           Config
-	logger        *slog.Logger
-	started       time.Time
-	consumed      uint64
-	logged        uint64
-	errors        uint64
+	cfg          Config
+	logger       *slog.Logger
+	started      time.Time
+	consumed     uint64
+	logged       uint64
+	errors       uint64
 	lastKafkaUnix atomic.Int64
+	pool         *pgxpool.Pool
+	redisClient  *redis.Client
+	shadowEngine *application.ShadowEngine
+	canaryConfig *canary.CanaryConfig
+	reconcileSvc *application.ReconciliationService
 }
 
 func LoadConfig(defaultServiceName, defaultPort string) Config {
+	poolMax := 20
+	if envPoolMax := os.Getenv("POSTGRES_POOL_MAX"); envPoolMax != "" {
+		if parsed, err := strconv.Atoi(envPoolMax); err == nil && parsed > 0 {
+			poolMax = parsed
+		}
+	}
+
+	minMatchRate := 99.9
+	if envRate := os.Getenv("MATCHING_SHADOW_MIN_MATCH_RATE_PERCENT"); envRate != "" {
+		if parsed, err := strconv.ParseFloat(envRate, 64); err == nil && parsed >= 0 && parsed <= 100 {
+			minMatchRate = parsed
+		}
+	}
+
+	maxUnmatched := 0
+	if envMax := os.Getenv("MATCHING_SHADOW_MAX_UNMATCHED_RUNS"); envMax != "" {
+		if parsed, err := strconv.Atoi(envMax); err == nil && parsed >= 0 {
+			maxUnmatched = parsed
+		}
+	}
+
+	reconciliationInterval := 300
+	if envInterval := os.Getenv("RECONCILIATION_INTERVAL_SECONDS"); envInterval != "" {
+		if parsed, err := strconv.Atoi(envInterval); err == nil && parsed > 0 {
+			reconciliationInterval = parsed
+		}
+	}
+
 	return Config{
 		ServiceName:      getenv("SERVICE_NAME", defaultServiceName),
 		Env:              getenv("SERVICE_ENV", getenv("NODE_ENV", "production")),
@@ -58,14 +109,25 @@ func LoadConfig(defaultServiceName, defaultPort string) Config {
 		KafkaTopics:      splitCSV(getenv("KAFKA_TOPICS", defaultTopics(defaultServiceName))),
 		RedisAddr:        getenv("REDIS_ADDR", "redis:6379"),
 		PostgresHost:     getenv("POSTGRES_HOST", "postgres"),
+		PostgresPort:     getenv("POSTGRES_PORT", "5432"),
+		PostgresUser:     getenv("POSTGRES_USER", "postgres"),
+		PostgresPassword: os.Getenv("POSTGRES_PASSWORD"),
+		PostgresDatabase: getenv("POSTGRES_DATABASE", "crypto_trading"),
+		PostgresPoolMax:  poolMax,
 		BuildVersion:     getenv("BUILD_VERSION", "dev"),
-		BuildCommit:      getenv("BUILD_COMMIT", "unknown"),
+		BuildCommit:     getenv("BUILD_COMMIT", "unknown"),
+		CanaryPairsCSV:             getenv("MATCHING_GO_CANARY_PAIRS", ""),
+		ShadowMinMatchRate:         minMatchRate,
+		ShadowMaxUnmatchedRuns:     maxUnmatched,
+		ReconciliationIntervalSec:   reconciliationInterval,
 	}
 }
 
 func New(cfg Config) *Server {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	return &Server{cfg: cfg, logger: logger, started: time.Now().UTC()}
+	srv := &Server{cfg: cfg, logger: logger, started: time.Now().UTC()}
+	srv.canaryConfig = canary.NewCanaryConfig(cfg.CanaryPairsCSV)
+	return srv
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -73,13 +135,44 @@ func (s *Server) Run(ctx context.Context) error {
 		return s.healthcheckCommand(ctx)
 	}
 
+	metrics.ServiceUp.WithLabelValues(s.cfg.ServiceName, s.cfg.Env).Set(1)
+	metrics.ServiceUptimeSeconds.WithLabelValues(s.cfg.ServiceName).Set(0)
+	metrics.ServiceBuildInfo.WithLabelValues(s.cfg.ServiceName, s.cfg.BuildVersion, s.cfg.BuildCommit).Set(1)
+	metrics.ServiceModeInfo.WithLabelValues(
+		s.cfg.ServiceName,
+		strconv.FormatBool(s.cfg.ShadowMode),
+		strconv.FormatBool(s.cfg.ReadOnlyMode),
+		strconv.FormatBool(s.cfg.MutationsEnabled),
+	).Set(1)
+
+	go s.updateMetrics()
+
+	if err := s.initPostgresPool(ctx); err != nil {
+		s.logger.Warn("postgres.pool.init.failed", "error", err.Error())
+	}
+	if err := s.initRedisClient(ctx); err != nil {
+		s.logger.Warn("redis.client.init.failed", "error", err.Error())
+	}
+
+	if s.pool != nil {
+		shadowRepo := persistence.NewShadowRepository(s.pool)
+		s.shadowEngine = application.NewShadowEngine(shadowRepo, &lockClientAdapter{srv}, s.logger)
+		s.reconcileSvc = application.NewReconciliationService(
+			shadowRepo,
+			s.logger,
+			s.cfg.ShadowMinMatchRate,
+			s.cfg.ShadowMaxUnmatchedRuns,
+		)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.healthz)
 	mux.HandleFunc("/readyz", s.readyz)
-	mux.HandleFunc("/metrics", s.metrics)
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/shadow/status", s.shadowStatus)
 	mux.HandleFunc("/", s.index)
 
-	srv := &http.Server{Addr: s.cfg.HTTPAddr, Handler: s.logRequests(mux), ReadHeaderTimeout: 5 * time.Second}
+	srv2 := &http.Server{Addr: s.cfg.HTTPAddr, Handler: s.logRequests(mux), ReadHeaderTimeout: 5 * time.Second}
 
 	stop, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -88,10 +181,27 @@ func (s *Server) Run(ctx context.Context) error {
 		go s.consumeKafka(stop, topic)
 	}
 
+	if s.reconcileSvc != nil && len(s.canaryConfig.List()) > 0 {
+		go s.reconcileSvc.RunReconciliation(
+			stop,
+			time.Duration(s.cfg.ReconciliationIntervalSec)*time.Second,
+			s.canaryConfig.List(),
+		)
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
-		s.logger.Info("service.starting", "service", s.cfg.ServiceName, "addr", s.cfg.HTTPAddr, "shadow_mode", s.cfg.ShadowMode, "read_only_mode", s.cfg.ReadOnlyMode, "mutations_enabled", s.cfg.MutationsEnabled, "kafka_topics", strings.Join(s.cfg.KafkaTopics, ","))
-		errCh <- srv.ListenAndServe()
+		s.logger.Info("service.starting",
+			"service", s.cfg.ServiceName,
+			"addr", s.cfg.HTTPAddr,
+			"shadow_mode", s.cfg.ShadowMode,
+			"read_only_mode", s.cfg.ReadOnlyMode,
+			"mutations_enabled", s.cfg.MutationsEnabled,
+			"kafka_topics", strings.Join(s.cfg.KafkaTopics, ","),
+			"canary_pairs", s.canaryConfig.List(),
+			"reconciliation_interval_sec", s.cfg.ReconciliationIntervalSec,
+		)
+		errCh <- srv2.ListenAndServe()
 	}()
 
 	select {
@@ -99,12 +209,139 @@ func (s *Server) Run(ctx context.Context) error {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		s.logger.Info("service.shutdown")
-		return srv.Shutdown(shutdownCtx)
+		s.closePostgresPool(shutdownCtx)
+		s.closeRedisClient()
+		return srv2.Shutdown(shutdownCtx)
 	case err := <-errCh:
+		s.closePostgresPool(context.Background())
+		s.closeRedisClient()
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
 		return err
+	}
+}
+
+func (s *Server) initPostgresPool(ctx context.Context) error {
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		s.cfg.PostgresUser,
+		s.cfg.PostgresPassword,
+		s.cfg.PostgresHost,
+		s.cfg.PostgresPort,
+		s.cfg.PostgresDatabase,
+	)
+
+	poolConfig, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("failed to parse postgres config: %w", err)
+	}
+
+	poolConfig.MaxConns = int32(s.cfg.PostgresPoolMax)
+	poolConfig.MinConns = 2
+	poolConfig.MaxConnLifetime = 30 * time.Minute
+	poolConfig.MaxConnIdleTime = 5 * time.Minute
+	poolConfig.HealthCheckPeriod = 1 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create postgres pool: %w", err)
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return fmt.Errorf("failed to ping postgres: %w", err)
+	}
+
+	s.pool = pool
+	s.logger.Info("postgres.pool.initialized", "host", s.cfg.PostgresHost, "port", s.cfg.PostgresPort, "database", s.cfg.PostgresDatabase, "max_conns", s.cfg.PostgresPoolMax)
+	return nil
+}
+
+func (s *Server) closePostgresPool(ctx context.Context) {
+	if s.pool != nil {
+		s.logger.Info("postgres.pool.closing")
+		s.pool.Close()
+		s.pool = nil
+	}
+}
+
+func (s *Server) Pool() *pgxpool.Pool { return s.pool }
+
+func (s *Server) initRedisClient(ctx context.Context) error {
+	s.redisClient = redis.NewClient(&redis.Options{Addr: s.cfg.RedisAddr})
+	if err := s.redisClient.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("failed to ping redis: %w", err)
+	}
+	s.logger.Info("redis.client.initialized", "addr", s.cfg.RedisAddr)
+	return nil
+}
+
+func (s *Server) closeRedisClient() {
+	if s.redisClient != nil {
+		s.logger.Info("redis.client.closing")
+		s.redisClient.Close()
+		s.redisClient = nil
+	}
+}
+
+func (s *Server) RedisClient() *redis.Client { return s.redisClient }
+
+type lockClientAdapter struct {
+	srv *Server
+}
+
+func (a *lockClientAdapter) Acquire(ctx context.Context) error {
+	if a.srv.redisClient == nil {
+		return errors.New("redis client not initialized")
+	}
+	key := fmt.Sprintf("matching:shadow:lock:%s", "global")
+	ok, err := a.srv.redisClient.SetNX(ctx, key, "matching-engine", 10*time.Second).Result()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("lock not acquired")
+	}
+	return nil
+}
+
+func (a *lockClientAdapter) Release(ctx context.Context) error {
+	if a.srv.redisClient == nil {
+		return errors.New("redis client not initialized")
+	}
+	key := fmt.Sprintf("matching:shadow:lock:%s", "global")
+	_, err := a.srv.redisClient.Del(ctx, key).Result()
+	return err
+}
+
+func (s *Server) shadowStatus(w http.ResponseWriter, r *http.Request) {
+	status := map[string]any{
+		"shadow_engine": s.shadowEngine != nil,
+		"canary_pairs":  s.canaryConfig.List(),
+		"canary_count":  s.canaryConfig.Count(),
+	}
+	if s.shadowEngine != nil {
+		m := s.shadowEngine.GetMetrics()
+		status["shadow_metrics"] = m
+	}
+	if s.reconcileSvc != nil {
+		status["reconciliation_pairs"] = s.reconcileSvc.GetPairs()
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+func (s *Server) updateMetrics() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		metrics.ServiceUptimeSeconds.WithLabelValues(s.cfg.ServiceName).Set(time.Since(s.started).Seconds())
+		if s.pool != nil {
+			stats := s.pool.Stat()
+			metrics.PostgresPoolIdleConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.IdleConns()))
+			metrics.PostgresPoolAcquiredConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.AcquiredConns()))
+			metrics.PostgresPoolTotalConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.TotalConns()))
+			metrics.PostgresPoolMaxConns.WithLabelValues(s.cfg.ServiceName).Set(float64(stats.MaxConns()))
+		}
 	}
 }
 
@@ -122,15 +359,23 @@ func (s *Server) consumeKafka(ctx context.Context, topic string) {
 				return
 			}
 			atomic.AddUint64(&s.errors, 1)
+			metrics.KafkaConsumerErrors.WithLabelValues(s.cfg.ServiceName, topic).Inc()
 			s.logger.Warn("kafka.consumer.error", "topic", topic, "error", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
 		count := atomic.AddUint64(&s.consumed, 1)
 		s.lastKafkaUnix.Store(time.Now().Unix())
+		metrics.KafkaMessagesConsumed.WithLabelValues(s.cfg.ServiceName, topic).Inc()
 		if count <= 20 || count%1000 == 0 {
 			atomic.AddUint64(&s.logged, 1)
-			s.logger.Info("kafka.message.consumed", "topic", msg.Topic, "partition", msg.Partition, "offset", msg.Offset, "key", string(msg.Key), "bytes", len(msg.Value), "count", count, "shadow_mode", s.cfg.ShadowMode, "read_only_mode", s.cfg.ReadOnlyMode, "mutations_enabled", s.cfg.MutationsEnabled)
+			s.logger.Info("kafka.message.consumed",
+				"topic", msg.Topic, "partition", msg.Partition,
+				"offset", msg.Offset, "key", string(msg.Key),
+				"bytes", len(msg.Value), "count", count,
+				"shadow_mode", s.cfg.ShadowMode,
+				"read_only_mode", s.cfg.ReadOnlyMode,
+				"mutations_enabled", s.cfg.MutationsEnabled)
 		}
 	}
 }
@@ -144,19 +389,24 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ready", "service": s.cfg.ServiceName, "kafka_brokers": s.cfg.KafkaBrokers, "kafka_topics": s.cfg.KafkaTopics, "redis_addr": s.cfg.RedisAddr, "postgres_host": s.cfg.PostgresHost})
-}
+	pgStatus := "not_configured"
+	if s.pool != nil {
+		if err := s.pool.Ping(r.Context()); err != nil {
+			pgStatus = "unhealthy"
+		} else {
+			pgStatus = "healthy"
+		}
+	}
 
-func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	uptime := int(time.Since(s.started).Seconds())
-	fmt.Fprintf(w, "# HELP go_service_up Service liveness.\n# TYPE go_service_up gauge\ngo_service_up{service=%q,env=%q} 1\n", s.cfg.ServiceName, s.cfg.Env)
-	fmt.Fprintf(w, "# HELP go_service_uptime_seconds Service uptime in seconds.\n# TYPE go_service_uptime_seconds gauge\ngo_service_uptime_seconds{service=%q} %d\n", s.cfg.ServiceName, uptime)
-	fmt.Fprintf(w, "# HELP go_service_mode_info Service safety mode flags.\n# TYPE go_service_mode_info gauge\ngo_service_mode_info{service=%q,shadow_mode=%q,read_only_mode=%q,mutations_enabled=%q} 1\n", s.cfg.ServiceName, strconv.FormatBool(s.cfg.ShadowMode), strconv.FormatBool(s.cfg.ReadOnlyMode), strconv.FormatBool(s.cfg.MutationsEnabled))
-	fmt.Fprintf(w, "# HELP go_service_build_info Build metadata.\n# TYPE go_service_build_info gauge\ngo_service_build_info{service=%q,version=%q,commit=%q} 1\n", s.cfg.ServiceName, s.cfg.BuildVersion, s.cfg.BuildCommit)
-	fmt.Fprintf(w, "# HELP go_service_kafka_messages_total Kafka messages consumed.\n# TYPE go_service_kafka_messages_total counter\ngo_service_kafka_messages_total{service=%q} %d\n", s.cfg.ServiceName, atomic.LoadUint64(&s.consumed))
-	fmt.Fprintf(w, "# HELP go_service_kafka_errors_total Kafka consumer errors.\n# TYPE go_service_kafka_errors_total counter\ngo_service_kafka_errors_total{service=%q} %d\n", s.cfg.ServiceName, atomic.LoadUint64(&s.errors))
-	fmt.Fprintf(w, "# HELP go_service_last_kafka_message_timestamp_seconds Last Kafka message time.\n# TYPE go_service_last_kafka_message_timestamp_seconds gauge\ngo_service_last_kafka_message_timestamp_seconds{service=%q} %d\n", s.cfg.ServiceName, s.lastKafkaUnix.Load())
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":          "ready",
+		"service":         s.cfg.ServiceName,
+		"kafka_brokers":   s.cfg.KafkaBrokers,
+		"kafka_topics":    s.cfg.KafkaTopics,
+		"redis_addr":      s.cfg.RedisAddr,
+		"postgres_host":   s.cfg.PostgresHost,
+		"postgres_status": pgStatus,
+	})
 }
 
 func (s *Server) healthcheckCommand(ctx context.Context) error {
@@ -180,7 +430,12 @@ func (s *Server) healthcheckCommand(ctx context.Context) error {
 func (s *Server) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
+		metrics.HTTPRequestsInFlight.Inc()
+		defer metrics.HTTPRequestsInFlight.Dec()
 		next.ServeHTTP(w, r)
+		duration := time.Since(started).Seconds()
+		metrics.HTTPRequestsTotal.WithLabelValues(r.Method, r.URL.Path, "0").Inc()
+		metrics.HTTPRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
 		s.logger.Info("http.request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr, "duration_ms", time.Since(started).Milliseconds())
 	})
 }
