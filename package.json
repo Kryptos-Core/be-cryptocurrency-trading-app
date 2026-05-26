@@ -10,15 +10,18 @@
     "dev": "cross-env NODE_ENV=development nest start --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main",
     "start:staging": "cross-env NODE_ENV=staging nest start",
+    
     "lint": "biome lint ./src ./scripts",
     "lint:fix": "biome check --write ./src ./scripts",
     "format": "biome format --write ./src ./scripts",
     "format:check": "biome format ./src ./scripts",
     "lint:boundaries": "node scripts/check-module-boundaries.mjs",
     "lint:uow": "node scripts/check-uow-policy.mjs",
+
     "test": "jest",
     "test:cov": "jest --coverage",
     "test:watch": "jest --watch",
+
     "db:migrate": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-migrations.ts",
     "db:migrate:prod": "node -r tsconfig-paths/register dist/seed/run-migrations.js",
     "db:migrate:generate": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:generate -d src/config/data-source.ts --verbose",
@@ -27,29 +30,35 @@
     "db:migrate:show": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:show -d src/config/data-source.ts --verbose",
     "db:seed": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
     "db:seed:prod": "cross-env NODE_ENV=production CORE_DB_HOST=127.0.0.1 ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
+
     "seed:encrypt": "ts-node -r tsconfig-paths/register src/seed/encrypt-seed-data.ts",
     "seed:decrypt": "ts-node -r tsconfig-paths/register src/seed/encrypt-seed-data.ts --decrypt",
     "seed:encrypt:dry": "ts-node -r tsconfig-paths/register src/seed/encrypt-seed-data.ts --dry-run",
+
     "db:clean": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-db-clean.ts",
     "db:clean:prod": "cross-env NODE_ENV=production CORE_DB_HOST=127.0.0.1 ts-node -r tsconfig-paths/register src/seed/run-db-clean.ts",
     "db:outbox:reset": "docker exec crypto_trading_postgres psql -U crypto_user -d crypto_trading_platform -c \"UPDATE integration_outbox SET dead_lettered_at = NULL, publish_attempts = 0, next_retry_at = NULL WHERE dead_lettered_at IS NOT NULL;\"",
     "db:migrate:ch": "docker exec -i crypto_trading_clickhouse clickhouse-client --host 127.0.0.1 --port 9000 --query \"$(cat scripts/docker/clickhouse-init.sql)\"",
     "db:migrate:ch:status": "docker exec crypto_trading_clickhouse clickhouse-client --host localhost --port 9000 --query \"SHOW TABLES FROM analytics FORMAT PrettyCompact\"",
     "clickhouse:tables:list": "docker exec crypto_trading_clickhouse clickhouse-client --host localhost --port 9000 --query \"SHOW TABLES FROM analytics FORMAT PrettyCompact\"",
+
     "docker:infra:up": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d",
     "docker:infra:up:full": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile kafka --profile clickhouse --profile timescale up -d",
     "docker:infra:down": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development down",
     "docker:infra:logs": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development logs -f",
     "docker:infra:health": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development ps --format \"table {{.Name}}\\t{{.Health}}\\t{{.Status}}\"",
     "docker:kafka:cleanup": "node scripts/docker/cleanup-kafka-volumes.js",
+
     "kafka:topics:create": "node scripts/create-kafka-topics.js",
     "kafka:topics:list": "docker exec crypto_trading_kafka kafka-topics --bootstrap-server localhost:9092 --list",
     "clickhouse:init:run": "docker compose -f docker-compose.infrastructure.yml --env-file .env.development --profile clickhouse run --rm clickhouse-init",
+
     "treasury:e2e": "ts-node -r tsconfig-paths/register scripts/daily-testnet-deposit-withdraw-e2e.ts",
     "treasury:health": "ts-node -r tsconfig-paths/register scripts/daily-treasury-health-check.ts",
     "treasury:daily": "npm run treasury:e2e && npm run treasury:health",
     "treasury:schedule:register": "powershell -ExecutionPolicy Bypass -File scripts/register-treasury-daily-task.ps1",
     "treasury:schedule:unregister": "powershell -ExecutionPolicy Bypass -File scripts/unregister-treasury-daily-task.ps1",
+
     "deploy:prod:up": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d",
     "deploy:prod:build": "docker compose -f docker-compose.prod.yml --env-file .env.production build --pull",
     "deploy:prod:start": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build",
