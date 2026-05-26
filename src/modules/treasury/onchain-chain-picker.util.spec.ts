@@ -94,15 +94,15 @@ describe('buildChainPickerOptions', () => {
       env: 'development',
     });
     expect(dto.operatorMode).toBe('sandbox');
-    expect(dto.pickers.onchain_deposit_withdraw).toContain('ETH_SEPOLIA');
-    expect(dto.pickers.onchain_deposit_withdraw).not.toContain('TON_TESTNET');
+    const withdrawCodes = dto.pickers.onchain_deposit_withdraw.map((c) => c.code);
+    expect(withdrawCodes).toContain('ETH_SEPOLIA');
+    expect(withdrawCodes).not.toContain('TON_TESTNET');
     expect(dto.networkCatalog.map((c) => c.code)).toContain('TON_TESTNET');
-    expect(dto.pickers.onchain_deposit_withdraw.filter((c) => c.startsWith('TRON_')).length).toBe(
-      2,
-    );
-    expect(dto.pickers.treasury_ops).toContain('TRON_NILE');
-    expect(dto.pickers.treasury_ops).toContain('TRON_SHASTA');
-    expect(dto.pickers.treasury_ops.length).toBe(dto.pickers.onchain_deposit_withdraw.length);
+    expect(withdrawCodes.filter((c) => c.startsWith('TRON_')).length).toBe(2);
+    const opsCodes = dto.pickers.treasury_ops.map((c) => c.code);
+    expect(opsCodes).toContain('TRON_NILE');
+    expect(opsCodes).toContain('TRON_SHASTA');
+    expect(opsCodes.length).toBe(withdrawCodes.length);
   });
 
   it('sandbox TRON_DEFAULT_NETWORK=TRON_NILE lists Nile then Shasta in user-facing pickers', () => {
@@ -110,11 +110,13 @@ describe('buildChainPickerOptions', () => {
       onchainOperatorMode: 'sandbox',
       tronDefaultNetwork: 'TRON_NILE',
     });
-    expect(dto.pickers.onchain_deposit_withdraw.filter((c) => c.startsWith('TRON_'))).toEqual([
+    const withdrawCodes = dto.pickers.onchain_deposit_withdraw.map((c) => c.code);
+    expect(withdrawCodes.filter((c) => c.startsWith('TRON_'))).toEqual([
       'TRON_NILE',
       'TRON_SHASTA',
     ]);
-    expect(dto.pickers.treasury_ops.filter((c) => c.startsWith('TRON_'))).toEqual([
+    const opsCodes = dto.pickers.treasury_ops.map((c) => c.code);
+    expect(opsCodes.filter((c) => c.startsWith('TRON_'))).toEqual([
       'TRON_NILE',
       'TRON_SHASTA',
     ]);
@@ -127,10 +129,10 @@ describe('buildChainPickerOptions', () => {
     });
     expect(resolveSandboxTronDefaultNetwork('TRON_SHASTA')).toBe('TRON_SHASTA');
     expect(dto.tronDefaultNetwork).toBe('TRON_SHASTA');
-    expect(
-      dto.pickers.onchain_deposit_withdraw[dto.pickers.onchain_deposit_withdraw.length - 1],
-    ).toBe('TRON_NILE');
-    expect(dto.pickers.treasury_ops.filter((c) => c.startsWith('TRON_'))).toEqual([
+    const withdrawCodes = dto.pickers.onchain_deposit_withdraw.map((c) => c.code);
+    expect(withdrawCodes[withdrawCodes.length - 1]).toBe('TRON_NILE');
+    const opsCodes = dto.pickers.treasury_ops.map((c) => c.code);
+    expect(opsCodes.filter((c) => c.startsWith('TRON_'))).toEqual([
       'TRON_SHASTA',
       'TRON_NILE',
     ]);
@@ -142,9 +144,10 @@ describe('buildChainPickerOptions', () => {
       env: 'development',
     });
     expect(dto.operatorMode).toBe('production');
-    expect(dto.pickers.onchain_deposit_withdraw).toContain('ETH_MAINNET');
-    expect(dto.pickers.onchain_deposit_withdraw).toContain('BASE_MAINNET');
-    expect(dto.pickers.onchain_deposit_withdraw).not.toContain('TON_MAINNET');
+    const withdrawCodes = dto.pickers.onchain_deposit_withdraw.map((c) => c.code);
+    expect(withdrawCodes).toContain('ETH_MAINNET');
+    expect(withdrawCodes).toContain('BASE_MAINNET');
+    expect(withdrawCodes).not.toContain('TON_MAINNET');
     expect(dto.tronDefaultNetwork).toBe('TRON_MAINNET');
   });
 
@@ -170,5 +173,39 @@ describe('buildChainPickerOptions', () => {
     const dto = buildChainPickerOptions({ onchainOperatorMode: 'production' });
     expect(dto.networkCatalog[0].code).toBe('TON_MAINNET');
     expect(dto.networkCatalog[0].capabilities.deposit).toBe(false);
+  });
+
+  it('each picker item includes blockchainLabel', () => {
+    const dto = buildChainPickerOptions({ onchainOperatorMode: 'production' });
+    for (const [, items] of Object.entries(dto.pickers)) {
+      expect(items.length).toBeGreaterThan(0);
+      for (const item of items) {
+        expect(item.code).toBeTruthy();
+        expect(item.blockchainLabel).toBeTruthy();
+      }
+    }
+  });
+
+  it('production blockchainLabels omit network suffix', () => {
+    const dto = buildChainPickerOptions({ onchainOperatorMode: 'production' });
+    const labels = dto.pickers.treasury_ops.map((i) => i.blockchainLabel);
+    expect(labels).toContain('Tron');
+    expect(labels).toContain('Ethereum');
+    expect(labels).toContain('Solana');
+    expect(labels).toContain('BNB Smart Chain');
+    labels.forEach((lbl) => {
+      expect(lbl).not.toMatch(/\(/);
+    });
+  });
+
+  it('sandbox blockchainLabels include network suffix for non-mainnets', () => {
+    const dto = buildChainPickerOptions({ onchainOperatorMode: 'sandbox' });
+    const withdrawLabels = dto.pickers.onchain_deposit_withdraw;
+    const nile = withdrawLabels.find((i) => i.code === 'TRON_NILE');
+    const sep = withdrawLabels.find((i) => i.code === 'ETH_SEPOLIA');
+    const bsc = withdrawLabels.find((i) => i.code === 'BSC_CHAPEL');
+    expect(nile?.blockchainLabel).toBe('Tron (Nile)');
+    expect(sep?.blockchainLabel).toBe('Ethereum (Sepolia)');
+    expect(bsc?.blockchainLabel).toBe('BNB Smart Chain (Chapel)');
   });
 });

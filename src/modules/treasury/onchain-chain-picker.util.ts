@@ -4,6 +4,7 @@
  */
 
 import type { ChainNetworkCatalogItemDto } from '@/common/constants/chain-registry';
+import { BlockchainNetwork } from '@/common/enums';
 import {
   buildNetworkCatalog,
   listActionableOnchainChainCodes,
@@ -26,11 +27,18 @@ export interface ChainPickerEnvInput {
   tronDefaultNetwork?: string;
 }
 
+export interface ChainPickerItem {
+  code: string;
+  /** Pre-computed blockchain label (mainnet name only, no network suffix).
+   *  Mirrors Flutter [OnchainChainPickerProvider.displayLabelForCode] logic. */
+  blockchainLabel: string;
+}
+
 export interface ChainPickerOptionsDto {
   operatorMode: 'sandbox' | 'production';
   /** Effective Tron row for sandbox (TRON_NILE | TRON_SHASTA); in production mode TRON_MAINNET. */
   tronDefaultNetwork: string;
-  pickers: Record<ChainPickerContextKey, string[]>;
+  pickers: Record<ChainPickerContextKey, ChainPickerItem[]>;
   /** Full network sheet (includes TON with capabilities off until Phase 2). */
   networkCatalog: ChainNetworkCatalogItemDto[];
 }
@@ -93,6 +101,73 @@ export function resolveRecommendedChainForDepositPicker(
   return pickerChains[0];
 }
 
+function chainPickerItem(code: string, mainnetOnly: boolean): ChainPickerItem {
+  const network = BlockchainNetwork[code as keyof typeof BlockchainNetwork];
+  if (!network) return { code, blockchainLabel: code };
+  return { code, blockchainLabel: blockchainLabelMap(network, mainnetOnly) };
+}
+
+function blockchainLabelMap(network: BlockchainNetwork, mainnetOnly: boolean): string {
+  switch (network) {
+    case BlockchainNetwork.TON_MAINNET:
+      return 'TON';
+    case BlockchainNetwork.TON_TESTNET:
+      return mainnetOnly ? 'TON' : 'TON Testnet';
+    case BlockchainNetwork.BSC_MAINNET:
+      return 'BNB Smart Chain';
+    case BlockchainNetwork.BSC_CHAPEL:
+      return mainnetOnly ? 'BNB Smart Chain' : 'BNB Smart Chain (Chapel)';
+    case BlockchainNetwork.SOLANA_MAINNET:
+      return 'Solana';
+    case BlockchainNetwork.SOLANA_DEVNET:
+      return mainnetOnly ? 'Solana' : 'Solana (devnet)';
+    case BlockchainNetwork.ETH_MAINNET:
+      return 'Ethereum';
+    case BlockchainNetwork.ETH_SEPOLIA:
+      return mainnetOnly ? 'Ethereum' : 'Ethereum (Sepolia)';
+    case BlockchainNetwork.BASE_MAINNET:
+      return 'Base';
+    case BlockchainNetwork.BASE_SEPOLIA:
+      return mainnetOnly ? 'Base' : 'Base (Sepolia)';
+    case BlockchainNetwork.ARBITRUM_MAINNET:
+      return 'Arbitrum One';
+    case BlockchainNetwork.ARBITRUM_SEPOLIA:
+      return mainnetOnly ? 'Arbitrum' : 'Arbitrum (Sepolia)';
+    case BlockchainNetwork.OPTIMISM_MAINNET:
+      return 'Optimism';
+    case BlockchainNetwork.OPTIMISM_SEPOLIA:
+      return mainnetOnly ? 'Optimism' : 'Optimism (Sepolia)';
+    case BlockchainNetwork.POLYGON_MAINNET:
+      return 'Polygon';
+    case BlockchainNetwork.POLYGON_AMOY:
+      return mainnetOnly ? 'Polygon' : 'Polygon (Amoy)';
+    case BlockchainNetwork.AVALANCHE_MAINNET:
+      return 'Avalanche';
+    case BlockchainNetwork.AVALANCHE_FUJI:
+      return mainnetOnly ? 'Avalanche' : 'Avalanche (Fuji)';
+    case BlockchainNetwork.GNOSIS_MAINNET:
+      return 'Gnosis';
+    case BlockchainNetwork.GNOSIS_CHIADO:
+      return mainnetOnly ? 'Gnosis' : 'Gnosis (Chiado)';
+    case BlockchainNetwork.LINEA_MAINNET:
+      return 'Linea';
+    case BlockchainNetwork.LINEA_SEPOLIA:
+      return mainnetOnly ? 'Linea' : 'Linea (Sepolia)';
+    case BlockchainNetwork.FANTOM_MAINNET:
+      return 'Fantom';
+    case BlockchainNetwork.FANTOM_TESTNET:
+      return mainnetOnly ? 'Fantom' : 'Fantom (testnet)';
+    case BlockchainNetwork.TRON_MAINNET:
+      return 'Tron';
+    case BlockchainNetwork.TRON_NILE:
+      return mainnetOnly ? 'Tron' : 'Tron (Nile)';
+    case BlockchainNetwork.TRON_SHASTA:
+      return mainnetOnly ? 'Tron' : 'Tron (Shasta)';
+    default:
+      return String(network);
+  }
+}
+
 export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPickerOptionsDto {
   const mainnetOnly = resolveTreasuryChainsUseMainnetOnly(input);
   const operatorMode: 'sandbox' | 'production' = mainnetOnly ? 'production' : 'sandbox';
@@ -108,14 +183,14 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
     tronDefaultNetwork,
     networkCatalog: catalog,
     pickers: {
-      treasury_ops: [...treasuryOpsList],
-      treasury_main_wallet: [...treasuryOpsList],
-      treasury_history_filter: [...treasuryOpsList],
-      withdrawal_admin_filter: [...actionable],
-      /** Same universe as [onchain_deposit_withdraw] — admin “Nạp tiền & ví quản lý” vs user deposit tab. */
-      managed_wallets: [...actionable],
-      onchain_deposit_withdraw: [...actionable],
-      treasury_e2e: [...treasuryOpsList],
+      treasury_ops: treasuryOpsList.map((c) => chainPickerItem(c, mainnetOnly)),
+      treasury_main_wallet: treasuryOpsList.map((c) => chainPickerItem(c, mainnetOnly)),
+      treasury_history_filter: treasuryOpsList.map((c) => chainPickerItem(c, mainnetOnly)),
+      withdrawal_admin_filter: actionable.map((c) => chainPickerItem(c, mainnetOnly)),
+      /** Same universe as [onchain_deposit_withdraw] — admin "Nạp tiền & ví quản lý" vs user deposit tab. */
+      managed_wallets: actionable.map((c) => chainPickerItem(c, mainnetOnly)),
+      onchain_deposit_withdraw: actionable.map((c) => chainPickerItem(c, mainnetOnly)),
+      treasury_e2e: treasuryOpsList.map((c) => chainPickerItem(c, mainnetOnly)),
     },
   };
 }

@@ -103,10 +103,12 @@ export class ManagedWalletsService {
     defaults: ManagedWalletResponseDto[];
   }> {
     const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
-    const chains = (pickerDto.pickers.managed_wallets ?? []).filter(
-      (c): c is BlockchainChainDbValue =>
+    const pickerChains = pickerDto.pickers.managed_wallets ?? [];
+    const chains = pickerChains
+      .map((c) => c.code)
+      .filter((c): c is BlockchainChainDbValue =>
         (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
-    );
+      );
     const recommendedChain = await this.getRecommendedChain();
     const defaults: ManagedWalletResponseDto[] = [];
 
@@ -299,7 +301,8 @@ export class ManagedWalletsService {
   }> {
     const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
     const pickerList = pickerDto.pickers.onchain_deposit_withdraw ?? [];
-    const fromPicker = pickerList.filter((c): c is BlockchainChainDbValue =>
+    const pickerCodes = pickerList.map((c) => c.code);
+    const fromPicker = pickerCodes.filter((c): c is BlockchainChainDbValue =>
       (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
     );
     const fallback = listActionableOnchainChainCodes(
@@ -358,9 +361,10 @@ export class ManagedWalletsService {
       ManagedWalletsService.RECOMMENDED_CHAIN_KEY,
     );
     const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
-    const allowed = (pickerDto.pickers.managed_wallets ?? []).filter(
-      (c): c is BlockchainChainDbValue =>
-        (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
+    const pickerChains = pickerDto.pickers.managed_wallets ?? [];
+    const pickerCodes = pickerChains.map((c) => c.code);
+    const allowed = pickerCodes.filter((c): c is BlockchainChainDbValue =>
+      (BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(c),
     );
     const raw = (v?.trim() || BlockchainNetwork.TRON_MAINNET) as string;
     if (!(BLOCKCHAIN_CHAIN_DB_VALUES as readonly string[]).includes(raw)) {
@@ -554,8 +558,8 @@ export class ManagedWalletsService {
       );
     }
     const pickerDto = this.onchainChainPickerService.getChainPickerOptions();
-    const allowed = pickerDto.pickers.managed_wallets ?? [];
-    if (!allowed.includes(chain)) {
+    const allowedCodes = (pickerDto.pickers.managed_wallets ?? []).map((c) => c.code);
+    if (!allowedCodes.includes(chain)) {
       throw new BadRequestException(
         `Chain ${chain} is not enabled for the current on-chain operator mode`,
         'RECOMMENDED_CHAIN_NOT_IN_PICKER',
