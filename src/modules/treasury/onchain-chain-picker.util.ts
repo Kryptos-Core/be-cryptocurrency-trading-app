@@ -41,6 +41,12 @@ export interface ChainPickerOptionsDto {
   pickers: Record<ChainPickerContextKey, ChainPickerItem[]>;
   /** Full network sheet (includes TON with capabilities off until Phase 2). */
   networkCatalog: ChainNetworkCatalogItemDto[];
+  /**
+   * Whether chain/network selectors (two-dropdown UX) should be shown.
+   * `false` in production — network is implicit mainnet, only ecosystem dropdown is shown.
+   * `true` in sandbox — both ecosystem and network dropdowns are displayed.
+   */
+  showNetworkSelector: boolean;
 }
 
 /** Same rule as Flutter [treasuryChainsUseMainnetOnly]. */
@@ -182,6 +188,7 @@ export function buildChainPickerOptions(input: ChainPickerEnvInput): ChainPicker
     operatorMode,
     tronDefaultNetwork,
     networkCatalog: catalog,
+    showNetworkSelector: !mainnetOnly,
     pickers: {
       treasury_ops: treasuryOpsList.map((c) => chainPickerItem(c, mainnetOnly)),
       treasury_main_wallet: treasuryOpsList.map((c) => chainPickerItem(c, mainnetOnly)),

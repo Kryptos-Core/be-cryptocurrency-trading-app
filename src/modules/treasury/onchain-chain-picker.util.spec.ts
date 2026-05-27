@@ -208,4 +208,14 @@ describe('buildChainPickerOptions', () => {
     expect(sep?.blockchainLabel).toBe('Ethereum (Sepolia)');
     expect(bsc?.blockchainLabel).toBe('BNB Smart Chain (Chapel)');
   });
+
+  it('production sets showNetworkSelector to false', () => {
+    const dto = buildChainPickerOptions({ onchainOperatorMode: 'production' });
+    expect(dto.showNetworkSelector).toBe(false);
+  });
+
+  it('sandbox sets showNetworkSelector to true', () => {
+    const dto = buildChainPickerOptions({ onchainOperatorMode: 'sandbox' });
+    expect(dto.showNetworkSelector).toBe(true);
+  });
 });
