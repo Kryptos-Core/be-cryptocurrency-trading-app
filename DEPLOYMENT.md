@@ -98,8 +98,8 @@ sudo systemctl start fail2ban
 su - deployer
 
 # Clone repository
-git clone <your-repo-url> /opt/crypto-trading
-cd /opt/crypto-trading
+git clone <your-repo-url> /home/ubuntu/be-cryptocurrency-trading-app
+cd /home/ubuntu/be-cryptocurrency-trading-app
 ```
 
 ### 2. Tạo .env.production
@@ -120,32 +120,88 @@ Thay tất cả `CHANGE_ME_*` với giá trị thực.
 mkdir -p backups/db logs prometheus grafana/dashboards grafana/provisioning/datasources alertmanager
 ```
 
-### 4. Triển Khai
+### 4. Baseline production networking posture
+
+Thiết lập mặc định đã được xác minh an toàn cho VPS này:
+
+- `BIND_HOST=127.0.0.1`
+- `KAFKA_EXTERNAL_BIND_HOST=0.0.0.0`
+- `APP_HOST=0.0.0.0`
+
+Kết quả mong muốn trên host:
+
+- local-only:
+  - PostgreSQL → `127.0.0.1:5432`
+  - Redis → `127.0.0.1:6379`
+  - TimescaleDB → `127.0.0.1:5433`
+  - ClickHouse HTTP → `127.0.0.1:8123`
+  - ClickHouse TCP → `127.0.0.1:9000`
+  - Kafka internal → `127.0.0.1:9092`
+  - Prometheus → `127.0.0.1:9090`
+  - Alertmanager → `127.0.0.1:9093`
+  - Grafana → `127.0.0.1:3001`
+  - Node Exporter → `127.0.0.1:9100`
+- public:
+  - Backend API → `0.0.0.0:3000`
+  - Kafka external → `0.0.0.0:29092`
+
+### 5. Triển Khai baseline production stack
 
 ```bash
-# Pull images
-docker compose pull
-
-# Start services
-docker compose up -d
-
-# Check status
-docker compose ps
-
-# View logs
-docker compose logs -f app
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
-### 5. Kiểm Tra Health
+### 6. Chạy migrations trước khi đánh giá backend health
 
 ```bash
-# Health check
-curl http://localhost:3000/health
-
-# Hoặc sử dụng script
-./scripts/health-check.sh
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
 ```
 
+Nếu bỏ qua bước này, backend có thể fail do thiếu schema và trông giống lỗi app/runtime dù root cause thực ra là DB chưa migrate.
+
+### 7. Triển khai monitoring stack
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build
+```
+
+### 8. Recreate requirement sau khi harden port binding
+
+Nếu bạn vừa đổi `BIND_HOST` hoặc published ports trong `.env.production`, chỉ `restart` là chưa đủ với container đã tồn tại. Cần recreate service bị ảnh hưởng để Docker áp dụng host bind mới.
+
+Ví dụ đã dùng cho TimescaleDB và ClickHouse:
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+```
+
+### 9. Kiểm Tra Health
+
+```bash
+curl -fsS http://127.0.0.1:3000/api/v1/health
+curl -fsS http://127.0.0.1:3000/api/v1/metrics >/dev/null
+curl -fsS http://127.0.0.1:9090/-/healthy
+curl -fsS http://127.0.0.1:9093/-/healthy
+curl -fsS http://127.0.0.1:9100/metrics >/dev/null
+curl -fsS http://127.0.0.1:3001/api/health
+```
+
+### 10. Kiểm tra listening ports trên host
+
+```bash
+ss -ltnp | grep -E ':(5432|5433|6379|8123|9000|9090|9092|9093|9100|29092|3000|3001)\b'
+```
+
+Kỳ vọng:
+- local-only: `5432`, `5433`, `6379`, `8123`, `9000`, `9090`, `9092`, `9093`, `9100`, `3001`
+- public: `3000`, `29092`
+```
 ---
 
 ## Triển Khai với Ansible
@@ -240,7 +296,83 @@ Trong GitHub repository > Settings > Webhooks:
 | Grafana | http://localhost:3001 | admin / (GF_SECURITY_ADMIN_PASSWORD) |
 | Alertmanager | http://localhost:9093 | - |
 
-### Alert Telegram
+### Baseline production posture on this VPS
+
+- `docker-compose.prod.yml` is run from the repository root with `--env-file .env.production`.
+- Internal data services are loopback-only by default via `BIND_HOST=127.0.0.1`:
+  - PostgreSQL → `127.0.0.1:5432`
+  - Redis → `127.0.0.1:6379`
+  - TimescaleDB → `127.0.0.1:5433`
+  - ClickHouse HTTP → `127.0.0.1:8123`
+  - ClickHouse native TCP → `127.0.0.1:9000`
+- Kafka is intentionally split across two listeners:
+  - internal/local broker → `127.0.0.1:9092` on host, `kafka:9092` inside Docker
+  - external/public broker → `0.0.0.0:29092` on host, advertised as `${APP_HOSTNAME}:29092`
+- Monitoring endpoints stay loopback-only:
+  - Prometheus → `127.0.0.1:9090`
+  - Alertmanager → `127.0.0.1:9093`
+  - Grafana → `127.0.0.1:3001`
+  - Node Exporter → `127.0.0.1:9100`
+
+### Monitoring deployment commands used on this VPS
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose --env-file .env.production -f docker-compose.monitoring.yml up -d --build
+```
+
+### Recreate requirement when hardening bind hosts / published ports
+
+If you change `BIND_HOST` or published port mappings in `.env.production`, `docker restart` is **not** enough for existing containers. You must recreate the affected services so Docker applies the new host bind addresses.
+
+Example used for data services after moving DB ports back to loopback:
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+```
+
+
+### Monitoring verification commands used on this VPS
+
+```bash
+curl -fsS http://127.0.0.1:9090/-/healthy
+curl -fsS http://127.0.0.1:9093/-/healthy
+curl -fsS http://127.0.0.1:9100/metrics >/dev/null && echo node_exporter_ok
+curl -fsS http://127.0.0.1:3001/api/health
+curl -fsS http://127.0.0.1:9090/api/v1/targets
+```
+
+### Prometheus target policy
+
+Default monitoring should scrape only services that are expected to be running in the baseline production profile:
+- Prometheus
+- Alertmanager
+- Node Exporter
+- Backend API
+- Market Aggregator
+
+Do **not** include optional profile-based services such as `matching-engine` and `public-ws-gateway` in the default Prometheus scrape config unless those profiles are intentionally enabled on the target server. This avoids false-red dashboards and noisy `down` target states after migration to a fresh VPS.
+
+If those optional services are enabled later, add explicit scrape jobs for their real Docker-reachable names:
+- `crypto_matching_engine:8081`
+- `crypto_public_ws_gateway:8082`
+
+### First boot / migration sequence on a new server
+
+After bringing up the production stack, run database migrations before judging backend health:
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+```
+
+Without this step, the backend can fail with missing-table errors such as:
+- `relation "integration_outbox" does not exist`
+- `relation "system_configs" does not exist`
+
+### Telegram alerting notes
 
 1. Tạo Telegram Bot: @BotFather
 2. Lấy bot token
@@ -265,23 +397,23 @@ Dashboard mặc định đã được provision tại `grafana/dashboards/defaul
 
 ```bash
 # Manual backup
-docker compose exec postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +%Y%m%d).dump
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production exec postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +%Y%m%d).dump
 
 # Auto backup (crontab)
-0 2 * * * docker compose -f /opt/crypto-trading/docker-compose.yml exec -T postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +\%Y\%m\%d).dump
+0 2 * * * cd /home/ubuntu/be-cryptocurrency-trading-app && sudo docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +\%Y\%m\%d).dump
 ```
 
 ### Phục Hồi Database
 
 ```bash
 # Stop app
-docker compose stop app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production stop app
 
 # Restore
-docker compose exec -T postgres pg_restore -U crypto_user -d crypto_trading_platform -c /backups/backup_YYYYMMDD.dump
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_restore -U crypto_user -d crypto_trading_platform -c /backups/backup_YYYYMMDD.dump
 
 # Start app
-docker compose up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
 ```
 
 ### Rollback Deployment
@@ -350,7 +482,7 @@ docker compose exec app env
 
 ```bash
 # Check if port is accessible
-curl -v http://localhost:3000/health
+curl -v http://localhost:3000/api/v1/health
 
 # Check Docker network
 docker network ls

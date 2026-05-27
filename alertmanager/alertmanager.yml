@@ -29,5 +29,5 @@ receivers:
 
   - name: 'telegram-bridge'
     webhook_configs:
-      - url: 'http://172.20.0.1:19095/alert'
+      - url: 'http://telegram-bridge:9095/alert'
         send_resolved: true

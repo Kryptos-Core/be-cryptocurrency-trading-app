@@ -48,7 +48,7 @@ VPS được thuê qua **chiasegpu.vn** — đây là KVM VM với NAT networkin
 | Hypervisor IP (public) | `123.16.178.176` |
 | OS | Ubuntu 22.04 LTS |
 | User | `ubuntu` |
-| Project dir | `/home/ubuntu/crypto-trading` |
+| Project dir | `/home/ubuntu/be-cryptocurrency-trading-app` |
 
 ---
 
@@ -57,17 +57,17 @@ VPS được thuê qua **chiasegpu.vn** — đây là KVM VM với NAT networkin
 ### Khởi động toàn bộ stack
 
 ```bash
-cd /home/ubuntu/crypto-trading
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
 ### Kiểm tra trạng thái
 
 ```bash
-docker ps
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
-### Services và ports (bind về 127.0.0.1)
+### Services và ports (bind theo trạng thái final đã harden)
 
 | Service | Container | Port |
 |---|---|---|
@@ -75,30 +75,71 @@ docker ps
 | PostgreSQL | `crypto_postgres` | `127.0.0.1:5432` |
 | TimescaleDB | `crypto_timescaledb` | `127.0.0.1:5433` |
 | Redis | `crypto_redis` | `127.0.0.1:6379` |
-| Kafka | `crypto_kafka` | `127.0.0.1:9092` |
+| Kafka internal | `crypto_kafka` | `127.0.0.1:9092` |
+| Kafka external | `crypto_kafka` | `0.0.0.0:29092` |
 | ClickHouse | `crypto_clickhouse` | `127.0.0.1:8123`, `127.0.0.1:9000` |
 | Prometheus | `prometheus` | `127.0.0.1:9090` |
 | Grafana | `grafana` | `127.0.0.1:3001` |
 | Alertmanager | `alertmanager` | `127.0.0.1:9093` |
+| Node Exporter | `node_exporter` | `127.0.0.1:9100` |
 
-> **Lưu ý:** Chỉ có app port 3000 bind ra `0.0.0.0`. Các service khác chỉ accessible từ localhost.
+> **Lưu ý:** Baseline production posture chỉ public `3000` (backend) và `29092` (Kafka external). Toàn bộ DB, monitoring, và Kafka internal listener phải loopback-only.
 
-### Docker Healthcheck
+### Backend healthcheck
 
 Healthcheck của `crypto_backend` phải dùng đúng path:
 
 ```yaml
 # docker-compose.prod.yml
 healthcheck:
-  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/v1/health"]
   interval: 30s
   timeout: 10s
   retries: 3
   start_period: 60s
 ```
 
-> ⚠️ **Lỗi thường gặp:** Dùng `/health` thay vì `/api/v1/health` → container bị `unhealthy`.  
+> ⚠️ **Lỗi thường gặp:** Dùng `/health` thay vì `/api/v1/health` → container bị `unhealthy`.
 > App có global prefix `/api/v1`, nên health endpoint là `/api/v1/health`.
+
+### Migration requirement sau first boot
+
+Trên server mới, backend có thể chưa healthy ngay nếu database schema chưa được migrate. Đây không nhất thiết là lỗi app.
+
+Sequence đã được xác minh:
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+```
+
+Các lỗi từng gặp khi thiếu schema:
+- `relation "integration_outbox" does not exist`
+- `relation "system_configs" does not exist`
+
+### Recreate requirement khi đổi BIND_HOST / published ports
+
+Nếu đổi `BIND_HOST` hoặc port mapping trong `.env.production`, `docker restart` là chưa đủ với container cũ. Cần recreate service để host bind mới có hiệu lực.
+
+Ví dụ:
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+```
+
+### Verification commands
+
+```bash
+curl -fsS http://127.0.0.1:3000/api/v1/health
+curl -fsS http://127.0.0.1:3000/api/v1/metrics >/dev/null
+curl -fsS http://127.0.0.1:9090/-/healthy
+curl -fsS http://127.0.0.1:9093/-/healthy
+curl -fsS http://127.0.0.1:9100/metrics >/dev/null
+curl -fsS http://127.0.0.1:3001/api/health
+ss -ltnp | grep -E ':(5432|5433|6379|8123|9000|9090|9092|9093|9100|29092|3000|3001)\b'
+```
 
 ---
 

@@ -2,6 +2,83 @@
 
 Tài liệu này ghi lại quá trình tăng cường monitoring/alerting cho crypto-trading stack, để có thể tái tạo setup trên server mới với ít lỗi sai hơn.
 
+## Final state đã được xác nhận trên VPS này
+
+### 1) Docker networking / exposure posture
+
+- `BIND_HOST=127.0.0.1` trong `.env.production`
+- `KAFKA_EXTERNAL_BIND_HOST=0.0.0.0` trong `.env.production`
+- Kết quả runtime mong muốn:
+  - PostgreSQL → `127.0.0.1:5432`
+  - Redis → `127.0.0.1:6379`
+  - TimescaleDB → `127.0.0.1:5433`
+  - ClickHouse HTTP → `127.0.0.1:8123`
+  - ClickHouse TCP → `127.0.0.1:9000`
+  - Kafka internal listener → `127.0.0.1:9092`
+  - Kafka external listener → `0.0.0.0:29092`
+  - Prometheus → `127.0.0.1:9090`
+  - Alertmanager → `127.0.0.1:9093`
+  - Grafana → `127.0.0.1:3001`
+  - Node Exporter → `127.0.0.1:9100`
+
+Lý do:
+- giảm bề mặt tấn công khi di dời server
+- chỉ Kafka external port `29092` là public theo nhu cầu vận hành
+- các DB/service nội bộ vẫn reachable từ host hoặc từ các container nội bộ, nhưng không public ra Internet
+
+### 2) Monitoring stack final state
+
+Compose path đã được xác nhận hoạt động:
+- `prometheus`
+- `alertmanager`
+- `grafana`
+- `node_exporter`
+- `telegram_bridge`
+
+Khác với một số note thử nghiệm trước đó, **final working path trên VPS này là Docker Compose-native**, không cần host-side Alertmanager workaround nữa.
+
+### 3) Prometheus default scrape policy
+
+Để tránh dashboard đỏ giả trên server mới, default `prometheus/prometheus.yml` chỉ scrape các service baseline luôn chạy:
+- `prometheus`
+- `alertmanager`
+- `node-exporter`
+- `crypto_backend`
+- `crypto_market_aggregator`
+
+Không scrape mặc định:
+- `crypto_matching_engine`
+- `crypto_public_ws_gateway`
+
+Lý do:
+- hai service này là optional/profile-based
+- nếu chưa enable mà vẫn scrape, Prometheus sẽ show `down`/`no such host`
+- điều đó gây nhầm lẫn sau migration dù production baseline vẫn khỏe
+
+Khi nào cần bật lại scrape cho optional services:
+- chỉ khi đã enable đúng Docker profile/service trên server đích
+- dùng đúng Docker-reachable names:
+  - `crypto_matching_engine:8081`
+  - `crypto_public_ws_gateway:8082`
+
+### 4) Migration requirement trước khi backend healthy
+
+Backend production trên server mới **không nên được coi là lỗi app** nếu vừa boot xong mà health chưa xanh ngay.
+
+Trên VPS này đã xác nhận root cause thật là thiếu database schema, với lỗi runtime như:
+- `relation "integration_outbox" does not exist`
+- `relation "system_configs" does not exist`
+
+Final recovery sequence đã được xác minh:
+
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+```
+
+Sau migration, backend đã lên healthy thành công.
+
 ## Phạm vi
 
 Stack được cover:
@@ -14,6 +91,7 @@ Stack được cover:
 Các file chính đã thay đổi:
 - `docker-compose.monitoring.yml`
 - `prometheus/alerts.yml`
+- `prometheus/prometheus.yml`
 - `alertmanager/alertmanager.yml`
 - `ansible/roles/monitoring/templates/alerts.yml.j2`
 - `ansible/roles/monitoring/templates/alertmanager.yml.j2`
@@ -185,14 +263,14 @@ Phát hiện quan trọng:
 - `.env.production` **không** chứa real Telegram token tại thời điểm verify; nó giữ `***`
 - Telegram end-to-end chỉ thành công sau khi restart host bridge với real token được cung cấp trong quá trình debug
 
-### Host-side Alertmanager
+### Historical debugging note: host-side Alertmanager experiment
 
-Thay vì dựa vào containerized Alertmanager-to-host bridge path, Alertmanager chạy trực tiếp với host networking:
+Trong một nhánh debug tạm thời, team từng thử chạy Alertmanager bằng host networking để cô lập vấn đề Telegram/TLS. Ví dụ thử nghiệm khi đó:
 ```bash
 docker run --rm --name alertmanager-host \
   --network host \
-  -v /home/ubuntu/crypto-trading/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro \
-  -v /home/ubuntu/crypto-trading/alertmanager/telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro \
+  -v /home/ubuntu/be-cryptocurrency-trading-app/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro \
+  -v /home/ubuntu/be-cryptocurrency-trading-app/alertmanager/telegram.tmpl:/etc/alertmanager/telegram.tmpl:ro \
   -v alertmanager_data:/alertmanager \
   prom/alertmanager:v0.27.0 \
   --config.file=/etc/alertmanager/alertmanager.yml \
@@ -201,7 +279,7 @@ docker run --rm --name alertmanager-host \
   --web.route-prefix=/
 ```
 
-Alertmanager host-network này đã load config thành công và serve health checks.
+**Lưu ý:** đây chỉ là evidence/debug path lịch sử. Final intended state cho VPS này và cho lần migrate sau vẫn là **Compose-native monitoring stack** (`prometheus`, `alertmanager`, `grafana`, `node_exporter`, `telegram_bridge`).
 
 ## Bằng chứng end-to-end
 
@@ -213,9 +291,9 @@ telegram_send_ok {"ok":true,...}
 
 ### Full firing path đã verify
 Path đã verify:
-- Alertmanager (host-network)
-- webhook to host bridge
-- host bridge gửi Telegram
+- Alertmanager
+- webhook to Telegram bridge
+- Telegram bridge gửi Telegram
 
 Log quan sát được:
 ```text
@@ -230,185 +308,108 @@ Một resolved alert payload cũng đã được inject trong testing, nhưng ca
 
 ## Những gì vẫn chưa hoàn hảo / operational caveats
 
-1. Current proven working path trên host này là **host-side Alertmanager + host-side bridge**, không phải pure Compose-to-Compose Telegram delivery.
-2. `.env.production` nên được sửa để chứa real Telegram bot token nếu muốn reproducible mà không cần manual runtime injection.
-3. Các Compose bridge experiments trong repo nên được coi là intermediate/debugging artifacts cho đến khi Docker/container trust environment được dọn dẹp.
-4. `version` trong Compose vẫn obsolete và có thể remove.
+1. Telegram delivery vẫn phụ thuộc vào việc `.env.production` chứa đúng `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`.
+2. Khi thay đổi `BIND_HOST` hoặc các port mapping của container đã tồn tại, cần **recreate** service thì bind mới mới có hiệu lực; chỉ `restart` là chưa đủ.
+3. Các optional services (`matching-engine`, `public-ws-gateway`) không nên được scrape mặc định nếu chưa enable profile tương ứng.
+4. Warning phụ như thiếu Firebase credentials hoặc `TRON_GRID_API_KEY` không làm backend chết, nhưng vẫn nên được xử lý khi bật các tính năng liên quan.
 
 ## Các bước tăng cường tiếp theo được khuyến nghị
 
-1. **Persist host-side Alertmanager và host-side bridge cleanly**
-   - systemd units hoặc another supervised host service model
-   - Không dựa vào ad-hoc `nohup` trên production
+1. **Giữ monitoring theo Docker Compose-native path**
+   - Dùng `docker-compose.monitoring.yml` làm source of truth
+   - Tránh quay lại workaround host-side nếu stack hiện tại vẫn healthy
 
-2. **Sửa `.env.production`**
-   - Replace placeholder `***` bằng real bot token trong intended secure deployment path
+2. **Chuẩn hóa quy trình recreate khi harden port exposure**
+   - Sau khi đổi `BIND_HOST` hoặc port binding trong `.env.production`, chạy recreate cho các service bị ảnh hưởng
+   - Ví dụ với TimescaleDB và ClickHouse:
+   ```bash
+   cd /home/ubuntu/be-cryptocurrency-trading-app
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+   ```
 
-3. **Dọn dẹp Compose bridge experiments**
-   - Hoặc remove hoặc finish stable Docker-native bridge sau khi container trust/network issues được resolve
+3. **Giữ docs deployment và monitoring đồng bộ với trạng thái final**
+   - Monitoring dùng Compose-native
+   - Alertmanager/Telegram bridge là containerized services trong monitoring stack
 
-4. **Investigate Docker/container trust path riêng**
-   - Container TLS trust tới Telegram và package repositories không nhất quán trên máy này
-   - Đây là host/runtime issue đáng fix độc lập với monitoring config
+4. **Investigate Docker/container trust path riêng nếu lỗi Telegram quay lại**
+   - Chỉ cần nếu sau này runtime/container TLS trust tới Telegram hoặc package repos lại có vấn đề
 
 ## Tóm tắt nhanh
 
-Pass này hoàn thành real deployment và runtime verification, không chỉ repo edits:
-- Monitoring config hardening đã apply
-- Alertmanager incompatibility với `--config.expand-env` đã identified và corrected
-- Runtime rules đã verify
-- Built-in Telegram notifier failure đã isolated tới runtime TLS/trust behavior
-- Host-side Telegram bridge đã implement
-- Host-network Alertmanager path đã dùng như pragmatic workaround
-- Real Telegram firing alert delivery đã verify end-to-end
-
-## Persistent setup đã hoàn thành (systemd)
-
-Để alerting survive reboots và tránh ad-hoc nohup runs, hai host-level systemd services đã được install và enable.
-
-### Service 1: Telegram bridge
-
-Unit file path:
-- `/etc/systemd/system/crypto-telegram-bridge.service`
-
-Unit content:
-```ini
-[Unit]
-Description=Crypto Telegram Bridge
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/crypto-trading
-ExecStart=/home/ubuntu/crypto-trading/alertmanager/run-telegram-bridge.sh
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Exec script:
-- `alertmanager/run-telegram-bridge.sh`
-- Đọc `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID` từ `.env.production`
-- Start `python3 alertmanager/telegram-bridge.py`
-
-### Service 2: Host-network Alertmanager
-
-Unit file path:
-- `/etc/systemd/system/crypto-alertmanager-host.service`
-
-Unit content:
-```ini
-[Unit]
-Description=Crypto Alertmanager Host
-After=network-online.target docker.service crypto-telegram-bridge.service
-Wants=network-online.target
-Requires=docker.service
-After=docker.service
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/crypto-trading
-ExecStart=/home/ubuntu/crypto-trading/alertmanager/run-alertmanager-host.sh
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Exec script:
-- `alertmanager/run-alertmanager-host.sh`
-- Chạy `prom/alertmanager:v0.27.0` với `--network host`
-- Mounts:
-  - `alertmanager/alertmanager.yml`
-  - `alertmanager/telegram.tmpl`
-  - `alertmanager_data` Docker volume
-
-### Các bước activation đã dùng
-
-```bash
-sudo chmod +x /home/ubuntu/crypto-trading/alertmanager/run-telegram-bridge.sh
-sudo chmod +x /home/ubuntu/crypto-trading/alertmanager/run-alertmanager-host.sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now crypto-telegram-bridge.service
-sudo systemctl enable --now crypto-alertmanager-host.service
-```
-
-### Đã verify runtime state
-
-Tại deployment completion cả hai services đều:
-- `enabled`
-- `active (running)`
-
-Các lệnh verify nhanh:
-```bash
-sudo systemctl is-enabled crypto-telegram-bridge.service crypto-alertmanager-host.service
-sudo systemctl is-active crypto-telegram-bridge.service crypto-alertmanager-host.service
-sudo systemctl status --no-pager crypto-telegram-bridge.service crypto-alertmanager-host.service
-```
+Pass này hoàn thành cả repo edits lẫn hardening/runtime verification cần thiết cho lần migrate sau:
+- Monitoring compose warning `version` đã được dọn
+- Default Prometheus scrape targets đã chỉ giữ baseline services luôn chạy
+- Kafka exposure giữ đúng split: local `9092`, public `29092`
+- ClickHouse và TimescaleDB đã được cấu hình loopback-only qua `BIND_HOST=127.0.0.1`
+- Tài liệu đã ghi lại migration requirement trước khi backend healthy
+- Tài liệu cũng ghi rõ việc phải recreate container sau khi đổi port binding / bind host
 
 ## Monitoring compose ownership sau hardening
 
-`docker-compose.monitoring.yml` hiện có chủ đích loại trừ experimental Alertmanager/bridge containers.
-
 Các Compose-managed monitoring services hiện tại:
 - `prometheus`
+- `alertmanager`
 - `grafana`
-- `node-exporter`
+- `node_exporter`
+- `telegram_bridge`
 
-Host-managed (systemd + host runtime):
-- Alertmanager (`crypto-alertmanager-host.service`)
-- Telegram bridge (`crypto-telegram-bridge.service`)
-
-Split này có chủ đích để reliability trên host này cho đến khi container TLS/trust behavior được fix.
+Đây là final intended state để mang sang VPS mới.
 
 ## Production environment requirements
 
-Required keys trong `/home/ubuntu/crypto-trading/.env.production`:
-- `TELEGRAM_BOT_TOKEN` (real production bot token)
+Required keys trong `/home/ubuntu/be-cryptocurrency-trading-app/.env.production`:
+- `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `GF_SECURITY_ADMIN_PASSWORD`
+- các database/app secrets production khác theo `.env.production.example`
 
 Notes:
 - Không commit real tokens/passwords vào Git.
-- Nếu Telegram delivery silently fail sau reboot, trước tiên confirm token/chat id có present và non-placeholder values.
+- Nếu Telegram delivery fail sau migration, trước tiên confirm token/chat id có present và non-placeholder values.
 
 ## Fast rebuild checklist (new server / disaster recovery)
 
-1. Clone repo tới `/home/ubuntu/crypto-trading`
+1. Clone repo tới thư mục đích, ví dụ `/home/ubuntu/be-cryptocurrency-trading-app`
 2. Chuẩn bị `.env.production` với real secrets
-3. Start Compose monitoring baseline:
+3. Start production stack baseline:
    ```bash
-   docker compose --env-file .env.production -f docker-compose.monitoring.yml up -d
+   cd /home/ubuntu/be-cryptocurrency-trading-app
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
    ```
-4. Ensure scripts executable:
+4. Chạy migrations trước khi đánh giá backend health:
    ```bash
-   chmod +x alertmanager/run-telegram-bridge.sh alertmanager/run-alertmanager-host.sh
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
    ```
-5. Install hai systemd unit files từ tài liệu này
-6. Enable/start services:
+5. Start monitoring stack:
    ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now crypto-telegram-bridge.service
-   sudo systemctl enable --now crypto-alertmanager-host.service
+   sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build
+   ```
+6. Nếu vừa đổi `BIND_HOST`/port binding cho services dữ liệu, recreate các service đó để bind mới có hiệu lực:
+   ```bash
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
    ```
 7. Verify health:
    ```bash
-   curl -fsS http://127.0.0.1:9093/-/healthy
    curl -fsS http://127.0.0.1:9090/-/healthy
+   curl -fsS http://127.0.0.1:9093/-/healthy
    curl -fsS http://127.0.0.1:9100/metrics >/dev/null
    curl -fsS http://127.0.0.1:3001/api/health
+   curl -fsS http://127.0.0.1:3000/api/v1/health
+   curl -fsS http://127.0.0.1:3000/api/v1/metrics >/dev/null
    ```
-8. Gửi một test alert và confirm Telegram receive path end-to-end
+8. Verify listening ports from host:
+   ```bash
+   ss -ltnp | grep -E ':(5432|5433|6379|8123|9000|9090|9092|9093|9100|29092|3001)\b'
+   ```
+9. Confirm expected exposure posture:
+   - local-only: `5432`, `5433`, `6379`, `8123`, `9000`, `9090`, `9092`, `9093`, `9100`, `3001`
+   - public: `29092`
+10. Gửi một test alert và confirm Telegram receive path end-to-end
 
 ## Known limitations (track for future cleanup)
 
-- Alertmanager không chạy như Compose service trong final setup.
-- Host-network mode được dùng như pragmatic workaround.
-- Duplicate `After=` lines trong `crypto-alertmanager-host.service` harmless nhưng có thể tidy later.
-- Docker/container TLS trust path tới Telegram/package repos vẫn deserves root-cause fix.
+- Optional services vẫn cần được add scrape thủ công nếu enable sau này.
+- Nếu team chuyển hoàn toàn sang `docker compose` plugin thay cho `docker-compose`, docs có thể được unify thêm cho nhất quán.
+- Docker/container TLS trust path tới Telegram/package repos vẫn đáng theo dõi nếu environment thay đổi.
+

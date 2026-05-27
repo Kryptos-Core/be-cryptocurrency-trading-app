@@ -1215,7 +1215,8 @@ npm run build
 npm start:prod
 
 # Production với PM2
-pm2 start dist/main.js --name crypto-trading-be
+# PM2 không dùng trong production stack (dùng Docker Compose)
+# docker compose -f docker-compose.prod.yml up -d app
 ```
 
 ### 10.4 Development Scripts

@@ -1,5 +1,8 @@
 # Prometheus configuration for Crypto Trading Platform
-# Scrape targets: Prometheus, Alertmanager, Node Exporter, and Backend
+# Default scrape targets: Prometheus, Alertmanager, Node Exporter, backend, and
+# the always-on market aggregator. Optional profile-based services such as
+# matching-engine and public-ws-gateway should be added only when they are
+# actually enabled in production.
 
 global:
   scrape_interval: 15s
@@ -42,38 +45,19 @@ scrape_configs:
   # Crypto Trading Backend
   - job_name: 'crypto-backend'
     static_configs:
-      - targets: ['app:3000']
+      - targets: ['crypto_backend:3000']
         labels:
           service: crypto-backend
     metrics_path: '/api/v1/metrics'
     scrape_interval: 30s
     scrape_timeout: 10s
 
-  # Go services are deployed shadow/canary-first. Prometheus will mark a target
-  # down when an optional profile is not running; keep alerts profile-aware.
+  # Default Go service that is enabled in the baseline production profile.
   - job_name: 'go-market-aggregator'
     static_configs:
-      - targets: ['market-aggregator:8080']
+      - targets: ['crypto_market_aggregator:8080']
         labels:
           service: market-aggregator
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-    scrape_timeout: 10s
-
-  - job_name: 'go-matching-engine'
-    static_configs:
-      - targets: ['matching-engine:8081']
-        labels:
-          service: matching-engine
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-    scrape_timeout: 10s
-
-  - job_name: 'go-public-ws-gateway'
-    static_configs:
-      - targets: ['public-ws-gateway:8082']
-        labels:
-          service: public-ws-gateway
     metrics_path: '/metrics'
     scrape_interval: 30s
     scrape_timeout: 10s
