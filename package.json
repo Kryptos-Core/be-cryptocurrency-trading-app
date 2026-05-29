@@ -29,7 +29,7 @@
     "db:migrate:revert": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:revert -d src/config/data-source.ts --verbose",
     "db:migrate:show": "cross-env NODE_ENV=development node -r tsconfig-paths/register ./node_modules/typeorm/cli-ts-node-commonjs.js -- migration:show -d src/config/data-source.ts --verbose",
     "db:seed": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
-    "db:seed:prod": "cross-env NODE_ENV=production CORE_DB_HOST=127.0.0.1 ts-node -r tsconfig-paths/register src/seed/run-seed.ts",
+    "db:seed:prod": "node -r tsconfig-paths/register dist/seed/run-seed.js",
 
     "seed:encrypt": "ts-node -r tsconfig-paths/register src/seed/encrypt-seed-data.ts",
     "seed:decrypt": "ts-node -r tsconfig-paths/register src/seed/encrypt-seed-data.ts --decrypt",

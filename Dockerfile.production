@@ -38,9 +38,12 @@ COPY --from=builder --chown=nestjs:nodejs /app/src ./src
 
 # Compile TypeScript files used at runtime outside webpack bundle without replacing bundled app dist
 RUN npm install --no-save typescript && \
+    cp -R src/seed/data /tmp/seed-data && \
     npx tsc --project tsconfig.json --outDir /tmp/compiled && \
     rm -rf src && \
     cp -R /tmp/compiled ./src && \
+    mkdir -p src/seed/data && \
+    cp -R /tmp/seed-data/. src/seed/data/ && \
     cp -R /tmp/compiled/seed dist/seed && \
     cp -R /tmp/compiled/config dist/config && \
     cp -R /tmp/compiled/entities dist/entities && \
@@ -50,7 +53,7 @@ RUN npm install --no-save typescript && \
     mkdir -p dist/modules/treasury/workers && \
     cp -R /tmp/compiled/modules/treasury/workers/* dist/modules/treasury/workers/ && \
     npm uninstall typescript && \
-    rm -rf /tmp/compiled
+    rm -rf /tmp/compiled /tmp/seed-data
 
 # Set production environment
 ENV NODE_ENV=production
