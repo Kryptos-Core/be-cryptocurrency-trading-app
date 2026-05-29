@@ -1,58 +1,59 @@
 [
-  {
-    "email": "admin@example.com",
-    "password": "ChangeMeAdmin!",
-    "first_name": "Admin",
-    "last_name": "User",
-    "status": "ACTIVE",
-    "role": "ADMIN"
-  },
-  {
-    "email": "trader1@example.com",
-    "password": "ChangeMeTrader!",
-    "first_name": "Trader",
-    "last_name": "One",
-    "status": "ACTIVE",
-    "role": "TRADER"
-  },
-  {
-    "email": "trader2@example.com",
-    "password": "ChangeMeTrader!",
-    "first_name": "Trader",
-    "last_name": "Two",
-    "status": "ACTIVE",
-    "role": "TRADER"
-  },
-  {
-    "email": "risk@example.com",
-    "password": "ChangeMeRisk!",
-    "first_name": "Risk",
-    "last_name": "Officer",
-    "status": "ACTIVE",
-    "role": "RISK_OFFICER"
-  },
-  {
-    "email": "support@example.com",
-    "password": "ChangeMeSupport!",
-    "first_name": "Support",
-    "last_name": "Agent",
-    "status": "ACTIVE",
-    "role": "SUPPORT_AGENT"
-  },
-  {
-    "email": "maker@example.com",
-    "password": "ChangeMeMaker!",
-    "first_name": "Market",
-    "last_name": "Maker",
-    "status": "ACTIVE",
-    "role": "MARKET_MAKER"
-  },
-  {
-    "email": "xosep44185@nyspring.com",
-    "password": "ChangeMeFinance!",
-    "first_name": "Finance",
-    "last_name": "Manager",
-    "status": "ACTIVE",
-    "role": "FINANCE_MANAGER"
-  }
-]
+    {
+      "email": "hsondz1910@gmail.com",
+      "password": "ChangeMeAdmin!",
+      "first_name": "Admin",
+      "last_name": "User",
+      "status": "ACTIVE",
+      "role": "ADMIN"
+    },
+    {
+      "email": "hoangsondz1910@gmail.com",
+      "password": "ChangeMeTrader!",
+      "first_name": "Trader",
+      "last_name": "One",
+      "status": "ACTIVE",
+      "role": "TRADER"
+    },
+    {
+      "email": "trader2@example.com",
+      "password": "ChangeMeTrader!",
+      "first_name": "Trader",
+      "last_name": "Two",
+      "status": "ACTIVE",
+      "role": "TRADER"
+    },
+    {
+      "email": "maxnoah901@gmail.com",
+      "password": "ChangeMeRisk!",
+      "first_name": "Risk",
+      "last_name": "Officer",
+      "status": "ACTIVE",
+      "role": "RISK_OFFICER"
+    },
+    {
+      "email": "support@example.com",
+      "password": "ChangeMeSupport!",
+      "first_name": "Support",
+      "last_name": "Agent",
+      "status": "ACTIVE",
+      "role": "SUPPORT_AGENT"
+    },
+    {
+      "email": "maker@example.com",
+      "password": "ChangeMeMaker!",
+      "first_name": "Market",
+      "last_name": "Maker",
+      "status": "ACTIVE",
+      "role": "MARKET_MAKER"
+    },
+    {
+      "email": "paperclip.health.dev@gmail.com",
+      "password": "ChangeMeFinance!",
+      "first_name": "Finance",
+      "last_name": "Manager",
+      "status": "ACTIVE",
+      "role": "FINANCE_MANAGER"
+    }
+  ]
+  
