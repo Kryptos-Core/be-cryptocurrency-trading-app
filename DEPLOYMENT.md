@@ -379,6 +379,44 @@ Without this step, the backend can fail with missing-table errors such as:
 3. Tạo group, add bot
 4. Lấy chat ID: @userinfobot
 
+### Alertmanager repeat interval và nội dung alert
+
+Production monitoring hiện đang dùng `repeat_interval: 5m` để các alert còn firing được nhắc lại sau mỗi 5 phút.
+
+Các file source of truth cần giữ đồng bộ:
+- Runtime Compose config: `alertmanager/alertmanager.yml`
+- Ansible template: `ansible/roles/monitoring/templates/alertmanager.yml.j2`
+- Runtime alert rules: `prometheus/alerts.yml`
+- Ansible alert template: `ansible/roles/monitoring/templates/alerts.yml.j2`
+- Telegram webhook renderer: `alertmanager/telegram-bridge.js`
+
+Khi thêm hoặc sửa alert rule:
+- Luôn khai báo tối thiểu `summary`, `description`, `impact`, `action`
+- Dùng labels như `{{ $labels.instance }}`, `{{ $labels.job }}`, `{{ $labels.mountpoint }}` để chỉ rõ server/container/filesystem bị ảnh hưởng nếu metric có label đó
+- Thêm `runbook_url` hoặc `dashboard_url` nếu có link xử lý nhanh; Telegram bridge sẽ tự hiển thị
+- Cập nhật cả `prometheus/alerts.yml` và `ansible/roles/monitoring/templates/alerts.yml.j2`, không chỉ sửa một nơi
+- Giữ `{% raw %}` trong Ansible alert template khi có Prometheus template variables dạng `{{ $labels... }}` để tránh Jinja render nhầm
+
+Sau khi đổi Alertmanager/Prometheus config:
+```bash
+cd /home/ubuntu/be-cryptocurrency-trading-app
+sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build --force-recreate alertmanager prometheus telegram_bridge
+```
+
+Validate nhanh trước/sau deploy:
+```bash
+python3 - <<'PY'
+import yaml
+for p in ['prometheus/alerts.yml', 'alertmanager/alertmanager.yml']:
+    with open(p) as f:
+        yaml.safe_load(f)
+    print('YAML_OK', p)
+PY
+node --check alertmanager/telegram-bridge.js
+curl -fsS http://127.0.0.1:9090/-/healthy
+curl -fsS http://127.0.0.1:9093/-/healthy
+```
+
 ### Dashboard Grafana
 
 Dashboard mặc định đã được provision tại `grafana/dashboards/default.json`:

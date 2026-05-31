@@ -11,8 +11,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Backend is down"
-          description: "Crypto Trading Backend has been down for more than 1 minute."
+          summary: "Backend API target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape the crypto-backend target for more than 1 minute. Job={{ $labels.job }}, instance={{ $labels.instance }}."
+          impact: "API requests, order placement, auth, and websocket-dependent flows may be unavailable."
+          action: "Check backend container health/logs, recent deploys, env vars, DB/Redis connectivity, and restart policy."
 
       # High Error Rate
       - alert: HighErrorRate
@@ -28,8 +30,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "High error rate detected"
-          description: "Error rate is above 5% for the last 5 minutes with request volume above 1 req/s."
+          summary: "Backend 5xx error rate is above 5%"
+          description: "More than 5% of crypto-backend HTTP requests are returning 5xx over 5 minutes while traffic is above 1 req/s."
+          impact: "Users may see failed API calls, failed trading operations, or degraded integrations."
+          action: "Inspect backend logs by route/status, recent releases, downstream DB/Redis latency, and exception traces."
 
       # High Latency
       - alert: HighLatency
@@ -40,8 +44,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High API latency"
-          description: "95th percentile latency is above 2 seconds."
+          summary: "Backend p95 latency is above 2 seconds"
+          description: "95th percentile HTTP request duration for crypto-backend is above 2 seconds for 5 minutes."
+          impact: "API, trading screens, and bots may experience slow responses or timeouts."
+          action: "Check slow endpoints, DB queries, Redis latency, CPU saturation, and external RPC/provider calls."
 
   - name: infrastructure
     interval: 30s
@@ -53,8 +59,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Host is down"
-          description: "Server is not responding to ping."
+          summary: "Server exporter target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape node-exporter for more than 1 minute. Job={{ $labels.job }}, instance={{ $labels.instance }}."
+          impact: "Host metrics are unavailable; the server may be down, unreachable, or node-exporter may have stopped."
+          action: "Check VM reachability, node-exporter container/service status, firewall/security group, and Docker daemon health."
 
       # Disk Space Low
       - alert: DiskSpaceLow
@@ -68,8 +76,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Disk space is low"
-          description: "Disk space on root partition is below 10%."
+          summary: "Root disk free space is below 10% on {{ $labels.instance }}"
+          description: "The root filesystem has less than 10% free space for 5 minutes. Mount={{ $labels.mountpoint }}, device={{ $labels.device }}."
+          impact: "Database writes, logs, Docker pulls, and application persistence can fail when disk fills up."
+          action: "Clean old Docker images/containers/logs, rotate large logs, verify database volume growth, or expand disk."
 
       # Load Average High
       - alert: LoadAverageHigh
@@ -78,8 +88,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Load average is high"
-          description: "System load average is above 80% of CPU count."
+          summary: "Server load average is high on {{ $labels.instance }}"
+          description: "1-minute load average is above 80% of CPU count for 10 minutes."
+          impact: "Containers may respond slowly; API latency, DB queries, and background workers can degrade."
+          action: "Inspect top processes, container CPU usage, noisy jobs, DB load, and recent traffic spikes."
 
   - name: deadmansswitch
     interval: 60s
@@ -90,5 +102,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Dead Man's Switch"
-          description: "This is a Dead Man's Switch alert that fires every minute. If you see this, Prometheus is still running."
+          summary: "Dead Man's Switch heartbeat"
+          description: "Prometheus alert pipeline is alive and sending the scheduled heartbeat."
+          impact: "This is an expected heartbeat, not an outage."
+          action: "If this heartbeat stops arriving, check Prometheus, Alertmanager, telegram-bridge, and Telegram credentials."

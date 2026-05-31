@@ -23,6 +23,19 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
+function formatDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? escapeHtml(value) : escapeHtml(date.toISOString());
+}
+
+function formatKeyValues(values, skip = []) {
+  return Object.entries(values || {})
+    .filter(([k, v]) => !skip.includes(k) && v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(v)}`)
+    .join(' ');
+}
+
 function summarizeAlert(alert) {
   const labels = alert.labels || {};
   const annotations = alert.annotations || {};
@@ -31,12 +44,17 @@ function summarizeAlert(alert) {
   const severity = escapeHtml(labels.severity || 'unknown');
   const summary = annotations.summary ? `\n<b>Summary:</b> ${escapeHtml(annotations.summary)}` : '';
   const description = annotations.description ? `\n<b>Description:</b> ${escapeHtml(annotations.description)}` : '';
-  const labelPairs = Object.entries(labels)
-    .filter(([k]) => !['alertname'].includes(k))
-    .map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(v)}`)
-    .join(' ');
+  const impact = annotations.impact ? `\n<b>Impact:</b> ${escapeHtml(annotations.impact)}` : '';
+  const action = annotations.action ? `\n<b>Action:</b> ${escapeHtml(annotations.action)}` : '';
+  const runbook = annotations.runbook_url ? `\n<b>Runbook:</b> ${escapeHtml(annotations.runbook_url)}` : '';
+  const dashboard = annotations.dashboard_url ? `\n<b>Dashboard:</b> ${escapeHtml(annotations.dashboard_url)}` : '';
+  const valueBlock = annotations.value ? `\n<b>Value:</b> ${escapeHtml(annotations.value)}` : '';
+  const startsAt = alert.startsAt ? `\n<b>Started:</b> ${formatDate(alert.startsAt)}` : '';
+  const endsAt = alert.endsAt ? `\n<b>Ended:</b> ${formatDate(alert.endsAt)}` : '';
+  const source = alert.generatorURL ? `\n<b>Source:</b> ${escapeHtml(alert.generatorURL)}` : '';
+  const labelPairs = formatKeyValues(labels, ['alertname']);
   const labelBlock = labelPairs ? `\n<b>Labels:</b> ${labelPairs}` : '';
-  return `• <b>${name}</b>\n<b>Status:</b> ${status}\n<b>Severity:</b> ${severity}${summary}${description}${labelBlock}`;
+  return `• <b>${name}</b>\n<b>Status:</b> ${status}\n<b>Severity:</b> ${severity}${summary}${description}${impact}${action}${valueBlock}${runbook}${dashboard}${startsAt}${endsAt}${source}${labelBlock}`;
 }
 
 function buildMessage(payload) {
@@ -45,10 +63,12 @@ function buildMessage(payload) {
   const common = payload.commonLabels || {};
   const groupName = escapeHtml(common.alertname || (alerts[0] && alerts[0].labels && alerts[0].labels.alertname) || 'Alert');
   const severity = escapeHtml(common.severity || (alerts[0] && alerts[0].labels && alerts[0].labels.severity) || 'unknown');
+  const groupLabels = formatKeyValues(payload.groupLabels || {});
+  const groupBlock = groupLabels ? `\n<b>Group labels:</b> ${groupLabels}` : '';
   const prefix = status === 'resolved' ? '✅' : severity === 'critical' ? '🚨' : severity === 'warning' ? '⚠️' : '🔔';
   const body = alerts.slice(0, 10).map(summarizeAlert).join('\n\n');
   const truncated = alerts.length > 10 ? `\n\n…and ${alerts.length - 10} more alerts` : '';
-  return `${prefix} <b>${groupName}</b>\n<b>Group status:</b> ${status}\n<b>Alert count:</b> ${alerts.length}${body ? `\n\n${body}` : ''}${truncated}`;
+  return `${prefix} <b>${groupName}</b>\n<b>Group status:</b> ${status}\n<b>Alert count:</b> ${alerts.length}${groupBlock}${body ? `\n\n${body}` : ''}${truncated}`;
 }
 
 function sendTelegramMessage(message) {

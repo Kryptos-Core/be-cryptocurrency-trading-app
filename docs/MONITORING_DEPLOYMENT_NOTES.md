@@ -93,6 +93,7 @@ Các file chính đã thay đổi:
 - `prometheus/alerts.yml`
 - `prometheus/prometheus.yml`
 - `alertmanager/alertmanager.yml`
+- `alertmanager/telegram-bridge.js`
 - `ansible/roles/monitoring/templates/alerts.yml.j2`
 - `ansible/roles/monitoring/templates/alertmanager.yml.j2`
 - `alertmanager/telegram-bridge.py`
@@ -108,8 +109,10 @@ File:
 - `ansible/roles/monitoring/templates/alertmanager.yml.j2`
 
 Thay đổi đã áp dụng:
-- Giữ `critical` alerts lặp mỗi `1h`
-- Giữ `warning` alerts lặp mỗi `12h`
+- `repeat_interval` hiện là `5m` cho top-level route
+- `repeat_interval` hiện là `5m` cho route `critical`
+- `repeat_interval` hiện là `5m` cho route `DeadMansSwitch`
+- `warning` không khai báo `repeat_interval` riêng nên kế thừa top-level `5m`
 - Tăng `group_interval` top-level từ `10s` lên `30s` để batch các alerts liên quan tốt hơn
 - Thêm route `DeadMansSwitch` riêng trước các severity routes
 - Thêm receiver path riêng cho deadman và các alerts khác
@@ -117,7 +120,12 @@ Thay đổi đã áp dụng:
 Lý do:
 - Tránh burst noise từ các alerts liên quan
 - Ngăn deadman alert bị trộn vào stream critical bình thường
-- Giữ incidents quan trọng trên production diễn ra nhanh trong khi warning alerts giữ nhẹ nhàng hơn
+- Nhắc lại các incidents đang firing sau mỗi 5 phút để không bị bỏ sót trong vận hành
+
+Checklist tránh setup sai:
+- Khi đổi interval, sửa đồng thời cả `alertmanager/alertmanager.yml` và `ansible/roles/monitoring/templates/alertmanager.yml.j2`
+- Sau khi deploy, reload/recreate Alertmanager để config mới có hiệu lực; chỉ sửa file trên disk là chưa đủ
+- Kiểm tra lại trong Alertmanager UI hoặc API rằng active route đang dùng `repeat_interval: 5m`
 
 ### 2) Cảnh báo high error rate đã được bảo vệ chống false positives ở low-traffic
 
@@ -152,7 +160,31 @@ Thay đổi đã áp dụng:
 - Route qua bridge path
 - Giữ delivery path riêng để deadman giữ visual distinct
 
-### 5) Đã fix Node Exporter healthcheck
+### 5) Nội dung Telegram alert đã được làm chi tiết hơn
+
+File:
+- `prometheus/alerts.yml`
+- `ansible/roles/monitoring/templates/alerts.yml.j2`
+- `alertmanager/telegram-bridge.js`
+
+Thay đổi đã áp dụng:
+- Prometheus alert annotations có thêm `impact` và `action` cho backend/server/container/database/Redis/disk/load/heartbeat
+- Alert summary/description có thêm context như `job`, `instance`, `mountpoint`, `device` nếu Prometheus có label tương ứng
+- Telegram bridge hiển thị thêm `Impact`, `Action`, `Value`, `Runbook`, `Dashboard`, `Started`, `Ended`, `Source`, `Group labels`
+- `ansible/roles/monitoring/templates/alerts.yml.j2` bọc `{% raw %}` / `{% endraw %}` để Ansible không parse nhầm Prometheus template variables dạng `{{ $labels.instance }}`
+
+Lý do:
+- Người nhận Telegram biết ngay alert ảnh hưởng gì và nên kiểm tra gì trước
+- Tránh setup thiếu annotation khiến Telegram chỉ có tên alert nhưng không đủ thông tin xử lý
+- Tránh lỗi render Ansible khi Prometheus alert rule dùng Go-template variables
+
+Checklist tránh setup thiếu:
+- Khi thêm alert mới, luôn có tối thiểu `summary`, `description`, `impact`, `action`
+- Nếu alert cần link vận hành, thêm `runbook_url` hoặc `dashboard_url`; bridge sẽ tự render nếu có
+- Nếu sửa `prometheus/alerts.yml`, cập nhật rule tương ứng trong `ansible/roles/monitoring/templates/alerts.yml.j2`
+- Nếu sửa template Ansible có `{{ $labels... }}`, giữ block `{% raw %}` để không bị Jinja render lỗi
+
+### 6) Đã fix Node Exporter healthcheck
 
 File:
 - `docker-compose.monitoring.yml`
@@ -412,4 +444,3 @@ Notes:
 - Optional services vẫn cần được add scrape thủ công nếu enable sau này.
 - Nếu team chuyển hoàn toàn sang `docker compose` plugin thay cho `docker-compose`, docs có thể được unify thêm cho nhất quán.
 - Docker/container TLS trust path tới Telegram/package repos vẫn đáng theo dõi nếu environment thay đổi.
-

@@ -1,4 +1,5 @@
 # Prometheus Alert Rules for Crypto Trading Platform
+{% raw %}
 
 groups:
   - name: crypto-trading-backend
@@ -11,8 +12,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Backend is down"
-          description: "Crypto Trading Backend has been down for more than 1 minute."
+          summary: "Backend API target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape the crypto-backend target for more than 1 minute. Job={{ $labels.job }}, instance={{ $labels.instance }}."
+          impact: "API requests, order placement, auth, and websocket-dependent flows may be unavailable."
+          action: "Check backend container health/logs, recent deploys, env vars, DB/Redis connectivity, and restart policy."
 
       # High Error Rate
       - alert: HighErrorRate
@@ -28,8 +31,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "High error rate detected"
-          description: "Error rate is above 5% for the last 5 minutes with request volume above 1 req/s."
+          summary: "Backend 5xx error rate is above 5%"
+          description: "More than 5% of crypto-backend HTTP requests are returning 5xx over 5 minutes while traffic is above 1 req/s."
+          impact: "Users may see failed API calls, failed trading operations, or degraded integrations."
+          action: "Inspect backend logs by route/status, recent releases, downstream DB/Redis latency, and exception traces."
 
       # High Latency
       - alert: HighLatency
@@ -40,8 +45,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High API latency"
-          description: "95th percentile latency is above 2 seconds."
+          summary: "Backend p95 latency is above 2 seconds"
+          description: "95th percentile HTTP request duration for crypto-backend is above 2 seconds for 5 minutes."
+          impact: "API, trading screens, and bots may experience slow responses or timeouts."
+          action: "Check slow endpoints, DB queries, Redis latency, CPU saturation, and external RPC/provider calls."
 
       # High Memory Usage
       - alert: HighMemoryUsage
@@ -52,8 +59,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High memory usage"
-          description: "Memory usage is above 85%."
+          summary: "Backend container memory usage is above 85%"
+          description: "Container app memory usage is above 85% of its configured limit for 5 minutes. Instance={{ $labels.instance }}."
+          impact: "The backend container is at risk of OOM kill, restarts, and request failures."
+          action: "Check memory leaks, heap usage, worker queues, large queries, and container restart/OOM events."
 
       # High CPU Usage
       - alert: HighCPUUsage
@@ -64,8 +73,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High CPU usage"
-          description: "CPU usage is above 80% for more than 5 minutes."
+          summary: "Backend container CPU usage is above 80%"
+          description: "Container app CPU usage is above 80% for more than 5 minutes. Instance={{ $labels.instance }}."
+          impact: "API latency, websocket updates, and background jobs may slow down or time out."
+          action: "Inspect CPU-heavy endpoints/jobs, event loop lag, traffic spikes, and container CPU limits."
 
   - name: crypto-trading-database
     interval: 30s
@@ -78,8 +89,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Database is down"
-          description: "PostgreSQL database is not responding."
+          summary: "PostgreSQL exporter target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape postgres-exporter for more than 1 minute."
+          impact: "Database visibility is lost and the app may fail if PostgreSQL itself is unavailable."
+          action: "Check PostgreSQL container/service status, exporter DSN, network, credentials, and database logs."
 
       # Database Connection Pool Exhausted
       - alert: DatabaseConnectionsHigh
@@ -89,8 +102,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Database connections high"
-          description: "Database connection usage is above 80%."
+          summary: "PostgreSQL connection usage is above 80%"
+          description: "Active PostgreSQL connections are above 80% of max_connections for 5 minutes."
+          impact: "New API requests and jobs may fail to acquire database connections."
+          action: "Inspect connection leaks, pool sizes, long-running sessions, PgBouncer settings, and stuck transactions."
 
       # Slow Queries
       - alert: SlowQueries
@@ -100,8 +115,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Slow queries detected"
-          description: "There are queries running for more than 30 seconds."
+          summary: "PostgreSQL has queries running longer than 30 seconds"
+          description: "At least one transaction/query has been active for more than 30 seconds for 5 minutes."
+          impact: "Slow queries can block writes, increase latency, and exhaust connection pools."
+          action: "Review pg_stat_activity, query plans, locks, missing indexes, and recent migrations/releases."
 
   - name: crypto-trading-redis
     interval: 30s
@@ -114,8 +131,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Redis is down"
-          description: "Redis cache server is not responding."
+          summary: "Redis exporter target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape Redis metrics for more than 1 minute."
+          impact: "Cache, queues, sessions, rate limits, or websocket fanout may be degraded if Redis is unavailable."
+          action: "Check Redis container/service status, exporter connectivity, Redis logs, memory, and restart events."
 
       # Redis Memory High
       - alert: RedisMemoryHigh
@@ -125,8 +144,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Redis memory usage high"
-          description: "Redis memory usage is above 80%."
+          summary: "Redis memory usage is above 80%"
+          description: "Redis used memory is above 80% of configured maxmemory for 5 minutes."
+          impact: "Redis may evict keys, reject writes, slow queues, or destabilize realtime features."
+          action: "Inspect key cardinality, queue backlog, eviction policy, maxmemory, and application cache growth."
 
   - name: infrastructure
     interval: 30s
@@ -139,8 +160,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Host is down"
-          description: "Server is not responding to ping."
+          summary: "Server exporter target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape node-exporter for more than 1 minute. Job={{ $labels.job }}, instance={{ $labels.instance }}."
+          impact: "Host metrics are unavailable; the server may be down, unreachable, or node-exporter may have stopped."
+          action: "Check VM reachability, node-exporter container/service status, firewall/security group, and Docker daemon health."
 
       # Disk Space Low
       - alert: DiskSpaceLow
@@ -154,8 +177,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Disk space is low"
-          description: "Disk space on root partition is below 10%."
+          summary: "Root disk free space is below 10% on {{ $labels.instance }}"
+          description: "The root filesystem has less than 10% free space for 5 minutes. Mount={{ $labels.mountpoint }}, device={{ $labels.device }}."
+          impact: "Database writes, logs, Docker pulls, and application persistence can fail when disk fills up."
+          action: "Clean old Docker images/containers/logs, rotate large logs, verify database volume growth, or expand disk."
 
       # Load Average High
       - alert: LoadAverageHigh
@@ -165,8 +190,10 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Load average is high"
-          description: "System load average is above 80% of CPU count."
+          summary: "Server load average is high on {{ $labels.instance }}"
+          description: "1-minute load average is above 80% of CPU count for 10 minutes."
+          impact: "Containers may respond slowly; API latency, DB queries, and background workers can degrade."
+          action: "Inspect top processes, container CPU usage, noisy jobs, DB load, and recent traffic spikes."
 
   - name: deadmansswitch
     interval: 60s
@@ -178,5 +205,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Dead Man's Switch"
-          description: "This is a Dead Man's Switch alert that fires every minute. If you see this, Prometheus is still running."
+          summary: "Dead Man's Switch heartbeat"
+          description: "Prometheus alert pipeline is alive and sending the scheduled heartbeat."
+          impact: "This is an expected heartbeat, not an outage."
+          action: "If this heartbeat stops arriving, check Prometheus, Alertmanager, telegram-bridge, and Telegram credentials."
+{% endraw %}
