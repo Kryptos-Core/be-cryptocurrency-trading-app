@@ -69,8 +69,37 @@ services:
       - alertmanager_data:/alertmanager
     networks:
       - monitoring-network
+    depends_on:
+      telegram-bridge:
+        condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:9093/-/healthy']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  telegram-bridge:
+    build:
+      context: .
+      dockerfile: alertmanager/Dockerfile.telegram-bridge
+    container_name: telegram_bridge
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID is required}
+      TELEGRAM_BRIDGE_HOST: 0.0.0.0
+      TELEGRAM_BRIDGE_PORT: 9095
+    expose:
+      - '9095'
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:9095/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -141,4 +170,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-

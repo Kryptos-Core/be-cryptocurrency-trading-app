@@ -88,8 +88,8 @@ services:
     container_name: telegram_bridge
     restart: unless-stopped
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID is required}
       TELEGRAM_BRIDGE_HOST: 0.0.0.0
       TELEGRAM_BRIDGE_PORT: 9095
     expose:
@@ -168,4 +168,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
