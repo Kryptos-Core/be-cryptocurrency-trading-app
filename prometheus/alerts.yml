@@ -52,6 +52,85 @@ groups:
   - name: infrastructure
     interval: 30s
     rules:
+      # Monitoring pipeline targets
+      - alert: MonitoringTargetDown
+        expr: up{job=~"prometheus|alertmanager|telegram-bridge|cadvisor|docker-health-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Monitoring target {{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} at {{ $labels.instance }} for more than 1 minute."
+          impact: "Alert delivery or monitoring visibility may be degraded; Telegram notifications can stop if alertmanager or telegram-bridge is affected."
+          action: "Check docker ps/health/logs for {{ $labels.job }}, container restart count, network attachment, and recent config changes."
+
+      # Docker container healthcheck status
+      - alert: ContainerUnhealthy
+        expr: docker_container_health_status{health_status="unhealthy"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.container }} is unhealthy"
+          description: "Docker healthcheck reports unhealthy for container {{ $labels.container }}. Image={{ $labels.image }}, compose_service={{ $labels.compose_service }}."
+          impact: "The service may be degraded or unavailable even if the process is still running."
+          action: "Run docker inspect/logs for {{ $labels.container }}, check its healthcheck command, dependencies, recent deploys, and restart if needed."
+
+      # Docker container stopped/exited state
+      - alert: ContainerExited
+        expr: docker_container_running{container!=""} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.container }} is not running"
+          description: "Docker reports container {{ $labels.container }} is stopped/exited. Image={{ $labels.image }}, compose_service={{ $labels.compose_service }}."
+          impact: "The service provided by this container is unavailable."
+          action: "Check docker ps -a, docker logs {{ $labels.container }}, exit code metric, restart policy, OOM events, and recent deployments."
+
+      # Docker container restart loop or repeated crash
+      - alert: ContainerRestarting
+        expr: increase(docker_container_restart_count[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.container }} restarted recently"
+          description: "Docker restart count increased within 5 minutes for container {{ $labels.container }}. Image={{ $labels.image }}, compose_service={{ $labels.compose_service }}."
+          impact: "Users may see intermittent failures, dropped websocket connections, or delayed background processing."
+          action: "Inspect docker logs around the restart, exit code, OOM kills, dependency availability, and recent config/image changes."
+
+      # Container memory pressure from cAdvisor
+      - alert: ContainerMemoryHigh
+        expr: |
+          (
+            container_memory_working_set_bytes{name!="", image!=""}
+            /
+            container_spec_memory_limit_bytes{name!="", image!=""}
+          ) > 0.9
+          and
+          container_spec_memory_limit_bytes{name!="", image!=""} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory usage is above 90%"
+          description: "Container {{ $labels.name }} working set memory is above 90% of its configured limit for 5 minutes."
+          impact: "The container may be close to OOM kill or severe GC/latency pressure."
+          action: "Inspect memory trend, heap usage, recent traffic/jobs, memory leaks, and container limit sizing."
+
+      # Container CPU pressure from cAdvisor
+      - alert: ContainerCpuHigh
+        expr: rate(container_cpu_usage_seconds_total{name!="", image!=""}[5m]) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} CPU usage is high"
+          description: "Container {{ $labels.name }} is using more than 0.9 CPU cores for 10 minutes."
+          impact: "The service may respond slowly and affect dependent flows."
+          action: "Check hot endpoints/jobs, traffic spikes, DB waits, matching/worker loops, and recent deploys."
+
       # Host Down
       - alert: HostDown
         expr: up{job="node-exporter"} == 0

@@ -168,3 +168,46 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    ports:
+      - '127.0.0.1:8081:8080'
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  docker-health-exporter:
+    build:
+      context: ./monitoring/docker-health-exporter
+    container_name: docker_health_exporter
+    restart: unless-stopped
+    environment:
+      DOCKER_HEALTH_EXPORTER_HOST: 0.0.0.0
+      DOCKER_HEALTH_EXPORTER_PORT: 9108
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    expose:
+      - '9108'
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1:9108/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3

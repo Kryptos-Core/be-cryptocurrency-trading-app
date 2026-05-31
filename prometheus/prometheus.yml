@@ -35,12 +35,33 @@ scrape_configs:
         labels:
           service: alertmanager
 
+  # Telegram bridge delivery path
+  - job_name: 'telegram-bridge'
+    static_configs:
+      - targets: ['telegram-bridge:9095']
+        labels:
+          service: telegram-bridge
+
   # Node Exporter (host metrics)
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']
         labels:
           service: node-exporter
+
+  # cAdvisor (container CPU/memory/restart/running metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: cadvisor
+
+  # Docker healthcheck exporter (healthy/unhealthy/exited state)
+  - job_name: 'docker-health-exporter'
+    static_configs:
+      - targets: ['docker-health-exporter:9108']
+        labels:
+          service: docker-health-exporter
 
   # Crypto Trading Backend
   - job_name: 'crypto-backend'
