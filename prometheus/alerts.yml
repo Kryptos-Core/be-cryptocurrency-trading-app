@@ -171,17 +171,3 @@ groups:
           description: "1-minute load average is above 80% of CPU count for 10 minutes."
           impact: "Containers may respond slowly; API latency, DB queries, and background workers can degrade."
           action: "Inspect top processes, container CPU usage, noisy jobs, DB load, and recent traffic spikes."
-
-  - name: deadmansswitch
-    interval: 60s
-    rules:
-      - alert: DeadMansSwitch
-        expr: vector(1)
-        for: 0m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Dead Man's Switch heartbeat"
-          description: "Prometheus alert pipeline is alive and sending the scheduled heartbeat."
-          impact: "This is an expected heartbeat, not an outage."
-          action: "If this heartbeat stops arriving, check Prometheus, Alertmanager, telegram-bridge, and Telegram credentials."

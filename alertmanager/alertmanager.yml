@@ -9,12 +9,6 @@ route:
   receiver: 'telegram-bridge'
   routes:
     - match:
-        alertname: DeadMansSwitch
-      receiver: 'telegram-bridge'
-      group_wait: 0s
-      repeat_interval: 5m
-
-    - match:
         severity: critical
       receiver: 'telegram-bridge'
       group_wait: 0s

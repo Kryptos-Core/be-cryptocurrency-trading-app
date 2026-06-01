@@ -12,12 +12,6 @@ route:
   receiver: 'telegram'
   routes:
     - match:
-        alertname: DeadMansSwitch
-      receiver: 'telegram-deadman'
-      group_wait: 0s
-      repeat_interval: 5m
-
-    - match:
         severity: critical
       receiver: 'telegram-critical'
       group_wait: 0s
@@ -78,18 +72,6 @@ receivers:
           🟡 *Severity:* Warning
         parse_mode: Markdown
         disable_notifications: false
-        send_resolved: true
-
-  - name: 'telegram-deadman'
-    telegram_configs:
-      - bot_token: '{{ telegram_bot_token }}'
-        chat_id: {{ telegram_chat_id }}
-        message: |
-          ❤️ *DeadMansSwitch*
-          *Status:* {{ .Status }}
-          Prometheus heartbeat is alive.
-        parse_mode: Markdown
-        disable_notifications: true
         send_resolved: true
 
   - name: 'null'
