@@ -1,5 +1,7 @@
 # Security Zones — NestJS Backend
 
+> Last reviewed: 2026-07-28 — verified against `src/modules/` (matching, orders, treasury, wallets, blockchain, auth, deposits, migrations, entities, config).
+
 ## Tổng Quan
 
 Backend xử lý giao dịch tài chính thực. Các zone dưới đây có rủi ro cao nhất — **đọc kỹ trước khi sửa bất kỳ file nào trong đó**.

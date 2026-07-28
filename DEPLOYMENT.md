@@ -161,6 +161,8 @@ sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --
 sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
 ```
 
+> Script migrate trong container production là `db:migrate:prod` (đọc `dist/seed/run-migrations.js`). Lệnh `migration:run` đã được thay bằng `db:migrate` / `db:migrate:revert`. Cùng nguyên tắc cho `dev` ở local: `npm run db:migrate` (script: `ts-node -r tsconfig-paths/register src/seed/run-migrations.ts`).
+
 Nếu bỏ qua bước này, backend có thể fail do thiếu schema và trông giống lỗi app/runtime dù root cause thực ra là DB chưa migrate.
 
 ### 7. Triển khai monitoring stack

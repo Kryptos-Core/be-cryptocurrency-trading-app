@@ -70,11 +70,11 @@ npm run db:seed
 SEED_DATA_ENCRYPTION_KEY=<key> npm run db:seed:prod
 ```
 
-Cần file **`.env.development`** hợp lệ (`CORE_DB_HOST`, `CORE_DB_PORT`, `CORE_DB_USERNAME`, `CORE_DB_PASSWORD`, `CORE_DB_NAME` (hoặc fallback `DB_*`)) — `npm run db:seed` đặt `NODE_ENV=development`. Nên chạy `npm run migration:run` trước lần đầu seed.
+Cần file **`.env.development`** hợp lệ (`CORE_DB_HOST`, `CORE_DB_PORT`, `CORE_DB_USERNAME`, `CORE_DB_PASSWORD`, `CORE_DB_NAME` (hoặc fallback `DB_*`)) — `npm run db:seed` đặt `NODE_ENV=development`. Nên chạy `npm run db:migrate` trước lần đầu seed.
 
 ## Sau khi seed
 
-1. Khởi động backend (`npm run start:dev`).
+1. Khởi động backend (`npm run dev` cho dev; production: `npm run start:prod` sau `npm run build`).
 2. Nếu bảng markets/currencies trống, ứng dụng sẽ tự sync từ Binance (theo `EXCHANGE_MODE`, testnet, v.v.).
 3. **Fail-fast:** nếu sync Binance thất bại khi catalog đang rỗng, process có thể thoát sớm — kiểm tra log và biến môi trường Binance.
 

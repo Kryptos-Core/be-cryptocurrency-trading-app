@@ -1,5 +1,7 @@
 # Kế Hoạch Bổ Sung Kafka Event Bus Cho `be-cryptocurrency-trading-app`
 
+> **Status (2026-07-28):** Plan lịch sử 2026-04-25 (cập nhật 2026-05-08). Phần lớn Phase 0–4 đã implement nhưng nhiều quyết định đã superseded bởi ADR-001 (relay/projection decoupling) trong runtime hiện tại — xem `docs/ARCHITECTURE_FULL_ROLLOUT.md` cho trạng thái thực tế. Đề xuất chuyển sang `docs/archive/` sau khi user duyệt.
+>
 > Ngày lập: 2026-04-25
 > Cập nhật: 2026-05-08 (đồng bộ sau audit thực tế codebase)
 > Phạm vi: đánh giá khả thi và kế hoạch triển khai Kafka/event bus dựa trên repo backend hiện tại, proposal Kafka/Redis/TimescaleDB/ClickHouse, và roadmap multi-database hiện có.

@@ -18,14 +18,11 @@ Giá trị mẫu đầy đủ nằm trong [`.env.development.example`](../.env.d
 Từ thư mục `be-cryptocurrency-trading-app`, dev mặc định dùng `.env.development`:
 
 ```bash
-npm run docker:infra:up
+npm run docker:infra:up         # PostgreSQL + Redis
+npm run docker:infra:up:full    # + Kafka + ClickHouse + TimescaleDB (theo profile)
 ```
 
-Chỉ Redis:
-
-```bash
-npm run docker:infra:up:redis
-```
+> `docker:infra:up:redis` đã bỏ — chạy `docker:infra:up` (đã bao gồm Redis trong profile mặc định).
 
 ## Thực hành
 

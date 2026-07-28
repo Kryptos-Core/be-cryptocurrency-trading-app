@@ -1,10 +1,12 @@
 # Onboarding NestJS Backend — Ngày 1
 
+> Last reviewed: 2026-07-28 — verified against `package.json`, `docker-compose.infrastructure.yml`, `src/modules/`.
+
 ## 1. Prerequisites
 
 ```bash
 # Kiểm tra versions
-node --version # >= 18.x
+node --version # >= 20.x
 npm --version
 docker --version
 docker compose version
@@ -18,29 +20,32 @@ cd be-cryptocurrency-trading-app
 
 # Tạo .env từ template development
 cp .env.development.example .env.development
-# Điền CORE_DB_*, REDIS_*, JWT_*, ... — hỏi Tech Lead
+# Điền CORE_DB_*, REDIS_*, JWT_SECRET, REOWN_PROJECT_ID, SEED_DATA_ENCRYPTION_KEY, … — hỏi Tech Lead.
 
-# Khởi động infrastructure (PostgreSQL + Redis)
-docker compose -f docker-compose.infrastructure.yml --env-file .env.development up -d
+# Khởi động infrastructure (PostgreSQL + Redis; :up:full = + Kafka + ClickHouse + TimescaleDB)
+npm run docker:infra:up
 
 # Kiểm tra containers
-docker compose -f docker-compose.infrastructure.yml ps
+npm run docker:infra:health
 
 # Cài dependencies
 npm install
 
-# Chạy migrations
-npm run migration:run
+# Chạy migrations (TypeORM)
+npm run db:migrate
 
 # (Tùy chọn) Kiểm tra ranh giới import giữa các module — CI / trước PR lớn
 npm run lint:boundaries
+npm run lint:uow
 
 # Seed data (optional, dev only)
 npm run db:seed
 
-# Khởi động server
-npm run start:dev
+# Khởi động server (dev mode watch)
+npm run dev
 ```
+
+> Script dev là `npm run dev` (Nest start --watch). Không còn `start:dev` / `migration:run` — xem `package.json` để biết đầy đủ (`db:migrate`, `db:migrate:revert`, `db:seed`, `seed:encrypt`, …).
 
 ## 3. Verify Setup
 
@@ -73,12 +78,22 @@ claude # Đọc .claude/CLAUDE.md tự động
 
 ```
 src/
-├── modules/ # 23 bounded contexts
+├── modules/ # 24+ bounded contexts (auth, orders, matching, wallets, treasury,
+│ #  blockchain, deposits, payment-config, managed-wallets, market-maker,
+│ #  currencies, exchange-rate, system-config, metadata, dashboard,
+│ #  user-binance-credentials, treasury-e2e-config, notifications, users,
+│ #  binance-rest, binance-proxy, price-oracle, redis, exchange, markets, trading)
 │ ├── auth/ # ✓ Clean Architecture: domain/, application/, infrastructure/
 │ ├── orders/ # ✓ Clean Architecture + CQRS (use-cases, queries, commands)
 │ ├── matching/ # ⚠ SENSITIVE — đọc VIBE_CODE.md trước khi sửa
 │ ├── wallets/ # Hybrid: BaseRepository + transactional PostgreSQL repositories
 │ ├── users/ # Hybrid
+│ ├── user-binance-credentials/ # AES-256-GCM credential storage (mirror FE binance_trading)
+│ ├── treasury/ # ⚠ SENSITIVE
+│ ├── blockchain/ # Linked wallets, on-chain deposits (UoW + outbox)
+│ ├── payment-config/ # Active payment method configs (PayOS)
+│ ├── system-config/ # Runtime config từ DB → Redis → .env (UI Admin Platform)
+│ ├── managed-wallets/ # Deposit UI hot wallets
 │ └── ...
 ├── common/
 │ ├── application-bus/ # @nestjs/cqrs — ApplicationBusModule
@@ -87,8 +102,9 @@ src/
 │ ├── read-model/ # applier read model (markets, on-chain deposits)
 │ ├── repositories/ # BaseRepository
 │ ├── services/ # RedisService, CloudinaryService, MailService, …
+│ ├── integration-events/ # event catalog (`integration-event-catalog.ts`)
 │ ├── types/ # TransactionContext (opaque interface)
-│ └── utils/ # Pagination helpers
+│ └── utils/ # Pagination, base-units helpers
 ├── config/ # Env validation (thêm biến mới vào env.validation.ts)
 ├── migrations/ # TypeORM migrations (KHÔNG xóa migration đã chạy)
 └── entities/ # Shared database entities (typed relations ✓)

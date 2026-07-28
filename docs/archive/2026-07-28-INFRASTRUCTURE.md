@@ -1,6 +1,8 @@
 # Infrastructure Documentation
 
-> **Bao quát:** Docker/Kubernetes, Database (PostgreSQL, TimescaleDB, ClickHouse), Redis, Kafka, BullMQ, Authentication, Logging/Monitoring/Tracing, CI/CD, và environment configuration.
+> **Status (2026-07-28):** Superseded by `docs/ARCHITECTURE.md`, `docs/ARCHITECTURE_FULL_ROLLOUT.md`, `docs/ENV_CONFIG_USAGE.md`, `docs/MONITORING_DEPLOYMENT_NOTES.md`. Tài liệu này rất lớn (~45KB) và phản ánh trạng thái cũ (multi-DB roadmap 2026-04). Giữ làm **historical reference**; **không dùng để chạy** stack mới. Đề xuất chuyển vào `docs/archive/` sau khi user xác nhận (xem báo cáo cuối của audit 2026-07-28).
+>
+> Phần bao quát: Docker/Kubernetes, Database (PostgreSQL, TimescaleDB, ClickHouse), Redis, Kafka, BullMQ, Authentication, Logging/Monitoring/Tracing, CI/CD, và environment configuration.
 
 ---
 

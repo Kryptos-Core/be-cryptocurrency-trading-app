@@ -1,5 +1,24 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
+/**
+ * LEGACY MySQL migration — DO NOT USE FOR POSTGRES.
+ *
+ * This file lives under `src/migrations_legacy_mysql/` and is intentionally
+ * NOT loaded by the active Postgres DataSource (see `src/config/data-source.ts`).
+ *
+ * It only ran during the project's MySQL era. On Postgres it returns early
+ * without creating any table, which is why the `market_maker_configs` table
+ * was missing after the MySQL → Postgres migration.
+ *
+ * The Postgres replacement lives at:
+ *   src/migrations/1800000001016-CreateMarketMakerConfigsPostgres.ts
+ *
+ * Rules:
+ *  - DO NOT add new Postgres-compatible logic here — it will never run.
+ *  - DO NOT remove this file without coordinating with the MySQL rollback plan
+ *    (legacy environments may still depend on it via explicit `--migration` runs).
+ *  - For any new schema work, create a migration under `src/migrations/`.
+ */
 export class CreateMarketMakerConfigs1775200000000 implements MigrationInterface {
   private isPostgres(queryRunner: QueryRunner): boolean {
     return queryRunner.connection.options.type === 'postgres';

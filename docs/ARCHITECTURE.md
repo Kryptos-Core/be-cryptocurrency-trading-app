@@ -1,5 +1,7 @@
 # Kiến trúc backend — trạng thái hiện tại
 
+> Last reviewed: 2026-07-28 — verified against `src/common/outbox/`, `src/common/unit-of-work/`, `src/common/application-bus/`, `src/migrations/`.
+
 Tài liệu này mô tả **những gì đã có trong mã nguồn** (outbox relay, CQRS bus, read model, UoW, ranh giới module). Biến env: [ENV_CONFIG_USAGE.md](ENV_CONFIG_USAGE.md). Checklist rollout: [ARCHITECTURE_FULL_ROLLOUT.md](ARCHITECTURE_FULL_ROLLOUT.md). Còn lại: [DATA_ACCESS_PATTERNS.md](DATA_ACCESS_PATTERNS.md), [REDIS_USAGE.md](REDIS_USAGE.md), [worker-pool-inventory.md](worker-pool-inventory.md).
 
 ## Tổng quan

@@ -1,5 +1,7 @@
 # Lộ Trình Multi-Database + TypeScript/Go
 
+> **Status (2026-07-28):** Plan lịch sử 2026-04-25. Nhiều phase đã superseded; xem `docs/ARCHITECTURE_FULL_ROLLOUT.md`, `docs/GO_SERVICES_PRODUCTION_ROLLOUT.md`, `docs/GO_PUBLIC_WS_ROLLOUT_RUNBOOK.md`, `docs/GO_REAL_TRAFFIC_AND_MUTATION_PLAN.md`, `docs/MULTI_DATABASE_TS_GO_ROADMAP.md` (chính file này — phần status 2026-04 có thể đã superseded, xem GO_*). Đề xuất chuyển sang `docs/archive/` sau khi user duyệt, hoặc chỉ giữ phần 0.3 "Đã hoàn thành trong repo backend" làm historical reference.
+>
 > Phạm vi: kế hoạch chi tiết cho `be-cryptocurrency-trading-app`, tham khảo thiết kế tổng quan trong `docs/MULTIBLE_DATABASE.md` nhưng không áp dụng máy móc. Mục tiêu là đưa backend hiện tại sang kiến trúc multi-database, PostgreSQL làm source of truth, kết hợp TypeScript + Go và vẫn bảo toàn contract với FE.
 >
 > Nguyên tắc bắt buộc: trước khi thay đổi logic vận hành hoặc business logic, phải đánh giá tác động API lên FE. FE Flutter hiện phụ thuộc rất chặt vào REST `/api/v1`, Socket.IO `/trading` và Socket.IO `/notifications`.

@@ -1,5 +1,7 @@
 # Phase 6-8: Go Shadow Matching
 
+> **Status (2026-07-28):** Plan Phase 6-8 từ roadmap cũ. Phần "Tổng quan / Phase 6" là plan lịch sử — Go aggregator/matching đã scaffold trong `go-services/` nhưng chưa shadow/canary thực chiến. Trạng thái runtime hiện tại: xem `docs/GO_SERVICES_PRODUCTION_ROLLOUT.md`, `docs/GO_PUBLIC_WS_ROLLOUT_RUNBOOK.md`, `docs/GO_REAL_TRAFFIC_AND_MUTATION_PLAN.md`. Đề xuất giữ làm historical reference; chuyển sang `docs/archive/` nếu user muốn.
+>
 > **Trạng thái:** ⬜ CHƯA BẮT ĐẦU - Cần Go service infrastructure
 
 ## Tổng quan

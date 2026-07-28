@@ -112,10 +112,21 @@ const data: any = ...; // BAD
 - Database operations: integration test với test DB
 
 ```bash
-npm test # Tất cả tests
-npx jest --coverage # Với coverage report
+npm test                    # Tất cả tests (Jest)
+npx jest --coverage         # Với coverage report
 npx jest --testPathPattern=orders # Chỉ orders module
 ```
+
+## Lint & Quality gates
+
+- **Biome** là tool lint/format duy nhất (`biome.json`):
+  - `npm run lint` — `biome lint ./src ./scripts`
+  - `npm run lint:fix` — `biome check --write ./src ./scripts`
+  - `npm run format` / `format:check`
+- **Module boundary guard:** `npm run lint:boundaries` (`scripts/check-module-boundaries.mjs`) — chặn `modules/A` import `modules/B/application/**`.
+- **UoW policy guard:** `npm run lint:uow` (`scripts/check-uow-policy.mjs`) — chặn `dataSource.transaction` trực tiếp ngoài repository.
+- **Type check:** `npx tsc --noEmit`.
+- **Coverage:** `npm run test:cov` — phải ≥ 80%.
 
 ## Database/Migration Rules
 

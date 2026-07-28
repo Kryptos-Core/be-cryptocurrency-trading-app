@@ -1,5 +1,7 @@
 # Full architecture rollout
 
+> Last reviewed: 2026-07-28 — verified against `src/common/`, `src/modules/blockchain/integration-events/`.
+
 Checklist và ghi chép **cross-cutting**: UoW, transactional outbox + relay, read model, worker pool — bổ sung cho [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Platform building blocks

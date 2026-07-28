@@ -1,5 +1,7 @@
 # Production Setup Guide
 
+> **Status (2026-07-28):** Ghi chép cũ theo VPS `kryptos-core-vps` (chiasegpu.vn, IP 192.168.122.80). Phần lớn nội dung vẫn đúng về posture nhưng nhiều chi tiết hostname/IP/Cloudflare tunnel đã cụ thể hoá cho instance cũ. Đề xuất giữ làm historical reference (xem `docs/DEPLOYMENT.md` ở root repo và `docs/MIGRATION_CHECKLIST.md` cho checklist áp dụng server mới); chuyển sang `docs/archive/` sau khi user duyệt nếu muốn.
+>
 > Hướng dẫn setup hạ tầng production cho `kryptos-core-vps` — bao gồm VPS, Docker, Nginx, Cloudflare Tunnel, và các bước debug đã trải qua.
 
 ---

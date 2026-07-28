@@ -1,5 +1,7 @@
 # Cấu hình môi trường - Cập nhật theo mã nguồn hiện tại
 
+> Last reviewed: 2026-07-28 — verified against `.env.development.example` (CORE_DB_*, MARKET_READ_SOURCE, EVENT_OUTBOX_*, WALLET/SEED/BINANCE_CREDENTIALS_ENCRYPTION_KEY, SMTP, Firebase).
+
 ## Tổng quan
 
 Backend sử dụng:
@@ -19,24 +21,111 @@ Sau đó điền thông tin và chạy ứng dụng (đảm bảo `NODE_ENV` kh�
 
 ## Nhóm biến quan trọng
 
-### Các biến cốt lõi bắt buộc (Core)
+### Database nguồn (Postgres, Redis, TimescaleDB)
 
 | Biến | Mô tả |
 |---|---|
-| DB_HOST | Host database alias legacy; hiện được map tới PostgreSQL nếu CORE_DB_* chưa khai báo |
-| DB_PORT | Port database alias legacy; hiện dùng cho PostgreSQL fallback |
-| DB_USERNAME | Username database alias legacy; hiện dùng cho PostgreSQL fallback |
-| DB_PASSWORD | Password database alias legacy; hiện dùng cho PostgreSQL fallback |
-| DB_NAME | Tên cơ sở dữ liệu fallback nếu chưa khai báo CORE_DB_NAME |
-| JWT_SECRET | Mã bí mật JWT |
-| REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB | Kết nối Redis (cache, lock khớp lệnh, pub/sub, lock relay outbox) — xem [REDIS_USAGE.md](REDIS_USAGE.md) |
+| `CORE_DB_SOURCE` | Source alias (luôn `postgres` cho runtime hiện tại). |
+| `CORE_DB_TYPE` | `postgres` (TypeORM driver). |
+| `CORE_DB_HOST` / `CORE_DB_PORT` / `CORE_DB_USERNAME` / `CORE_DB_PASSWORD` / `CORE_DB_NAME` | PostgreSQL connection — **nguồn dữ liệu chính** (source of truth) cho orders, wallets, on-chain deposits, treasury, users. |
+| `DB_HOST` / `DB_PORT` / `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | Alias legacy — fallback cho PostgreSQL nếu `CORE_DB_*` chưa khai báo. |
+| `MARKET_READ_SOURCE` | `postgres` (mặc định) \| `redis` \| `timescale` — chọn nguồn cho market read path. |
+| `MARKET_TS_HOST` / `MARKET_TS_PORT` / `MARKET_TS_USERNAME` / `MARKET_TS_PASSWORD` / `MARKET_TS_DB` | TimescaleDB (Market read store, port 5433 theo `.env.development.example`). |
+| `JWT_SECRET` / `JWT_EXPIRATION` | JWT signing key + TTL (mặc định `24h`). |
+
+### Event outbox & Kafka (publisher driver)
+
+| Biến | Mô tả |
+|---|---|
+| `EVENT_OUTBOX_ENABLED` | `true` / `false` — bật transaction outbox. |
+| `EVENT_SCHEMA_FORMAT` | `json` (mặc định). |
+| `EVENT_PUBLISHER_DRIVER` | `noop` (dev mặc định) \| `kafka` \| `redis` \| `bullmq`. |
+| `EVENT_OUTBOX_MAX_ATTEMPTS` | Số lần retry tối đa (mặc định `5`). |
+| `EVENT_OUTBOX_RETRY_BASE_MS` | Backoff cơ sở (mặc định `1000`). |
+| `KAFKAJS_NO_PARTITIONER_WARNING` | Tắt warning kafkajs (tùy chọn). |
+| `KAFKA_BROKERS` | Danh sách broker, ví dụ `localhost:29092` (dev) hoặc `kafka:9092` (production compose). |
+| `KAFKA_CLIENT_ID` | Client id cho outbox publisher. |
+| `KAFKA_TOPIC_PREFIX` | Tiền tố topic (mặc định `crypto-trading`). |
+| `KAFKA_CLUSTER_ID` | Cluster id — generate một lần. |
+| `KAFKA_DLQ_TOPIC_ENABLED` | Bật dead-letter topic. |
+| `KAFKA_CONSUMERS_ENABLED` | Bật consumer groups. |
+| `KAFKA_CONSUMER_GROUP_PREFIX` | Tiền tố group, ví dụ `crypto-trading`. |
+
+### Redis (cache, lock, pub/sub)
+
+| Biến | Mô tả |
+|---|---|
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | Kết nối Redis — cache, lock khớp lệnh, pub/sub, lock relay outbox. Xem [REDIS_USAGE.md](REDIS_USAGE.md). |
 
 ### Read model / CQRS (feature flags)
 
 | Biến | Mô tả |
 |---|---|
-| READ_MARKETS_FROM_PROJECTION | (Tùy chọn) `true` / `1` / `yes`: một số API list cặp đọc từ **`read_market_pairs`** khi filter đơn giản (`GetMarketPairQuery`). Mặc định tắt. Bật sau khi migration + relay đã đồng bộ — [ARCHITECTURE.md](ARCHITECTURE.md). |
-| READ_MODEL_ONCHAIN_DEPOSITS | (Tùy chọn) `true` / `1` / `yes`: listing on-chain deposit user đọc **`read_onchain_deposits`** (merge với non-deposit từ `onchain_transactions`). Mặc định tắt. Bật sau migration `read_onchain_deposits` + relay — [ARCHITECTURE_FULL_ROLLOUT.md](ARCHITECTURE_FULL_ROLLOUT.md). |
+| `READ_MARKETS_FROM_PROJECTION` | (Tùy chọn) `true` / `1` / `yes`: một số API list cặp đọc từ **`read_market_pairs`** khi filter đơn giản (`GetMarketPairQuery`). Mặc định tắt. Bật sau khi migration + relay đã đồng bộ — [ARCHITECTURE.md](ARCHITECTURE.md). |
+| `READ_MODEL_ONCHAIN_DEPOSITS` | (Tùy chọn) `true` / `1` / `yes`: listing on-chain deposit user đọc **`read_onchain_deposits`** (merge với non-deposit từ `onchain_transactions`). Mặc định tắt. Bật sau migration `read_onchain_deposits` + relay — [ARCHITECTURE_FULL_ROLLOUT.md](ARCHITECTURE_FULL_ROLLOUT.md). |
+
+### Matching engine (TS / Go) + Ticker / Public WS
+
+| Biến | Mô tả |
+|---|---|
+| `MATCHING_ENGINE` | `ts` (mặc định, production-ready) \| `go` (shadow matching, Phase 6-8). |
+| `TICKER_SOURCE` | `nestjs` (mặc định) \| `redis` \| `go_aggregator`. |
+| `PUBLIC_WS_SOURCE` | `nestjs` (mặc định) \| `redis` \| `go`. |
+| `MATCHING_GO_CANARY_PAIRS` | Danh sách cặp canary Go matching (CSV). |
+| `GO_AGGREGATOR_TICKER_CHANNEL` | Redis channel cho ticker từ Go (mặc định `trading:external:ticker`). |
+| `GO_AGGREGATOR_OHLC_CHANNEL` | Redis channel cho OHLC từ Go (mặc định `trading:external:ohlc`). |
+| `MATCHING_SHADOW_MONITOR_PAIRS` | Cặp theo dõi shadow parity. |
+| `MATCHING_SHADOW_ALERT_MIN_MATCH_RATE_PERCENT` | Ngưỡng match rate (mặc định `99.9`). |
+| `MATCHING_SHADOW_ALERT_MAX_UNMATCHED_RUNS` | Ngưỡng unmatched runs (mặc định `0`). |
+| `GO_ROLLOUT_WINDOW_HOURS` / `GO_ROLLOUT_MAX_PUBLIC_WS_DRIFT_PAIRS` / `GO_ROLLOUT_MIN_PUBLIC_WS_COMPARED_PAIRS` / `GO_ROLLOUT_ROLLBACK_DRILL_MAX_AGE_HOURS` | Ngưỡng Go rollout. |
+| `MARKET_AGGREGATOR_SHADOW_MODE` / `MARKET_AGGREGATOR_READ_ONLY_MODE` | Shadow + read-only flag cho Go market-aggregator. |
+| `MATCHING_ENGINE_SHADOW_MODE` / `MATCHING_ENGINE_MUTATIONS_ENABLED` | **Mặc định tắt `MUTATIONS_ENABLED`**; bật chỉ sau parity sign-off. |
+| `PUBLIC_WS_GATEWAY_SHADOW_MODE` / `PUBLIC_WS_GATEWAY_CANARY_PERCENT` | Shadow + canary traffic % cho Go public WS gateway. |
+
+> Toàn bộ matching config có thể chỉnh qua **`/api/v1/system-configs/runtime`** (DB → Redis cache → `.env` fallback) — Tab **Platform** trên màn Payment Configuration.
+
+### Encryption keys
+
+| Biến | Mô tả |
+|---|---|
+| `WALLET_ENCRYPTION_KEY` | 32 bytes hex (64 ký tự) — AES-256-GCM cho treasury / payment-config payloads. |
+| `SEED_DATA_ENCRYPTION_KEY` | 32 bytes hex — giải mã `users.json.enc` (xem `src/seed/README.md`). Generate: `openssl rand -hex 32`. |
+| `BINANCE_CREDENTIALS_ENCRYPTION_KEY` | 32 bytes hex — AES-256 cho per-user Binance API keys (lưu ở `user-binance-credentials`/FE `binance_trading`). |
+
+### Email & Push
+
+| Biến | Mô tả |
+|---|---|
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP relay cho email (verification, security change requests, …). Mặc định `smtp.gmail.com:587`. |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | Đường dẫn tới Firebase Admin SDK service account JSON. Trong compose production nên đặt ngoài repo. |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` / `CLOUDINARY_AVATAR_FOLDER` | Cloudinary cho avatar upload (`features.users.me.avatar`). Xem [PROFILE_AVATAR_SECURITY_REVIEW.md](PROFILE_AVATAR_SECURITY_REVIEW.md). |
+
+### Application-level safety flags (production)
+
+| Biến | Mô tả |
+|---|---|
+| `LOG_ENABLED` / `LOG_LEVEL` / `LOG_FORMAT` | Toggle + level + format (`json`/`pretty`). |
+| `RATE_LIMIT_TTL` / `RATE_LIMIT_MAX` | Rate limit theo IP/user. |
+| `BCRYPT_ROUNDS` | Cost factor cho bcrypt hash. |
+| `BLOCKCHAIN_ALLOW_TEST_SIGNATURE` / `ALLOW_UI_TEST_SIGNATURE` | **Rủi ro cao** — chỉ bật trên staging/dev. |
+| `MATCHING_BOOK_FULL_REFRESH` | Refresh full order book khi khởi động. |
+| `GF_SECURITY_ADMIN_PASSWORD` | Mật khẩu admin Grafana. |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram alert forwarding (Alertmanager bridge). |
+
+### Network / public API
+
+| Biến | Mô tả |
+|---|---|
+| `APP_HOST` / `BIND_HOST` / `APP_PORT` / `APP_HOSTNAME` / `APP_PUBLIC_URL` | Listen address (mặc định `0.0.0.0:3000`); hostname + public URL cho CORS/healthcheck. |
+| `KAFKA_EXTERNAL_BIND_HOST` / `KAFKA_EXTERNAL_PORT` | Listener public cho Kafka external (mặc định `0.0.0.0:29092`). |
+| `CORS_ORIGIN` / `CORS_CREDENTIALS` | CORS config cho FE app domain. |
+| `APP_ENV_FILE` | Tên file env mà Docker compose override (vd `.env.staging`). |
+
+### ClickHouse / analytics
+
+| Biến | Mô tả |
+|---|---|
+| `CLICKHOUSE_DB` / `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` / `CLICKHOUSE_PORT` / `CLICKHOUSE_TCP_PORT` | ClickHouse (audit/analytics). |
 
 ### Giao dịch và Sàn giao dịch (Trading và Exchange)
 

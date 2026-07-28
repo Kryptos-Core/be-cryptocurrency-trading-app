@@ -19,6 +19,12 @@ export function typeormEntityGlobPaths(callerDirname: string): string[] {
 /**
  * Explicit migration file paths for TypeORM CLI/DataSource usage.
  * Filters out `*.spec.ts` / `*.spec.js` so test files never get loaded as migrations.
+ *
+ * NOTE: Legacy MySQL migrations under `src/migrations_legacy_mysql/` are
+ * INTENTIONALLY excluded from this list — they are not compatible with the
+ * current Postgres DataSource and must never run against `core_db`. They
+ * remain on disk only for historical reference / MySQL rollback scenarios.
+ * See the file-level banner in that folder for details.
  */
 export function typeormMigrationFilePaths(callerDirname: string): string[] {
   const migrationsDir = path.resolve(callerDirname, '../migrations');

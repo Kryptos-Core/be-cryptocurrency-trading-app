@@ -1,5 +1,7 @@
 # Kryptos Core — Backend API
 
+> Last reviewed: 2026-07-28 — verified against `package.json`, `.env.development.example`, `src/modules/`, `docker-compose.infrastructure.yml`.
+
 API backend cho nền tảng giao dịch tiền mã hóa (**NestJS**). Base path: `/api/v1`.
 
 ## Tính năng chính
@@ -35,21 +37,31 @@ Tạo file `.env.development` từ `.env.development.example`. **Không commit f
 
 ```bash
 npm install
-npm run migration:run
+npm run db:migrate
 npm run db:seed
-npm run start:dev
+npm run dev          # nest start --watch với NODE_ENV=development
 ```
+
+Lưu ý: script dev trong `package.json` là `npm run dev` (không còn `start:dev`). Các lệnh migration/seed cũng đã đổi tên: `db:migrate` / `db:migrate:revert`, `db:seed` / `db:clean`. Chi tiết: `docs/MIGRATION_CHECKLIST.md`, `docs/ENV_CONFIG_USAGE.md`.
 
 ## Scripts quan trọng
 
 | Script | Mô tả |
 |--------|--------|
-| `npm run start:dev` | Dev server (NODE_ENV=development) |
-| `npm run build && npm run start:prod` | Production |
-| `npm run migration:run` / `migration:revert` | TypeORM migrations |
+| `npm run dev` | Dev server (NODE_ENV=development, `nest start --watch`) |
+| `npm run start:prod` | Production (sau khi `npm run build`) |
+| `npm run start:staging` | Staging (`nest start` không watch) |
+| `npm run db:migrate` / `db:migrate:revert` / `db:migrate:show` | TypeORM migrations (development) |
+| `npm run db:migrate:prod` | Migrations trong container production |
 | `npm run db:seed` / `db:clean` | Seed / truncate data |
-| `npm run test` | Unit + integration tests |
-| `npm run lint` | Biome lint |
+| `npm run seed:encrypt` / `seed:decrypt` / `seed:encrypt:dry` | AES-256-GCM cho `users.json.enc` |
+| `npm run test` / `test:cov` / `test:watch` | Jest unit + integration |
+| `npm run lint` / `lint:fix` / `format` | **Biome** (không còn ESLint/Prettier) |
+| `npm run lint:boundaries` | Module boundary guard (`scripts/check-module-boundaries.mjs`) |
+| `npm run lint:uow` | Direct `dataSource.transaction` guard (`scripts/check-uow-policy.mjs`) |
+| `npm run docker:infra:up` / `:up:full` / `:down` / `:logs` / `:health` | Docker compose infrastructure |
+| `npm run treasury:e2e` / `treasury:health` / `treasury:daily` / `treasury:schedule:register` | Treasury runbook |
+| `npm run deploy:prod:up` / `:build` / `:migrate` / `:full` | Production deploy |
 
 ## Kiểm tra nhanh
 

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
-import { NotFoundException } from '@/common/exceptions';
+import { BadRequestException, BusinessException, NotFoundException } from '@/common/exceptions';
 import { CacheService } from '@/common/services';
 import { MarketMakerConfig } from '@/entities/market-maker-config.entity';
 import { MarketsService } from '@/modules/markets/markets.service';
@@ -58,7 +58,27 @@ export class MarketMakerService {
   }
 
   async upsertConfig(userId: string, pairId: string, dto: UpsertMarketMakerConfigDto) {
-    await this.marketsService.findOne(pairId);
+    const pair = await this.marketsService.findOne(pairId);
+
+    const minOrderAmount = Number.parseFloat(pair.min_order_amount);
+    const requestedAmount = Number.parseFloat(dto.order_amount);
+    if (
+      !Number.isFinite(requestedAmount) ||
+      requestedAmount <= 0 ||
+      (Number.isFinite(minOrderAmount) &&
+        minOrderAmount > 0 &&
+        requestedAmount < minOrderAmount)
+    ) {
+      throw new BusinessException(
+        `order_amount must be at least ${pair.min_order_amount} (min order amount for ${pair.symbol})`,
+        'MM_ORDER_AMOUNT_BELOW_MIN',
+        {
+          order_amount: dto.order_amount,
+          min_order_amount: pair.min_order_amount,
+          symbol: pair.symbol,
+        },
+      );
+    }
 
     const existing = await this.configRepository.findByUserPair(userId, pairId);
     const model = existing ?? new MarketMakerConfig();
@@ -94,7 +114,18 @@ export class MarketMakerService {
     refreshCycleKey?: string,
     orderAmountOverride?: string,
   ) {
-    const config = await this.getConfigByPair(userId, pairId);
+    let config;
+    try {
+      config = await this.getConfigByPair(userId, pairId);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new BadRequestException(
+          `Market maker config not found for pair ${pairId}; create one first`,
+          'MM_CONFIG_NOT_FOUND',
+        );
+      }
+      throw err;
+    }
     if (!config.is_active) {
       return {
         skipped: true,
@@ -113,13 +144,25 @@ export class MarketMakerService {
       };
     }
 
-    const cancelled = await this.ordersService.cancelOpenOrdersForPair(userId, pairId);
-    const placed = await this.mmOrderStrategyService.placeMakerOrders({
-      userId,
-      pairId,
-      config,
-      orderAmountOverride,
-    });
+    let cancelled: Awaited<ReturnType<OrdersService['cancelOpenOrdersForPair']>>;
+    let placed: Awaited<ReturnType<MmOrderStrategyService['placeMakerOrders']>>;
+    try {
+      cancelled = await this.ordersService.cancelOpenOrdersForPair(userId, pairId);
+      placed = await this.mmOrderStrategyService.placeMakerOrders({
+        userId,
+        pairId,
+        config,
+        orderAmountOverride,
+      });
+    } catch (err) {
+      if (err instanceof BusinessException) {
+        throw err;
+      }
+      throw new BusinessException(
+        `Failed to place maker orders: ${(err as Error)?.message ?? 'unknown error'}`,
+        'MM_PLACE_FAILED',
+      );
+    }
 
     const response = {
       refreshCycleKey: cycleKey,
