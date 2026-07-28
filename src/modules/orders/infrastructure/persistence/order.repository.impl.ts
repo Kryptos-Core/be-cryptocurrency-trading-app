@@ -290,28 +290,47 @@ export class OrderRepositoryImpl extends BaseRepository<Order> implements OrderR
     skip: number,
     limit: number,
   ): Promise<Order[]> {
+    const normalizedStatus =
+      status != null && String(status).trim() !== '' ? String(status).trim() : null;
+
+    const where = normalizedStatus
+      ? 'WHERE user_id = $1 AND status = $2'
+      : 'WHERE user_id = $1';
+    const params: unknown[] = normalizedStatus
+      ? [userId, normalizedStatus, skip, limit]
+      : [userId, skip, limit];
+
     const rows = await this.dataSource.query(
       `SELECT order_id, user_id, pair_id, side, type, price, amount, filled_amount, avg_price,
               status, time_in_force, reserved_quote, reserved_base, client_order_id, idempotency_key,
               slippage_tolerance, created_at, updated_at
        FROM orders
-       WHERE user_id = $1
-         AND ($2::text IS NULL OR $2 = '' OR status = $2)
+       ${where}
        ORDER BY created_at DESC
-       OFFSET $3
-       LIMIT $4`,
-      [userId, status, skip, limit],
+       OFFSET $${normalizedStatus ? 3 : 2}
+       LIMIT $${normalizedStatus ? 4 : 3}`,
+      params,
     );
     return (rows ?? []).map((row: OrderRow) => this.mapRowToOrder(row));
   }
 
   async countByUser(userId: string, status: string | null): Promise<number> {
+    const normalizedStatus =
+      status != null && String(status).trim() !== '' ? String(status).trim() : null;
+
+    if (!normalizedStatus) {
+      const rows = await this.dataSource.query(
+        `SELECT COUNT(*)::int AS total FROM orders WHERE user_id = $1`,
+        [userId],
+      );
+      return Number(rows?.[0]?.total ?? 0);
+    }
+
     const rows = await this.dataSource.query(
       `SELECT COUNT(*)::int AS total
        FROM orders
-       WHERE user_id = $1
-         AND ($2::text IS NULL OR $2 = '' OR status = $2)`,
-      [userId, status],
+       WHERE user_id = $1 AND status = $2::orders_status_enum`,
+      [userId, normalizedStatus],
     );
     return Number(rows?.[0]?.total ?? 0);
   }
