@@ -2,6 +2,29 @@
 
 This document records the production-ready rollout path for the Go services under `go-services/`.
 
+> Last reviewed: 2026-07-29 — verified against `docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.staging.yml`, `go-services/Makefile`.
+
+## Local development (Windows / Linux / macOS)
+
+Trên local dev, đặc biệt trên **Windows** (GnuWin32 `make` không parse được bash syntax `if [ ... ]; then` của target `run-dev`/`run-one`), dùng unified Docker Compose ở repo root:
+
+```bash
+# Từ be-cryptocurrency-trading-app/
+docker compose -f docker-compose.yml up -d --profile services
+
+# Hoặc dùng wrapper Makefile (cross-platform)
+cd go-services
+make docker-up                    # infrastructure + 3 services
+make docker-up-infra              # chỉ infrastructure
+make docker-up-one SERVICE=matching-engine
+make docker-logs SERVICE=market-aggregator
+make docker-restart SERVICE=matching-engine
+make docker-rebuild SERVICE=matching-engine
+make docker-down
+```
+
+Tất cả containers join network `crypto-trading-network` để resolve Postgres / Redis / Kafka bằng hostname Docker. Chi tiết: [`go-services/README.md`](../go-services/README.md), [`../README.md`](../README.md).
+
 ## Current status
 
 The repository now contains runnable Go service skeletons for:
@@ -36,6 +59,20 @@ public-ws-gateway      profile: go-canary
 `market-aggregator` is included in the default compose graph because it is configured shadow/read-only and does not receive public traffic.
 
 `matching-engine` and `public-ws-gateway` require explicit profile opt-in.
+
+### Shared Docker network
+
+Tất cả containers (infrastructure lẫn Go services) join network `crypto-trading-network` (name cố định). Nhờ đó NestJS backend container trong `docker-compose.prod.yml` / `docker-compose.staging.yml` có thể resolve host `market-aggregator`, `matching-engine`, `public-ws-gateway` mà không cần link thủ công. File `docker-compose.infrastructure.yml` (cũng include bởi `docker-compose.yml` ở repo root) define network này.
+
+### Local dev compose
+
+Repo root `docker-compose.yml` (include `docker-compose.infrastructure.yml`) thêm 3 Go services trong profile `services` cho local dev workflow:
+
+```bash
+docker compose -f docker-compose.yml up -d --profile services
+```
+
+Cùng network `crypto-trading-network`, image build từ `./go-services/<service>/Dockerfile`.
 
 ## Build and validation
 

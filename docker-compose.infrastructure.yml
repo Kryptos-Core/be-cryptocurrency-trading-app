@@ -26,6 +26,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: crypto_trading_postgres
+    networks:
+      - crypto-trading-network
     environment:
       POSTGRES_USER: ${CORE_DB_USERNAME}
       POSTGRES_PASSWORD: ${CORE_DB_PASSWORD}
@@ -44,6 +46,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: crypto_trading_redis
+    networks:
+      - crypto-trading-network
     command: >
       sh -c 'if [ -z "$REDIS_PASSWORD" ]; then redis-server --appendonly yes; else redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"; fi'
     environment:
@@ -63,6 +67,8 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     container_name: crypto_trading_zookeeper
+    networks:
+      - crypto-trading-network
     profiles: ['kafka']
     restart: "no"
     environment:
@@ -80,6 +86,8 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: crypto_trading_kafka
+    networks:
+      - crypto-trading-network
     profiles: ['kafka']
     restart: "no"
     depends_on:
@@ -113,6 +121,8 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.6-alpine
     container_name: crypto_trading_clickhouse
+    networks:
+      - crypto-trading-network
     profiles: ['clickhouse']
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-default}
@@ -140,6 +150,8 @@ services:
   timescaledb:
     image: timescale/timescaledb:2.17.2-pg16
     container_name: crypto_trading_timescaledb
+    networks:
+      - crypto-trading-network
     profiles: ['timescale']
     environment:
       POSTGRES_USER: ${MARKET_TS_USERNAME}
@@ -158,6 +170,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  crypto-trading-network:
+    name: crypto-trading-network
 
 volumes:
   postgres_data:

@@ -362,7 +362,36 @@ Xem [docs/metrics-reference.md](metrics-reference.md) để biết danh sách đ
 
 ## 7. Deployment
 
-### 7.1 Docker Compose Profiles
+### 7.1 Local development (Windows / Linux / macOS) — Docker Compose
+
+Compose file chính ở repo root backend `docker-compose.yml` include `docker-compose.infrastructure.yml` và định nghĩa 3 Go services trong profile `services`. Tất cả containers join network `crypto-trading-network` để resolve Postgres/Redis/Kafka bằng hostname Docker.
+
+```bash
+# Khởi động infrastructure + 3 Go services
+docker compose -f docker-compose.yml up -d --profile services
+
+# Chỉ infrastructure
+docker compose -f docker-compose.yml up -d
+
+# Chỉ một service (vd. market-aggregator)
+docker compose -f docker-compose.yml up -d --profile services market-aggregator
+
+# Logs
+docker compose -f docker-compose.yml logs -f market-aggregator
+
+# Stop
+docker compose -f docker-compose.yml down
+```
+
+Cross-platform wrapper Makefile ở `go-services/Makefile` (`docker-up`, `docker-up-infra`, `docker-up-one SERVICE=...`, `docker-down`, `docker-logs`, `docker-restart`, `docker-rebuild`) chạy được trên Windows, không phụ thuộc bash shell.
+
+> **Note:** Trên local dev, các services bind ra host ports `MARKET_AGGREGATOR_PORT` (default 8080), `MATCHING_ENGINE_PORT` (8081), `PUBLIC_WS_GATEWAY_PORT` (8082). Khuyến nghị dùng Docker Compose thay vì `make run-dev` (Makefile targets `run-dev` / `run-one` dùng bash `if [ ... ]; then` syntax không hoạt động với GnuWin32 `make` trên Windows).
+
+### 7.2 Production / Staging
+
+Production/Staging dùng compose riêng (`docker-compose.prod.yml`, `docker-compose.staging.yml`) với profile `go-risky` (matching-engine) và `go-canary` (public-ws-gateway). Xem [docs/GO_SERVICES_PRODUCTION_ROLLOUT.md](../../docs/GO_SERVICES_PRODUCTION_ROLLOUT.md).
+
+### 7.3 Docker Compose Profiles
 
 ```yaml
 # docker-compose.prod.yml
@@ -383,19 +412,27 @@ public-ws-gateway:
   profiles: []
 ```
 
-### 7.2 Quick commands
+### 7.4 Quick commands
 
 ```bash
-# Build all
+# Docker Compose — khuyến nghị cho local dev (cross-platform)
+make docker-up                    # Start infrastructure + 3 services
+make docker-up-one SERVICE=matching-engine
+make docker-logs SERVICE=market-aggregator
+make docker-restart SERVICE=matching-engine
+make docker-rebuild SERVICE=matching-engine
+make docker-down
+
+# Build Go binaries (Linux / macOS bash only)
 make build
 
-# Run all locally
+# Run all services locally (Linux / macOS bash only — không chạy trên GnuWin32 make)
 make run-dev
 
-# Run specific service
+# Run specific service (Linux / macOS bash only)
 make run-one SERVICE=matching-engine
 
-# Test specific service
+# Test specific service (cross-platform)
 make test-one SERVICE=matching-engine
 
 # Test with coverage
@@ -405,7 +442,7 @@ make test-cover SERVICE=matching-engine
 make test-race SERVICE=matching-engine
 ```
 
-### 7.3 CI/CD Pipeline
+### 7.5 CI/CD Pipeline
 
 ```
 .github/workflows/go-services.yml
@@ -416,7 +453,7 @@ make test-race SERVICE=matching-engine
     └─► Docker Build + Push
 ```
 
-### 7.4 Health checks
+### 7.6 Health checks
 
 Tất cả services đều expose:
 
@@ -426,7 +463,7 @@ GET /readyz   — Readiness probe (check Redis, Kafka, PostgreSQL)
 GET /metrics  — Prometheus metrics
 ```
 
-### 7.5 Migration roadmap
+### 7.7 Migration roadmap
 
 | Phase | Nội dung | Trạng thái |
 |-------|----------|-------------|

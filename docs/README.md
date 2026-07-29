@@ -1,6 +1,6 @@
 # Tài liệu — be-cryptocurrency-trading-app
 
-> Last reviewed: 2026-07-28 — verified against `package.json`, `.env.development.example`, `src/modules/`, `docker-compose.infrastructure.yml`, `go-services/`.
+> Last reviewed: 2026-07-29 — verified against `package.json`, `.env.development.example`, `src/modules/`, `docker-compose.yml`, `docker-compose.infrastructure.yml`, `go-services/`.
 
 Đây là chỉ mục toàn bộ tài liệu trong repo NestJS backend. Team BE dùng repo này làm workspace độc lập (xem `AGENTS.md`); FE Flutter là repo riêng.
 
@@ -46,6 +46,28 @@
 | [`docs/MONITORING_DEPLOYMENT_NOTES.md`](MONITORING_DEPLOYMENT_NOTES.md) | Ghi chép tăng cường monitoring/alerting. |
 | [`docs/TREASURY_DAILY_RUNBOOK.md`](TREASURY_DAILY_RUNBOOK.md) | Runbook treasury: `treasury:daily` script + Task Scheduler. |
 | [`docs/PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md) | VPS cũ (chiasegpu.vn) + Cloudflare Tunnel — **historical reference**. |
+
+## Go Services (Gradual Migration)
+
+Repo có 3 Go microservices chạy song song với NestJS trong giai đoạn migration: `market-aggregator` (port 8080), `matching-engine` (8081), `public-ws-gateway` (8082).
+
+| File | Mục đích |
+|------|---------|
+| [`go-services/README.md`](../go-services/README.md) | Quickstart + Docker Compose workflow + Makefile targets. |
+| [`go-services/docs/README.md`](../go-services/docs/README.md) | Kiến trúc chi tiết, Prometheus metrics, deployment từng service. |
+| [`go-services/docs/matching-engine.md`](../go-services/docs/matching-engine.md) | Chi tiết Matching Engine (domain models, safety modes). |
+| [`go-services/docs/metrics-reference.md`](../go-services/docs/metrics-reference.md) | Prometheus metrics reference. |
+| [`docs/GO_SERVICES_PRODUCTION_ROLLOUT.md`](GO_SERVICES_PRODUCTION_ROLLOUT.md) | Rollout + safety policy + cách deploy từng service trên production. |
+| [`docs/GO_PUBLIC_WS_ROLLOUT_RUNBOOK.md`](GO_PUBLIC_WS_ROLLOUT_RUNBOOK.md) | Runbook rollout ticker/Public WS feature flags. |
+| [`docs/GO_REAL_TRAFFIC_AND_MUTATION_PLAN.md`](GO_REAL_TRAFFIC_AND_MUTATION_PLAN.md) | Real traffic + matching mutation guardrails. |
+
+Local dev (Windows / Linux / macOS) chạy Go services qua unified `docker-compose.yml` ở repo root:
+
+```bash
+docker compose -f docker-compose.yml up -d --profile services
+# Hoặc dùng wrapper Makefile (cross-platform)
+cd go-services && make docker-up
+```
 
 ## Reference / Plans (đánh dấu cần review)
 

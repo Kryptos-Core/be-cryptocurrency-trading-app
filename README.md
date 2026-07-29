@@ -1,6 +1,6 @@
 # Kryptos Core — Backend API
 
-> Last reviewed: 2026-07-28 — verified against `package.json`, `.env.development.example`, `src/modules/`, `docker-compose.infrastructure.yml`.
+> Last reviewed: 2026-07-29 — verified against `package.json`, `.env.development.example`, `src/modules/`, `docker-compose.yml`, `docker-compose.infrastructure.yml`, `go-services/`.
 
 API backend cho nền tảng giao dịch tiền mã hóa (**NestJS**). Base path: `/api/v1`.
 
@@ -23,11 +23,23 @@ Kiến trúc chi tiết: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ### 1. Infrastructure (Docker)
 
+Compose file chính ở repo root (`docker-compose.yml`) include `docker-compose.infrastructure.yml` và thêm 3 Go services (`market-aggregator`, `matching-engine`, `public-ws-gateway`) trong profile `services`.
+
 ```bash
-npm run docker:infra:up        # PostgreSQL + Redis
+# Chỉ infrastructure (Postgres + Redis) — npm script wrapper
+npm run docker:infra:up
 npm run docker:infra:up:full   # + Kafka + ClickHouse + TimescaleDB
 npm run docker:infra:down      # Tắt
+
+# Hoặc dùng docker compose trực tiếp (tương đương)
+docker compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml --profile kafka --profile clickhouse --profile timescale up -d
+
+# Khởi động luôn 3 Go services (profile services)
+docker compose -f docker-compose.yml up -d --profile services
 ```
+
+Xem chi tiết tại [go-services/README.md](go-services/README.md) và [docs/GO_SERVICES_PRODUCTION_ROLLOUT.md](docs/GO_SERVICES_PRODUCTION_ROLLOUT.md).
 
 ### 2. Biến môi trường
 
@@ -86,3 +98,22 @@ Lưu ý: script dev trong `package.json` là `npm run dev` (không còn `start:d
 | PostgreSQL | 5432 |
 | Redis | 6379 |
 | Kafka | 9092 |
+| Go — `market-aggregator` | 8080 |
+| Go — `matching-engine` | 8081 |
+| Go — `public-ws-gateway` | 8082 |
+
+## Go Services (Gradual Migration)
+
+Trong giai đoạn chuyển đổi sang Go, ba services `market-aggregator`, `matching-engine`, `public-ws-gateway` chạy song song với NestJS. Trên local dev / Windows, khuyến nghị dùng **unified Docker Compose** ở repo root:
+
+```bash
+# Infrastructure + 3 Go services
+docker compose -f docker-compose.yml up -d --profile services
+
+# Hoặc dùng wrapper Makefile (cross-platform)
+cd go-services
+make docker-up            # start tất cả
+make docker-logs SERVICE=market-aggregator
+```
+
+Network `crypto-trading-network` được share giữa infrastructure containers và Go services. Production/Staging dùng compose riêng (`docker-compose.prod.yml`, `docker-compose.staging.yml`) — xem [docs/GO_SERVICES_PRODUCTION_ROLLOUT.md](docs/GO_SERVICES_PRODUCTION_ROLLOUT.md) và [go-services/README.md](go-services/README.md).

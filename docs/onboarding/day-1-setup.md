@@ -1,6 +1,6 @@
 # Onboarding NestJS Backend — Ngày 1
 
-> Last reviewed: 2026-07-28 — verified against `package.json`, `docker-compose.infrastructure.yml`, `src/modules/`.
+> Last reviewed: 2026-07-29 — verified against `package.json`, `docker-compose.yml`, `docker-compose.infrastructure.yml`, `go-services/`, `src/modules/`.
 
 ## 1. Prerequisites
 
@@ -43,7 +43,14 @@ npm run db:seed
 
 # Khởi động server (dev mode watch)
 npm run dev
+
+# (Tùy chọn) Khởi động luôn 3 Go services cùng infrastructure (Windows-friendly)
+docker compose -f docker-compose.yml up -d --profile services
+# Hoặc dùng wrapper Makefile (cross-platform)
+#   cd go-services && make docker-up
 ```
+
+> Lệnh `npm run docker:infra:up` chỉ chạy infrastructure. Để chạy kèm 3 Go services (`market-aggregator` 8080, `matching-engine` 8081, `public-ws-gateway` 8082) trong giai đoạn Gradual Migration, dùng `docker compose -f docker-compose.yml up -d --profile services`. Xem [go-services/README.md](../../go-services/README.md) và [docs/GO_SERVICES_PRODUCTION_ROLLOUT.md](../GO_SERVICES_PRODUCTION_ROLLOUT.md).
 
 > Script dev là `npm run dev` (Nest start --watch). Không còn `start:dev` / `migration:run` — xem `package.json` để biết đầy đủ (`db:migrate`, `db:migrate:revert`, `db:seed`, `seed:encrypt`, …).
 

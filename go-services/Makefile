@@ -2,7 +2,7 @@
 # Usage: make <target> SERVICE=<service-name>
 # Example: make test SERVICE=matching-engine
 
-.PHONY: help build test lint vet fmt clean docker-build docker-push docker-lint-diff
+.PHONY: help build test lint vet fmt clean docker-build docker-push docker-lint-diff docker-up docker-down docker-logs
 
 SERVICES := market-aggregator matching-engine public-ws-gateway
 
@@ -128,6 +128,39 @@ clean:
 		cd $$svc && rm -f coverage.out coverage.html && go clean && cd ..; \
 	done
 
+# Docker Compose targets (works on Windows, Linux, macOS)
+# NOTE: Run from go-services/ directory
+
+docker-up:
+	@echo "Starting infrastructure + services with Docker Compose..."
+	@cd .. && docker compose -f docker-compose.yml up -d --profile services
+
+docker-up-infra:
+	@echo "Starting infrastructure only..."
+	@cd .. && docker compose -f docker-compose.infrastructure.yml up -d
+
+docker-up-one:
+	@echo "Starting $(SERVICE) with Docker Compose..."
+	@cd .. && docker compose -f docker-compose.yml up -d --profile services $(SERVICE)
+
+docker-down:
+	@echo "Stopping all services..."
+	@cd .. && docker compose -f docker-compose.yml down
+
+docker-logs:
+	@cd .. && docker compose -f docker-compose.yml logs -f $(SERVICE)
+
+docker-logs-all:
+	@cd .. && docker compose -f docker-compose.yml logs -f
+
+docker-restart:
+	@echo "Restarting $(SERVICE)..."
+	@cd .. && docker compose -f docker-compose.yml restart $(SERVICE)
+
+docker-rebuild:
+	@echo "Rebuilding $(SERVICE)..."
+	@cd .. && docker compose -f docker-compose.yml up -d --build $(SERVICE)
+
 # Docker cleanup
 docker-clean:
 	@docker rmi $$(docker images 'crypto-trading-*' -q) 2>/dev/null || true
@@ -159,8 +192,14 @@ help:
 	@echo "  lint              - Run all linters (needs staticcheck, golangci-lint installed)"
 	@echo "  docker-build      - Build all Docker images"
 	@echo "  docker-build-one  - Build specific Docker image (SERVICE=<name>)"
-	@echo "  run-dev           - Run all services locally"
-	@echo "  run-one           - Run specific service locally (SERVICE=<name>)"
+	@echo "  docker-up         - Docker Compose: Start infra + services (RECOMMENDED)"
+	@echo "  docker-up-infra   - Docker Compose: Start infrastructure only"
+	@echo "  docker-up-one     - Docker Compose: Start specific service (SERVICE=<name>)"
+	@echo "  docker-down       - Docker Compose: Stop all services"
+	@echo "  docker-logs       - Docker Compose: View logs (SERVICE=<name>)"
+	@echo "  docker-logs-all   - Docker Compose: View all logs"
+	@echo "  docker-restart    - Docker Compose: Restart service (SERVICE=<name>)"
+	@echo "  docker-rebuild    - Docker Compose: Rebuild service (SERVICE=<name>)"
 	@echo "  clean             - Clean build artifacts"
 	@echo "  ci                - CI pipeline (tidy + vet + test)"
 	@echo ""
@@ -168,3 +207,5 @@ help:
 	@echo "  make build-one SERVICE=matching-engine"
 	@echo "  make test-one SERVICE=matching-engine"
 	@echo "  make docker-build-one SERVICE=market-aggregator"
+	@echo "  make docker-up           # Start everything with Docker"
+	@echo "  make docker-logs SERVICE=market-aggregator  # View logs"

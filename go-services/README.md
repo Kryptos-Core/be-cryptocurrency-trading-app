@@ -12,13 +12,17 @@ Các service Go được tách theo clean architecture, chạy song song với N
 
 ## Quick Start
 
-### Development
+> **Recommended workflow (Windows / Linux / macOS):** dùng Docker Compose để khởi động infrastructure + Go services. Xem [Running with Docker](#running-with-docker--khuyến-nghị).
+>
+> Makefile targets `run-dev` / `run-one` dùng bash shell (`if [ ... ]; then`) và không hoạt động trên Windows `make` của GnuWin32. Trên Windows hãy dùng Docker Compose hoặc WSL/Git Bash.
+
+### Development (Linux / macOS — bash `make`)
 
 ```bash
 # Build all services
 make build
 
-# Run all services locally
+# Run all services locally (requires bash; not Windows GnuWin32 make)
 make run-dev
 
 # Run a specific service
@@ -28,15 +32,82 @@ make run-one SERVICE=matching-engine
 make test-one SERVICE=matching-engine
 ```
 
-### Docker
+### Running with Docker — Khuyến nghị
+
+Compose file chính ở repo root backend `docker-compose.yml` include `docker-compose.infrastructure.yml` và định nghĩa 3 Go services (`market-aggregator`, `matching-engine`, `public-ws-gateway`) trong profile `services`. Tất cả services join chung network `crypto-trading-network` để resolve Postgres/Redis/Kafka bằng hostname Docker.
 
 ```bash
-# Build all Docker images
-make docker-build
+# Khởi động infrastructure + Go services (chạy từ be-cryptocurrency-trading-app/)
+docker compose -f docker-compose.yml up -d --profile services
 
-# Run via docker-compose (production)
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d market-aggregator matching-engine
+# Chỉ infrastructure (Postgres + Redis)
+docker compose -f docker-compose.yml up -d
+
+# Chỉ một service (vd. market-aggregator)
+docker compose -f docker-compose.yml up -d --profile services market-aggregator
+
+# Xem logs (theo dõi stdout của service)
+docker compose -f docker-compose.yml logs -f market-aggregator
+
+# Stop tất cả
+docker compose -f docker-compose.yml down
+
+# Rebuild và restart một service (sau khi đổi code)
+docker compose -f docker-compose.yml up -d --build matching-engine
 ```
+
+Hoặc dùng wrapper Makefile (cross-platform, cũng chạy trên Windows):
+
+```bash
+cd go-services
+
+# Start infrastructure + Go services
+make docker-up
+
+# Chỉ infrastructure
+make docker-up-infra
+
+# Chỉ một service
+make docker-up-one SERVICE=matching-engine
+
+# Logs
+make docker-logs SERVICE=market-aggregator
+make docker-logs-all
+
+# Restart / rebuild
+make docker-restart SERVICE=matching-engine
+make docker-rebuild SERVICE=matching-engine
+
+# Stop
+make docker-down
+```
+
+#### Profiles & dependencies
+
+| Profile / service | Bật khi nào | Depends on |
+|-------------------|-------------|------------|
+| `market-aggregator` | Mặc định trong profile `services` | Postgres + Redis (healthy) |
+| `matching-engine`  | Mặc định trong profile `services` | Postgres + Redis (healthy) |
+| `public-ws-gateway`| Mặc định trong profile `services` | Redis (healthy) |
+| `kafka`            | `--profile kafka` | Zookeeper |
+| `clickhouse`       | `--profile clickhouse` | — |
+| `timescale`        | `--profile timescale` | — |
+
+Network: tất cả containers nằm trong `crypto-trading-network` (đặt tên cố định để NestJS backend container trong `docker-compose.prod.yml` / `docker-compose.staging.yml` có thể join cùng network và resolve host `market-aggregator`, `matching-engine`, `public-ws-gateway`).
+
+#### Env vars cho Docker Compose
+
+Compose file dùng biến từ `.env.development`. Các biến chính:
+
+- `MARKET_AGGREGATOR_PORT` (mặc định `8080`)
+- `MATCHING_ENGINE_PORT` (mặc định `8081`)
+- `PUBLIC_WS_GATEWAY_PORT` (mặc định `8082`)
+- `KAFKA_BROKERS` (mặc định `kafka:9092`, chỉ dùng khi bật profile `kafka`)
+- `REDIS_PASSWORD`, `CORE_DB_*`, `LOG_LEVEL`
+
+### Docker (production / staging)
+
+Production/Staging compose riêng (`docker-compose.prod.yml`, `docker-compose.staging.yml`) đã chứa Go services. Trên môi trường đó dùng profile cũ (`go-risky`, `go-canary`) — xem [docs/GO_SERVICES_PRODUCTION_ROLLOUT.md](../docs/GO_SERVICES_PRODUCTION_ROLLOUT.md).
 
 ## Architecture
 
@@ -177,19 +248,12 @@ Pipeline:
 
 ## Documentation
 
-Chi tiết kỹ thuật:
-
-- [docs/README.md](docs/README.md) — System architecture, overview tất cả services
-- [docs/matching-engine.md](docs/matching-engine.md) — Chi tiết Matching Engine
-- [docs/metrics-reference.md](docs/metrics-reference.md) — Prometheus metrics reference
-
-## Documentation
-
 Chi tiết kỹ thuật từng service:
 
 - [docs/README.md](docs/README.md) — System architecture, overview tất cả services
 - [docs/matching-engine.md](docs/matching-engine.md) — Chi tiết Matching Engine
 - [docs/metrics-reference.md](docs/metrics-reference.md) — Prometheus metrics reference
+- [../docs/GO_SERVICES_PRODUCTION_ROLLOUT.md](../docs/GO_SERVICES_PRODUCTION_ROLLOUT.md) — Rollout & safety policy cho production.
 
 ## Structure
 
