@@ -130,36 +130,44 @@ clean:
 
 # Docker Compose targets (works on Windows, Linux, macOS)
 # NOTE: Run from go-services/ directory
+#
+# Each compose file pairs with its own .env file. NEVER create a generic .env.
+# Pairing (enforced by scripts/docker/up.sh):
+#   development  -> docker-compose.development.yml        + .env.development
+#   staging      -> docker-compose.staging.yml            + .env.staging
+#   production   -> docker-compose.prod.yml               + .env.production
+
+ENV ?= development
 
 docker-up:
-	@echo "Starting infrastructure + services with Docker Compose..."
-	@cd .. && docker compose -f docker-compose.yml up -d --profile services
+	@echo "Starting infrastructure + services for $(ENV)..."
+	@cd .. && bash scripts/docker/up.sh $(ENV)
 
 docker-up-infra:
-	@echo "Starting infrastructure only..."
-	@cd .. && docker compose -f docker-compose.infrastructure.yml up -d
+	@echo "Starting infrastructure only for $(ENV)..."
+	@cd .. && bash scripts/docker/up.sh $(ENV) --infra-only
 
 docker-up-one:
-	@echo "Starting $(SERVICE) with Docker Compose..."
-	@cd .. && docker compose -f docker-compose.yml up -d --profile services $(SERVICE)
+	@echo "Starting $(SERVICE) for $(ENV)..."
+	@cd .. && bash scripts/docker/up.sh $(ENV) --services-only
 
 docker-down:
-	@echo "Stopping all services..."
-	@cd .. && docker compose -f docker-compose.yml down
+	@echo "Stopping all services for $(ENV)..."
+	@cd .. && bash scripts/docker/up.sh $(ENV) --down
 
 docker-logs:
-	@cd .. && docker compose -f docker-compose.yml logs -f $(SERVICE)
+	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml logs -f $(SERVICE)
 
 docker-logs-all:
-	@cd .. && docker compose -f docker-compose.yml logs -f
+	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml logs -f
 
 docker-restart:
 	@echo "Restarting $(SERVICE)..."
-	@cd .. && docker compose -f docker-compose.yml restart $(SERVICE)
+	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml restart $(SERVICE)
 
 docker-rebuild:
 	@echo "Rebuilding $(SERVICE)..."
-	@cd .. && docker compose -f docker-compose.yml up -d --build $(SERVICE)
+	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml up -d --build $(SERVICE)
 
 # Docker cleanup
 docker-clean:
@@ -192,20 +200,24 @@ help:
 	@echo "  lint              - Run all linters (needs staticcheck, golangci-lint installed)"
 	@echo "  docker-build      - Build all Docker images"
 	@echo "  docker-build-one  - Build specific Docker image (SERVICE=<name>)"
-	@echo "  docker-up         - Docker Compose: Start infra + services (RECOMMENDED)"
-	@echo "  docker-up-infra   - Docker Compose: Start infrastructure only"
-	@echo "  docker-up-one     - Docker Compose: Start specific service (SERVICE=<name>)"
-	@echo "  docker-down       - Docker Compose: Stop all services"
-	@echo "  docker-logs       - Docker Compose: View logs (SERVICE=<name>)"
-	@echo "  docker-logs-all   - Docker Compose: View all logs"
-	@echo "  docker-restart    - Docker Compose: Restart service (SERVICE=<name>)"
-	@echo "  docker-rebuild    - Docker Compose: Rebuild service (SERVICE=<name>)"
+	@echo "  docker-up         - Docker Compose: Start infra + services (RECOMMENDED, ENV=<env>)"
+	@echo "  docker-up-infra   - Docker Compose: Start infrastructure only (ENV=<env>)"
+	@echo "  docker-up-one     - Docker Compose: Start specific service (SERVICE=<name>, ENV=<env>)"
+	@echo "  docker-down       - Docker Compose: Stop all services (ENV=<env>)"
+	@echo "  docker-logs       - Docker Compose: View logs (SERVICE=<name>, ENV=<env>)"
+	@echo "  docker-logs-all   - Docker Compose: View all logs (ENV=<env>)"
+	@echo "  docker-restart    - Docker Compose: Restart service (SERVICE=<name>, ENV=<env>)"
+	@echo "  docker-rebuild    - Docker Compose: Rebuild service (SERVICE=<name>, ENV=<env>)"
 	@echo "  clean             - Clean build artifacts"
 	@echo "  ci                - CI pipeline (tidy + vet + test)"
+	@echo ""
+	@echo "Environments (ENV): development (default) | staging | production"
+	@echo "Each ENV pairs with its own .env.<ENV> file. Never create a bare .env."
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build-one SERVICE=matching-engine"
 	@echo "  make test-one SERVICE=matching-engine"
 	@echo "  make docker-build-one SERVICE=market-aggregator"
-	@echo "  make docker-up           # Start everything with Docker"
-	@echo "  make docker-logs SERVICE=market-aggregator  # View logs"
+	@echo "  make docker-up                       # start development (default)"
+	@echo "  make docker-up ENV=staging           # start staging"
+	@echo "  make docker-logs SERVICE=market-aggregator ENV=development"

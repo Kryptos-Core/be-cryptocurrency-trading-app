@@ -1,26 +1,18 @@
-# Infrastructure services cho local development.
-# Bia duoc interpolate tu .env.development boi npm scripts / docker compose.
+# ============================================================
+# Development infrastructure (Postgres, Redis, Kafka, ClickHouse, TimescaleDB).
+# Pair: .env.development (mandatory — no .env fallback).
+# Included by docker-compose.development.yml.
 #
-# San co (khong can profile):
-#   docker compose -f docker-compose.infrastructure.yml up -d
+# Usage (standalone infra):
+#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml up -d
+#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml --profile kafka up -d
+#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml --profile clickhouse up -d
 #
-# Kafka + ClickHouse + TimescaleDB (co profile):
-#   docker compose -f docker-compose.infrastructure.yml --profile kafka --profile clickhouse --profile timescale up -d
-#
-# ─── Kafka troubleshooting ────────────────────────────────────────────────────
-# Neu Kafka die voi loi NodeExistsException (vi du sau khi restart Docker):
-#   .\scripts\docker\cleanup-kafka-volumes.ps1       # Windows PowerShell
-#   ./scripts/docker/cleanup-kafka-volumes.sh -y    # Linux / macOS
-#
-# Hoac thu cach thu cong:
-#   1. docker stop crypto_trading_kafka crypto_trading_zookeeper
-#   2. docker volume ls | findstr crypto
-#   3. docker volume rm be-cryptocurrency-trading-app_zookeeper_data
-#                              be-cryptocurrency-trading-app_zookeeper_txn
-#                              be-cryptocurrency-trading-app_kafka_data
-#   4. docker compose -f docker-compose.infrastructure.yml --profile kafka up -d
-#   5. docker logs crypto_trading_kafka --tail 50
-# ─────────────────────────────────────────────────────────────────────────────
+# Profiles:
+#   - kafka: Zookeeper + Kafka
+#   - clickhouse: ClickHouse
+#   - timescale: TimescaleDB
+# ============================================================
 #
 services:
   postgres:
@@ -28,6 +20,8 @@ services:
     container_name: crypto_trading_postgres
     networks:
       - crypto-trading-network
+    env_file:
+      - .env.development
     environment:
       POSTGRES_USER: ${CORE_DB_USERNAME}
       POSTGRES_PASSWORD: ${CORE_DB_PASSWORD}
@@ -48,6 +42,8 @@ services:
     container_name: crypto_trading_redis
     networks:
       - crypto-trading-network
+    env_file:
+      - .env.development
     command: >
       sh -c 'if [ -z "$REDIS_PASSWORD" ]; then redis-server --appendonly yes; else redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"; fi'
     environment:
@@ -71,6 +67,8 @@ services:
       - crypto-trading-network
     profiles: ['kafka']
     restart: "no"
+    env_file:
+      - .env.development
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -90,6 +88,8 @@ services:
       - crypto-trading-network
     profiles: ['kafka']
     restart: "no"
+    env_file:
+      - .env.development
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -124,6 +124,8 @@ services:
     networks:
       - crypto-trading-network
     profiles: ['clickhouse']
+    env_file:
+      - .env.development
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-default}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
@@ -153,6 +155,8 @@ services:
     networks:
       - crypto-trading-network
     profiles: ['timescale']
+    env_file:
+      - .env.development
     environment:
       POSTGRES_USER: ${MARKET_TS_USERNAME}
       POSTGRES_PASSWORD: ${MARKET_TS_PASSWORD}

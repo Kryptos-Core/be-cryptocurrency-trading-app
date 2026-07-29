@@ -1,0 +1,116 @@
+# ============================================================
+# Development Docker Compose — local stack (Go services + infra)
+# ============================================================
+# Env file: .env.development (REQUIRED, no .env file fallback).
+# Infra: docker-compose.infrastructure.development.yml (included).
+#
+# Usage:
+#   docker compose --env-file .env.development -f docker-compose.development.yml up -d
+#
+# Profiles:
+#   - services (default-on): market-aggregator + matching-engine + public-ws-gateway
+#   - go-risky : matching-engine only
+#   - go-canary: public-ws-gateway only
+#
+# Pairing rule (mandatory):
+#   docker-compose.development.yml          <-> .env.development
+#   docker-compose.infrastructure.development.yml <-> .env.development
+#   docker-compose.staging.yml              <-> .env.staging
+#   docker-compose.prod.yml                 <-> .env.production
+#   docker-compose.monitoring.yml           <-> .env.production (default base)
+#   docker-compose.monitoring.staging.yml   <-> .env.staging
+# ============================================================
+
+include:
+  - ./docker-compose.infrastructure.development.yml
+
+services:
+  # Go Services
+  market-aggregator:
+    build:
+      context: ./go-services
+      dockerfile: market-aggregator/Dockerfile
+    container_name: crypto_trading_market_aggregator
+    profiles: ['services']
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${CORE_DB_USERNAME}
+      - POSTGRES_PASSWORD=${CORE_DB_PASSWORD}
+      - POSTGRES_DATABASE=${CORE_DB_NAME}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - KAFKA_BROKERS=kafka:9092
+      - HTTP_ADDR=:8080
+      - LOG_LEVEL=info
+    ports:
+      - "${MARKET_AGGREGATOR_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crypto-trading-network
+
+  matching-engine:
+    build:
+      context: ./go-services
+      dockerfile: matching-engine/Dockerfile
+    container_name: crypto_trading_matching_engine
+    profiles: ['services']
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${CORE_DB_USERNAME}
+      - POSTGRES_PASSWORD=${CORE_DB_PASSWORD}
+      - POSTGRES_DATABASE=${CORE_DB_NAME}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - KAFKA_BROKERS=kafka:9092
+      - HTTP_ADDR=:8080
+      - LOG_LEVEL=info
+    ports:
+      - "${MATCHING_ENGINE_PORT:-8091}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crypto-trading-network
+
+  public-ws-gateway:
+    build:
+      context: ./go-services
+      dockerfile: public-ws-gateway/Dockerfile
+    container_name: crypto_trading_public_ws_gateway
+    profiles: ['services']
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - KAFKA_BROKERS=kafka:9092
+      - HTTP_ADDR=:8080
+      - LOG_LEVEL=info
+    ports:
+      - "${PUBLIC_WS_GATEWAY_PORT:-8092}:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - crypto-trading-network

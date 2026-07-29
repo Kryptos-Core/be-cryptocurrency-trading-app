@@ -359,14 +359,14 @@ func (s *Server) consumeKafka(ctx context.Context, topic string) {
 				return
 			}
 			atomic.AddUint64(&s.errors, 1)
-			metrics.KafkaConsumerErrors.WithLabelValues(s.cfg.ServiceName, topic).Inc()
+			metrics.KafkaConsumerErrors.WithLabelValues(topic).Inc()
 			s.logger.Warn("kafka.consumer.error", "topic", topic, "error", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
 		count := atomic.AddUint64(&s.consumed, 1)
 		s.lastKafkaUnix.Store(time.Now().Unix())
-		metrics.KafkaMessagesConsumed.WithLabelValues(s.cfg.ServiceName, topic).Inc()
+		metrics.KafkaMessagesConsumed.WithLabelValues(topic).Inc()
 		if count <= 20 || count%1000 == 0 {
 			atomic.AddUint64(&s.logged, 1)
 			s.logger.Info("kafka.message.consumed",
