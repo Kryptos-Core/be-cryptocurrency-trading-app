@@ -31,7 +31,7 @@ services:
   # ─── Core Database ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: crypto_postgres
+    container_name: postgres
     restart: unless-stopped
     ports:
       - "${BIND_HOST:-127.0.0.1}:${CORE_DB_PORT:-5432}:5432"
@@ -70,7 +70,7 @@ services:
   # ─── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: crypto_redis
+    container_name: redis
     restart: unless-stopped
     ports:
       - "${BIND_HOST:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
@@ -97,7 +97,7 @@ services:
   # ─── Kafka (ZooKeeper Mode) ────────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
-    container_name: crypto_zookeeper
+    container_name: zookeeper
     restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -116,7 +116,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: crypto_kafka
+    container_name: kafka
     restart: unless-stopped
     depends_on:
       zookeeper:
@@ -150,7 +150,7 @@ services:
   # ─── ClickHouse ────────────────────────────────────────────────────────────────
   clickhouse:
     image: clickhouse/clickhouse-server:24.6-alpine
-    container_name: crypto_clickhouse
+    container_name: clickhouse
     restart: unless-stopped
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-default}
@@ -180,7 +180,7 @@ services:
   # ─── TimescaleDB ──────────────────────────────────────────────────────────────
   timescaledb:
     image: timescale/timescaledb:2.17.2-pg16
-    container_name: crypto_timescaledb
+    container_name: timescaledb
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${MARKET_TS_USERNAME}
@@ -211,8 +211,8 @@ services:
       target: production
       args:
         - NODE_ENV=production
-    container_name: crypto_backend
-    image: crypto-trading-backend:latest
+    container_name: backend
+    image: backend:latest
     restart: unless-stopped
     ports:
       - "${APP_HOST:-0.0.0.0}:${APP_PORT:-3000}:3000"
@@ -257,8 +257,8 @@ services:
     build:
       context: ./go-services
       dockerfile: market-aggregator/Dockerfile
-    container_name: crypto_market_aggregator
-    image: crypto-trading-market-aggregator:latest
+    container_name: market_aggregator
+    image: market-aggregator:latest
     restart: unless-stopped
     depends_on:
       kafka:
@@ -317,8 +317,8 @@ services:
     build:
       context: ./go-services
       dockerfile: matching-engine/Dockerfile
-    container_name: crypto_matching_engine
-    image: crypto-trading-matching-engine:latest
+    container_name: matching_engine
+    image: matching-engine:latest
     restart: unless-stopped
     profiles:
       - go-risky
@@ -381,8 +381,8 @@ services:
     build:
       context: ./go-services
       dockerfile: public-ws-gateway/Dockerfile
-    container_name: crypto_public_ws_gateway
-    image: crypto-trading-public-ws-gateway:latest
+    container_name: public_ws_gateway
+    image: public-ws-gateway:latest
     restart: unless-stopped
     profiles:
       - go-canary

@@ -30,7 +30,7 @@ services:
     build:
       context: ./go-services
       dockerfile: market-aggregator/Dockerfile
-    container_name: crypto_trading_market_aggregator
+    container_name: market_aggregator
     profiles: ['services']
     restart: unless-stopped
     env_file:
@@ -62,7 +62,7 @@ services:
     build:
       context: ./go-services
       dockerfile: matching-engine/Dockerfile
-    container_name: crypto_trading_matching_engine
+    container_name: matching_engine
     profiles: ['services']
     restart: unless-stopped
     env_file:
@@ -94,7 +94,7 @@ services:
     build:
       context: ./go-services
       dockerfile: public-ws-gateway/Dockerfile
-    container_name: crypto_trading_public_ws_gateway
+    container_name: public_ws_gateway
     profiles: ['services']
     restart: unless-stopped
     env_file:

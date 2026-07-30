@@ -17,7 +17,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: crypto_trading_postgres
+    container_name: postgres
     networks:
       - crypto-trading-network
     env_file:
@@ -39,7 +39,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: crypto_trading_redis
+    container_name: redis
     networks:
       - crypto-trading-network
     env_file:
@@ -62,7 +62,7 @@ services:
   # Zookeeper — required for Kafka < 3.6. For KRaft mode, see docs/kafka-kraft.md
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
-    container_name: crypto_trading_zookeeper
+    container_name: zookeeper
     networks:
       - crypto-trading-network
     profiles: ['kafka']
@@ -83,7 +83,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: crypto_trading_kafka
+    container_name: kafka
     networks:
       - crypto-trading-network
     profiles: ['kafka']
@@ -120,7 +120,7 @@ services:
   # Volume reuse (restart) khong chay lai init SQL; dung npm run db:migrate:ch de apply thu cong.
   clickhouse:
     image: clickhouse/clickhouse-server:24.6-alpine
-    container_name: crypto_trading_clickhouse
+    container_name: clickhouse
     networks:
       - crypto-trading-network
     profiles: ['clickhouse']
@@ -151,7 +151,7 @@ services:
   # TimescaleDB — PostgreSQL with TimescaleDB extension.
   timescaledb:
     image: timescale/timescaledb:2.17.2-pg16
-    container_name: crypto_trading_timescaledb
+    container_name: timescaledb
     networks:
       - crypto-trading-network
     profiles: ['timescale']
