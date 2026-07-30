@@ -85,15 +85,15 @@ go test ./go-services/market-aggregator/...
 go test ./go-services/matching-engine/...
 go test ./go-services/public-ws-gateway/...
 
-docker compose -f docker-compose.prod.yml --env-file .env.production config
+docker compose -f docker-compose.prod.yml --env-file .env.prod config
 
-docker compose -f docker-compose.prod.yml --env-file .env.production build market-aggregator
+docker compose -f docker-compose.prod.yml --env-file .env.prod build market-aggregator
 ```
 
 Run all Go image builds:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile go-risky --profile go-canary build \
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile go-risky --profile go-canary build \
   market-aggregator matching-engine public-ws-gateway
 ```
 
@@ -102,7 +102,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production --profile g
 ```bash
 cd /home/ubuntu/crypto-trading
 
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build market-aggregator
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build market-aggregator
 
 docker ps | grep crypto_market_aggregator
 
@@ -128,7 +128,7 @@ Do not deploy this service without the explicit profile and safety flags:
 ```bash
 MATCHING_ENGINE_SHADOW_MODE=true \
 MATCHING_ENGINE_MUTATIONS_ENABLED=false \
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile go-risky up -d --build matching-engine
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile go-risky up -d --build matching-engine
 ```
 
 Required pre-cutover criteria before any real mutation path is considered:
@@ -143,7 +143,7 @@ Required pre-cutover criteria before any real mutation path is considered:
 
 ```bash
 PUBLIC_WS_GATEWAY_CANARY_PERCENT=0 \
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile go-canary up -d --build public-ws-gateway
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile go-canary up -d --build public-ws-gateway
 ```
 
 Only raise `PUBLIC_WS_GATEWAY_CANARY_PERCENT` after internal checks pass. Keep NestJS `/trading` fallback for at least one release.
@@ -174,21 +174,21 @@ Optional-profile services may appear down when the profile is not running. Alert
 Market aggregator:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production stop market-aggregator
+docker compose -f docker-compose.prod.yml --env-file .env.prod stop market-aggregator
 ```
 
 Matching engine:
 
 ```bash
 MATCHING_ENGINE_MUTATIONS_ENABLED=false
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile go-risky stop matching-engine
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile go-risky stop matching-engine
 ```
 
 Public WS gateway:
 
 ```bash
 PUBLIC_WS_GATEWAY_CANARY_PERCENT=0
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile go-canary stop public-ws-gateway
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile go-canary stop public-ws-gateway
 ```
 
 ## Implementation notes

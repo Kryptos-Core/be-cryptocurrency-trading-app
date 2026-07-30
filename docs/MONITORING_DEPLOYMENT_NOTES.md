@@ -6,8 +6,8 @@ Tài liệu này ghi lại quá trình tăng cường monitoring/alerting cho cr
 
 ### 1) Docker networking / exposure posture
 
-- `BIND_HOST=127.0.0.1` trong `.env.production`
-- `KAFKA_EXTERNAL_BIND_HOST=0.0.0.0` trong `.env.production`
+- `BIND_HOST=127.0.0.1` trong `.env.prod`
+- `KAFKA_EXTERNAL_BIND_HOST=0.0.0.0` trong `.env.prod`
 - Kết quả runtime mong muốn:
   - PostgreSQL → `127.0.0.1:5432`
   - Redis → `127.0.0.1:6379`
@@ -73,8 +73,8 @@ Final recovery sequence đã được xác minh:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
 Sau migration, backend đã lên healthy thành công.
@@ -89,7 +89,7 @@ Stack được cover:
 - Gửi cảnh báo qua Telegram
 
 Các file chính đã thay đổi:
-- `docker-compose.monitoring.yml`
+- `docker-compose.monitoring.prod.yml`
 - `prometheus/alerts.yml`
 - `prometheus/prometheus.yml`
 - `alertmanager/alertmanager.yml`
@@ -187,7 +187,7 @@ Checklist tránh setup thiếu:
 ### 6) Đã fix Node Exporter healthcheck
 
 File:
-- `docker-compose.monitoring.yml`
+- `docker-compose.monitoring.prod.yml`
 
 Thay đổi đã áp dụng:
 - Đổi Node Exporter healthcheck endpoint từ `/health` sang `/metrics`
@@ -211,7 +211,7 @@ Kết quả quan sát được:
 
 ### Docker Compose config validation
 ```bash
-TELEGRAM_BOT_TOKEN=*** GF_SECURITY_ADMIN_PASSWORD=*** docker compose -f docker-compose.monitoring.yml config
+TELEGRAM_BOT_TOKEN=*** GF_SECURITY_ADMIN_PASSWORD=*** docker compose -f docker-compose.monitoring.prod.yml config
 ```
 
 Kết quả quan sát được:
@@ -224,7 +224,7 @@ Kết quả quan sát được:
 
 Lệnh đã dùng:
 ```bash
-docker compose --env-file .env.production -f docker-compose.monitoring.yml up -d
+docker compose --env-file .env.prod -f docker-compose.monitoring.prod.yml up -d
 ```
 
 ### 2) Tìm và fix Alertmanager crash-loop từ unsupported env expansion
@@ -292,7 +292,7 @@ Runtime behavior:
 - Gửi Telegram messages qua host `curl`
 
 Phát hiện quan trọng:
-- `.env.production` **không** chứa real Telegram token tại thời điểm verify; nó giữ `***`
+- `.env.prod` **không** chứa real Telegram token tại thời điểm verify; nó giữ `***`
 - Telegram end-to-end chỉ thành công sau khi restart host bridge với real token được cung cấp trong quá trình debug
 
 ### Historical debugging note: host-side Alertmanager experiment
@@ -340,7 +340,7 @@ Một resolved alert payload cũng đã được inject trong testing, nhưng ca
 
 ## Những gì vẫn chưa hoàn hảo / operational caveats
 
-1. Telegram delivery vẫn phụ thuộc vào việc `.env.production` chứa đúng `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`.
+1. Telegram delivery vẫn phụ thuộc vào việc `.env.prod` chứa đúng `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`.
 2. Khi thay đổi `BIND_HOST` hoặc các port mapping của container đã tồn tại, cần **recreate** service thì bind mới mới có hiệu lực; chỉ `restart` là chưa đủ.
 3. Các optional services (`matching-engine`, `public-ws-gateway`) không nên được scrape mặc định nếu chưa enable profile tương ứng.
 4. Warning phụ như thiếu Firebase credentials hoặc `TRON_GRID_API_KEY` không làm backend chết, nhưng vẫn nên được xử lý khi bật các tính năng liên quan.
@@ -348,15 +348,15 @@ Một resolved alert payload cũng đã được inject trong testing, nhưng ca
 ## Các bước tăng cường tiếp theo được khuyến nghị
 
 1. **Giữ monitoring theo Docker Compose-native path**
-   - Dùng `docker-compose.monitoring.yml` làm source of truth
+   - Dùng `docker-compose.monitoring.prod.yml` làm source of truth
    - Tránh quay lại workaround host-side nếu stack hiện tại vẫn healthy
 
 2. **Chuẩn hóa quy trình recreate khi harden port exposure**
-   - Sau khi đổi `BIND_HOST` hoặc port binding trong `.env.production`, chạy recreate cho các service bị ảnh hưởng
+   - Sau khi đổi `BIND_HOST` hoặc port binding trong `.env.prod`, chạy recreate cho các service bị ảnh hưởng
    - Ví dụ với TimescaleDB và ClickHouse:
    ```bash
    cd /home/ubuntu/be-cryptocurrency-trading-app
-   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate timescaledb clickhouse
    ```
 
 3. **Giữ docs deployment và monitoring đồng bộ với trạng thái final**
@@ -389,11 +389,11 @@ Các Compose-managed monitoring services hiện tại:
 
 ## Production environment requirements
 
-Required keys trong `/home/ubuntu/be-cryptocurrency-trading-app/.env.production`:
+Required keys trong `/home/ubuntu/be-cryptocurrency-trading-app/.env.prod`:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `GF_SECURITY_ADMIN_PASSWORD`
-- các database/app secrets production khác theo `.env.production.example`
+- các database/app secrets production khác theo `.env.prod.example`
 
 Notes:
 - Không commit real tokens/passwords vào Git.
@@ -402,24 +402,24 @@ Notes:
 ## Fast rebuild checklist (new server / disaster recovery)
 
 1. Clone repo tới thư mục đích, ví dụ `/home/ubuntu/be-cryptocurrency-trading-app`
-2. Chuẩn bị `.env.production` với real secrets
+2. Chuẩn bị `.env.prod` với real secrets
 3. Start production stack baseline:
    ```bash
    cd /home/ubuntu/be-cryptocurrency-trading-app
-   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
    ```
 4. Chạy migrations trước khi đánh giá backend health:
    ```bash
-   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
-   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate:prod
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
    ```
 5. Start monitoring stack:
    ```bash
-   sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build
+   sudo docker-compose -f docker-compose.monitoring.prod.yml --env-file .env.prod up -d --build
    ```
 6. Nếu vừa đổi `BIND_HOST`/port binding cho services dữ liệu, recreate các service đó để bind mới có hiệu lực:
    ```bash
-   sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+   sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate timescaledb clickhouse
    ```
 7. Verify health:
    ```bash

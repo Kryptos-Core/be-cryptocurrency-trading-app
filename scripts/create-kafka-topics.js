@@ -33,7 +33,7 @@ function runCommand(cmd, options = {}) {
 function topicExists(name) {
   try {
     const output = execSync(
-      `docker exec crypto_trading_kafka kafka-topics --bootstrap-server ${KAFKA_BROKER} --list`,
+      `docker exec kafka kafka-topics --bootstrap-server ${KAFKA_BROKER} --list`,
       { encoding: 'utf8' },
     );
     return output.includes(name);
@@ -55,7 +55,7 @@ async function main() {
 
     console.log(`[CREATE] Creating topic: ${topic.name}`);
     const cmd = [
-      'docker exec crypto_trading_kafka kafka-topics',
+      'docker exec kafka kafka-topics',
       `--bootstrap-server ${KAFKA_BROKER}`,
       '--create',
       `--topic ${topic.name}`,
@@ -72,7 +72,7 @@ async function main() {
   console.log('');
   console.log('Done. Listing all topics:');
   runCommand(
-    `docker exec crypto_trading_kafka kafka-topics --bootstrap-server ${KAFKA_BROKER} --list`,
+    `docker exec kafka kafka-topics --bootstrap-server ${KAFKA_BROKER} --list`,
   );
 }
 

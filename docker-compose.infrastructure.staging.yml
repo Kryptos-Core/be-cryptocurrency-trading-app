@@ -1,13 +1,13 @@
 # ============================================================
-# Development infrastructure (Postgres, Redis, Kafka, ClickHouse, TimescaleDB).
-# Pair: .env.development (mandatory — no .env fallback).
-# Included by docker-compose.development.yml.
+# Staging infrastructure (Postgres, Redis, Kafka, ClickHouse, TimescaleDB).
+# Pair: .env.staging (mandatory — no .env fallback).
+# Companion to docker-compose.staging.yml (all-in-one deployment).
 #
 # Usage (standalone infra):
-#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml up -d
-#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml --profile kafka up -d
-#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml --profile clickhouse up -d
-#   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml --profile timescale up -d
+#   docker compose --env-file .env.staging -f docker-compose.infrastructure.staging.yml up -d
+#   docker compose --env-file .env.staging -f docker-compose.infrastructure.staging.yml --profile kafka up -d
+#   docker compose --env-file .env.staging -f docker-compose.infrastructure.staging.yml --profile clickhouse up -d
+#   docker compose --env-file .env.staging -f docker-compose.infrastructure.staging.yml --profile timescale up -d
 #
 # Profiles:
 #   - kafka: Zookeeper + Kafka
@@ -15,32 +15,57 @@
 #   - timescale: TimescaleDB
 # ============================================================
 
-name: crypto-trading-dev
+name: crypto-trading-staging
 
 x-logging: &default-logging
   driver: "json-file"
   options:
-    max-size: "20m"
-    max-file: "3"
+    max-size: "50m"
+    max-file: "5"
 
 services:
+  # ─── Core Database ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: crypto-trading-dev-postgres
+    container_name: crypto-trading-staging-postgres
     restart: unless-stopped
     networks:
       - crypto-trading-network
     environment:
+      POSTGRES_DB: ${CORE_DB_NAME:?CORE_DB_NAME is required}
       POSTGRES_USER: ${CORE_DB_USERNAME:?CORE_DB_USERNAME is required}
       POSTGRES_PASSWORD: ${CORE_DB_PASSWORD:?CORE_DB_PASSWORD is required}
-      POSTGRES_DB: ${CORE_DB_NAME:?CORE_DB_NAME is required}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
       TZ: 'UTC'
     ports:
       - "${BIND_HOST:-127.0.0.1}:${CORE_DB_PORT:-5432}:5432"
     volumes:
-      - crypto-trading-dev-postgres-data:/var/lib/postgresql/data
+      - crypto-trading-staging-postgres-data:/var/lib/postgresql/data
+      - ./backups/db:/backups:rw
       - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    shm_size: 256mb
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - min_wal_size=80MB
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CORE_DB_USERNAME} -d ${CORE_DB_NAME}"]
       interval: 10s
@@ -49,32 +74,47 @@ services:
       start_period: 30s
     logging: *default-logging
 
+  # ─── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: crypto-trading-dev-redis
+    container_name: crypto-trading-staging-redis
     restart: unless-stopped
     networks:
       - crypto-trading-network
-    command: >
-      sh -c 'if [ -z "$REDIS_PASSWORD" ]; then redis-server --appendonly yes; else redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"; fi'
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - "900 1"
+      - --save
+      - "300 10"
+      - --save
+      - "60 10000"
     ports:
       - "${BIND_HOST:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     volumes:
-      - crypto-trading-dev-redis-data:/data
+      - crypto-trading-staging-redis-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a $REDIS_PASSWORD} ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 10s
     logging: *default-logging
 
-  # Zookeeper — required for Kafka < 3.6. For KRaft mode, see docs/kafka-kraft.md
+  # ─── Kafka (ZooKeeper Mode) ────────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
-    container_name: crypto-trading-dev-zookeeper
+    container_name: crypto-trading-staging-zookeeper
     restart: unless-stopped
     networks:
       - crypto-trading-network
@@ -83,8 +123,8 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     volumes:
-      - crypto-trading-dev-zookeeper-data:/var/lib/zookeeper/data
-      - crypto-trading-dev-zookeeper-txn:/var/lib/zookeeper/log
+      - crypto-trading-staging-zookeeper-data:/var/lib/zookeeper/data
+      - crypto-trading-staging-zookeeper-txn:/var/lib/zookeeper/log
     healthcheck:
       test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
       interval: 10s
@@ -95,7 +135,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: crypto-trading-dev-kafka
+    container_name: crypto-trading-staging-kafka
     restart: unless-stopped
     networks:
       - crypto-trading-network
@@ -107,7 +147,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://${APP_HOSTNAME:-localhost}:${KAFKA_EXTERNAL_PORT:-29092}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://${APP_HOSTNAME:?APP_HOSTNAME is required}:${KAFKA_EXTERNAL_PORT:-29092}
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:${KAFKA_EXTERNAL_PORT:-29092}
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -116,9 +156,9 @@ services:
       KAFKA_DATA_DIRS: /var/lib/kafka/data
       TZ: 'UTC'
     volumes:
-      - crypto-trading-dev-kafka-data:/var/lib/kafka/data
+      - crypto-trading-staging-kafka-data:/var/lib/kafka/data
     ports:
-      - "${BIND_HOST:-127.0.0.1}:${KAFKA_EXTERNAL_PORT:-29092}:29092"
+      - "${KAFKA_EXTERNAL_BIND_HOST:-0.0.0.0}:${KAFKA_EXTERNAL_PORT:-29092}:29092"
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 15s
@@ -127,11 +167,10 @@ services:
       start_period: 60s
     logging: *default-logging
 
-  # ClickHouse — schema SQL trong docker-entrypoint-initdb.d chay tu dong lan dau.
-  # Volume reuse (restart) khong chay lai init SQL; dung npm run db:migrate:ch de apply thu cong.
+  # ─── ClickHouse ────────────────────────────────────────────────────────────────
   clickhouse:
     image: clickhouse/clickhouse-server:24.6-alpine
-    container_name: crypto-trading-dev-clickhouse
+    container_name: crypto-trading-staging-clickhouse
     restart: unless-stopped
     networks:
       - crypto-trading-network
@@ -146,7 +185,7 @@ services:
       - "${BIND_HOST:-127.0.0.1}:${CLICKHOUSE_PORT:-8123}:8123"
       - "${BIND_HOST:-127.0.0.1}:${CLICKHOUSE_TCP_PORT:-9000}:9000"
     volumes:
-      - crypto-trading-dev-clickhouse-data:/var/lib/clickhouse
+      - crypto-trading-staging-clickhouse-data:/var/lib/clickhouse
       - ./scripts/docker/clickhouse-init.sql:/docker-entrypoint-initdb.d/clickhouse-init.sql:ro
     ulimits:
       nofile:
@@ -157,13 +196,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     logging: *default-logging
 
-  # TimescaleDB — PostgreSQL with TimescaleDB extension.
+  # ─── TimescaleDB ──────────────────────────────────────────────────────────────
   timescaledb:
     image: timescale/timescaledb:2.17.2-pg16
-    container_name: crypto-trading-dev-timescaledb
+    container_name: crypto-trading-staging-timescaledb
     restart: unless-stopped
     networks:
       - crypto-trading-network
@@ -179,7 +218,7 @@ services:
     ports:
       - "${BIND_HOST:-127.0.0.1}:${MARKET_TS_PORT:-5433}:5432"
     volumes:
-      - crypto-trading-dev-timescaledb-data:/var/lib/postgresql/data
+      - crypto-trading-staging-timescaledb-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${MARKET_TS_USERNAME} -d ${MARKET_TS_DB}"]
       interval: 10s
@@ -190,13 +229,13 @@ services:
 
 networks:
   crypto-trading-network:
-    name: crypto-trading-dev-network
+    name: crypto-trading-staging-network
 
 volumes:
-  crypto-trading-dev-postgres-data:
-  crypto-trading-dev-timescaledb-data:
-  crypto-trading-dev-redis-data:
-  crypto-trading-dev-clickhouse-data:
-  crypto-trading-dev-zookeeper-data:
-  crypto-trading-dev-zookeeper-txn:
-  crypto-trading-dev-kafka-data:
+  crypto-trading-staging-postgres-data:
+  crypto-trading-staging-timescaledb-data:
+  crypto-trading-staging-redis-data:
+  crypto-trading-staging-clickhouse-data:
+  crypto-trading-staging-zookeeper-data:
+  crypto-trading-staging-zookeeper-txn:
+  crypto-trading-staging-kafka-data:

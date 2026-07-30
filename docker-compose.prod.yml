@@ -2,14 +2,14 @@
 # Production Docker Compose - All-in-One Deployment
 # ============================================================
 # Usage:
-#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 #
 # With migrations:
-#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
-#   docker compose -f docker-compose.prod.yml --env-file .env.production exec app npm run db:migrate:prod
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d app
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod exec app npm run db:migrate:prod
 #
 # Stop:
-#   docker compose -f docker-compose.prod.yml --env-file .env.production down
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod down
 # ============================================================
 
 name: crypto-trading-prod
@@ -207,7 +207,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.production
+      dockerfile: Dockerfile.prod
       target: production
       args:
         - NODE_ENV=production
@@ -222,7 +222,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env.production
+      - .env.prod
     environment:
       NODE_ENV: production
       CORE_DB_HOST: postgres
@@ -270,7 +270,7 @@ services:
       timescaledb:
         condition: service_healthy
     env_file:
-      - .env.production
+      - .env.prod
     environment:
       SERVICE_NAME: market-aggregator
       SERVICE_ENV: production
@@ -330,7 +330,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - .env.production
+      - .env.prod
     environment:
       SERVICE_NAME: matching-engine
       SERVICE_ENV: production
@@ -392,7 +392,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env.production
+      - .env.prod
     environment:
       SERVICE_NAME: public-ws-gateway
       SERVICE_ENV: production

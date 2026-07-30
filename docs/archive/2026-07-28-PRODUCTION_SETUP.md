@@ -60,13 +60,13 @@ VPS được thuê qua **chiasegpu.vn** — đây là KVM VM với NAT networkin
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
 ### Kiểm tra trạng thái
 
 ```bash
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production ps
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod ps
 ```
 
 ### Services và ports (bind theo trạng thái final đã harden)
@@ -112,8 +112,8 @@ Sequence đã được xác minh:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
 Các lỗi từng gặp khi thiếu schema:
@@ -122,13 +122,13 @@ Các lỗi từng gặp khi thiếu schema:
 
 ### Recreate requirement khi đổi BIND_HOST / published ports
 
-Nếu đổi `BIND_HOST` hoặc port mapping trong `.env.production`, `docker restart` là chưa đủ với container cũ. Cần recreate service để host bind mới có hiệu lực.
+Nếu đổi `BIND_HOST` hoặc port mapping trong `.env.prod`, `docker restart` là chưa đủ với container cũ. Cần recreate service để host bind mới có hiệu lực.
 
 Ví dụ:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate timescaledb clickhouse
 ```
 
 ### Verification commands

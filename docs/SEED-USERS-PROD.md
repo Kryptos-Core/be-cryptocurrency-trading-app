@@ -60,9 +60,9 @@ npm install
 ### 0.3. Copy file môi trường
 
 ```bash
-cp .env.production.example .env.production
+cp .env.prod.example .env.prod
 # Hoặc copy từ VPS nếu có sẵn:
-# scp <VPS_USER>@<VPS_HOST>:/opt/crypto-trading/.env.production .env.production
+# scp <VPS_USER>@<VPS_HOST>:/opt/crypto-trading/.env.prod .env.prod
 ```
 
 ### 0.4. Build production
@@ -172,11 +172,11 @@ Output sẽ là 64 ký tự hex, ví dụ:
 3a7f8b2c1e4d9f0a3b5c7e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2
 ```
 
-### 2.2. Thêm key vào `.env.production`
+### 2.2. Thêm key vào `.env.prod`
 
 ```bash
-# Thêm dòng này vào .env.production (hoặc .env.development)
-echo "SEED_DATA_ENCRYPTION_KEY=<key-cua-ban>" >> .env.production
+# Thêm dòng này vào .env.prod (hoặc .env.development)
+echo "SEED_DATA_ENCRYPTION_KEY=<key-cua-ban>" >> .env.prod
 ```
 
 ### 2.3. Mã hoá file seed
@@ -231,35 +231,35 @@ scp src/seed/data/users.json.enc <VPS_USER>@<VPS_HOST>:/tmp/users.json.enc
 
 **Cách 1 — Nhập trực tiếp trên VPS (khuyến nghị cho production)**
 
-SSH vào VPS, thêm vào `.env.production`:
+SSH vào VPS, thêm vào `.env.prod`:
 
 ```bash
 ssh <VPS_USER>@<VPS_HOST>
 # Trên VPS:
-nano /opt/crypto-trading/.env.production
+nano /opt/crypto-trading/.env.prod
 # Thêm dòng:
 # SEED_DATA_ENCRYPTION_KEY=<key-cua-ban>
 ```
 
-**Cách 2 — Copy file `.env.production` đã có key**
+**Cách 2 — Copy file `.env.prod` đã có key**
 
 ```bash
-# Trên local, thêm key vào .env.production
-echo "SEED_DATA_ENCRYPTION_KEY=<key-cua-ban>" >> .env.production
+# Trên local, thêm key vào .env.prod
+echo "SEED_DATA_ENCRYPTION_KEY=<key-cua-ban>" >> .env.prod
 
 # Copy lên VPS (file này nên được truyền qua kênh an toàn)
-scp .env.production <VPS_USER>@<VPS_HOST>:/tmp/.env.production.seeded
-ssh <VPS_USER>@<VPS_HOST> "mv /tmp/.env.production.seeded /opt/crypto-trading/.env.production"
+scp .env.prod <VPS_USER>@<VPS_HOST>:/tmp/.env.prod.seeded
+ssh <VPS_USER>@<VPS_HOST> "mv /tmp/.env.prod.seeded /opt/crypto-trading/.env.prod"
 ```
 
 **Cách 3 — Dùng `sops` (nếu đã cấu hình)**
 
 ```bash
-# Encrypt .env.production với sops trước khi gửi
-sops -e .env.production > .env.production.enc
-scp .env.production.enc <VPS_USER>@<VPS_HOST>:/tmp/
+# Encrypt .env.prod với sops trước khi gửi
+sops -e .env.prod > .env.prod.enc
+scp .env.prod.enc <VPS_USER>@<VPS_HOST>:/tmp/
 # Trên VPS:
-sops -d /tmp/.env.production.enc > /opt/crypto-trading/.env.production
+sops -d /tmp/.env.prod.enc > /opt/crypto-trading/.env.prod
 ```
 
 ### 3.3. Di chuyển file seed vào đúng vị trí
@@ -284,7 +284,7 @@ cd /opt/crypto-trading
 docker exec -it crypto-trading-app-1 node -r tsconfig-paths/register dist/seed/run-seed.js
 ```
 
-> **Lưu ý:** Container phải được build với seed scripts trong `dist/`. Đảm bảo `Dockerfile.production` đã copy `src/seed/` vào image.
+> **Lưu ý:** Container phải được build với seed scripts trong `dist/`. Đảm bảo `Dockerfile.prod` đã copy `src/seed/` vào image.
 
 ### 4.2. Cách B — Chạy từ source trên VPS
 
@@ -437,7 +437,7 @@ sudo rm /opt/crypto-trading/src/seed/data/users.json
 ```bash
 # Xoá các file tạm nếu có
 rm -f /tmp/users.json.enc
-rm -f /tmp/.env.production.seeded
+rm -f /tmp/.env.prod.seeded
 ```
 
 ### 6.3. Xoá users.json.example khỏi git (nếu muốn)
@@ -531,7 +531,7 @@ docker exec -it crypto-trading-db-1 psql -U crypto_user -d crypto_trading_platfo
 
 ```bash
 # Build lại image với seed scripts
-docker build -f Dockerfile.production -t crypto-trading-app:latest .
+docker build -f Dockerfile.prod -t crypto-trading-app:latest .
 docker compose -f docker-compose.prod.yml up -d --build app
 ```
 
@@ -579,10 +579,10 @@ SEED_DATA_ENCRYPTION_KEY=<key> npm run seed:decrypt
 ## Security Checklist
 
 - [ ] `users.json.enc` đã được copy lên VPS
-- [ ] `SEED_DATA_ENCRYPTION_KEY` đã được set trong `.env.production` trên VPS (không phải trong code)
+- [ ] `SEED_DATA_ENCRYPTION_KEY` đã được set trong `.env.prod` trên VPS (không phải trong code)
 - [ ] `users.json` plaintext đã bị ghi đè bằng `[]` hoặc xoá
 - [ ] Không có `users.json` plaintext trong git history
 - [ ] Password trong file seed là mạnh (ít nhất 12 ký tự, có uppercase + lowercase + number + special)
 - [ ] Không có user nào có role `ADMIN` với password yếu
 - [ ] Sau khi seed thành công, đổi password của tất cả users (đặc biệt là ADMIN) ngay lập tức qua API hoặc trực tiếp trong DB
-- [ ] `users.json.enc` được backup cùng với `.env.production` trong secret management system
+- [ ] `users.json.enc` được backup cùng với `.env.prod` trong secret management system

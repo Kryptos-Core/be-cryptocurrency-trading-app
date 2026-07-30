@@ -8,7 +8,7 @@ Checklist cực ngắn để bring up production stack trên server mới theo t
 cd /home/ubuntu/be-cryptocurrency-trading-app
 ```
 
-## 2) Chuẩn bị `.env.production`
+## 2) Chuẩn bị `.env.prod`
 
 Đảm bảo ít nhất các biến sau có giá trị thật:
 - `BIND_HOST=127.0.0.1`
@@ -22,21 +22,21 @@ cd /home/ubuntu/be-cryptocurrency-trading-app
 ## 3) Bring up baseline production stack
 
 ```bash
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production ps
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod ps
 ```
 
 ## 4) Chạy migrations trước khi kết luận backend lỗi
 
 ```bash
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
 ## 5) Bring up monitoring stack
 
 ```bash
-sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build
+sudo docker-compose -f docker-compose.monitoring.prod.yml --env-file .env.prod up -d --build
 ```
 
 ## 6) Nếu vừa đổi bind host / published ports, recreate service bị ảnh hưởng
@@ -44,7 +44,7 @@ sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production 
 Ví dụ với TimescaleDB + ClickHouse:
 
 ```bash
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate timescaledb clickhouse
 ```
 
 ## 7) Verify health

@@ -207,7 +207,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.production
+      dockerfile: Dockerfile.prod
       target: production
       args:
         - NODE_ENV=production

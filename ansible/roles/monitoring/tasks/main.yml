@@ -70,8 +70,8 @@
 
 - name: Copy monitoring docker-compose
   ansible.builtin.copy:
-    src: ../../docker-compose.monitoring.yml
-    dest: "{{ app_deploy_path }}/docker-compose.monitoring.yml"
+    src: ../../docker-compose.monitoring.prod.yml
+    dest: "{{ app_deploy_path }}/docker-compose.monitoring.prod.yml"
     owner: "{{ ansible_user }}"
     mode: '0644'
   notify: Start Monitoring Stack
@@ -81,7 +81,7 @@
     project_src: "{{ app_deploy_path }}"
     project_name: monitoring
     files:
-      - docker-compose.monitoring.yml
+      - docker-compose.monitoring.prod.yml
     state: present
     pull: yes
   register: monitoring_status
@@ -110,6 +110,6 @@ handlers:
       project_src: "{{ app_deploy_path }}"
       project_name: monitoring
       files:
-        - docker-compose.monitoring.yml
+        - docker-compose.monitoring.prod.yml
       state: present
       pull: yes

@@ -114,7 +114,7 @@ pipeline {
                             --build-arg NPM_CONFIG_PRODUCTION=true \
                             -t ${REGISTRY}/${DOCKER_IMAGE}:${imageTag} \
                             -t ${REGISTRY}/${DOCKER_IMAGE}:${env.BRANCH_NAME}-latest \
-                            -f Dockerfile.production \
+                            -f Dockerfile.prod \
                             .
                     """
                 }
@@ -161,8 +161,8 @@ pipeline {
                         sh """
                             ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} '''
                                 cd ${DEPLOY_PATH}
-                                docker compose pull app
-                                docker compose run --rm app npm run db:migrate || echo "Migration completed or skipped"
+                                docker compose -f docker-compose.prod.yml --env-file .env.prod pull app
+                                docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate || echo "Migration completed or skipped"
                             '''
                         '''
                     }
@@ -186,7 +186,7 @@ pipeline {
                                 cd ${DEPLOY_PATH}
 
                                 # Pull latest images
-                                docker compose pull
+                                docker compose -f docker-compose.prod.yml --env-file .env.prod pull
 
                                 # Tag the new image as latest
                                 docker tag ${REGISTRY}/${DOCKER_IMAGE}:${env.IMAGE_TAG} crypto-trading-backend:latest
@@ -195,15 +195,15 @@ pipeline {
                                 docker tag crypto-trading-backend:latest crypto-trading-backend:previous || true
 
                                 # Stop current containers
-                                docker compose stop app
+                                docker compose -f docker-compose.prod.yml --env-file .env.prod stop app
 
                                 # Start app with new image
-                                docker compose up -d app
+                                docker compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 
                                 # Health check
                                 ./scripts/health-check.sh || {
                                     echo "Health check failed! Rolling back..."
-                                    docker compose up -d app
+                                    docker compose -f docker-compose.prod.yml --env-file .env.prod up -d app
                                     ./scripts/health-check.sh
                                     exit 1
                                 }
@@ -212,7 +212,7 @@ pipeline {
                                 docker image prune -f
 
                                 echo "Deployment completed successfully"
-                                docker compose ps
+                                docker compose -f docker-compose.prod.yml --env-file .env.prod ps
                             '''
                         """
                     }
@@ -234,8 +234,8 @@ pipeline {
                         sh """
                             ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} '''
                                 cd ${DEPLOY_PATH}
-                                docker compose -f docker-compose.monitoring.yml pull
-                                docker compose -f docker-compose.monitoring.yml up -d
+                                docker compose -f docker-compose.monitoring.prod.yml --env-file .env.prod pull
+                                docker compose -f docker-compose.monitoring.prod.yml --env-file .env.prod up -d
                                 echo "Monitoring stack deployed"
                             '''
                         """

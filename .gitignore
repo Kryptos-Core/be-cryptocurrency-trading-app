@@ -6,7 +6,7 @@ dist/
 # Environment (do not commit secrets)
 .env.development
 .env.staging
-.env.production
+.env.prod
 .env.*
 
 # Local seed users (copy from src/seed/data/users.json.example)

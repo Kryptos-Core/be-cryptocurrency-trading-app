@@ -195,7 +195,7 @@ MATCHING_ENGINE_SHADOW_MODE=true
 Then stop container if needed:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production --profile go-risky stop matching-engine
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile go-risky stop matching-engine
 ```
 
 ## Implementation sequence for this repository

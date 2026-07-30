@@ -7,8 +7,8 @@
 # Pairing rules (mandatory):
 #   development  -> docker-compose.development.yml        + .env.development
 #   staging      -> docker-compose.staging.yml            + .env.staging
-#   production   -> docker-compose.prod.yml               + .env.production
-#   monitoring   -> docker-compose.monitoring.yml         + .env.production (base)
+#   production   -> docker-compose.prod.yml               + .env.prod
+#   monitoring   -> docker-compose.monitoring.prod.yml     + .env.prod (base)
 #   monitoring-staging -> docker-compose.monitoring.staging.yml + .env.staging
 #
 # Refuses to run if no env is specified, or the resolved files don't exist.
@@ -37,11 +37,11 @@ switch ($Environment) {
     }
     { $_ -in @("production", "prod") } {
         $composeFile = Join-Path $repoRoot "docker-compose.prod.yml"
-        $envFile     = Join-Path $repoRoot ".env.production"
+        $envFile     = Join-Path $repoRoot ".env.prod"
     }
     { $_ -in @("monitoring", "mon") } {
-        $composeFile = Join-Path $repoRoot "docker-compose.monitoring.yml"
-        $envFile     = Join-Path $repoRoot ".env.production"
+        $composeFile = Join-Path $repoRoot "docker-compose.monitoring.prod.yml"
+        $envFile     = Join-Path $repoRoot ".env.prod"
     }
     { $_ -in @("monitoring-staging", "mon-stg") } {
         $composeFile = Join-Path $repoRoot "docker-compose.monitoring.staging.yml"

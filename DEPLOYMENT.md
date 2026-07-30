@@ -102,14 +102,14 @@ git clone <your-repo-url> /home/ubuntu/be-cryptocurrency-trading-app
 cd /home/ubuntu/be-cryptocurrency-trading-app
 ```
 
-### 2. Tạo .env.production
+### 2. Tạo .env.prod
 
 ```bash
 # Copy example file
-cp .env.production.example .env.production
+cp .env.prod.example .env.prod
 
 # Edit with real values
-nano .env.production
+nano .env.prod
 ```
 
 Thay tất cả `CHANGE_ME_*` với giá trị thực.
@@ -149,16 +149,16 @@ Kết quả mong muốn trên host:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production ps
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod ps
 ```
 
 ### 6. Chạy migrations trước khi đánh giá backend health
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
 > Script migrate trong container production là `db:migrate:prod` (đọc `dist/seed/run-migrations.js`). Lệnh `migration:run` đã được thay bằng `db:migrate` / `db:migrate:revert`. Cùng nguyên tắc cho `dev` ở local: `npm run db:migrate` (script: `ts-node -r tsconfig-paths/register src/seed/run-migrations.ts`).
@@ -169,18 +169,18 @@ Nếu bỏ qua bước này, backend có thể fail do thiếu schema và trông
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build
+sudo docker-compose -f docker-compose.monitoring.prod.yml --env-file .env.prod up -d --build
 ```
 
 ### 8. Recreate requirement sau khi harden port binding
 
-Nếu bạn vừa đổi `BIND_HOST` hoặc published ports trong `.env.production`, chỉ `restart` là chưa đủ với container đã tồn tại. Cần recreate service bị ảnh hưởng để Docker áp dụng host bind mới.
+Nếu bạn vừa đổi `BIND_HOST` hoặc published ports trong `.env.prod`, chỉ `restart` là chưa đủ với container đã tồn tại. Cần recreate service bị ảnh hưởng để Docker áp dụng host bind mới.
 
 Ví dụ đã dùng cho TimescaleDB và ClickHouse:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate timescaledb clickhouse
 ```
 
 ### 9. Kiểm Tra Health
@@ -300,7 +300,7 @@ Trong GitHub repository > Settings > Webhooks:
 
 ### Baseline production posture on this VPS
 
-- `docker-compose.prod.yml` is run from the repository root with `--env-file .env.production`.
+- `docker-compose.prod.yml` is run from the repository root with `--env-file .env.prod`.
 - Internal data services are loopback-only by default via `BIND_HOST=127.0.0.1`:
   - PostgreSQL → `127.0.0.1:5432`
   - Redis → `127.0.0.1:6379`
@@ -320,18 +320,18 @@ Trong GitHub repository > Settings > Webhooks:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose --env-file .env.production -f docker-compose.monitoring.yml up -d --build
+sudo docker-compose --env-file .env.prod -f docker-compose.monitoring.prod.yml up -d --build
 ```
 
 ### Recreate requirement when hardening bind hosts / published ports
 
-If you change `BIND_HOST` or published port mappings in `.env.production`, `docker restart` is **not** enough for existing containers. You must recreate the affected services so Docker applies the new host bind addresses.
+If you change `BIND_HOST` or published port mappings in `.env.prod`, `docker restart` is **not** enough for existing containers. You must recreate the affected services so Docker applies the new host bind addresses.
 
 Example used for data services after moving DB ports back to loopback:
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate timescaledb clickhouse
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate timescaledb clickhouse
 ```
 
 
@@ -366,8 +366,8 @@ After bringing up the production stack, run database migrations before judging b
 
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm app npm run db:migrate:prod
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate:prod
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
 Without this step, the backend can fail with missing-table errors such as:
@@ -402,7 +402,7 @@ Khi thêm hoặc sửa alert rule:
 Sau khi đổi Alertmanager/Prometheus config:
 ```bash
 cd /home/ubuntu/be-cryptocurrency-trading-app
-sudo docker-compose -f docker-compose.monitoring.yml --env-file .env.production up -d --build --force-recreate alertmanager prometheus telegram_bridge
+sudo docker-compose -f docker-compose.monitoring.prod.yml --env-file .env.prod up -d --build --force-recreate alertmanager prometheus telegram_bridge
 ```
 
 Validate nhanh trước/sau deploy:
@@ -437,23 +437,23 @@ Dashboard mặc định đã được provision tại `grafana/dashboards/defaul
 
 ```bash
 # Manual backup
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production exec postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +%Y%m%d).dump
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod exec postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +%Y%m%d).dump
 
 # Auto backup (crontab)
-0 2 * * * cd /home/ubuntu/be-cryptocurrency-trading-app && sudo docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +\%Y\%m\%d).dump
+0 2 * * * cd /home/ubuntu/be-cryptocurrency-trading-app && sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres pg_dump -U crypto_user -d crypto_trading_platform -Fc -f /backups/backup_$(date +\%Y\%m\%d).dump
 ```
 
 ### Phục Hồi Database
 
 ```bash
 # Stop app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production stop app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod stop app
 
 # Restore
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_restore -U crypto_user -d crypto_trading_platform -c /backups/backup_YYYYMMDD.dump
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres pg_restore -U crypto_user -d crypto_trading_platform -c /backups/backup_YYYYMMDD.dump
 
 # Start app
-sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
 ### Rollback Deployment
@@ -472,7 +472,7 @@ sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d 
 
 ### 1. Secrets Management
 
-- Tất cả secrets chỉ trong `.env.production` trên server
+- Tất cả secrets chỉ trong `.env.prod` trên server
 - Không bao giờ commit secrets vào git
 - Sử dụng Ansible Vault cho encrypted inventory:
 

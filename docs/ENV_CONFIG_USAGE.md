@@ -5,7 +5,7 @@
 ## Tổng quan
 
 Backend sử dụng:
-- `src/config/env.validation.ts` — `validateEnvironment`: chỉ các key khai báo trong class **`EnvironmentVariables`** và trong mảng **`envVarKeys`** mới đi vào object đã validate và được **`ConfigService.get()`** đọc từ file env (`.env.development` / `.env.staging` / `.env.production` theo `NODE_ENV`). Thêm biến mới mà quên hai chỗ này → biến **không có hiệu lực** (đã gặp với `WALLETCONNECT_*` trước khi bổ sung whitelist).
+- `src/config/env.validation.ts` — `validateEnvironment`: chỉ các key khai báo trong class **`EnvironmentVariables`** và trong mảng **`envVarKeys`** mới đi vào object đã validate và được **`ConfigService.get()`** đọc từ file env (`.env.development` / `.env.staging` / `.env.prod` theo `NODE_ENV`). Thêm biến mới mà quên hai chỗ này → biến **không có hiệu lực** (đã gặp với `WALLETCONNECT_*` trước khi bổ sung whitelist).
 - `src/config/app.config.ts` — ánh xạ sang namespace `app` (đọc `process.env` sau bước validate).
 
 Ứng dụng sẽ thất bại khi khởi động nếu có lỗi xác thực (validation).
@@ -14,7 +14,7 @@ Backend sử dụng:
 
 ```bash
 cp .env.development.example .env.development
-# staging / production: dùng .env.staging.example / .env.production.example
+# staging / production: dùng .env.staging.example / .env.prod.example
 ```
 
 Sau đó điền thông tin và chạy ứng dụng (đảm bảo `NODE_ENV` khớp file, hoặc dùng script npm đã set sẵn).

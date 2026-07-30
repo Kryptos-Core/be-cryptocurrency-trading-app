@@ -11,7 +11,7 @@
 
 - name: Create environment file
   ansible.builtin.copy:
-    dest: "{{ app_deploy_path }}/.env.production"
+    dest: "{{ app_deploy_path }}/.env.prod"
     content: |
       NODE_ENV=production
       PORT=3000
@@ -74,10 +74,10 @@
     mode: '0600'
   no_log: true
 
-- name: Copy docker-compose.yml to server
+- name: Copy docker-compose.prod.yml to server
   ansible.builtin.copy:
-    src: ../docker-compose.yml
-    dest: "{{ app_deploy_path }}/docker-compose.yml"
+    src: ../docker-compose.prod.yml
+    dest: "{{ app_deploy_path }}/docker-compose.prod.yml"
     owner: "{{ ansible_user }}"
     mode: '0644'
   notify: Reload Docker Compose
@@ -98,7 +98,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ app_deploy_path }}"
     files:
-      - docker-compose.yml
+      - docker-compose.prod.yml
     pull: yes
   register: docker_pull_result
 
@@ -106,7 +106,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ app_deploy_path }}"
     files:
-      - docker-compose.yml
+      - docker-compose.prod.yml
     state: absent
   changed_when: false
 
@@ -114,7 +114,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ app_deploy_path }}"
     files:
-      - docker-compose.yml
+      - docker-compose.prod.yml
     state: present
     pull: yes
   register: docker_compose_result
@@ -125,7 +125,7 @@
 - name: Run database migrations
   ansible.builtin.shell: |
     cd {{ app_deploy_path }}
-    docker compose -f docker-compose.yml run --rm app npm run db:migrate || echo "Migration completed or no migrations needed"
+    docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm app npm run db:migrate || echo "Migration completed or no migrations needed"
   register: migration_result
   changed_when: false
   when: app_env == 'production'
@@ -143,8 +143,8 @@ handlers:
   - name: Reload Docker Compose
     ansible.builtin.shell: |
       cd {{ app_deploy_path }}
-      docker compose -f docker-compose.yml down
-      docker compose -f docker-compose.yml up -d
+      docker compose -f docker-compose.prod.yml --env-file .env.prod down
+      docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 
   - name: Wait for app to be healthy
     ansible.builtin.wait_for:

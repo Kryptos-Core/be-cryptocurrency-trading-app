@@ -135,7 +135,7 @@ clean:
 # Pairing (enforced by scripts/docker/up.sh):
 #   development  -> docker-compose.development.yml        + .env.development
 #   staging      -> docker-compose.staging.yml            + .env.staging
-#   production   -> docker-compose.prod.yml               + .env.production
+#   production   -> docker-compose.prod.yml               + .env.prod
 
 ENV ?= development
 
@@ -156,18 +156,18 @@ docker-down:
 	@cd .. && bash scripts/docker/up.sh $(ENV) --down
 
 docker-logs:
-	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml logs -f $(SERVICE)
+	@cd .. && bash -c 'if [ "$$ENV" = "production" ]; then suffix=prod; else suffix=$$ENV; fi; docker compose --env-file .env.$$suffix -f docker-compose.$$suffix.yml logs -f $(SERVICE)'
 
 docker-logs-all:
-	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml logs -f
+	@cd .. && bash -c 'if [ "$$ENV" = "production" ]; then suffix=prod; else suffix=$$ENV; fi; docker compose --env-file .env.$$suffix -f docker-compose.$$suffix.yml logs -f'
 
 docker-restart:
 	@echo "Restarting $(SERVICE)..."
-	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml restart $(SERVICE)
+	@cd .. && bash -c 'if [ "$$ENV" = "production" ]; then suffix=prod; else suffix=$$ENV; fi; docker compose --env-file .env.$$suffix -f docker-compose.$$suffix.yml restart $(SERVICE)'
 
 docker-rebuild:
 	@echo "Rebuilding $(SERVICE)..."
-	@cd .. && docker compose --env-file .env.$(ENV) -f docker-compose.$(ENV).yml up -d --build $(SERVICE)
+	@cd .. && bash -c 'if [ "$$ENV" = "production" ]; then suffix=prod; else suffix=$$ENV; fi; docker compose --env-file .env.$$suffix -f docker-compose.$$suffix.yml up -d --build $(SERVICE)'
 
 # Docker cleanup
 docker-clean:

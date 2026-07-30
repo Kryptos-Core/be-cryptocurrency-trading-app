@@ -16,8 +16,8 @@
 #   docker-compose.development.yml          <-> .env.development
 #   docker-compose.infrastructure.development.yml <-> .env.development
 #   docker-compose.staging.yml              <-> .env.staging
-#   docker-compose.prod.yml                 <-> .env.production
-#   docker-compose.monitoring.yml           <-> .env.production (default base)
+#   docker-compose.prod.yml                 <-> .env.prod
+#   docker-compose.monitoring.prod.yml      <-> .env.prod (default base)
 #   docker-compose.monitoring.staging.yml   <-> .env.staging
 # ============================================================
 

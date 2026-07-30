@@ -11,10 +11,10 @@
 #                   (uses docker-compose.infrastructure.development.yml + .env.development
 #                    ONLY if you want a local-ish preview; staging infra otherwise
 #                    comes from docker-compose.staging.yml itself)
-#   production   -> docker-compose.prod.yml               + .env.production
+#   production   -> docker-compose.prod.yml               + .env.prod
 #
 # For monitoring:
-#   monitoring      -> docker-compose.monitoring.yml       + .env.production (base)
+#   monitoring      -> docker-compose.monitoring.prod.yml  + .env.prod (base)
 #   monitoring-staging -> docker-compose.monitoring.staging.yml + .env.staging
 #
 # Refuses to run if no env is specified, or the resolved files don't exist.
@@ -43,11 +43,11 @@ case "${ENV_NAME}" in
         ;;
     production|prod)
         COMPOSE_FILE="${REPO_ROOT}/docker-compose.prod.yml"
-        ENV_FILE="${REPO_ROOT}/.env.production"
+        ENV_FILE="${REPO_ROOT}/.env.prod"
         ;;
     monitoring|mon)
-        COMPOSE_FILE="${REPO_ROOT}/docker-compose.monitoring.yml"
-        ENV_FILE="${REPO_ROOT}/.env.production"
+        COMPOSE_FILE="${REPO_ROOT}/docker-compose.monitoring.prod.yml"
+        ENV_FILE="${REPO_ROOT}/.env.prod"
         ;;
     monitoring-staging|mon-stg)
         COMPOSE_FILE="${REPO_ROOT}/docker-compose.monitoring.staging.yml"

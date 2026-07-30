@@ -4,7 +4,7 @@ dist
 .gitignore
 *.md
 .env*
-!.env.production.example
+!.env.prod.example
 coverage
 .nyc_output
 .DS_Store
