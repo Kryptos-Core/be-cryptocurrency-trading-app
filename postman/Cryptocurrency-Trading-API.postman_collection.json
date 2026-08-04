@@ -505,6 +505,37 @@
 					"response": []
 				},
 				{
+					"name": "Email verification required flag",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/email-verification-required",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"email-verification-required"
+							]
+						},
+						"description": "Any authenticated user. Returns whether OTP gating is active.",
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Change password",
 					"request": {
 						"method": "POST",
@@ -539,7 +570,7 @@
 						},
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"currentPassword\": \"oldPassword\",\n  \"newPassword\": \"newSecure1!\"\n}"
+							"raw": "{\n  \"newPassword\": \"newSecure1!\",\n  \"otpCode\": \"123456\"\n}"
 						}
 					},
 					"response": []
@@ -966,6 +997,79 @@
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"key\": \"MARKET_SOURCE\",\n  \"value\": \"binance\"\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Runtime auth-security (email verification toggle)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/system-configs/runtime/auth-security",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"system-configs",
+								"runtime",
+								"auth_security"
+							]
+						},
+						"description": "ADMIN only. Returns EMAIL_VERIFICATION_REQUIRED setting.",
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Patch runtime auth-security (disable/enable email verification)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/system-configs/runtime/auth-security",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"system-configs",
+								"runtime",
+								"auth_security"
+							]
+						},
+						"description": "ADMIN only. Set EMAIL_VERIFICATION_REQUIRED to false to bypass OTP flows.",
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"updates\": {\n    \"EMAIL_VERIFICATION_REQUIRED\": \"false\"\n  }\n}"
 						}
 					},
 					"response": []
@@ -3767,11 +3871,11 @@
 								"v1",
 								"users",
 								"me",
-								"contact-email",
-								"send-otp"
-							]
-						},
-						"description": "",
+							"contact-email",
+							"send-otp"
+						]
+					},
+					"description": "Sends OTP to new email. Returns EMAIL_VERIFICATION_DISABLED if admin disabled email verification.",
 						"auth": {
 							"type": "bearer",
 							"bearer": [
@@ -3784,7 +3888,7 @@
 						},
 						"body": {
 							"mode": "raw",
-							"raw": "{}"
+							"raw": "{\n  \"email\": \"real@example.com\"\n}"
 						}
 					},
 					"response": []
@@ -3826,7 +3930,48 @@
 						},
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"code\": \"000000\"\n}"
+							"raw": "{\n  \"email\": \"real@example.com\",\n  \"otpCode\": \"000000\"\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update contact email (no OTP — only when email verification disabled by admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/users/me/contact-email",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"me",
+								"contact-email"
+							]
+						},
+						"description": "Updates email without OTP. Only works when EMAIL_VERIFICATION_REQUIRED is false.",
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"real@example.com\"\n}"
 						}
 					},
 					"response": []

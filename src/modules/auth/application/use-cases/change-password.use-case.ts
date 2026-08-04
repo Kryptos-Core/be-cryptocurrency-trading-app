@@ -5,6 +5,7 @@ import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hashe
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
 import type { ChangePasswordDto } from '@/modules/auth/dto';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class ChangePasswordUseCase {
     private readonly twoFaService: TwoFaService,
     @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   async execute(userId: string, dto: ChangePasswordDto): Promise<{ success: boolean }> {
@@ -33,15 +35,21 @@ export class ChangePasswordUseCase {
       );
     }
 
-    const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
-    if (!otpValid) {
-      throw new BadRequestException('OTP khong hop le hoac da het han', 'INVALID_OTP');
+    const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
+    if (emailVerificationRequired) {
+      if (!dto.otpCode) {
+        throw new BadRequestException('OTP code is required', 'OTP_REQUIRED');
+      }
+      const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
+      if (!otpValid) {
+        throw new BadRequestException('OTP khong hop le hoac da het han', 'INVALID_OTP');
+      }
     }
 
     const passwordHash = await this.passwordHasher.hash(dto.newPassword);
     await this.authRepository.updatePassword(userId, passwordHash);
 
-    this.logger.log(`Password changed for user=${userId}`);
+    this.logger.log(`Password changed for user=${userId} (emailVerificationRequired=${emailVerificationRequired})`);
     return { success: true };
   }
 }

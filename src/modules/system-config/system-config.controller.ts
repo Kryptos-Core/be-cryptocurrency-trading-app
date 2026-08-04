@@ -126,6 +126,29 @@ export class SystemConfigController {
     return this._updateBulkByCategory(ConfigCategory.CORE, dto.updates ?? {}, userId);
   }
 
+  // ── AUTH_SECURITY ──────────────────────────────────────────────────────────
+
+  /**
+   * AUTH_SECURITY: email verification toggle (ADMIN-only, no extra permission needed
+   * since it is a subset of ADMIN's broader SYSTEM_CONFIG_EDIT_AUTH_SECURITY right).
+   */
+  @Get('runtime/auth_security')
+  @RequireRoles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Runtime settings — AUTH_SECURITY category (email verification toggle)' })
+  async getRuntimeSettingsAuthSecurityHandler() {
+    return this._getRuntimeSettingsByCategory(ConfigCategory.AUTH_SECURITY);
+  }
+
+  @Patch('runtime/auth_security')
+  @RequireRoles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Bulk update AUTH_SECURITY runtime settings (email verification toggle)' })
+  async patchRuntimeSettingsAuthSecurity(
+    @Body() dto: UpdateRuntimeSettingsBulkDto,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this._updateBulkByCategory(ConfigCategory.AUTH_SECURITY, dto.updates ?? {}, userId);
+  }
+
   // ── LEGACY (all categories — keep existing endpoint for backward compat) ─
 
   @Get('runtime')

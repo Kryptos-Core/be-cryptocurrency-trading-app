@@ -21,6 +21,7 @@ import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard } from '@/common/guards';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { AuthService } from './auth.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   ChangePasswordDto,
   LoginDto,
@@ -47,6 +48,7 @@ export class AuthController {
     private readonly walletAuthService: WalletAuthService,
     private readonly walletConnectAuthService: WalletConnectAuthService,
     private readonly twoFaService: TwoFaService,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   /**
@@ -239,6 +241,13 @@ export class AuthController {
   @ApiSuccessResponse('OTP sent successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async sendTwoFaOtp(@CurrentUser('userId') userId: string) {
+    const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
+    if (!emailVerificationRequired) {
+      throw new BadRequestException(
+        'Email verification is disabled by admin. OTP is not required.',
+        'EMAIL_VERIFICATION_DISABLED',
+      );
+    }
     const user = await this.authService.getUserById(userId);
     if (isWalletPlaceholderEmail(user.email)) {
       throw new BadRequestException(
@@ -247,6 +256,26 @@ export class AuthController {
       );
     }
     return this.twoFaService.sendOtp(userId, user.email);
+  }
+
+  /**
+   * Returns whether email verification (OTP gating) is currently required.
+   * Safe to call on every screen for any authenticated user.
+   */
+  @Get('email-verification-required')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get email verification required flag',
+    description:
+      'Returns whether OTP email gating is active. When false, all OTP flows are bypassed.',
+  })
+  @ApiSuccessResponse('Email verification required flag')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getEmailVerificationRequired() {
+    const required = await this.systemConfigService.isEmailVerificationRequired();
+    return { emailVerificationRequired: required };
   }
 
   /**

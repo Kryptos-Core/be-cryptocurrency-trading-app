@@ -4,6 +4,7 @@ import { CloudinaryService } from '@/common/services';
 import { User } from '@/entities/user.entity';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { OrdersModule } from '@/modules/orders/orders.module';
+import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 import { UsersRepository } from '@/modules/users/infrastructure/persistence';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
@@ -27,6 +28,7 @@ import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
     forwardRef(() => OrdersModule),
     forwardRef(() => WalletsModule),
     forwardRef(() => BlockchainModule),
+    forwardRef(() => SystemConfigModule),
   ],
   providers: [
     UsersService,

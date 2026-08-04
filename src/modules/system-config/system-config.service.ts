@@ -186,6 +186,19 @@ export class SystemConfigService implements OnModuleInit {
   }
 
   /**
+   * Returns true when email verification (OTP gating) is required for sensitive
+   * actions (password change, email change, contact-email OTP, wallet ops).
+   *
+   * Defaults to `true` (secure by default) when the key is absent from DB
+   * and not set via env — see `resolveEnvFallback`.
+   */
+  async isEmailVerificationRequired(): Promise<boolean> {
+    const raw = await this.get<string>('EMAIL_VERIFICATION_REQUIRED');
+    const effective = raw ?? this.resolveEnvFallback('EMAIL_VERIFICATION_REQUIRED');
+    return effective === 'true';
+  }
+
+  /**
    * Effective string for a runtime key (never null for whitelisted keys).
    */
   async getEffectiveString(key: RuntimeSettingKey): Promise<string> {
@@ -378,6 +391,7 @@ export class SystemConfigService implements OnModuleInit {
         // PHAN 4: Trading price manipulation keys
         if (key === 'trading.max_slippage_pct') return envOr('TRADING_MAX_SLIPPAGE_PCT', '0.01');
         if (key === 'trading.price_stale_threshold_ms') return envOr('TRADING_PRICE_STALE_THRESHOLD_MS', '300000');
+        if (key === 'EMAIL_VERIFICATION_REQUIRED') return envOr('EMAIL_VERIFICATION_REQUIRED', 'true');
         return '';
       }
     }

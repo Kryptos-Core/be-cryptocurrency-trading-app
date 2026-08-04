@@ -52,6 +52,7 @@ import {
   RequestSecurityChangeDto,
   ReviewSecurityChangeDto,
   SendContactEmailOtpDto,
+  UpdateContactEmailDto,
   UpdateMyProfileBasicDto,
   UpdateUserDto,
   type UserFilterDto,
@@ -211,6 +212,31 @@ export class UsersController {
       userId,
       dto.email,
       dto.otpCode,
+    );
+  }
+
+  /**
+   * Update contact email directly — only when email verification is disabled by admin.
+   * PATCH /users/me/contact-email
+   */
+  @Patch('me/contact-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update contact email (no OTP)',
+    description:
+      'Updates the user email without OTP. Only allowed when email verification is disabled by admin.',
+  })
+  @ApiBody({ type: UpdateContactEmailDto })
+  @ApiSuccessResponse('Email updated')
+  @ApiBadRequestResponse('Email verification required or email already exists')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async updateContactEmail(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpdateContactEmailDto,
+  ) {
+    return this.contactEmailVerificationService.updateContactEmailWithoutOtp(
+      userId,
+      dto.email,
     );
   }
 

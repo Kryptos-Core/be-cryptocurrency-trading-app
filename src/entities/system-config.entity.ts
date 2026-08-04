@@ -5,6 +5,8 @@ export enum ConfigCategory {
   FINANCE = 'finance', // Withdraw Max, Transfer Limits, Rate fallbacks
   OPS = 'ops', // Matching engine, Go aggregator, outbox alerts, rollout, market read
   CORE = 'core', // Default symbols, market sources, wallet config
+  /** Auth / security toggles: email verification requirement, future auth switches. */
+  AUTH_SECURITY = 'auth_security',
 }
 
 export enum ConfigDataType {

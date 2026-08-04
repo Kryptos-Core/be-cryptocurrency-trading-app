@@ -78,6 +78,7 @@ const ROLE_PERMISSION_MATRIX: Record<UserRole, Permission[]> = {
     Permission.SYSTEM_CONFIG_EDIT_FINANCE,
     Permission.SYSTEM_CONFIG_EDIT_OPS,
     Permission.SYSTEM_CONFIG_EDIT_CORE,
+    Permission.SYSTEM_CONFIG_EDIT_AUTH_SECURITY,
   ],
 };
 

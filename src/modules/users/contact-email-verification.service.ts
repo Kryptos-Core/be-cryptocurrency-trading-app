@@ -4,6 +4,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@/com
 import { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { ONCHAIN_TRANSACTION_REPOSITORY, type OnchainTransactionRepositoryPort } from '@/modules/blockchain/domain/ports';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import type { UserRecord } from '@/modules/users';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 
@@ -32,6 +33,7 @@ export class ContactEmailVerificationService {
     private readonly mailService: MailService,
     @Inject(ONCHAIN_TRANSACTION_REPOSITORY)
     private readonly onchainTxRepo: OnchainTransactionRepositoryPort,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   private otpKey(userId: string, emailNormalized: string): string {
@@ -51,6 +53,14 @@ export class ContactEmailVerificationService {
   }
 
   async sendOtp(userId: string, newEmailRaw: string): Promise<{ expiresIn: number }> {
+    const disabled = await this.systemConfigService.isEmailVerificationRequired();
+    if (!disabled) {
+      throw new BadRequestException(
+        'Email verification is disabled by admin. OTP is not required.',
+        'EMAIL_VERIFICATION_DISABLED',
+      );
+    }
+
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
@@ -117,6 +127,14 @@ export class ContactEmailVerificationService {
     newEmailRaw: string,
     otpCode: string,
   ): Promise<{ user: UserRecord; forceRelogin: boolean }> {
+    const disabled = await this.systemConfigService.isEmailVerificationRequired();
+    if (!disabled) {
+      throw new BadRequestException(
+        'Email verification is disabled by admin. OTP is not required.',
+        'EMAIL_VERIFICATION_DISABLED',
+      );
+    }
+
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User', userId);
@@ -207,6 +225,67 @@ export class ContactEmailVerificationService {
     }
 
     // User must re-login to get a JWT with the new email claim
+    return { user: updated, forceRelogin: true };
+  }
+
+  /**
+   * Direct email update without OTP — only callable when email verification is
+   * disabled by admin. Validates email availability and withdrawal safety.
+   */
+  async updateContactEmailWithoutOtp(
+    userId: string,
+    newEmailRaw: string,
+  ): Promise<{ user: UserRecord; forceRelogin: boolean }> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User', userId);
+    }
+
+    if (isWalletPlaceholderEmail(user.email)) {
+      throw new BadRequestException(
+        'Tài khoản ví dùng email tạm. Vui lòng xác minh email thật trong Hồ sơ.',
+        'USE_CONTACT_EMAIL_VERIFICATION',
+      );
+    }
+
+    const newEmail = newEmailRaw.toLowerCase().trim();
+    const emailLower = newEmail.toLowerCase().trim();
+    const exists = await this.usersRepository.emailExists(emailLower, userId);
+    if (exists) {
+      throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
+    }
+
+    const pendingWithdrawals = await this.onchainTxRepo.findPendingWithdrawals(1);
+    if (pendingWithdrawals.length > 0) {
+      throw new BadRequestException(
+        'Không thể đổi email khi có lệnh rút tiền đang chờ xử lý. Vui lòng thử lại sau.',
+        'PENDING_WITHDRAWALS',
+      );
+    }
+
+    const oldEmail = user.email;
+    await this.usersRepository.update(userId, { email: newEmail });
+    await this.usersRepository.setEmailVerified(userId, true);
+
+    try {
+      await this.mailService.sendEmailChangeNotification(oldEmail, newEmail, userId);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to send email-change notification for user=${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    this.logger.log(
+      `[ContactEmail] Email updated (no OTP) for user=${userId}: ${oldEmail} -> ${newEmail}`,
+    );
+
+    const updated = await this.usersRepository.findById(userId);
+    if (!updated) {
+      throw new NotFoundException('User', userId);
+    }
+
     return { user: updated, forceRelogin: true };
   }
 }

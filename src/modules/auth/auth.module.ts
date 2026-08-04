@@ -15,6 +15,7 @@ import { AuthRepositoryImpl } from '@/modules/auth/infrastructure/persistence';
 import { BcryptPasswordHasherAdapter } from '@/modules/auth/infrastructure/providers/bcrypt-password-hasher.adapter';
 import { JwtTokenIssuerAdapter } from '@/modules/auth/infrastructure/providers/jwt-token-issuer.adapter';
 import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
+import { SystemConfigModule } from '@/modules/system-config/system-config.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -43,6 +44,7 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     TypeOrmModule.forFeature([User]),
     forwardRef(() => BlockchainModule),
     forwardRef(() => UsersModule),
+    forwardRef(() => SystemConfigModule),
   ],
   providers: [
     AuthService,

@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@/com
 import { CloudinaryService } from '@/common/services';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import type { UserRecord } from '@/modules/users';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
@@ -18,6 +19,7 @@ describe('UsersService', () => {
   let usersRepository: jest.Mocked<UsersRepositoryPort>;
   let cloudinaryService: jest.Mocked<CloudinaryService>;
   let twoFaService: jest.Mocked<TwoFaService>;
+  let systemConfigService: jest.Mocked<SystemConfigService>;
 
   const mockUserRecord: UserRecord = {
     user_id: 'user-1',
@@ -53,6 +55,9 @@ describe('UsersService', () => {
     const mockTwoFa = {
       verifyOtp: jest.fn().mockResolvedValue(true),
     };
+    const mockSystemConfig = {
+      isEmailVerificationRequired: jest.fn().mockResolvedValue(true),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -62,6 +67,7 @@ describe('UsersService', () => {
         { provide: TwoFaService, useValue: mockTwoFa },
         { provide: WalletsService, useValue: {} },
         { provide: ORDER_REPOSITORY, useValue: {} },
+        { provide: SystemConfigService, useValue: mockSystemConfig },
       ],
     }).compile();
 
@@ -69,8 +75,14 @@ describe('UsersService', () => {
     usersRepository = module.get(USERS_REPOSITORY);
     cloudinaryService = module.get(CloudinaryService);
     twoFaService = module.get(TwoFaService);
+    systemConfigService = module.get(SystemConfigService);
 
     (usersRepository.findById as jest.Mock).mockResolvedValue(mockUserRecord);
+    (usersRepository.reviewSecurityChangeRequest as jest.Mock).mockResolvedValue({
+      request_id: 'auto-approved-req',
+      user_id: 'user-1',
+      status: 'APPROVED',
+    });
   });
 
   describe('updateProfileBasic', () => {
@@ -166,6 +178,72 @@ describe('UsersService', () => {
       await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('should auto-approve EMAIL_CHANGE when email verification is disabled by admin', async () => {
+      (usersRepository.findById as jest.Mock).mockResolvedValue({
+        ...mockUserRecord,
+        two_fa_enabled: 1,
+      });
+      (systemConfigService.isEmailVerificationRequired as jest.Mock).mockResolvedValue(false);
+      (usersRepository.emailExists as jest.Mock).mockResolvedValue(false);
+      (usersRepository.createSecurityChangeRequest as jest.Mock).mockResolvedValue('auto-approved-req');
+      (usersRepository.reviewSecurityChangeRequest as jest.Mock).mockResolvedValue({
+        request_id: 'auto-approved-req',
+        user_id: 'user-1',
+        status: 'APPROVED',
+      });
+
+      const dto: RequestSecurityChangeDto = {
+        changeType: 'EMAIL_CHANGE',
+        payload: { email: 'new@test.com' },
+        // No otpCode when email verification is disabled
+      };
+      const result = await service.requestSecurityChange('user-1', dto);
+
+      expect(twoFaService.verifyOtp).not.toHaveBeenCalled();
+      expect(usersRepository.reviewSecurityChangeRequest).toHaveBeenCalledWith(
+        'auto-approved-req',
+        'user-1',
+        { approve: true },
+      );
+      expect(result.status).toBe('APPROVED');
+    });
+
+    it('should create PENDING request when email verification is required (otpCode provided)', async () => {
+      (usersRepository.findById as jest.Mock).mockResolvedValue({
+        ...mockUserRecord,
+        two_fa_enabled: 1,
+      });
+      (systemConfigService.isEmailVerificationRequired as jest.Mock).mockResolvedValue(true);
+      (usersRepository.emailExists as jest.Mock).mockResolvedValue(false);
+      (usersRepository.createSecurityChangeRequest as jest.Mock).mockResolvedValue('pending-req');
+
+      const dto: RequestSecurityChangeDto = {
+        changeType: 'EMAIL_CHANGE',
+        payload: { email: 'new@test.com' },
+        otpCode: '123456',
+      };
+      const result = await service.requestSecurityChange('user-1', dto);
+
+      expect(twoFaService.verifyOtp).toHaveBeenCalledWith('user-1', '123456');
+      expect(usersRepository.reviewSecurityChangeRequest).not.toHaveBeenCalled();
+      expect(result.status).toBe('PENDING');
+    });
+
+    it('should throw OTP_REQUIRED when email verification required but no otpCode', async () => {
+      (usersRepository.findById as jest.Mock).mockResolvedValue({
+        ...mockUserRecord,
+        two_fa_enabled: 1,
+      });
+      (systemConfigService.isEmailVerificationRequired as jest.Mock).mockResolvedValue(true);
+
+      const dto: RequestSecurityChangeDto = {
+        changeType: 'EMAIL_CHANGE',
+        payload: { email: 'new@test.com' },
+        // No otpCode
+      };
+      await expect(service.requestSecurityChange('user-1', dto)).rejects.toThrow(BadRequestException);
     });
   });
 

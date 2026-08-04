@@ -98,6 +98,8 @@ export enum Permission {
   SYSTEM_CONFIG_EDIT_OPS = 'system_config:edit_ops',
   /** Ops: manage CORE runtime settings (symbols, market sources, wallet config) */
   SYSTEM_CONFIG_EDIT_CORE = 'system_config:edit_core',
+  /** Admin: manage AUTH_SECURITY runtime settings (email verification toggle, future auth switches) */
+  SYSTEM_CONFIG_EDIT_AUTH_SECURITY = 'system_config:edit_auth_security',
   /** Manage treasury E2E runner configs and health thresholds */
   TREASURY_E2E_CONFIGS_MANAGE = 'treasury_e2e_configs:manage',
   /** Approve or reject withdrawal requests (manual review queue) */

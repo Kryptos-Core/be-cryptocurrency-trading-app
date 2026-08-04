@@ -9,6 +9,7 @@ import { TwoFaService } from '@/modules/auth/two-fa.service';
 import type { BlockchainOnchainTransactionRecord } from '@/modules/blockchain';
 import { ORDER_REPOSITORY, type OrderRepositoryPort } from '@/modules/orders/domain/ports';
 import type { UserRecord } from '@/modules/users';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import { WalletsService } from '@/modules/wallets/wallets.service';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from './domain/ports';
 import type {
@@ -41,6 +42,7 @@ export class UsersService {
     private readonly walletsService: WalletsService,
     @Inject(ORDER_REPOSITORY)
     private readonly orderRepository: OrderRepositoryPort,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   /**
@@ -221,6 +223,9 @@ export class UsersService {
 
   /**
    * Create a security change request (PENDING). Requires reviewer to approve.
+   *
+   * When EMAIL_VERIFICATION_REQUIRED is false (disabled by admin), OTP verification
+   * is bypassed and the request is auto-approved immediately.
    */
   async requestSecurityChange(
     userId: string,
@@ -243,12 +248,16 @@ export class UsersService {
       );
     }
 
-    if (!dto.otpCode) {
-      throw new BadRequestException('OTP code is required when 2FA is enabled', 'OTP_REQUIRED');
-    }
-    const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
-    if (!otpValid) {
-      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+    // Gate: skip OTP verification when email verification is disabled by admin.
+    const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
+    if (emailVerificationRequired) {
+      if (!dto.otpCode) {
+        throw new BadRequestException('OTP code is required when 2FA is enabled', 'OTP_REQUIRED');
+      }
+      const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
+      if (!otpValid) {
+        throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+      }
     }
 
     let payload: Record<string, unknown> = { ...dto.payload };
@@ -280,6 +289,16 @@ export class UsersService {
       dto.changeType,
       payload,
     );
+
+    // When email verification is disabled, auto-approve immediately.
+    if (!emailVerificationRequired) {
+      await this.reviewSecurityChangeRequest(requestId, userId, { approve: true });
+      this.logger.log(
+        `Security change request auto-approved (email verification disabled): ${requestId}, user=${userId}`,
+      );
+      return { requestId, status: 'APPROVED' };
+    }
+
     this.logger.log(`Security change request created: ${requestId}, user=${userId}`);
     return { requestId, status: 'PENDING' };
   }

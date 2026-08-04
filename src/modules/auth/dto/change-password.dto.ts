@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, MinLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Length, MinLength } from 'class-validator';
 
 export class ChangePasswordDto {
   @ApiProperty({
@@ -13,13 +13,15 @@ export class ChangePasswordDto {
   newPassword!: string;
 
   @ApiProperty({
-    description: 'OTP code from email (required when 2FA enabled)',
+    description:
+      'OTP code from email. Required when 2FA is enabled AND email verification is required. Optional when email verification is disabled by admin.',
     example: '123456',
     minLength: 6,
     maxLength: 6,
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(6, 6, { message: 'OTP must be 6 digits' })
-  otpCode!: string;
+  otpCode?: string;
 }

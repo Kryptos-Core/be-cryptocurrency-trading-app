@@ -524,6 +524,18 @@ const EXTRA_FINANCE_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   },
 ];
 
+/** Auth / security runtime settings. ADMIN-only. */
+const EXTRA_AUTH_SECURITY_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
+  {
+    key: 'EMAIL_VERIFICATION_REQUIRED',
+    type: ConfigDataType.BOOLEAN,
+    category: ConfigCategory.AUTH_SECURITY,
+    name: 'Email verification required (OTP gating)',
+    description:
+      'When true, sensitive actions (wallet add/remove, password change, email change, contact-email OTP) require OTP email. When false, all email-OTP flows are bypassed. Only disable in trusted/internal environments.',
+  },
+];
+
 /** Full seed list: core + every `*_RPC_URL` from evm-chain-definitions + per-chain auto max (no duplicates). */
 export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   ...BASE_RUNTIME_SETTING_SEEDS,
@@ -533,6 +545,7 @@ export const RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
   ...EXTRA_MARKET_READ_RUNTIME_SETTING_SEEDS,
   ...EXTRA_GO_ROLLOUT_RUNTIME_SETTING_SEEDS,
   ...EXTRA_FINANCE_RUNTIME_SETTING_SEEDS,
+  ...EXTRA_AUTH_SECURITY_RUNTIME_SETTING_SEEDS,
 ];
 
 /** Whitelisted keys manageable via UI / runtime settings (mirror .env names). */
