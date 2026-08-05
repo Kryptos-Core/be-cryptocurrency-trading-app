@@ -17,7 +17,11 @@ import {
   CurrentUser,
   Public,
 } from '@/common/decorators';
-import { BadRequestException } from '@/common/exceptions';
+import {
+  ContactEmailRequiredException,
+  EmailVerificationDisabledException,
+  InvalidOtpException,
+} from '@/common/errors';
 import { JwtAuthGuard } from '@/common/guards';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { AuthService } from './auth.service';
@@ -243,17 +247,11 @@ export class AuthController {
   async sendTwoFaOtp(@CurrentUser('userId') userId: string) {
     const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
     if (!emailVerificationRequired) {
-      throw new BadRequestException(
-        'Email verification is disabled by admin. OTP is not required.',
-        'EMAIL_VERIFICATION_DISABLED',
-      );
+      throw EmailVerificationDisabledException();
     }
     const user = await this.authService.getUserById(userId);
     if (isWalletPlaceholderEmail(user.email)) {
-      throw new BadRequestException(
-        'Tài khoản đăng nhập bằng ví chưa có email liên hệ thật. Vui lòng thêm email trong Hồ sơ (bảo mật) và chờ duyệt trước khi dùng OTP qua mail.',
-        'CONTACT_EMAIL_REQUIRED',
-      );
+      throw ContactEmailRequiredException();
     }
     return this.twoFaService.sendOtp(userId, user.email);
   }
@@ -298,7 +296,7 @@ export class AuthController {
   async validateTwoFaOtp(@CurrentUser('userId') userId: string, @Body() dto: TwoFaOtpDto) {
     const ok = await this.twoFaService.validateOtpOnly(userId, dto.otpCode);
     if (!ok) {
-      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+      throw InvalidOtpException();
     }
     return { valid: true };
   }

@@ -1,6 +1,6 @@
 # Cấu hình môi trường - Cập nhật theo mã nguồn hiện tại
 
-> Last reviewed: 2026-07-28 — verified against `.env.development.example` (CORE_DB_*, MARKET_READ_SOURCE, EVENT_OUTBOX_*, WALLET/SEED/BINANCE_CREDENTIALS_ENCRYPTION_KEY, SMTP, Firebase).
+> Last reviewed: 2026-08-05 — verified against `.env.development.example`, `src/config/env.validation.ts`, and `src/modules/system-config/runtime-settings.definitions.ts`.
 
 ## Tổng quan
 
@@ -97,6 +97,7 @@ Sau đó điền thông tin và chạy ứng dụng (đảm bảo `NODE_ENV` kh�
 | Biến | Mô tả |
 |---|---|
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP relay cho email (verification, security change requests, …). Mặc định `smtp.gmail.com:587`. |
+| `EMAIL_VERIFICATION_REQUIRED` | Runtime boolean, mặc định `true` (secure by default). `false` bỏ qua email OTP cho đổi password/email, contact-email OTP và thêm/xóa ví. Có thể đặt bằng env; DB runtime setting trong category `AUTH_SECURITY` (`auth_security`) ghi đè fallback này. Chỉ ADMIN chỉnh tại **Payment Configuration → Platform → Auth & Security**; chi tiết API và migration: [ARCHITECTURE.md](ARCHITECTURE.md#email-verification-runtime-setting). |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Đường dẫn tới Firebase Admin SDK service account JSON. Trong compose production nên đặt ngoài repo. |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` / `CLOUDINARY_AVATAR_FOLDER` | Cloudinary cho avatar upload (`features.users.me.avatar`). Xem [PROFILE_AVATAR_SECURITY_REVIEW.md](PROFILE_AVATAR_SECURITY_REVIEW.md). |
 

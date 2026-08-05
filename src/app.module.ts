@@ -9,6 +9,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ApplicationBusModule } from './common/application-bus/application-bus.module';
 import { BullBoardModule } from './common/bull-board/bull-board.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { I18nModule } from './common/i18n';
 import { OutboxModule } from './common/outbox/outbox.module';
 import { UnitOfWorkModule } from './common/unit-of-work/unit-of-work.module';
 import appConfig from './config/app.config';
@@ -97,7 +98,7 @@ class BullBoardAuthMiddleware {
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
     }),
-    DatabaseProvidersModule,
+    I18nModule, // Global i18n service for email templates
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

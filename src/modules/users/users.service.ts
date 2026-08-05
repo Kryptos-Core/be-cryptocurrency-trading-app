@@ -1,5 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
+import {
+  AvatarUploadDisabledException,
+  EmailExistsException,
+  InvalidChangeTypeException,
+  InvalidOtpException,
+  InvalidPayloadException,
+  OtpRequiredException,
+  TwoFaRequiredException,
+  UseChangePasswordEndpointException,
+  UseContactEmailVerificationException,
+} from '@/common/errors';
+import { NotFoundException } from '@/common/exceptions';
 import { CloudinaryService } from '@/common/services';
 import { runInSpan } from '@/common/telemetry';
 import { calcSkip } from '@/common/utils/pagination.util';
@@ -149,7 +160,7 @@ export class UsersService {
     // Check if email already exists
     const existingUser = await this.usersRepository.findByEmail(email);
     if (existingUser) {
-      throw new ConflictException('Email already exists', 'EMAIL_EXISTS');
+      throw EmailExistsException({ email });
     }
 
     return this.usersRepository.create(email, passwordHash);
@@ -166,7 +177,7 @@ export class UsersService {
     if (updateUserDto.email && updateUserDto.email !== user.email) {
       const emailExists = await this.usersRepository.emailExists(updateUserDto.email, userId);
       if (emailExists) {
-        throw new ConflictException('Email already exists', 'EMAIL_EXISTS');
+        throw EmailExistsException({ email: updateUserDto.email });
       }
     }
 
@@ -234,29 +245,23 @@ export class UsersService {
     const user = await this.findOne(userId);
 
     if (isWalletPlaceholderEmail(user.email) && dto.changeType === 'EMAIL_CHANGE') {
-      throw new BadRequestException(
-        'Tài khoản ví dùng email tạm. Vui lòng xác minh email thật trong Hồ sơ: nhập địa chỉ mới và nhập OTP được gửi tới email đó.',
-        'USE_CONTACT_EMAIL_VERIFICATION',
-      );
+      throw UseContactEmailVerificationException();
     }
 
     // Chỉ cho phép gửi yêu cầu thay đổi thông tin nhạy cảm khi đã bật 2FA
     if (user.two_fa_enabled !== 1) {
-      throw new BadRequestException(
-        'Vui lòng bật xác thực hai bước trong Cài đặt trước khi thay đổi email hoặc mật khẩu.',
-        'TWO_FA_REQUIRED',
-      );
+      throw TwoFaRequiredException();
     }
 
     // Gate: skip OTP verification when email verification is disabled by admin.
     const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
     if (emailVerificationRequired) {
       if (!dto.otpCode) {
-        throw new BadRequestException('OTP code is required when 2FA is enabled', 'OTP_REQUIRED');
+        throw OtpRequiredException();
       }
       const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
       if (!otpValid) {
-        throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn', 'INVALID_OTP');
+        throw InvalidOtpException();
       }
     }
 
@@ -265,21 +270,18 @@ export class UsersService {
     if (dto.changeType === 'EMAIL_CHANGE') {
       const email = payload.email as string | undefined;
       if (!email || typeof email !== 'string') {
-        throw new BadRequestException('Payload must contain email', 'INVALID_PAYLOAD');
+        throw InvalidPayloadException();
       }
       const emailLower = email.toLowerCase().trim();
       const exists = await this.usersRepository.emailExists(emailLower, userId);
       if (exists) {
-        throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
+        throw EmailExistsException({ email: emailLower });
       }
       payload = { email: emailLower };
     } else if (dto.changeType === 'PASSWORD_CHANGE') {
-      throw new BadRequestException(
-        'Đổi mật khẩu không cần xét duyệt. Vui lòng dùng chức năng Đổi mật khẩu trong Cài đặt.',
-        'USE_CHANGE_PASSWORD_ENDPOINT',
-      );
+      throw UseChangePasswordEndpointException();
     } else {
-      throw new BadRequestException('Unsupported change type', 'INVALID_CHANGE_TYPE');
+      throw InvalidChangeTypeException();
     }
 
     const requestId = newUuid();
@@ -378,10 +380,7 @@ export class UsersService {
     const user = await this.findOne(userId);
 
     if (!this.cloudinaryService.isConfigured()) {
-      throw new BadRequestException(
-        'Avatar upload is not configured (Cloudinary). Contact administrator.',
-        'AVATAR_UPLOAD_DISABLED',
-      );
+      throw AvatarUploadDisabledException();
     }
 
     const { url, publicId } = await this.cloudinaryService.upload(buffer, userId.slice(0, 8));

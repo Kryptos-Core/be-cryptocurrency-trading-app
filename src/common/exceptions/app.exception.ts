@@ -45,15 +45,34 @@ export class TreasuryWalletBusyException extends BusinessException {
 
 /**
  * Resource Not Found Exception
+ *
+ * Accepts three forms:
+ *   - `NotFoundException('Resource not found')` — 1-arg, message-only,
+ *     code defaults to `'NOT_FOUND'`.
+ *   - `NotFoundException('Resource', 'userId')` — legacy (resource, id),
+ *     message becomes `"<resource> with id <id> not found"`, code is
+ *     `'NOT_FOUND'`. The id is rendered into the message so the FE sees a
+ *     human-readable error.
+ *   - `NotFoundException('', 'CUSTOM_CODE')` — new typed-descriptor form,
+ *     code is what the caller passes, message is empty (the global filter
+ *     re-renders the message from `messages.ts` keyed by the code).
+ *     Detection rule: first arg is empty *and* second arg is a string.
  */
 export class NotFoundException extends AppException {
   constructor(resourceOrMessage: string, identifierOrCode?: string | number) {
-    // Support both old signature: NotFoundException('Resource', 'id') and new: NotFoundException('message', 'code')
-    const isOldSignature = typeof identifierOrCode === 'string' || typeof identifierOrCode === 'number';
-    const message = isOldSignature
-      ? `${resourceOrMessage}${identifierOrCode !== undefined ? ` with id ${identifierOrCode}` : ''} not found`
-      : resourceOrMessage;
-    const code = isOldSignature ? 'NOT_FOUND' : (identifierOrCode ?? 'NOT_FOUND');
+    const isTypedDescriptor =
+      resourceOrMessage === '' &&
+      typeof identifierOrCode === 'string' &&
+      identifierOrCode !== '';
+    const isLegacyResource = !isTypedDescriptor && typeof identifierOrCode === 'string';
+    const message = isTypedDescriptor
+      ? ''
+      : isLegacyResource
+        ? `${resourceOrMessage} with id ${identifierOrCode} not found`
+        : resourceOrMessage;
+    const code = isTypedDescriptor
+      ? (identifierOrCode as string)
+      : 'NOT_FOUND';
     super(message, code, 404);
     Object.setPrototypeOf(this, NotFoundException.prototype);
   }
@@ -71,10 +90,16 @@ export class UnauthorizedException extends AppException {
 
 /**
  * Forbidden Exception
+ *
+ * Accepts either:
+ *   - `ForbiddenException('message')` — legacy, code is fixed to 'FORBIDDEN'.
+ *   - `ForbiddenException('message', 'CUSTOM_CODE')` — used by the typed
+ *     descriptors to surface fine-grained codes (e.g. `ADMIN_REQUIRED`)
+ *     while keeping the 403 status code.
  */
 export class ForbiddenException extends AppException {
-  constructor(message: string = 'Forbidden') {
-    super(message, 'FORBIDDEN', 403);
+  constructor(message: string = 'Forbidden', code: string = 'FORBIDDEN') {
+    super(message, code, 403);
     Object.setPrototypeOf(this, ForbiddenException.prototype);
   }
 }
@@ -99,10 +124,16 @@ export class ValidationException extends AppException {
 
 /**
  * Conflict Exception (Duplicate resource)
+ *
+ * Accepts either:
+ *   - `ConflictException('message', 'CODE')` — legacy, no context.
+ *   - `ConflictException('message', 'CODE', { extra })` — typed-descriptor form,
+ *     context is forwarded to the filter so `translateError` can interpolate
+ *     variables (e.g. `{count}` in `WITHDRAWAL_PENDING_EXISTS`).
  */
 export class ConflictException extends AppException {
-  constructor(message: string, code: string = 'CONFLICT') {
-    super(message, code, 409);
+  constructor(message: string, code: string = 'CONFLICT', context?: Record<string, unknown>) {
+    super(message, code, 409, context);
     Object.setPrototypeOf(this, ConflictException.prototype);
   }
 }

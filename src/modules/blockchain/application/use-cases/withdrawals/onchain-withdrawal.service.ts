@@ -9,6 +9,7 @@ import {
   WalletTransactionAction,
 } from '@/common/enums';
 import { ConflictException, InternalServerException, BusinessException } from '@/common/exceptions';
+import { DEFAULT_LOCALE, I18nService } from '@/common/i18n';
 import { CacheService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import {
@@ -89,7 +90,12 @@ export class OnchainWithdrawalService {
     private readonly _usersService: UsersService,
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: UsersRepositoryPort,
+    private readonly _i18n: I18nService,
   ) {}
+
+  private _locale() {
+    return this._i18n.currentLocale() ?? DEFAULT_LOCALE;
+  }
 
   async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {
     const isTronChain =
@@ -237,10 +243,14 @@ export class OnchainWithdrawalService {
 
       // Fire-and-forget: notify FINANCE_MANAGERs about new withdrawal request
       const assetSymbol = asset === WithdrawalAsset.USDT_TRC20 ? 'USDT' : 'TRX';
+      const locale = this._locale();
       this._notifyFinanceManagers(
         {
-          title: 'New Withdrawal Request',
-          body: `User requested withdrawal of ${dto.amount} ${assetSymbol} on ${dto.chain}`,
+          title: this._i18n.translate('withdrawalRequestedTitle', locale),
+          body: this._i18n.translate('withdrawalRequestedBody', locale, {
+            amount: dto.amount,
+            symbol: assetSymbol,
+          }),
           type: 'withdrawal_request',
           data: {
             txId,
@@ -359,11 +369,12 @@ export class OnchainWithdrawalService {
 
         if (txRecord.user_id) {
           const assetSymbol = asset === WithdrawalAsset.USDT_TRC20 ? 'USDT' : 'TRX';
+          const locale = this._locale();
           this._notifyUser(
             txRecord.user_id,
             {
-              title: 'Withdrawal Failed',
-              body: `Your withdrawal of ${txRecord.amount} ${assetSymbol} on ${txRecord.chain} could not be processed. Please contact support.`,
+              title: this._i18n.translate('withdrawalFailedTitle', locale),
+              body: this._i18n.translate('withdrawalFailedBody', locale),
               type: 'withdrawal_rejected',
               data: {
                 txId,
@@ -470,11 +481,15 @@ export class OnchainWithdrawalService {
 
       if (txRecord.user_id) {
         const assetSymbol = asset === WithdrawalAsset.USDT_TRC20 ? 'USDT' : 'TRX';
+        const locale = this._locale();
         this._notifyUser(
           txRecord.user_id,
           {
-            title: 'Withdrawal Approved',
-            body: `Your withdrawal of ${txRecord.amount} ${assetSymbol} on ${txRecord.chain} has been approved and is being processed.`,
+            title: this._i18n.translate('withdrawalApprovedTitle', locale),
+            body: this._i18n.translate('withdrawalApprovedBody', locale, {
+              amount: txRecord.amount,
+              symbol: assetSymbol,
+            }),
             type: 'withdrawal_approved',
             data: {
               txId,
@@ -543,13 +558,14 @@ export class OnchainWithdrawalService {
       if (txRecord.user_id) {
         const asset = (txRecord as { asset?: WithdrawalAsset }).asset ?? WithdrawalAsset.NATIVE;
         const assetSymbol = asset === WithdrawalAsset.USDT_TRC20 ? 'USDT' : 'TRX';
+        const locale = this._locale();
         this._notifyUser(
           txRecord.user_id,
           {
-            title: 'Withdrawal Rejected',
+            title: this._i18n.translate('withdrawalRejectedTitle', locale),
             body: reason != null
-              ? `Your withdrawal request has been rejected. Reason: ${reason}`
-              : 'Your withdrawal request has been rejected.',
+              ? this._i18n.translate('withdrawalRejectedBody', locale, { reason })
+              : this._i18n.translate('withdrawalRejectedBodyNoReason', locale),
             type: 'withdrawal_rejected',
             data: {
               txId,
@@ -708,11 +724,16 @@ export class OnchainWithdrawalService {
 
       // Notify user
       if (tx.user_id) {
+        const assetSymbol = tx.asset === WithdrawalAsset.USDT_TRC20 ? 'USDT' : 'TRX';
+        const locale = this._locale();
         this._notifyUser(
           tx.user_id,
           {
-            title: 'Withdrawal Completed',
-            body: `Your withdrawal of ${tx.amount} on ${tx.chain} has been confirmed on the blockchain.`,
+            title: this._i18n.translate('withdrawalCompletedTitle', locale),
+            body: this._i18n.translate('withdrawalCompletedBody', locale, {
+              amount: tx.amount,
+              symbol: assetSymbol,
+            }),
             type: 'withdrawal_approved' as const,
             data: { txId, chain: tx.chain, amount: tx.amount, txHash: tx.tx_hash },
           },

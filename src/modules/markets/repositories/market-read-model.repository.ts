@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DataSource, Repository } from 'typeorm';
 import { MARKET_TS_DB } from '@/config';
@@ -15,7 +15,7 @@ export class MarketReadModelRepository {
 
   constructor(
     private readonly configService: ConfigService,
-    @Inject(MARKET_TS_DB) private readonly marketTsDb: DataSource | null,
+    @Optional() @Inject(MARKET_TS_DB) private readonly marketTsDb: DataSource | null,
   ) {
     this.marketReadSource = (this.configService.get<string>('MARKET_READ_SOURCE') ?? 'postgres')
       .trim()

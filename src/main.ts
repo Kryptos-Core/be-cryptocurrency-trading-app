@@ -4,6 +4,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { enablePostgresQuestionMarkAdapter } from './common/database/pg-placeholder-adapter';
 import { AllExceptionsFilter } from './common/filters';
+import { I18nService, buildValidationPipeOptions } from './common/i18n';
 import {
   LoggingInterceptor,
   ResponseInterceptor,
@@ -62,20 +63,20 @@ async function bootstrap() {
   // Enable CORS
   app.enableCors();
 
-  // Global Pipes
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
+  // Resolve i18n service and validate the catalog at boot so missing
+  // translations fail fast instead of rendering English-only at runtime.
+  const i18nService = app.get(I18nService);
+  i18nService.validateCatalog();
+  // Attach `req.locale` based on `?lang=` / `Accept-Language` before any
+  // controller runs. The exception filter + ValidationPipe use it.
+  app.use(i18nService.localeMiddleware());
+
+  // Global Pipes — exceptionFactory translates class-validator constraints
+  // through I18nService using the locale resolved by `localeMiddleware()`.
+  app.useGlobalPipes(new ValidationPipe(buildValidationPipeOptions(i18nService)));
 
   // Global Filters
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter(i18nService));
 
   // Global Interceptors
   app.useGlobalInterceptors(

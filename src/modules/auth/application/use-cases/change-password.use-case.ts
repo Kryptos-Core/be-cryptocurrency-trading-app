@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { BadRequestException, UnauthorizedException } from '@/common/exceptions';
+import {
+  InvalidOtpException,
+  OtpRequiredException,
+  TwoFaRequiredException,
+} from '@/common/errors';
+import { UnauthorizedException } from '@/common/exceptions';
 import type { PasswordHasherPort } from '@/modules/auth/application/ports/password-hasher.port';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from '@/modules/auth/domain/ports';
@@ -29,20 +34,17 @@ export class ChangePasswordUseCase {
       throw new UnauthorizedException('User not found');
     }
     if (user.two_fa_enabled !== 1) {
-      throw new BadRequestException(
-        'Vui long bat xac thuc hai buoc trong Cai dat truoc khi doi mat khau.',
-        'TWO_FA_REQUIRED',
-      );
+      throw TwoFaRequiredException();
     }
 
     const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
     if (emailVerificationRequired) {
       if (!dto.otpCode) {
-        throw new BadRequestException('OTP code is required', 'OTP_REQUIRED');
+        throw OtpRequiredException();
       }
       const otpValid = await this.twoFaService.verifyOtp(userId, dto.otpCode);
       if (!otpValid) {
-        throw new BadRequestException('OTP khong hop le hoac da het han', 'INVALID_OTP');
+        throw InvalidOtpException();
       }
     }
 

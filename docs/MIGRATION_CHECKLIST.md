@@ -33,6 +33,10 @@ sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod run --rm app
 sudo docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app
 ```
 
+## TypeORM `ALTER TYPE ... ADD VALUE`
+
+Backend cấu hình `migrationsTransactionMode: 'each'` trong `src/config/data-source.ts`, trong khi PostgreSQL cấm `ALTER TYPE ... ADD VALUE` bên trong transaction. Với migration thêm enum value, dùng pattern trong `src/migrations/1700000002000-AddAuthSecurityCategoryToSystemConfigs.ts`: nếu `queryRunner.isTransactionActive` thì commit, chạy `ALTER TYPE` trên connection không có transaction, rồi `startTransaction()` lại. Migration mẫu thêm `auth_security` vào `system_configs_category_enum`; không sửa migration đã deploy.
+
 ## 5) Bring up monitoring stack
 
 ```bash

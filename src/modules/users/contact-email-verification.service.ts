@@ -1,6 +1,17 @@
 import { randomInt } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
+import {
+  EmailExistsException,
+  EmailVerificationDisabledException,
+  InvalidOtpException,
+  NotWalletPlaceholderException,
+  OtpAttemptLimitException,
+  OtpCooldownException,
+  PendingWithdrawalsException,
+  UseContactEmailVerificationException,
+  WithdrawalPendingExistsException,
+} from '@/common/errors';
+import { NotFoundException } from '@/common/exceptions';
 import { CacheService, MailService } from '@/common/services';
 import { isWalletPlaceholderEmail } from '@/common/utils/wallet-placeholder-email.util';
 import { ONCHAIN_TRANSACTION_REPOSITORY, type OnchainTransactionRepositoryPort } from '@/modules/blockchain/domain/ports';
@@ -55,10 +66,7 @@ export class ContactEmailVerificationService {
   async sendOtp(userId: string, newEmailRaw: string): Promise<{ expiresIn: number }> {
     const disabled = await this.systemConfigService.isEmailVerificationRequired();
     if (!disabled) {
-      throw new BadRequestException(
-        'Email verification is disabled by admin. OTP is not required.',
-        'EMAIL_VERIFICATION_DISABLED',
-      );
+      throw EmailVerificationDisabledException();
     }
 
     const user = await this.usersRepository.findById(userId);
@@ -66,19 +74,16 @@ export class ContactEmailVerificationService {
       throw new NotFoundException('User', userId);
     }
     if (!isWalletPlaceholderEmail(user.email)) {
-      throw new BadRequestException(
-        'Chi tai khoan dang nhap vi (email tam) moi dung duoc buoc nay. Hay dung doi email co xet duyet trong Cai dat.',
-        'NOT_WALLET_PLACEHOLDER',
-      );
+      throw NotWalletPlaceholderException();
     }
 
     const newEmail = newEmailRaw.toLowerCase().trim();
     if (isWalletPlaceholderEmail(newEmail)) {
-      throw new BadRequestException('Email khong hop le', 'INVALID_EMAIL');
+      throw new NotFoundException('Email khong hop le', 'INVALID_EMAIL');
     }
     const exists = await this.usersRepository.emailExists(newEmail, userId);
     if (exists) {
-      throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
+      throw EmailExistsException({ email: newEmail });
     }
 
     // Check OTP attempt counter for brute-force protection
@@ -86,10 +91,8 @@ export class ContactEmailVerificationService {
     const attemptCount = await this.cacheService.get<number>(attemptKey);
     if (attemptCount !== null && attemptCount >= ContactEmailVerificationService.OTP_MAX_ATTEMPTS) {
       const ttl = await this.cacheService.getTtl(attemptKey);
-      throw new BadRequestException(
-        `Qua nhieu lan thu OTP. Vui long thu lai sau ${ttl > 0 ? ttl : ContactEmailVerificationService.OTP_ATTEMPT_WINDOW_SEC} giay.`,
-        'OTP_ATTEMPT_LIMIT_EXCEEDED',
-      );
+      const seconds = ttl > 0 ? ttl : ContactEmailVerificationService.OTP_ATTEMPT_WINDOW_SEC;
+      throw OtpAttemptLimitException({ seconds });
     }
 
     const otpKey = this.otpKey(userId, newEmail);
@@ -106,10 +109,8 @@ export class ContactEmailVerificationService {
     const cooldown = await this.cacheService.get<string>(cdKey);
     if (cooldown) {
       const cooldownTtl = await this.cacheService.getTtl(cdKey);
-      throw new BadRequestException(
-        `Vui long cho ${cooldownTtl > 0 ? cooldownTtl : this.cooldownSeconds} giay truoc khi gui lai OTP.`,
-        'OTP_COOLDOWN',
-      );
+      const seconds = cooldownTtl > 0 ? cooldownTtl : this.cooldownSeconds;
+      throw OtpCooldownException({ seconds });
     }
 
     const code = this.createOtpCode();
@@ -129,10 +130,7 @@ export class ContactEmailVerificationService {
   ): Promise<{ user: UserRecord; forceRelogin: boolean }> {
     const disabled = await this.systemConfigService.isEmailVerificationRequired();
     if (!disabled) {
-      throw new BadRequestException(
-        'Email verification is disabled by admin. OTP is not required.',
-        'EMAIL_VERIFICATION_DISABLED',
-      );
+      throw EmailVerificationDisabledException();
     }
 
     const user = await this.usersRepository.findById(userId);
@@ -140,25 +138,19 @@ export class ContactEmailVerificationService {
       throw new NotFoundException('User', userId);
     }
     if (!isWalletPlaceholderEmail(user.email)) {
-      throw new BadRequestException(
-        'Chi tai khoan dang nhap vi (email tam) moi dung duoc buoc nay.',
-        'NOT_WALLET_PLACEHOLDER',
-      );
+      throw NotWalletPlaceholderException();
     }
 
     const newEmail = newEmailRaw.toLowerCase().trim();
     if (isWalletPlaceholderEmail(newEmail)) {
-      throw new BadRequestException('Email khong hop le', 'INVALID_EMAIL');
+      throw new NotFoundException('Email khong hop le', 'INVALID_EMAIL');
     }
 
     // Block email change if user has pending withdrawals (security: prevent address change during withdrawal)
     const pendingWithdrawals = await this.onchainTxRepo.findPendingWithdrawals(999);
     const userPendingWithdrawals = pendingWithdrawals.filter((w) => w.user_id === userId);
     if (userPendingWithdrawals.length > 0) {
-      throw new ConflictException(
-        `Khong the thay doi email khi co ${userPendingWithdrawals.length} yeu cau rut tien dang cho xu ly. Vui long doi hoac huy yeu cau rut tien truoc.`,
-        'WITHDRAWAL_PENDING_EXISTS',
-      );
+      throw WithdrawalPendingExistsException({ count: userPendingWithdrawals.length });
     }
 
     const otpKey = this.otpKey(userId, newEmail);
@@ -169,15 +161,12 @@ export class ContactEmailVerificationService {
     await this.cacheService.set(attemptKey, attemptCount, ContactEmailVerificationService.OTP_ATTEMPT_WINDOW_SEC);
 
     if (attemptCount > ContactEmailVerificationService.OTP_MAX_ATTEMPTS) {
-      throw new BadRequestException(
-        `Qua nhieu lan thu OTP. Vui long cho 15 phut truoc khi thu lai.`,
-        'OTP_ATTEMPT_LIMIT_EXCEEDED',
-      );
+      throw OtpAttemptLimitException({ seconds: ContactEmailVerificationService.OTP_ATTEMPT_WINDOW_SEC });
     }
 
     const cached = await this.cacheService.get<string | number>(otpKey);
     if (cached == null) {
-      throw new BadRequestException('Ma OTP khong hop le hoac da het han', 'INVALID_OTP');
+      throw InvalidOtpException();
     }
     const cachedStr = String(cached).trim();
     const codeStr = String(otpCode).trim();
@@ -185,12 +174,12 @@ export class ContactEmailVerificationService {
       this.logger.warn(
         `[ContactEmail] Invalid OTP attempt ${attemptCount}/${ContactEmailVerificationService.OTP_MAX_ATTEMPTS} for user=${userId} email=${newEmail}`,
       );
-      throw new BadRequestException('Ma OTP khong hop le hoac da het han', 'INVALID_OTP');
+      throw InvalidOtpException();
     }
 
     const exists = await this.usersRepository.emailExists(newEmail, userId);
     if (exists) {
-      throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
+      throw EmailExistsException({ email: newEmail });
     }
 
     const oldEmail = user.email;
@@ -242,25 +231,19 @@ export class ContactEmailVerificationService {
     }
 
     if (isWalletPlaceholderEmail(user.email)) {
-      throw new BadRequestException(
-        'Tài khoản ví dùng email tạm. Vui lòng xác minh email thật trong Hồ sơ.',
-        'USE_CONTACT_EMAIL_VERIFICATION',
-      );
+      throw UseContactEmailVerificationException();
     }
 
     const newEmail = newEmailRaw.toLowerCase().trim();
     const emailLower = newEmail.toLowerCase().trim();
     const exists = await this.usersRepository.emailExists(emailLower, userId);
     if (exists) {
-      throw new ConflictException('Email already in use', 'EMAIL_EXISTS');
+      throw EmailExistsException({ email: emailLower });
     }
 
     const pendingWithdrawals = await this.onchainTxRepo.findPendingWithdrawals(1);
     if (pendingWithdrawals.length > 0) {
-      throw new BadRequestException(
-        'Không thể đổi email khi có lệnh rút tiền đang chờ xử lý. Vui lòng thử lại sau.',
-        'PENDING_WITHDRAWALS',
-      );
+      throw PendingWithdrawalsException();
     }
 
     const oldEmail = user.email;
