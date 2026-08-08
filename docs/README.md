@@ -32,6 +32,7 @@
 | File | Mục đích |
 |------|---------|
 | [`docs/ENV_CONFIG_USAGE.md`](ENV_CONFIG_USAGE.md) | Danh sách env var đầy đủ (CORE_DB, MARKET_TS, EVENT_OUTBOX, KAFKA, matching, exchange, on-chain, encryption, SMTP, Firebase, safety flags). |
+| [`docs/KAFKA_LOCAL_DEV_LIFECYCLE.md`](KAFKA_LOCAL_DEV_LIFECYCLE.md) | Logic Kafka hiện tại (compose + producer + DLQ + circuit breaker + consumer scaffold), timeline thay đổi từ lần đầu implement đến 2026-07-30, vì sao tắt/bật Docker trước đây làm Kafka không recover và giờ chạy bình thường, runbook cleanup / stop / start / bật driver. |
 | [`docs/WALLETCONNECT.md`](WALLETCONNECT.md) | WC v2 / Reown, route REST, SignClient singleton, env whitelist. |
 | [`docs/BINANCE_TESTNET_SETUP.md`](BINANCE_TESTNET_SETUP.md) | Testnet config + endpoint đồng bộ thủ công. |
 | [`docs/PROFILE_AVATAR_SECURITY_REVIEW.md`](PROFILE_AVATAR_SECURITY_REVIEW.md) | Cloudinary avatar + security change request workflow. |

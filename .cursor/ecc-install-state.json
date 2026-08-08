@@ -31,9 +31,11 @@
     "skippedModules": []
   },
   "source": {
-    "repoVersion": "1.10.0",
+    "repoVersion": "2.2.0",
     "repoCommit": "7dfdbe0b1704a79669a6e24e2dbe76433caf5795",
-    "manifestVersion": 1
+    "manifestVersion": 1,
+    "upgradedAt": "2026-08-09",
+    "previousVersion": "1.10.0"
   },
   "operations": [],
   "operationsNote": "Truncated by project cleanup; full log was 913 operations. Re-run ECC install.ps1 if you need to diff against source."

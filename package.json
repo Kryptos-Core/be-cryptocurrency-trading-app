@@ -17,6 +17,8 @@
     "format:check": "biome format ./src ./scripts",
     "lint:boundaries": "node scripts/check-module-boundaries.mjs",
     "lint:uow": "node scripts/check-uow-policy.mjs",
+    "audit:config": "node scripts/audit-config-keys.mjs",
+    "test:coverage:gate": "node scripts/coverage-gate.mjs",
 
     "test": "jest",
     "test:cov": "jest --coverage",
