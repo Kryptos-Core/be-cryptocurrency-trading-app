@@ -43,15 +43,16 @@ export class ImportMainWalletDto {
   @MaxLength(100)
   label?: string;
 
-  @ApiProperty({
-    description: 'TOTP 6-digit 2FA code from authenticator app (required)',
+  @ApiPropertyOptional({
+    description:
+      'TOTP 6-digit 2FA code from authenticator app. Required when admin has TOTP gating enabled for treasury main wallets (default). Optional when admin has disabled it (sandbox / internal env only — see AUTH_SECURITY settings).',
     example: '123456',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MinLength(6)
   @MaxLength(8)
-  mfaCode!: string;
+  mfaCode?: string;
 }
 
 /**
@@ -71,12 +72,16 @@ export class ReviewMainWalletDto {
 
 /** Email OTP — same verification as import main wallet. */
 export class RevealMainWalletPrivateKeyDto {
-  @ApiProperty({ description: 'Email OTP from POST /auth/2fa/send-otp', example: '123456' })
+  @ApiPropertyOptional({
+    description:
+      'TOTP 6-digit 2FA code. Required when admin has TOTP gating enabled for treasury main wallets (default). Optional when admin has disabled it (sandbox / internal env only — see AUTH_SECURITY settings).',
+    example: '123456',
+  })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MinLength(6)
   @MaxLength(8)
-  mfaCode!: string;
+  mfaCode?: string;
 }
 
 export class UpdateMainWalletDto {

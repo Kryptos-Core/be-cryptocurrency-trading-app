@@ -64,12 +64,14 @@ describe('ContactEmailVerificationService', () => {
   });
 
   describe('sendOtp', () => {
-    it('throws EMAIL_VERIFICATION_DISABLED when email verification is disabled by admin', async () => {
+    it('returns { skipped: true } when email verification is disabled by admin', async () => {
       (systemConfigService.isEmailVerificationRequired as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.sendOtp('user-1', 'real@example.com')).rejects.toMatchObject({
-        response: { errorCode: 'EMAIL_VERIFICATION_DISABLED' },
-      });
+      const result = await service.sendOtp('user-1', 'real@example.com');
+      expect(result).toEqual({ skipped: true });
+      // Should NOT touch cache or mail when skipped.
+      expect(cacheService.get).not.toHaveBeenCalled();
+      expect(mailService.sendContactEmailVerificationOtp).not.toHaveBeenCalled();
     });
 
     it('sends OTP when email verification is required', async () => {
@@ -80,7 +82,7 @@ describe('ContactEmailVerificationService', () => {
 
       const result = await service.sendOtp('user-1', 'real@example.com');
 
-      expect(result.expiresIn).toBe(300);
+      expect(result).toMatchObject({ expiresIn: 300 });
       expect(mailService.sendContactEmailVerificationOtp).toHaveBeenCalledWith(
         'real@example.com',
         expect.stringMatching(/^\d{6}$/),
@@ -95,14 +97,19 @@ describe('ContactEmailVerificationService', () => {
       await expect(
         service.verifyAndUpdateEmail('user-1', 'real@example.com', '123456'),
       ).rejects.toMatchObject({
-        response: { errorCode: 'EMAIL_VERIFICATION_DISABLED' },
+        code: 'EMAIL_VERIFICATION_DISABLED',
       });
     });
 
     it('verifies and updates email when email verification is required', async () => {
       (systemConfigService.isEmailVerificationRequired as jest.Mock).mockResolvedValue(true);
       (usersRepository.findById as jest.Mock).mockResolvedValue(mockUser);
-      (cacheService.get as jest.Mock).mockResolvedValue('123456');
+      (cacheService.get as jest.Mock).mockImplementation(async (key: string) => {
+        // Only the bare OTP key holds the OTP code; attempts/cooldown keys hold null.
+        if (key.includes(':otp:') && !key.includes(':attempts:')) return '123456';
+        return null;
+      });
+      (cacheService.getTtl as jest.Mock).mockResolvedValue(300);
       (cacheService.delete as jest.Mock).mockResolvedValue(undefined);
       (usersRepository.emailExists as jest.Mock).mockResolvedValue(false);
       (usersRepository.update as jest.Mock).mockResolvedValue(undefined);

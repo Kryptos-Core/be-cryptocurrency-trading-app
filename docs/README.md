@@ -25,7 +25,7 @@
 | [`docs/BASE_REPOSITORY_USAGE.md`](BASE_REPOSITORY_USAGE.md) | `BaseRepository` method list (find/save/transaction/query). |
 | [`docs/REDIS_USAGE.md`](REDIS_USAGE.md) | Cache, lock khớp lệnh, lock relay outbox, idempotency, WC session. |
 | [`docs/worker-pool-inventory.md`](worker-pool-inventory.md) | Piscina tasks CPU-bound; matching single-thread; outbox scale consumers. |
-| [`AGENTS.md`](../AGENTS.md), [`VIBE_CODE.md`](../VIBE_CODE.md), [`CONTRIBUTING-RULES.md`](../CONTRIBUTING-RULES.md), [`ECC-COMMANDS.md`](../ECC-COMMANDS.md) | AI workflow, conventions, PR process. |
+| [`AGENTS.md`](../AGENTS.md), [`VIBE_CODE.md`](../VIBE_CODE.md), [`CONTRIBUTING-RULES.md`](../CONTRIBUTING-RULES.md) | AI workflow, conventions, PR process. Lệnh slash: xem `.cursor/commands/` và `.claude/commands/`. |
 
 ## Configuration & Environment
 

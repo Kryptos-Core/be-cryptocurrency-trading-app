@@ -534,6 +534,14 @@ const EXTRA_AUTH_SECURITY_RUNTIME_SETTING_SEEDS: RuntimeSettingSeed[] = [
     description:
       'When true, sensitive actions (wallet add/remove, password change, email change, contact-email OTP) require OTP email. When false, all email-OTP flows are bypassed. Only disable in trusted/internal environments.',
   },
+  {
+    key: 'TREASURY_WALLET_TOTP_REQUIRED',
+    type: ConfigDataType.BOOLEAN,
+    category: ConfigCategory.AUTH_SECURITY,
+    name: 'Treasury main wallet TOTP required (import / reveal)',
+    description:
+      'When true (default), import and reveal-private-key of treasury main wallets require a TOTP 2FA code. When false, the TOTP check is bypassed for treasury main-wallet operations. This flag has no effect when ONCHAIN_OPERATOR_MODE=production — TOTP is always enforced for production on-chain wallets regardless of this setting. Only disable on sandbox / internal environments.',
+  },
 ];
 
 /** Full seed list: core + every `*_RPC_URL` from evm-chain-definitions + per-chain auto max (no duplicates). */

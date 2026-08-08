@@ -9,9 +9,20 @@ dist/
 .env.prod
 .env.*
 
+# Firebase / GCP service account keys (must never be in VCS)
+firebase-service-account.json
+**/firebase-service-account*.json
+*.gcp-key.json
+gcp-credentials.json
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
 # Local seed users (copy from src/seed/data/users.json.example)
 src/seed/data/users.json
 
 # Test coverage (Jest / Istanbul)
 coverage/
 .coverage-tmp/
+src/coverage/

@@ -19,7 +19,6 @@ import {
 } from '@/common/decorators';
 import {
   ContactEmailRequiredException,
-  EmailVerificationDisabledException,
   InvalidOtpException,
 } from '@/common/errors';
 import { JwtAuthGuard } from '@/common/guards';
@@ -247,7 +246,9 @@ export class AuthController {
   async sendTwoFaOtp(@CurrentUser('userId') userId: string) {
     const emailVerificationRequired = await this.systemConfigService.isEmailVerificationRequired();
     if (!emailVerificationRequired) {
-      throw EmailVerificationDisabledException();
+      // Admin disabled email-OTP gating — return a no-op success so clients
+      // that call this endpoint as part of a guarded flow can proceed.
+      return { skipped: true };
     }
     const user = await this.authService.getUserById(userId);
     if (isWalletPlaceholderEmail(user.email)) {
@@ -274,6 +275,33 @@ export class AuthController {
   async getEmailVerificationRequired() {
     const required = await this.systemConfigService.isEmailVerificationRequired();
     return { emailVerificationRequired: required };
+  }
+
+  /**
+   * Combined auth/security runtime flags for the Flutter client.
+   * Returns both the email OTP gating flag and the treasury TOTP gating flag.
+   * Safe to call on every screen for any authenticated user.
+   */
+  @Get('auth-security-flags')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get combined auth/security runtime flags',
+    description:
+      'Returns the email-OTP gating flag and the treasury TOTP gating flag. The client uses this to decide whether to show OTP/TOTP dialogs for sensitive operations.',
+  })
+  @ApiSuccessResponse('Auth/security flags')
+  @ApiUnauthorizedResponse('Unauthorized')
+  async getAuthSecurityFlags() {
+    const [emailVerificationRequired, treasuryWalletTotpRequired] = await Promise.all([
+      this.systemConfigService.isEmailVerificationRequired(),
+      this.systemConfigService.isTreasuryWalletTotpRequired(),
+    ]);
+    return {
+      emailVerificationRequired,
+      treasuryWalletTotpRequired,
+    };
   }
 
   /**

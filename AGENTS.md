@@ -32,7 +32,7 @@ Mở **đúng thư mục gốc repo NestJS này** làm folder workspace (cùng c
 
 **Hướng dẫn agent chi tiết:** [`.cursor/AGENTS.md`](./.cursor/AGENTS.md).
 
-**Lệnh slash / multi-agent ECC:** [ECC-COMMANDS.md](./ECC-COMMANDS.md).
+**Lệnh slash / multi-agent ECC:** xem `.cursor/commands/`, `.claude/commands/`, và `docs/onboarding/ecc-commands-quick-ref.md`.
 
 ## Optional upstream
 

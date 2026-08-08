@@ -15,6 +15,7 @@ import { Permission, UserRole } from '@/common/enums';
 import { BadRequestException } from '@/common/exceptions';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
+import { SystemConfigService } from '@/modules/system-config/system-config.service';
 import {
   ApproveMainWalletDeletionUseCase,
   ApproveMainWalletUseCase,
@@ -79,6 +80,7 @@ export class TreasuryController {
     private readonly treasuryOperationsService: TreasuryOperationsService,
     private readonly twoFaService: TwoFaService,
     private readonly onchainChainPickerService: OnchainChainPickerService,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -208,13 +210,25 @@ export class TreasuryController {
     @CurrentUser('userId') actorUserId: string,
     @CurrentUser('role') actorRole: UserRole,
   ) {
-    // ── MFA verification (consumes OTP) ──────────────────────────────────
-    const mfaValid = await this.twoFaService.verifyOtp(actorUserId, dto.mfaCode);
-    if (!mfaValid) {
-      throw new BadRequestException(
-        'Invalid or expired MFA code. Request a new OTP via POST /auth/2fa/send-otp and try again.',
-        'INVALID_MFA_CODE',
-      );
+    // ── TOTP 2FA verification (consumes OTP) ────────────────────────────
+    // Skipped when admin has disabled TOTP for treasury wallets (sandbox only —
+    // ONCHAIN_OPERATOR_MODE=production always re-enables the check inside
+    // SystemConfigService.isTreasuryWalletTotpRequired).
+    const treasuryTotpRequired = await this.systemConfigService.isTreasuryWalletTotpRequired();
+    if (treasuryTotpRequired) {
+      if (!dto.mfaCode) {
+        throw new BadRequestException(
+          'TOTP code is required when treasury TOTP gating is enabled.',
+          'MFA_CODE_REQUIRED',
+        );
+      }
+      const mfaValid = await this.twoFaService.verifyOtp(actorUserId, dto.mfaCode);
+      if (!mfaValid) {
+        throw new BadRequestException(
+          'Invalid or expired MFA code. Request a new OTP via POST /auth/2fa/send-otp and try again.',
+          'INVALID_MFA_CODE',
+        );
+      }
     }
 
     return this.importMainWalletUseCase.execute(dto, actorUserId, actorRole);
@@ -282,12 +296,24 @@ export class TreasuryController {
     @Body() dto: RevealMainWalletPrivateKeyDto,
     @CurrentUser('userId') actorUserId: string,
   ) {
-    const mfaValid = await this.twoFaService.verifyOtp(actorUserId, dto.mfaCode);
-    if (!mfaValid) {
-      throw new BadRequestException(
-        'Invalid or expired MFA code. Request a new OTP via POST /auth/2fa/send-otp and try again.',
-        'INVALID_MFA_CODE',
-      );
+    // Skipped when admin has disabled TOTP for treasury wallets. Service
+    // returns true unconditionally on ONCHAIN_OPERATOR_MODE=production so the
+    // check is always enforced for real on-chain wallets.
+    const treasuryTotpRequired = await this.systemConfigService.isTreasuryWalletTotpRequired();
+    if (treasuryTotpRequired) {
+      if (!dto.mfaCode) {
+        throw new BadRequestException(
+          'TOTP code is required when treasury TOTP gating is enabled.',
+          'MFA_CODE_REQUIRED',
+        );
+      }
+      const mfaValid = await this.twoFaService.verifyOtp(actorUserId, dto.mfaCode);
+      if (!mfaValid) {
+        throw new BadRequestException(
+          'Invalid or expired MFA code. Request a new OTP via POST /auth/2fa/send-otp and try again.',
+          'INVALID_MFA_CODE',
+        );
+      }
     }
     return this.revealMainWalletPrivateKeyUseCase.execute(mainWalletId, actorUserId);
   }

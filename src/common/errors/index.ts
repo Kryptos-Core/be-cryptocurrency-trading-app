@@ -42,6 +42,9 @@ export {
   ExternalServiceError,
 } from './resource-errors';
 
+// Re-export legacy descriptor factories so existing call sites continue to work.
+export * from './error-descriptors';
+
 export type ErrorCode =
   | 'AUTH/INVALID_CREDENTIALS'
   | 'AUTH/EMAIL_NOT_VERIFIED'

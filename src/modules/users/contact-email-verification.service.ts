@@ -63,10 +63,14 @@ export class ContactEmailVerificationService {
     return randomInt(100000, 1000000).toString();
   }
 
-  async sendOtp(userId: string, newEmailRaw: string): Promise<{ expiresIn: number }> {
+  async sendOtp(userId: string, newEmailRaw: string): Promise<{ expiresIn: number } | { skipped: true }> {
     const disabled = await this.systemConfigService.isEmailVerificationRequired();
     if (!disabled) {
-      throw EmailVerificationDisabledException();
+      // Admin disabled email-OTP gating — return a no-op so the caller can
+      // proceed without sending an OTP. Clients should normally call
+      // updateContactEmailWithoutOtp instead, but this guards against races
+      // where the admin flips the flag mid-flow.
+      return { skipped: true };
     }
 
     const user = await this.usersRepository.findById(userId);

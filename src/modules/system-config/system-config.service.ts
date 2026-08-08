@@ -199,6 +199,26 @@ export class SystemConfigService implements OnModuleInit {
   }
 
   /**
+   * Returns true when treasury main-wallet operations (import / reveal private key)
+   * must verify a TOTP 2FA code.
+   *
+   * Hard-override: when `ONCHAIN_OPERATOR_MODE=production`, TOTP is ALWAYS required
+   * regardless of the DB/env value — we never let an admin disable 2FA on real on-chain
+   * wallets by mistake.
+   *
+   * Defaults to `true` (secure by default) when the key is absent from DB and not set
+   * via env — see `resolveEnvFallback`.
+   */
+  async isTreasuryWalletTotpRequired(): Promise<boolean> {
+    if ((process.env.ONCHAIN_OPERATOR_MODE || '').toLowerCase() === 'production') {
+      return true;
+    }
+    const raw = await this.get<string>('TREASURY_WALLET_TOTP_REQUIRED');
+    const effective = raw ?? this.resolveEnvFallback('TREASURY_WALLET_TOTP_REQUIRED');
+    return effective === 'true';
+  }
+
+  /**
    * Effective string for a runtime key (never null for whitelisted keys).
    */
   async getEffectiveString(key: RuntimeSettingKey): Promise<string> {
@@ -392,6 +412,7 @@ export class SystemConfigService implements OnModuleInit {
         if (key === 'trading.max_slippage_pct') return envOr('TRADING_MAX_SLIPPAGE_PCT', '0.01');
         if (key === 'trading.price_stale_threshold_ms') return envOr('TRADING_PRICE_STALE_THRESHOLD_MS', '300000');
         if (key === 'EMAIL_VERIFICATION_REQUIRED') return envOr('EMAIL_VERIFICATION_REQUIRED', 'true');
+        if (key === 'TREASURY_WALLET_TOTP_REQUIRED') return envOr('TREASURY_WALLET_TOTP_REQUIRED', 'true');
         return '';
       }
     }

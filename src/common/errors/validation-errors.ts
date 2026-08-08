@@ -1,4 +1,4 @@
-import { DomainError } from '../domain-error.base';
+import { DomainError } from './domain-error.base';
 
 /**
  * VALIDATION/SCHEMA_INVALID - 422

@@ -10,7 +10,7 @@ Thu muc `.claude/` la nguon chuan cua BE. Khi mo workspace la root monorepo, BE 
 |------|---------|
 | `VIBE_CODE.md` | Chuẩn AI của team BE |
 | `AGENTS.md` | Danh sach agent ECC cho BE |
-| `ECC-COMMANDS.md` | Lệnh CCG / multi-agent |
+| `docs/onboarding/ecc-commands-quick-ref.md` | Lệnh CCG / multi-agent |
 | `docs/ARCHITECTURE.md` | Kiến trúc chi tiet |
 | `README.md` | Setup, chạy local |
 
@@ -146,4 +146,4 @@ ECC commands (neu can):
 npx ccg-workflow
 ```
 
-Chi tiet: `ECC-COMMANDS.md`.
+Chi tiet: `docs/onboarding/ecc-commands-quick-ref.md`.
