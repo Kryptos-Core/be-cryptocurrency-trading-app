@@ -8,6 +8,8 @@ import { User } from '@/entities/user.entity';
 import { PASSWORD_HASHER } from '@/modules/auth/application/ports/password-hasher.token';
 import { TOKEN_ISSUER } from '@/modules/auth/application/ports/token-issuer.token';
 import { ChangePasswordUseCase } from '@/modules/auth/application/use-cases/change-password.use-case';
+import { ListSandboxUsersUseCase } from '@/modules/auth/application/use-cases/list-sandbox-users.use-case';
+import { LoginEmailOnlyUseCase } from '@/modules/auth/application/use-cases/login-email-only.use-case';
 import { LoginWithPasswordUseCase } from '@/modules/auth/application/use-cases/login-with-password.use-case';
 import { RegisterUserUseCase } from '@/modules/auth/application/use-cases/register-user.use-case';
 import { AUTH_REPOSITORY } from '@/modules/auth/domain/ports';
@@ -55,6 +57,8 @@ import { WalletConnectAuthService } from './wallet-connect-auth.service';
     MailService,
     RegisterUserUseCase,
     LoginWithPasswordUseCase,
+    LoginEmailOnlyUseCase,
+    ListSandboxUsersUseCase,
     ChangePasswordUseCase,
     BcryptPasswordHasherAdapter,
     {

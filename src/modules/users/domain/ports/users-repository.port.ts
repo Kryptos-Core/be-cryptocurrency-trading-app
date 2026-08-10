@@ -31,12 +31,28 @@ export type ReviewedSecurityChangeRequestRecord = {
 };
 
 /**
+ * Sandbox-only projection of an active user — used by the email-only login picker.
+ * Sensitive fields (password_hash, two_fa_secret, fcm_token) are intentionally excluded.
+ */
+export type SandboxUserPickRecord = {
+  user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: UserRole;
+  status: 'ACTIVE' | 'BANNED' | 'PENDING';
+  avatar_url: string | null;
+  created_at: Date;
+};
+
+/**
  * Users Repository Port — domain contract for user persistence.
  */
 export interface UsersRepositoryPort {
   findById(userId: string): Promise<UserRecord | null>;
   findByEmail(email: string): Promise<UserRecord | null>;
   findAll(page?: number, limit?: number): Promise<{ users: UserRecord[]; total: number }>;
+  findActiveForSandbox(): Promise<SandboxUserPickRecord[]>;
   findAllWithFilters(
     filters: UserFilterDto,
   ): Promise<{ users: UserRecord[]; total: number; page: number; limit: number }>;

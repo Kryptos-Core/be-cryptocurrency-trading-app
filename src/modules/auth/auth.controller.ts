@@ -28,6 +28,7 @@ import { SystemConfigService } from '@/modules/system-config/system-config.servi
 import {
   ChangePasswordDto,
   LoginDto,
+  LoginEmailOnlyDto,
   RegisterDto,
   TwoFaOtpDto,
   WalletNonceDto,
@@ -119,6 +120,45 @@ export class AuthController {
   @ApiBadRequestResponse('Invalid input data')
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  /**
+   * Login by email only — sandbox/testnet convenience endpoint.
+   * Active only when ONCHAIN_OPERATOR_MODE=sandbox. Returns 404 in production.
+   * POST /auth/login-email-only
+   */
+  @Public()
+  @Post('login-email-only')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sandbox-only login by email (no password)',
+    description:
+      'Dev/QA convenience endpoint. Returns 404 unless ONCHAIN_OPERATOR_MODE=sandbox. The user must be ACTIVE.',
+  })
+  @ApiBody({ type: LoginEmailOnlyDto })
+  @ApiSuccessResponse('Sandbox login successful')
+  @ApiUnauthorizedResponse('Invalid credentials')
+  @ApiBadRequestResponse('Invalid email')
+  async loginEmailOnly(@Body() dto: LoginEmailOnlyDto) {
+    return this.authService.loginEmailOnly(dto);
+  }
+
+  /**
+   * List active users for the sandbox login picker.
+   * Active only when ONCHAIN_OPERATOR_MODE=sandbox. Returns 404 in production.
+   * GET /auth/sandbox-users
+   */
+  @Public()
+  @Get('sandbox-users')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List active users (sandbox login picker)',
+    description:
+      'Returns ACTIVE users (no password hash / 2FA secret / FCM token). Returns 404 unless ONCHAIN_OPERATOR_MODE=sandbox.',
+  })
+  @ApiSuccessResponse('Sandbox users retrieved')
+  async listSandboxUsers() {
+    return this.authService.listSandboxUsers();
   }
 
   /**

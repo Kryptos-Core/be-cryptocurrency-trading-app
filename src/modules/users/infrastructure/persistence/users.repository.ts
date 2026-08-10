@@ -60,6 +60,44 @@ export class UsersRepository {
     return (rows?.[0] as User | undefined) ?? null;
   }
 
+  async findActiveForSandbox(): Promise<
+    Array<{
+      user_id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      role: UserRole;
+      status: 'ACTIVE' | 'BANNED' | 'PENDING';
+      avatar_url: string | null;
+      created_at: Date;
+    }>
+  > {
+    const rows = await this.dataSource.query(
+      `SELECT
+          u.user_id,
+          u.email,
+          u.first_name,
+          u.last_name,
+          u.role,
+          u.status,
+          u.avatar_url,
+          u.created_at
+         FROM users u
+        WHERE u.status = 'ACTIVE'
+        ORDER BY u.role ASC, u.created_at DESC`,
+    );
+    return (rows ?? []) as Array<{
+      user_id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      role: UserRole;
+      status: 'ACTIVE' | 'BANNED' | 'PENDING';
+      avatar_url: string | null;
+      created_at: Date;
+    }>;
+  }
+
   async findAll(page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> {
     const result = await this.findAllWithFilters({ page, limit });
     return { users: result.users, total: result.total };

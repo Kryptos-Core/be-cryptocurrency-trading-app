@@ -13,14 +13,14 @@ jest.mock('@/common/utils/wallet-placeholder-email.util', () => ({
 
 describe('AuthController — OTP-flagged endpoints', () => {
   let controller: AuthController;
-  let authService: { getUserById: jest.Mock };
+  let authService: { getUserById: jest.Mock; loginEmailOnly: jest.Mock; listSandboxUsers: jest.Mock };
   let twoFaService: { sendOtp: jest.Mock };
   let systemConfigService: { isEmailVerificationRequired: jest.Mock; isTreasuryWalletTotpRequired: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    authService = { getUserById: jest.fn() };
+    authService = { getUserById: jest.fn(), loginEmailOnly: jest.fn(), listSandboxUsers: jest.fn() };
     twoFaService = { sendOtp: jest.fn().mockResolvedValue({ expiresIn: 300 }) };
     systemConfigService = {
       isEmailVerificationRequired: jest.fn().mockResolvedValue(true),
@@ -90,6 +90,24 @@ describe('AuthController — OTP-flagged endpoints', () => {
         emailVerificationRequired: true,
         treasuryWalletTotpRequired: true,
       });
+    });
+  });
+
+  describe('loginEmailOnly', () => {
+    it('delegates to AuthService.loginEmailOnly with the request body', async () => {
+      authService.loginEmailOnly.mockResolvedValue({ accessToken: 'tok', user: { email: 'a@b' } });
+      const result = await controller.loginEmailOnly({ email: 'a@b' } as any);
+      expect(authService.loginEmailOnly).toHaveBeenCalledWith({ email: 'a@b' });
+      expect(result).toEqual({ accessToken: 'tok', user: { email: 'a@b' } });
+    });
+  });
+
+  describe('listSandboxUsers', () => {
+    it('delegates to AuthService.listSandboxUsers', async () => {
+      authService.listSandboxUsers.mockResolvedValue([{ userId: 'u1' }]);
+      const result = await controller.listSandboxUsers();
+      expect(authService.listSandboxUsers).toHaveBeenCalled();
+      expect(result).toEqual([{ userId: 'u1' }]);
     });
   });
 });
