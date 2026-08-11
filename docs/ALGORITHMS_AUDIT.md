@@ -1,6 +1,20 @@
 # Thuật toán & Pattern quan trọng — Trạng thái hiện tại & Kế hoạch
 
-> Last reviewed: 2026-08-01 — verified against `src/modules/matching/`, `src/modules/orders/`, `src/modules/wallets/`, `src/modules/treasury/`, `src/common/`, `src/modules/trading/`, `go-services/`, `fe-cryptocurrency-trading-app/lib/core/services/`.
+> Last reviewed: 2026-08-11 — verified against `src/modules/matching/`, `src/modules/orders/`, `src/modules/wallets/`, `src/modules/treasury/`, `src/common/`, `src/modules/trading/`, `go-services/`, `fe-cryptocurrency-trading-app/lib/core/services/`.
+>
+> **Verification 2026-08-11**: Đã xác minh tất cả các file và thư mục được reference trong tài liệu tồn tại trong codebase. Các implementation đã được verify:
+> - ✅ Price-Time Priority (TS): `src/modules/matching/domain/services/strategies/price-time-priority.strategy.ts`
+> - ✅ Price-Time Priority (Go): `go-services/matching-engine/internal/domain/matching/strategy.go`
+> - ✅ Market Order Strategy: `src/modules/matching/domain/services/strategies/market-order.strategy.ts`
+> - ✅ Order Book: `src/modules/matching/domain/services/orderbook/order-book.service.ts`
+> - ✅ Circuit Breaker: `src/modules/matching/domain/services/circuit-breaker.service.ts`
+> - ✅ Trading Price Stream: `src/modules/trading/services/trading-price-stream.service.ts`
+> - ✅ Binance Price Feed: `src/modules/trading/services/binance-price-feed.service.ts`
+> - ✅ Redis Distributed Lock: `src/common/utils/redis-distributed-lock.ts`
+> - ✅ Binance REST Client: `src/modules/binance-rest/binance-rest-client.service.ts`
+> - ✅ Event Store: `src/modules/matching/infrastructure/projections/event-store.ts`
+> - ✅ Technical Indicators (Flutter): `fe-cryptocurrency-trading-app/lib/core/services/indicator_service.dart`
+> - ✅ Chart Cache (Flutter): `fe-cryptocurrency-trading-app/lib/core/services/chart_cache_service.dart`
 
 Tài liệu này audit **6 nhóm thuật toán/pattern quan trọng** của một sàn giao dịch tiền mã hoá và map chúng sang codebase hiện tại (NestJS backend + Go services + Flutter frontend). Mỗi mục có:
 
@@ -2464,3 +2478,11 @@ Wrap `@nestjs/throttler` với `ThrottlerStorageRedisService` để share rate l
 | [security-zones.md](./security-zones.md) | Đánh dấu criticality từng module |
 | [GO_REAL_TRAFFIC_AND_MUTATION_PLAN.md](./GO_REAL_TRAFFIC_AND_MUTATION_PLAN.md) | Roadmap Go shadow matching |
 | [GO_SERVICES_PRODUCTION_ROLLOUT.md](./GO_SERVICES_PRODUCTION_ROLLOUT.md) | Rollout Go services |
+---
+
+## Lịch sử cập nhật
+
+| Ngày | Người cập nhật | Thay đổi |
+|------|-----------------|-----------|
+| 2026-08-11 | Claude Code | Xác minh lại tất cả 27 file reference trong tài liệu. Tất cả các file đều tồn tại trong codebase. |
+| 2026-08-01 | Claude Code | Cập nhật lần đầu với đầy đủ chi tiết về 6 nhóm thuật toán/pattern |
