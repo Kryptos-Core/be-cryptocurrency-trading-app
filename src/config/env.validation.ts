@@ -792,6 +792,37 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   BINANCE_CREDENTIALS_ENCRYPTION_KEY?: string;
+
+  // ─── Vilao AI (LLM) ───────────────────────────────────────────────────────
+  @IsString()
+  @IsOptional()
+  VILAO_API_KEY?: string;
+
+  @IsUrl({ require_tld: false })
+  @IsOptional()
+  VILAO_BASE_URL?: string = 'https://api.vilao.ai/v1';
+
+  @IsString()
+  @IsOptional()
+  VILAO_DEFAULT_MODEL?: string = 'gx/gpt-5.4';
+
+  @IsString()
+  @IsOptional()
+  VILAO_FAST_MODEL?: string = 'openai/gpt-4o-mini';
+
+  @IsString()
+  @IsOptional()
+  VILAO_EMBEDDING_MODEL?: string = 'openai/gpt-4o-mini';
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  VILAO_RATE_LIMIT_PER_USER_PER_MIN?: number = 20;
+
+  @IsInt()
+  @Min(1000)
+  @IsOptional()
+  VILAO_DAILY_TOKEN_BUDGET_PER_USER?: number = 100000;
 }
 
 /**
@@ -985,6 +1016,13 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     'WALLETCONNECT_RELAY_URL',
     'WALLETCONNECT_WEBHOOK_SECRET',
     'BINANCE_CREDENTIALS_ENCRYPTION_KEY',
+    'VILAO_API_KEY',
+    'VILAO_BASE_URL',
+    'VILAO_DEFAULT_MODEL',
+    'VILAO_FAST_MODEL',
+    'VILAO_EMBEDDING_MODEL',
+    'VILAO_RATE_LIMIT_PER_USER_PER_MIN',
+    'VILAO_DAILY_TOKEN_BUDGET_PER_USER',
   ];
 
   // Chỉ lấy các env vars mà chúng ta quan tâm

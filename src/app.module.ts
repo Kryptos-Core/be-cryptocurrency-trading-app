@@ -20,6 +20,7 @@ import { getBullRedisConfig } from './config/redis.config';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AiAssistantModule } from './modules/ai-assistant/ai-assistant.module';
 import { BinanceRestModule } from './modules/binance-rest/binance-rest.module';
 import { BinanceProxyModule } from './modules/binance-proxy/binance-proxy.module';
 import { UserBinanceCredentialsModule } from './modules/user-binance-credentials/user-binance-credentials.module';
@@ -116,6 +117,7 @@ class BullBoardAuthMiddleware {
     BinanceProxyModule,
     UserBinanceCredentialsModule,
     AuthModule,
+    AiAssistantModule,
     UsersModule,
     CurrenciesModule,
     MarketsModule,
