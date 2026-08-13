@@ -54,6 +54,7 @@ const DEFAULT_MODEL = 'ccf/claude-sonnet-5';
 const DEFAULT_FAST_MODEL = 'ccf/claude-haiku-4-5-20251001';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
+const REQUEST_TIMEOUT_MS = 60_000; // hard upper bound per attempt
 const SOFT_ERROR_LOG_PREFIX = '[vilao-llm] soft error';
 const DEFAULT_MAX_TOKENS = 1024;
 
@@ -122,6 +123,10 @@ export class VilaoLlmClient {
     const { system, messages } = splitSystemPrompt(req.messages);
     const tools = req.tools?.map(toAnthropicTool);
 
+    // Combine caller-provided AbortSignal with an internal timeout so the
+    // gateway never hangs forever on a stalled upstream.
+    const combinedSignal = mergeAbortSignals(req.signal, REQUEST_TIMEOUT_MS);
+
     const response = await this.withRetry(
       () =>
         client.messages.create({
@@ -135,7 +140,7 @@ export class VilaoLlmClient {
           temperature: req.temperature ?? 0.7,
           max_tokens: req.max_tokens ?? DEFAULT_MAX_TOKENS,
         }),
-      req.signal,
+      combinedSignal.signal,
     );
 
     return fromAnthropicResponse(response);
@@ -163,24 +168,35 @@ export class VilaoLlmClient {
       max_tokens: req.max_tokens ?? DEFAULT_MAX_TOKENS,
     });
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && 'delta' in event) {
-        const delta = (event.delta as { type?: string; text?: string }).text ?? '';
-        yield { delta };
-      } else if (event.type === 'message_stop') {
-        const finalMessage = await stream.finalMessage();
-        const usage = finalMessage.usage;
-        yield {
-          delta: '',
-          finish_reason: finalMessage.stop_reason ?? 'end_turn',
-          usage: {
-            prompt_tokens: usage.input_tokens,
-            completion_tokens: usage.output_tokens,
-            total_tokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
-          },
-        };
-        return;
+    // Add an internal timeout on top of the caller signal so iterators
+    // never sit idle waiting on stalled upstream connections.
+    const combinedSignal = mergeAbortSignals(req.signal, REQUEST_TIMEOUT_MS);
+
+    try {
+      for await (const event of stream) {
+        if (combinedSignal.signal.aborted) {
+          throw new Error('Vilao LLM stream aborted');
+        }
+        if (event.type === 'content_block_delta' && 'delta' in event) {
+          const delta = (event.delta as { type?: string; text?: string }).text ?? '';
+          yield { delta };
+        } else if (event.type === 'message_stop') {
+          const finalMessage = await stream.finalMessage();
+          const usage = finalMessage.usage;
+          yield {
+            delta: '',
+            finish_reason: finalMessage.stop_reason ?? 'end_turn',
+            usage: {
+              prompt_tokens: usage.input_tokens,
+              completion_tokens: usage.output_tokens,
+              total_tokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+            },
+          };
+          return;
+        }
       }
+    } finally {
+      combinedSignal.dispose();
     }
   }
 
@@ -241,6 +257,34 @@ export class VilaoLlmClient {
       );
     });
   }
+}
+
+/**
+ * Combine a caller-supplied AbortSignal with an internal timeout. Either
+ * signal aborts the underlying fetch; the internal timer is cleared on
+ * completion so the Node process can exit cleanly.
+ */
+function mergeAbortSignals(
+  external: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`Vilao LLM request timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
+  const onAbort = () => controller.abort(external?.reason);
+  if (external) {
+    if (external.aborted) {
+      controller.abort(external.reason);
+    } else {
+      external.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+  const dispose = () => {
+    clearTimeout(timer);
+    if (external) external.removeEventListener('abort', onAbort);
+  };
+  return { signal: controller.signal, dispose };
 }
 
 function splitSystemPrompt(messages: ChatMessage[]): {

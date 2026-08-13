@@ -110,6 +110,16 @@ export class StreamChatUseCase {
         });
         await this.repo.updateLastMessage(conversation.conversation_id, 0, 0);
 
+        // If this conversation was just created, derive a short title from the
+        // first user message so the list screen shows meaningful summaries.
+        if (!input.conversationId) {
+          const derivedTitle = deriveTitle(input.userText);
+          if (derivedTitle) {
+            await this.repo.updateTitle(conversation.conversation_id, derivedTitle);
+            conversation.title = derivedTitle;
+          }
+        }
+
         await input.onEvent({
           type: 'start',
           conversationId: conversation.conversation_id,
@@ -240,4 +250,28 @@ function chunkForStreaming(content: string): string[] {
   if (!content) return [];
   const tokens = content.match(/\S+\s*|\s+/g) ?? [content];
   return tokens;
+}
+
+/**
+ * Derive a short, human-readable conversation title from the first user
+ * message. Strips whitespace, removes question marks, and truncates to ~50
+ * characters. Falls back to a default if the input is unusable.
+ */
+function deriveTitle(text: string, maxLen = 50): string {
+  const cleaned = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return 'Cuộc hội thoại mới';
+  // Drop trailing punctuation so titles don't end with "?".
+  const stripped = cleaned.replace(/[?.!,;:\u2026]+\s*$/u, '').trim();
+  const candidate = stripped || cleaned;
+  if (candidate.length <= maxLen) return capitalize(candidate);
+  return capitalize(candidate.slice(0, maxLen - 1).trimEnd()) + '…';
+}
+
+function capitalize(s: string): string {
+  if (!s) return s;
+  // Preserve leading diacritics (Vietnamese) while upper-casing the first
+  // letter char.
+  const chars = Array.from(s);
+  chars[0] = chars[0].toLocaleUpperCase();
+  return chars.join('');
 }
