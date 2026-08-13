@@ -19,19 +19,19 @@ describe('VilaoLlmClient', () => {
 
   it('uses default model when none configured', () => {
     const client = new VilaoLlmClient(buildConfig({ VILAO_API_KEY: 'pat-test' }));
-    expect(client.getDefaultModel()).toBe('gx/gpt-5.4');
-    expect(client.getFastModel()).toBe('openai/gpt-4o-mini');
+    expect(client.getDefaultModel()).toBe('ccf/claude-sonnet-5');
+    expect(client.getFastModel()).toBe('ccf/claude-haiku-4-5-20251001');
   });
 
   it('honors custom models', () => {
     const client = new VilaoLlmClient(
       buildConfig({
         VILAO_API_KEY: 'pat-test',
-        VILAO_DEFAULT_MODEL: 'openai/gpt-4o',
-        VILAO_FAST_MODEL: 'openai/gpt-4o-mini',
+        VILAO_DEFAULT_MODEL: 'ccf/claude-opus-5',
+        VILAO_FAST_MODEL: 'ccf/claude-haiku-4-5-20251001',
       }),
     );
-    expect(client.getDefaultModel()).toBe('openai/gpt-4o');
+    expect(client.getDefaultModel()).toBe('ccf/claude-opus-5');
   });
 
   it('throws when calling chat without API key', async () => {

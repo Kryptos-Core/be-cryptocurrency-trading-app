@@ -804,15 +804,15 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  VILAO_DEFAULT_MODEL?: string = 'gx/gpt-5.4';
+  VILAO_DEFAULT_MODEL?: string = 'ccf/claude-sonnet-5';
 
   @IsString()
   @IsOptional()
-  VILAO_FAST_MODEL?: string = 'openai/gpt-4o-mini';
+  VILAO_FAST_MODEL?: string = 'ccf/claude-haiku-4-5-20251001';
 
   @IsString()
   @IsOptional()
-  VILAO_EMBEDDING_MODEL?: string = 'openai/gpt-4o-mini';
+  VILAO_EMBEDDING_MODEL?: string = 'openai/text-embedding-3-small';
 
   @IsInt()
   @Min(1)

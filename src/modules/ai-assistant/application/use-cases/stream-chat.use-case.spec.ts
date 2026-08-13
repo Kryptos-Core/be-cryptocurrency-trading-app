@@ -65,14 +65,14 @@ const buildFakes = (opts: {
 
   const llm = {
     isConfigured: true,
-    getDefaultModel: () => 'gx/gpt-5.4',
-    getFastModel: () => 'openai/gpt-4o-mini',
+    getDefaultModel: () => 'ccf/claude-sonnet-5',
+    getFastModel: () => 'ccf/claude-haiku-4-5-20251001',
     chat: opts.chatError
       ? jest.fn().mockRejectedValue(opts.chatError)
       : jest.fn().mockResolvedValue(
           opts.chatResponse ?? {
             content: 'Xin chào',
-            model: 'gx/gpt-5.4',
+            model: 'ccf/claude-sonnet-5',
             tokens_in: 10,
             tokens_out: 5,
             finish_reason: 'stop',
@@ -213,7 +213,7 @@ describe('StreamChatUseCase', () => {
     const f = buildFakes({
       chatResponse: {
         content: 'BTC đang tăng',
-        model: 'gx/gpt-5.4',
+        model: 'ccf/claude-sonnet-5',
         tokens_in: 11,
         tokens_out: 4,
         finish_reason: 'stop',

@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
@@ -51,5 +52,6 @@ export class AiMessage {
   created_at!: Date;
 
   @ManyToOne(() => AiConversation, (c) => c.messages, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'conversation_id' })
   conversation!: AiConversation;
 }

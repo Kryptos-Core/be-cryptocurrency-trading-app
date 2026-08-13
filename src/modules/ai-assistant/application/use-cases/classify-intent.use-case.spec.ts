@@ -5,8 +5,8 @@ describe('ClassifyIntentUseCase', () => {
   const buildLlm = (overrides: Partial<VilaoLlmClient> = {}) => {
     const fake = {
       isConfigured: true,
-      getDefaultModel: jest.fn().mockReturnValue('gx/gpt-5.4'),
-      getFastModel: jest.fn().mockReturnValue('openai/gpt-4o-mini'),
+      getDefaultModel: jest.fn().mockReturnValue('ccf/claude-sonnet-5'),
+      getFastModel: jest.fn().mockReturnValue('ccf/claude-haiku-4-5-20251001'),
       chat: jest.fn(),
       streamChat: jest.fn(),
       ...overrides,
@@ -30,7 +30,7 @@ describe('ClassifyIntentUseCase', () => {
     const llm = buildLlm({
       chat: jest.fn().mockResolvedValue({
         content: 'market',
-        model: 'openai/gpt-4o-mini',
+        model: 'ccf/claude-haiku-4-5-20251001',
         tokens_in: 5,
         tokens_out: 1,
         finish_reason: 'stop',
@@ -40,7 +40,7 @@ describe('ClassifyIntentUseCase', () => {
     await expect(useCase.execute('Giá BTC/USDT hôm nay bao nhiêu?')).resolves.toBe('market');
     expect(llm.chat).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'openai/gpt-4o-mini',
+        model: 'ccf/claude-haiku-4-5-20251001',
         temperature: 0,
         max_tokens: 8,
       }),
@@ -57,7 +57,7 @@ describe('ClassifyIntentUseCase', () => {
     const llm = buildLlm({
       chat: jest.fn().mockResolvedValue({
         content: 'unknown-label',
-        model: 'openai/gpt-4o-mini',
+        model: 'ccf/claude-haiku-4-5-20251001',
         tokens_in: 1,
         tokens_out: 1,
         finish_reason: 'stop',

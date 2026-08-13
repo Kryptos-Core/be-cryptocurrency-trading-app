@@ -19,12 +19,12 @@ export class AddTreasuryWalletTotpRequiredToSystemConfigs1700000002001
     await queryRunner.query(
       `
         INSERT INTO system_configs (
-          key, value, type, category, name, description, is_read_only
+          key, value, type, category, name, description, "isReadOnly"
         )
         VALUES (
           'TREASURY_WALLET_TOTP_REQUIRED',
           'true',
-          'boolean',
+          'bool',
           'auth_security',
           'Treasury main wallet TOTP required (import / reveal)',
           'When true (default), import and reveal-private-key of treasury main wallets require a TOTP 2FA code. When false, the TOTP check is bypassed for treasury main-wallet operations. This flag has no effect when ONCHAIN_OPERATOR_MODE=production.',

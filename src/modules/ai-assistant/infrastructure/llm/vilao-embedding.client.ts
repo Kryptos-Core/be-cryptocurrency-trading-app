@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { VilaoLlmClient } from './vilao-llm.client';
 
-const DEFAULT_EMBEDDING_MODEL = 'openai/gpt-4o-mini';
+const DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
+const DEFAULT_BASE_URL = 'https://api.vilao.ai/v1';
 
 export interface EmbedResult {
   embedding: number[];
@@ -12,9 +12,12 @@ export interface EmbedResult {
 }
 
 /**
- * Thin wrapper around the Vilao embeddings endpoint.
- * Falls back to the shared OpenAI client from VilaoLlmClient to avoid
- * creating a second SDK instance.
+ * Thin wrapper around Vilao's OpenAI-compatible `/v1/embeddings` endpoint.
+ *
+ * Vilao does not expose an Anthropic-format embeddings API, so we keep the
+ * OpenAI SDK for this specific concern. The chat/streaming path lives on
+ * `VilaoLlmClient` and uses Claude via the Anthropic-compatible `/v1/messages`
+ * endpoint instead.
  */
 @Injectable()
 export class VilaoEmbeddingClient {
@@ -22,15 +25,20 @@ export class VilaoEmbeddingClient {
   private readonly client: OpenAI | null;
   private readonly defaultModel: string;
 
-  constructor(
-    private readonly llmClient: VilaoLlmClient,
-    configService: ConfigService,
-  ) {
+  constructor(configService: ConfigService) {
+    const apiKey = configService.get<string>('VILAO_API_KEY')?.trim();
+    const baseURL = configService.get<string>('VILAO_BASE_URL') ?? DEFAULT_BASE_URL;
     this.defaultModel =
       configService.get<string>('VILAO_EMBEDDING_MODEL') ?? DEFAULT_EMBEDDING_MODEL;
-    // The VilaoLlmClient already constructed the OpenAI client; reuse it via
-    // a trivial getter to avoid duplicating the API key wiring.
-    this.client = (this.llmClient as unknown as { client: OpenAI | null }).client;
+
+    if (!apiKey) {
+      this.logger.warn(
+        'VILAO_API_KEY chưa được cấu hình — AI Assistant embeddings sẽ trả lỗi. Xem docs/vilao.ai/VilaoLLM.md.',
+      );
+      this.client = null;
+    } else {
+      this.client = new OpenAI({ apiKey, baseURL });
+    }
   }
 
   get isConfigured(): boolean {

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { AiConversation } from '@/entities/ai-conversation.entity';
@@ -32,7 +33,13 @@ import { SeedAiHelpDocsUseCase } from './application/use-cases/seed-ai-help-docs
 @Module({
   imports: [
     TypeOrmModule.forFeature([AiConversation, AiMessage, AiConversationDocChunk]),
-    JwtModule.register({}),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+      }),
+    }),
     MarketsModule,
     OrdersModule,
     WalletsModule,

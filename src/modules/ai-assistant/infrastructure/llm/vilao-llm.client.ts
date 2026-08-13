@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -49,33 +49,41 @@ export interface ChatStreamChunk {
   };
 }
 
-const DEFAULT_BASE_URL = 'https://api.vilao.ai/v1';
-const DEFAULT_MODEL = 'gx/gpt-5.4';
+const DEFAULT_BASE_URL = 'https://api.vilao.ai';
+const DEFAULT_MODEL = 'ccf/claude-sonnet-5';
+const DEFAULT_FAST_MODEL = 'ccf/claude-haiku-4-5-20251001';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
 const SOFT_ERROR_LOG_PREFIX = '[vilao-llm] soft error';
+const DEFAULT_MAX_TOKENS = 1024;
 
 /**
- * Vilao LLM client.
+ * Vilao LLM client — Anthropic-compatible Claude provider.
  *
- * Wraps the OpenAI SDK pointed at Vilao's OpenAI-compatible endpoint.
+ * Vilao.ai exposes its Claude (`ccf/*`) models via the Anthropic Messages API
+ * (`POST /v1/messages`). We use the official `@anthropic-ai/sdk` with a
+ * custom `baseURL` so requests are routed to Vilao's gateway while keeping
+ * the rest of the application code unaware of the provider.
+ *
  * Returns graceful degradation when the API key is missing so the rest of the
  * app can still boot (dev) or fail fast (production) per `failFastInProd`.
  */
 @Injectable()
 export class VilaoLlmClient {
   private readonly logger = new Logger(VilaoLlmClient.name);
-  private readonly client: OpenAI | null;
+  private readonly client: Anthropic | null;
   private readonly defaultModel: string;
   private readonly fastModel: string;
   private readonly failFastInProd: boolean;
 
   constructor(configService: ConfigService) {
     const apiKey = configService.get<string>('VILAO_API_KEY')?.trim();
-    const baseURL = configService.get<string>('VILAO_BASE_URL') ?? DEFAULT_BASE_URL;
+    const baseURL =
+      configService.get<string>('VILAO_BASE_URL')?.replace(/\/v1\/?$/, '') ?? DEFAULT_BASE_URL;
     this.defaultModel =
       configService.get<string>('VILAO_DEFAULT_MODEL') ?? DEFAULT_MODEL;
-    this.fastModel = configService.get<string>('VILAO_FAST_MODEL') ?? 'openai/gpt-4o-mini';
+    this.fastModel =
+      configService.get<string>('VILAO_FAST_MODEL') ?? DEFAULT_FAST_MODEL;
     this.failFastInProd = (configService.get<string>('NODE_ENV') ?? 'development') === 'production';
 
     if (!apiKey) {
@@ -84,7 +92,7 @@ export class VilaoLlmClient {
       );
       this.client = null;
     } else {
-      this.client = new OpenAI({ apiKey, baseURL });
+      this.client = new Anthropic({ apiKey, baseURL });
     }
   }
 
@@ -102,32 +110,35 @@ export class VilaoLlmClient {
 
   /**
    * Non-streaming chat completion. Returns parsed response with token counts.
+   *
+   * Translates our OpenAI-flavoured `ChatMessage`/`ChatTool` input into the
+   * Anthropic Messages API format (system prompt as a top-level field,
+   * tools wrapped in `{ name, description, input_schema }`, tool messages
+   * converted to Anthropic `tool_result` blocks).
    */
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const client = this.requireClient();
     const model = req.model ?? this.defaultModel;
-    const response = await this.withRetry(() =>
-      client.chat.completions.create({
-        model,
-        messages: req.messages as OpenAI.ChatCompletionMessageParam[],
-        tools: req.tools as OpenAI.ChatCompletionTool[] | undefined,
-        tool_choice: req.tool_choice as OpenAI.ChatCompletionToolChoiceOption | undefined,
-        temperature: req.temperature ?? 0.7,
-        max_tokens: req.max_tokens,
-        stream: false,
-      }),
+    const { system, messages } = splitSystemPrompt(req.messages);
+    const tools = req.tools?.map(toAnthropicTool);
+
+    const response = await this.withRetry(
+      () =>
+        client.messages.create({
+          model,
+          system,
+          messages: messages as Anthropic.MessageParam[],
+          tools,
+          tool_choice: req.tool_choice
+            ? toAnthropicToolChoice(req.tool_choice)
+            : (tools ? { type: 'auto' } : undefined),
+          temperature: req.temperature ?? 0.7,
+          max_tokens: req.max_tokens ?? DEFAULT_MAX_TOKENS,
+        }),
       req.signal,
     );
 
-    const choice = response.choices[0];
-    return {
-      content: choice?.message?.content ?? '',
-      model: response.model,
-      tokens_in: response.usage?.prompt_tokens ?? 0,
-      tokens_out: response.usage?.completion_tokens ?? 0,
-      finish_reason: choice?.finish_reason ?? 'unknown',
-      tool_calls: (choice?.message?.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
-    };
+    return fromAnthropicResponse(response);
   }
 
   /**
@@ -137,40 +148,43 @@ export class VilaoLlmClient {
   async *streamChat(req: ChatRequest): AsyncIterable<ChatStreamChunk> {
     const client = this.requireClient();
     const model = req.model ?? this.defaultModel;
-    const stream = await this.withRetry(
-      () =>
-        client.chat.completions.create({
-          model,
-          messages: req.messages as OpenAI.ChatCompletionMessageParam[],
-          tools: req.tools as OpenAI.ChatCompletionTool[] | undefined,
-          tool_choice: req.tool_choice as OpenAI.ChatCompletionToolChoiceOption | undefined,
-          temperature: req.temperature ?? 0.7,
-          max_tokens: req.max_tokens,
-          stream: true,
-          stream_options: { include_usage: true },
-        }),
-      req.signal,
-    );
+    const { system, messages } = splitSystemPrompt(req.messages);
+    const tools = req.tools?.map(toAnthropicTool);
 
-    for await (const raw of stream as AsyncIterable<OpenAI.ChatCompletionChunk>) {
-      const choice = raw.choices[0];
-      const chunk: ChatStreamChunk = {
-        delta: choice?.delta?.content ?? '',
-        tool_calls: (choice?.delta?.tool_calls as Array<Record<string, unknown>> | undefined) ?? undefined,
-        finish_reason: choice?.finish_reason ?? undefined,
-      };
-      if (raw.usage) {
-        chunk.usage = {
-          prompt_tokens: raw.usage.prompt_tokens,
-          completion_tokens: raw.usage.completion_tokens,
-          total_tokens: raw.usage.total_tokens,
+    const stream = client.messages.stream({
+      model,
+      system,
+      messages: messages as Anthropic.MessageParam[],
+      tools,
+      tool_choice: req.tool_choice
+        ? toAnthropicToolChoice(req.tool_choice)
+        : (tools ? { type: 'auto' } : undefined),
+      temperature: req.temperature ?? 0.7,
+      max_tokens: req.max_tokens ?? DEFAULT_MAX_TOKENS,
+    });
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && 'delta' in event) {
+        const delta = (event.delta as { type?: string; text?: string }).text ?? '';
+        yield { delta };
+      } else if (event.type === 'message_stop') {
+        const finalMessage = await stream.finalMessage();
+        const usage = finalMessage.usage;
+        yield {
+          delta: '',
+          finish_reason: finalMessage.stop_reason ?? 'end_turn',
+          usage: {
+            prompt_tokens: usage.input_tokens,
+            completion_tokens: usage.output_tokens,
+            total_tokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+          },
         };
+        return;
       }
-      yield chunk;
     }
   }
 
-  private requireClient(): OpenAI {
+  private requireClient(): Anthropic {
     if (this.client) return this.client;
     const hint = this.failFastInProd
       ? 'AI Assistant disabled in production.'
@@ -227,4 +241,103 @@ export class VilaoLlmClient {
       );
     });
   }
+}
+
+function splitSystemPrompt(messages: ChatMessage[]): {
+  system: string | undefined;
+  messages: Anthropic.MessageParam[];
+} {
+  const systemParts: string[] = [];
+  const rest: Anthropic.MessageParam[] = [];
+  for (const m of messages) {
+    if (m.role === 'system') {
+      systemParts.push(m.content);
+      continue;
+    }
+    if (m.role === 'tool') {
+      rest.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: m.tool_call_id ?? '',
+            content: m.content,
+          },
+        ],
+      });
+      continue;
+    }
+    if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
+      const content: Anthropic.ContentBlockParam[] = [];
+      if (m.content) {
+        content.push({ type: 'text', text: m.content });
+      }
+      for (const tc of m.tool_calls) {
+        const fn = (tc as { id?: string; function?: { name?: string; arguments?: string } }).function;
+        const id = (tc as { id?: string }).id ?? fn?.name ?? '';
+        let parsedInput: Record<string, unknown> = {};
+        if (fn?.arguments) {
+          try {
+            parsedInput = JSON.parse(fn.arguments) as Record<string, unknown>;
+          } catch {
+            parsedInput = {};
+          }
+        }
+        content.push({
+          type: 'tool_use',
+          id,
+          name: fn?.name ?? '',
+          input: parsedInput,
+        });
+      }
+      rest.push({ role: 'assistant', content });
+      continue;
+    }
+    rest.push({ role: m.role, content: m.content });
+  }
+  const system = systemParts.length > 0 ? systemParts.join('\n\n') : undefined;
+  return { system, messages: rest };
+}
+
+function toAnthropicTool(tool: ChatTool): Anthropic.Tool {
+  return {
+    name: tool.function.name,
+    description: tool.function.description,
+    input_schema: tool.function.parameters as Anthropic.Tool.InputSchema,
+  };
+}
+
+function toAnthropicToolChoice(
+  choice: NonNullable<ChatRequest['tool_choice']>,
+): Anthropic.ToolChoice {
+  if (choice === 'auto') return { type: 'auto' };
+  if (choice === 'none') return { type: 'any' };
+  return { type: 'tool', name: choice.function.name };
+}
+
+function fromAnthropicResponse(response: Anthropic.Message): ChatResponse {
+  let text = '';
+  const toolCalls: Array<Record<string, unknown>> = [];
+  for (const block of response.content) {
+    if (block.type === 'text') {
+      text += block.text;
+    } else if (block.type === 'tool_use') {
+      toolCalls.push({
+        id: block.id,
+        type: 'function',
+        function: {
+          name: block.name,
+          arguments: JSON.stringify(block.input ?? {}),
+        },
+      });
+    }
+  }
+  return {
+    content: text,
+    model: response.model,
+    tokens_in: response.usage.input_tokens,
+    tokens_out: response.usage.output_tokens,
+    finish_reason: response.stop_reason ?? 'end_turn',
+    tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+  };
 }

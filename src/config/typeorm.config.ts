@@ -3,6 +3,9 @@ import type { LogLevel } from 'typeorm/logger/Logger';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 import { AdminWalletAdjustment } from '../entities/admin-wallet-adjustment.entity';
+import { AiConversation } from '../entities/ai-conversation.entity';
+import { AiConversationDocChunk } from '../entities/ai-conversation-doc-chunk.entity';
+import { AiMessage } from '../entities/ai-message.entity';
 import { AppSetting } from '../entities/app-setting.entity';
 import { Currency } from '../entities/currency.entity';
 import { CurrencyNetwork } from '../entities/currency-network.entity';
@@ -38,10 +41,69 @@ import { Withdrawal } from '../entities/withdrawal.entity';
 import { DepositMatchRequest } from '../modules/blockchain/entities/deposit-match-request.entity';
 import { LinkedWallet } from '../modules/blockchain/entities/linked-wallet.entity';
 import { OnchainTransaction } from '../modules/blockchain/entities/onchain-transaction.entity';
-import { typeormMigrationFilePaths } from './typeorm-entity-glob-paths';
+import { AddOpsCategoryToSystemConfigs1700000000003 } from '../migrations/1700000000003-AddOpsCategoryToSystemConfigs';
+import { AddAuthSecurityCategoryToSystemConfigs1700000002000 } from '../migrations/1700000002000-AddAuthSecurityCategoryToSystemConfigs';
+import { AddTreasuryWalletTotpRequiredToSystemConfigs1700000002001 } from '../migrations/1700000002001-AddTreasuryWalletTotpRequiredToSystemConfigs';
+import { BaselinePostgresSchema1600000000000 } from '../migrations/1600000000000-BaselinePostgresSchema';
+import { CreateTreasuryE2EConfigTable1800000001000 } from '../migrations/1800000001000-CreateTreasuryE2EConfigTable';
+import { AddArchivedAtToTreasuryE2EConfig1800000001001 } from '../migrations/1800000001001-AddArchivedAtToTreasuryE2EConfig';
+import { MakeOnchainTransactionFromAddressNullable1800000001002 } from '../migrations/1800000001002-MakeOnchainTransactionFromAddressNullable';
+import { ExpandDedupeKeyLength1800000001003 } from '../migrations/1800000001003-ExpandDedupeKeyLength';
+import { CreateIntegrationOutboxAndReadMarketPairs1800000001004 } from '../migrations/1800000001004-CreateIntegrationOutboxAndReadMarketPairs';
+import { CreatePostgresMissingTables1800000001005 } from '../migrations/1800000001005-CreatePostgresMissingTables';
+import { FixProcessedIntegrationEventsIdColumn1800000001006 } from '../migrations/1800000001006-FixProcessedIntegrationEventsIdColumn';
+import { CreateReadMarketTrades1800000001006 } from '../migrations/1800000001006-CreateReadMarketTrades';
+import { CreateBlockchainTablesAndFixEventType1800000001007 } from '../migrations/1800000001007-CreateBlockchainTablesAndFixEventType';
+import { CreateReadMarketOhlcv1800000001007 } from '../migrations/1800000001007-CreateReadMarketOhlcv';
+import { FixProcessedIntegrationEventsIdDefault1800000001008 } from '../migrations/1800000001008-FixProcessedIntegrationEventsIdDefault';
+import { CreateAppSettingsTable1800000001009 } from '../migrations/1800000001009-CreateAppSettingsTable';
+import { EnsureAssetColumnOnOnchainTransactions1800000001010 } from '../migrations/1800000001010-EnsureAssetColumnOnOnchainTransactions';
+import { CreateDepositWatcherCursors1800000001011 } from '../migrations/1800000001011-CreateDepositWatcherCursors';
+import { AddWithdrawalNotificationTypes1800000001012 } from '../migrations/1800000001012-AddWithdrawalNotificationTypes';
+import { AddGlobalWalletUniqueness1800000001013 } from '../migrations/1800000001013-AddGlobalWalletUniqueness';
+import { AddFraudRiskFlagsAndThresholds1800000001014 } from '../migrations/1800000001014-AddFraudRiskFlagsAndThresholds';
+import { CreateFiatDepositsTable1800000001015 } from '../migrations/1800000001015-CreateFiatDepositsTable';
+import { CreateMarketMakerConfigsPostgres1800000001016 } from '../migrations/1800000001016-CreateMarketMakerConfigsPostgres';
+import { CreateUserSecurityChangeRequestsPostgres1800000001017 } from '../migrations/1800000001017-CreateUserSecurityChangeRequestsPostgres';
+import { CreateAdminWalletAdjustmentsPostgres1800000001018 } from '../migrations/1800000001018-CreateAdminWalletAdjustmentsPostgres';
+import { CreateAiAssistantTables1800000001019 } from '../migrations/1800000001019-CreateAiAssistantTables';
+import { CreateUserBinanceCredentials1700000000001 } from '../migrations/1700000000001-CreateUserBinanceCredentials';
+
+const ALL_MIGRATIONS = [
+  BaselinePostgresSchema1600000000000,
+  CreateUserBinanceCredentials1700000000001,
+  AddOpsCategoryToSystemConfigs1700000000003,
+  AddAuthSecurityCategoryToSystemConfigs1700000002000,
+  AddTreasuryWalletTotpRequiredToSystemConfigs1700000002001,
+  CreateTreasuryE2EConfigTable1800000001000,
+  AddArchivedAtToTreasuryE2EConfig1800000001001,
+  MakeOnchainTransactionFromAddressNullable1800000001002,
+  ExpandDedupeKeyLength1800000001003,
+  CreateIntegrationOutboxAndReadMarketPairs1800000001004,
+  CreatePostgresMissingTables1800000001005,
+  FixProcessedIntegrationEventsIdColumn1800000001006,
+  CreateReadMarketTrades1800000001006,
+  CreateBlockchainTablesAndFixEventType1800000001007,
+  CreateReadMarketOhlcv1800000001007,
+  FixProcessedIntegrationEventsIdDefault1800000001008,
+  CreateAppSettingsTable1800000001009,
+  EnsureAssetColumnOnOnchainTransactions1800000001010,
+  CreateDepositWatcherCursors1800000001011,
+  AddWithdrawalNotificationTypes1800000001012,
+  AddGlobalWalletUniqueness1800000001013,
+  AddFraudRiskFlagsAndThresholds1800000001014,
+  CreateFiatDepositsTable1800000001015,
+  CreateMarketMakerConfigsPostgres1800000001016,
+  CreateUserSecurityChangeRequestsPostgres1800000001017,
+  CreateAdminWalletAdjustmentsPostgres1800000001018,
+  CreateAiAssistantTables1800000001019,
+];
 
 const ALL_ENTITIES = [
   AdminWalletAdjustment,
+  AiConversation,
+  AiConversationDocChunk,
+  AiMessage,
   AppSetting,
   Currency,
   CurrencyNetwork,
@@ -103,7 +165,7 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
     password,
     database,
     entities: ALL_ENTITIES,
-    migrations: typeormMigrationFilePaths(__dirname),
+    migrations: ALL_MIGRATIONS,
     migrationsRun: configService.get<string>('NODE_ENV') !== 'production',
     synchronize: false,
     logging: debugSql ? (['query', 'error'] as LogLevel[]) : false,
