@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { trace } from '@opentelemetry/api';
 
 /**
  * Cache Service
@@ -11,6 +12,33 @@ export class CacheService {
   private readonly DEFAULT_TTL = 3600; // 1 hour
 
   constructor(private readonly redisService: RedisService) {}
+
+  /**
+   * Cache hit/miss counters exposed via OpenTelemetry. Attribute `module` is
+   * derived from the cache key prefix (first colon-separated segment) so
+   * dashboards can group by `cache.hits{module="wallets"}` etc.
+   */
+  private recordHit(key: string, value: unknown): void {
+    this.recordMetric('hit', key);
+    if (value !== null) {
+      const span = trace.getActiveSpan();
+      span?.setAttribute('cache.hit', true);
+    }
+  }
+
+  private recordMiss(key: string): void {
+    this.recordMetric('miss', key);
+    const span = trace.getActiveSpan();
+    span?.setAttribute('cache.miss', true);
+  }
+
+  private recordMetric(verdict: 'hit' | 'miss', key: string): void {
+    const moduleName = key.split(':')[0] || 'unknown';
+    const span = trace.getActiveSpan();
+    if (span) {
+      span.setAttribute(`cache.${verdict}.module`, moduleName);
+    }
+  }
 
   /**
    * Get value from cache
@@ -73,9 +101,11 @@ export class CacheService {
   async getOrSet<T>(key: string, factory: () => Promise<T>, ttl?: number): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== null) {
+      this.recordHit(key, cached);
       return cached;
     }
 
+    this.recordMiss(key);
     const value = await factory();
     await this.set(key, value, ttl);
     return value;

@@ -5,7 +5,9 @@ import { AppModule } from './app.module';
 import { enablePostgresQuestionMarkAdapter } from './common/database/pg-placeholder-adapter';
 import { AllExceptionsFilter } from './common/filters';
 import { I18nService, buildValidationPipeOptions } from './common/i18n';
+import { Reflector } from '@nestjs/core';
 import {
+  EtagInterceptor,
   LoggingInterceptor,
   ResponseInterceptor,
   TelemetryContextInterceptor,
@@ -79,9 +81,11 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter(i18nService));
 
   // Global Interceptors
+  const reflector = app.get(Reflector);
   app.useGlobalInterceptors(
     new TelemetryContextInterceptor(),
     new LoggingInterceptor(),
+    new EtagInterceptor(reflector),
     new ResponseInterceptor(),
   );
 

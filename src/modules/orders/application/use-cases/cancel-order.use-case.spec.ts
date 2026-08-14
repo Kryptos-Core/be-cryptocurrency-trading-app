@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { BusinessException, ForbiddenException, NotFoundException } from '@/common/exceptions';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import { CacheInvalidationHelper } from '@/common/services';
 import { CancelOrderUseCase } from '@/modules/orders/application/use-cases/cancel-order.use-case';
 import { ORDER_MATCHING_GATEWAY, ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
@@ -16,6 +17,9 @@ describe('CancelOrderUseCase', () => {
   const outboxAppender = {
     append: jest.fn(),
   };
+  const cacheInvalidator = {
+    invalidateUserCaches: jest.fn().mockResolvedValue(undefined),
+  };
 
   let useCase: CancelOrderUseCase;
 
@@ -27,6 +31,7 @@ describe('CancelOrderUseCase', () => {
         { provide: ORDER_REPOSITORY, useValue: orderRepository },
         { provide: ORDER_MATCHING_GATEWAY, useValue: orderMatchingGateway },
         { provide: OutboxAppender, useValue: outboxAppender },
+        { provide: CacheInvalidationHelper, useValue: cacheInvalidator },
       ],
     }).compile();
 

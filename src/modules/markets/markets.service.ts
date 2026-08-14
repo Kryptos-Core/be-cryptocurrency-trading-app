@@ -67,6 +67,7 @@ export class MarketsService implements OnModuleInit {
   private readonly logger = new Logger(MarketsService.name);
   private readonly CACHE_KEY_PREFIX = 'markets:';
   private readonly CACHE_TTL = 300; // 5 minutes for market data (shorter than currencies)
+  private readonly CACHE_TTL_FIRST_PAGE = 60; // 60s for the first page — most-hit “Hot tab” payload
   private readonly TICKER_CACHE_TTL = 60; // 1 minute for ticker (real-time data)
 
   constructor(
@@ -119,6 +120,7 @@ export class MarketsService implements OnModuleInit {
     const sortByNorm = this.normalizeSortBy(sortBy);
     const sortOrderNorm = this.normalizeSortOrder(sortOrder);
     const cacheKey = `${this.CACHE_KEY_PREFIX}list:${page}:${limit}:${includeInactive}:${searchNorm}:${baseNorm}:${quoteNorm}:${quoteSymbolsNorm.join('|')}:${sortByNorm}:${sortOrderNorm}:${fuzzySearch}`;
+    const listTtl = page === 1 ? this.CACHE_TTL_FIRST_PAGE : this.CACHE_TTL;
 
     const result = await this.cacheService.getOrSet(
       cacheKey,
@@ -134,7 +136,7 @@ export class MarketsService implements OnModuleInit {
           fuzzySearch,
         });
       },
-      this.CACHE_TTL,
+      listTtl,
     );
 
     const pairs = result.data ?? [];

@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { CacheService, RedisService } from '@/common/services';
+import { CacheInvalidationHelper, CacheService, RedisService } from '@/common/services';
 
 /**
  * Redis Module
@@ -10,7 +10,7 @@ import { CacheService, RedisService } from '@/common/services';
 @Global()
 @Module({
   imports: [ConfigModule],
-  providers: [RedisService, CacheService],
-  exports: [RedisService, CacheService],
+  providers: [RedisService, CacheService, CacheInvalidationHelper],
+  exports: [RedisService, CacheService, CacheInvalidationHelper],
 })
 export class RedisModule {}

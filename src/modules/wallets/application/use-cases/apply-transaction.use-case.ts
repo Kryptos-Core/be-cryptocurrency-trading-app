@@ -5,6 +5,7 @@ import { BadRequestException, BusinessException, ConflictException } from '@/com
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { WalletBalanceChangedOutboxPayloadV1 } from '@/common/integration-events/wallet-balance-changed-outbox-payload';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import { CacheInvalidationHelper } from '@/common/services';
 import type { TransactionContext } from '@/common/types/transaction-context';
 import { walletAggregateId } from '@/common/utils/aggregate-id.util';
 import {
@@ -33,6 +34,7 @@ export class ApplyTransactionUseCase {
     @Inject(CURRENCY_LOOKUP) private readonly currencyLookup: CurrencyLookupPort,
     private readonly balanceCalc: BalanceCalculationService,
     private readonly outboxAppender: OutboxAppender,
+    private readonly cacheInvalidator: CacheInvalidationHelper,
   ) {}
 
   async execute(
@@ -75,14 +77,21 @@ export class ApplyTransactionUseCase {
         total: this.balanceCalc.calculateTotal(result.available, result.frozen),
       });
 
+      // Invalidate the user's wallets-list and per-currency balance cache entries.
+      // WS `wallet:balance` will push the fresh value to live clients, but the
+      // REST cache must be flushed so the next tab tap returns the new state.
+      await this.cacheInvalidator.invalidateUserCaches(['wallets'], userId);
+
       if (dto.action === WalletTransactionAction.TRANSFER && dto.targetUserId) {
+        const targetUserId = String(dto.targetUserId);
+        await this.cacheInvalidator.invalidateUserCaches(['wallets'], targetUserId);
         const targetWallet = await this.walletRepo.findByUserCurrency(
-          String(dto.targetUserId),
+          targetUserId,
           currencyId,
         );
         if (targetWallet) {
           const tSnap = this.balanceCalc.buildBalanceSnapshot(
-            String(dto.targetUserId),
+            targetUserId,
             currencyId,
             targetWallet.available ?? '0',
             targetWallet.frozen ?? '0',

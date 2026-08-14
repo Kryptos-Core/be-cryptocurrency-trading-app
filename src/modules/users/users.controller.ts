@@ -40,6 +40,7 @@ import { RequireRoles } from '@/common/decorators/require-roles.decorator';
 import { Permission, UserRole } from '@/common/enums';
 import { JwtAuthGuard, PermissionGuard, RoleGuard } from '@/common/guards';
 import { GetUsersQuery } from './application/queries/get-users.query';
+import { GetCurrentUserQuery } from './application/queries/get-current-user.query';
 import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case';
 import { RequestSecurityChangeUseCase } from './application/use-cases/request-security-change.use-case';
 import { ReviewSecurityChangeUseCase } from './application/use-cases/review-security-change.use-case';
@@ -70,6 +71,7 @@ import {
 export class UsersController {
   constructor(
     private readonly getUsersQuery: GetUsersQuery,
+    private readonly getCurrentUserQuery: GetCurrentUserQuery,
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly deleteUserUseCase: DeleteUserUseCase,
     private readonly updateProfileBasicUseCase: UpdateProfileBasicUseCase,
@@ -145,7 +147,7 @@ export class UsersController {
   @ApiSuccessResponse('User profile retrieved successfully')
   @ApiUnauthorizedResponse('Unauthorized')
   async getCurrentUser(@CurrentUser('userId') userId: string) {
-    return this.getUsersQuery.findOne(userId);
+    return this.getCurrentUserQuery.execute(userId);
   }
 
   /**

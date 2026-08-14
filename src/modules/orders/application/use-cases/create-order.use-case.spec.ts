@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { BusinessException, NotFoundException } from '@/common/exceptions';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
-import { CacheService } from '@/common/services';
+import { CacheInvalidationHelper, CacheService } from '@/common/services';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/create-order.use-case';
 import { ORDER_MATCHING_GATEWAY, ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
@@ -19,6 +19,9 @@ describe('CreateOrderUseCase', () => {
   const cacheService = {
     get: jest.fn(),
     set: jest.fn(),
+  };
+  const cacheInvalidator = {
+    invalidateUserCaches: jest.fn().mockResolvedValue(undefined),
   };
   const validationStrategy = {
     validate: jest.fn(),
@@ -45,6 +48,7 @@ describe('CreateOrderUseCase', () => {
         CreateOrderUseCase,
         { provide: ORDER_REPOSITORY, useValue: orderRepository },
         { provide: CacheService, useValue: cacheService },
+        { provide: CacheInvalidationHelper, useValue: cacheInvalidator },
         { provide: OrderValidationService, useValue: validationStrategy },
         { provide: ORDER_MATCHING_GATEWAY, useValue: orderMatchingGateway },
         {

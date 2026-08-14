@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BadRequestException, NotFoundException } from '@/common/exceptions';
-import { CacheService, MailService } from '@/common/services';
+import { CacheInvalidationHelper, CacheService, MailService } from '@/common/services';
 import { USERS_REPOSITORY, type UsersRepositoryPort } from '@/modules/users/domain/ports';
 import { AUTH_REPOSITORY, type AuthRepositoryPort } from './domain/ports';
 
@@ -18,6 +18,7 @@ export class TwoFaService {
     private readonly usersRepository: UsersRepositoryPort,
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: AuthRepositoryPort,
+    private readonly cacheInvalidator: CacheInvalidationHelper,
   ) {}
 
   private otpKey(userId: string): string {
@@ -108,6 +109,7 @@ export class TwoFaService {
     }
 
     await this.authRepository.setTwoFaEnabled(userId, true);
+    await this.cacheInvalidator.invalidateUserCaches(['users'], userId);
     this.logger.log(`2FA enabled for user=${userId}`);
   }
 
@@ -123,6 +125,7 @@ export class TwoFaService {
     }
 
     await this.authRepository.setTwoFaEnabled(userId, false);
+    await this.cacheInvalidator.invalidateUserCaches(['users'], userId);
     this.logger.log(`2FA disabled for user=${userId}`);
   }
 }

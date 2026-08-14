@@ -9,6 +9,7 @@ import { USERS_REPOSITORY } from '@/modules/users/domain/ports';
 import { UsersRepository } from '@/modules/users/infrastructure/persistence';
 import { WalletsModule } from '@/modules/wallets/wallets.module';
 import { GetUsersQuery } from './application/queries/get-users.query';
+import { GetCurrentUserQuery } from './application/queries/get-current-user.query';
 import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case';
 import { RequestSecurityChangeUseCase } from './application/use-cases/request-security-change.use-case';
 import { ReviewSecurityChangeUseCase } from './application/use-cases/review-security-change.use-case';
@@ -40,6 +41,7 @@ import { BlockchainModule } from '@/modules/blockchain/blockchain.module';
     CloudinaryService,
     ContactEmailVerificationService,
     GetUsersQuery,
+    GetCurrentUserQuery,
     UpdateUserUseCase,
     DeleteUserUseCase,
     UpdateProfileBasicUseCase,

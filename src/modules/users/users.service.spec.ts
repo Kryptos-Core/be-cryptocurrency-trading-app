@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@/common/exceptions';
-import { CloudinaryService } from '@/common/services';
+import { CacheInvalidationHelper, CloudinaryService } from '@/common/services';
 import { TwoFaService } from '@/modules/auth/two-fa.service';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 import { SystemConfigService } from '@/modules/system-config/system-config.service';
@@ -58,6 +58,9 @@ describe('UsersService', () => {
     const mockSystemConfig = {
       isEmailVerificationRequired: jest.fn().mockResolvedValue(true),
     };
+    const mockCacheInvalidator = {
+      invalidateUserCaches: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +71,7 @@ describe('UsersService', () => {
         { provide: WalletsService, useValue: {} },
         { provide: ORDER_REPOSITORY, useValue: {} },
         { provide: SystemConfigService, useValue: mockSystemConfig },
+        { provide: CacheInvalidationHelper, useValue: mockCacheInvalidator },
       ],
     }).compile();
 

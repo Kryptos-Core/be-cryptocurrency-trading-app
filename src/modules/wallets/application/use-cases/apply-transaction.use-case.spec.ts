@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { WalletReferenceType, WalletTransactionAction } from '@/common/enums';
 import { BadRequestException, BusinessException, ConflictException } from '@/common/exceptions';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import { CacheInvalidationHelper } from '@/common/services';
 import type { TransactionContext } from '@/common/types/transaction-context';
 import { walletAggregateId } from '@/common/utils/aggregate-id.util';
 import {
@@ -42,6 +43,7 @@ describe('ApplyTransactionUseCase', () => {
   let eventPublisher: jest.Mocked<{ publishBalanceChange: jest.Mock }>;
   let currencyLookup: jest.Mocked<{ getSymbol: jest.Mock }>;
   let outboxAppender: jest.Mocked<{ append: jest.Mock }>;
+  let cacheInvalidator: jest.Mocked<{ invalidateUserCaches: jest.Mock }>;
 
   beforeEach(async () => {
     walletRepo = {
@@ -70,6 +72,10 @@ describe('ApplyTransactionUseCase', () => {
       append: jest.fn().mockResolvedValue(undefined),
     };
 
+    cacheInvalidator = {
+      invalidateUserCaches: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         ApplyTransactionUseCase,
@@ -79,6 +85,7 @@ describe('ApplyTransactionUseCase', () => {
         { provide: WALLET_EVENT_PUBLISHER, useValue: eventPublisher },
         { provide: CURRENCY_LOOKUP, useValue: currencyLookup },
         { provide: OutboxAppender, useValue: outboxAppender },
+        { provide: CacheInvalidationHelper, useValue: cacheInvalidator },
       ],
     }).compile();
 

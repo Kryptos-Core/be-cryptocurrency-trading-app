@@ -3,6 +3,7 @@ import { BusinessException, ForbiddenException, NotFoundException } from '@/comm
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { OrderLifecycleOutboxPayloadV1 } from '@/common/integration-events/order-lifecycle-outbox-payload';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
+import { CacheInvalidationHelper } from '@/common/services';
 import { CancelOrderCommand } from '@/modules/orders/commands/cancel-order.command';
 import {
   ORDER_MATCHING_GATEWAY,
@@ -20,6 +21,7 @@ export class CancelOrderUseCase {
     @Inject(ORDER_MATCHING_GATEWAY)
     private readonly orderMatchingGateway: OrderMatchingGatewayPort,
     private readonly outboxAppender: OutboxAppender,
+    private readonly cacheInvalidator: CacheInvalidationHelper,
   ) {}
 
   async execute(command: CancelOrderCommand) {
@@ -60,6 +62,8 @@ export class CancelOrderUseCase {
     }
 
     await this.appendOrderCancelledEvent(updated);
+    // Bust the user's orders list cache so the next REST fetch reflects the cancellation.
+    await this.cacheInvalidator.invalidateUserCaches(['orders'], userId);
     return updated;
   }
 

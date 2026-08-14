@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { CacheService } from '@/common/services';
 import { WALLET_REPOSITORY } from '@/modules/wallets/domain/ports';
 import { BalanceCalculationService } from '@/modules/wallets/domain/services/balance-calculation.service';
 import { GetBalanceQuery } from './get-balance.query';
@@ -7,19 +8,32 @@ function makeWallet(available: string, frozen: string) {
   return { wallet_id: 'wid-1', available, frozen };
 }
 
+function makeCacheServicePassthrough() {
+  return {
+    getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) => factory()),
+    get: jest.fn(),
+    set: jest.fn(),
+    delete: jest.fn(),
+    invalidatePattern: jest.fn(),
+  };
+}
+
 describe('GetBalanceQuery', () => {
   let query: GetBalanceQuery;
 
   let walletRepo: jest.Mocked<{ findByUserCurrency: jest.Mock }>;
+  let cacheService: ReturnType<typeof makeCacheServicePassthrough>;
 
   beforeEach(async () => {
     walletRepo = { findByUserCurrency: jest.fn() };
+    cacheService = makeCacheServicePassthrough();
 
     const module = await Test.createTestingModule({
       providers: [
         GetBalanceQuery,
         BalanceCalculationService,
         { provide: WALLET_REPOSITORY, useValue: walletRepo },
+        { provide: CacheService, useValue: cacheService },
       ],
     }).compile();
 

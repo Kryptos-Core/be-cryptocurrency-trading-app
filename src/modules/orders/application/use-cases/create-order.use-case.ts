@@ -3,7 +3,7 @@ import { BusinessException, ForbiddenException, NotFoundException } from '@/comm
 import { OutboxIntegrationEventType } from '@/common/integration-events/integration-event-catalog';
 import type { OrderLifecycleOutboxPayloadV1 } from '@/common/integration-events/order-lifecycle-outbox-payload';
 import { OutboxAppender } from '@/common/outbox/outbox-appender.service';
-import { CacheService } from '@/common/services';
+import { CacheInvalidationHelper, CacheService } from '@/common/services';
 import { newUuid } from '@/common/utils/uuid.util';
 import { Order } from '@/entities/order.entity';
 import { PrepareCreateOrderContextService } from '@/modules/orders/application/services/prepare-create-order-context.service';
@@ -50,6 +50,7 @@ export class CreateOrderUseCase {
     @Inject(ORDER_REPOSITORY)
     private readonly orderRepository: OrderRepositoryPort,
     private readonly cacheService: CacheService,
+    private readonly cacheInvalidator: CacheInvalidationHelper,
     private readonly validationService: OrderValidationService,
     @Inject(ORDER_MATCHING_GATEWAY)
     private readonly orderMatchingGateway: OrderMatchingGatewayPort,
@@ -151,6 +152,8 @@ export class CreateOrderUseCase {
 
     await this.appendOrderCreatedEvent(order);
     await this.cacheService.set(cacheKey, this.orderToPlain(order), IDEMPOTENCY_TTL_SEC);
+    // Bust the user's orders list cache so the next REST fetch reflects the new order.
+    await this.cacheInvalidator.invalidateUserCaches(['orders'], userId);
     return order;
   }
 

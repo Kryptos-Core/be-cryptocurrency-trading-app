@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { CacheService } from '@/common/services';
 import { FindMyOrdersQuery } from '@/modules/orders/application/queries/find-my-orders.query';
 import { ORDER_REPOSITORY } from '@/modules/orders/domain/ports';
 
@@ -8,12 +9,20 @@ describe('FindMyOrdersQuery', () => {
     countByUser: jest.fn(),
   };
 
+  const cacheService = {
+    getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) => factory()),
+  };
+
   let query: FindMyOrdersQuery;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
-      providers: [FindMyOrdersQuery, { provide: ORDER_REPOSITORY, useValue: orderRepository }],
+      providers: [
+        FindMyOrdersQuery,
+        { provide: ORDER_REPOSITORY, useValue: orderRepository },
+        { provide: CacheService, useValue: cacheService },
+      ],
     }).compile();
 
     query = moduleRef.get(FindMyOrdersQuery);

@@ -11,7 +11,7 @@ import {
   UseContactEmailVerificationException,
 } from '@/common/errors';
 import { NotFoundException } from '@/common/exceptions';
-import { CloudinaryService } from '@/common/services';
+import { CacheInvalidationHelper, CloudinaryService } from '@/common/services';
 import { runInSpan } from '@/common/telemetry';
 import { calcSkip } from '@/common/utils/pagination.util';
 import { newUuid } from '@/common/utils/uuid.util';
@@ -54,6 +54,7 @@ export class UsersService {
     @Inject(ORDER_REPOSITORY)
     private readonly orderRepository: OrderRepositoryPort,
     private readonly systemConfigService: SystemConfigService,
+    private readonly cacheInvalidator: CacheInvalidationHelper,
   ) {}
 
   /**
@@ -190,7 +191,9 @@ export class UsersService {
     });
 
     // Fetch and return updated user
-    return this.findOne(userId);
+    const updated = await this.findOne(userId);
+    await this.cacheInvalidator.invalidateUserCaches(['users'], userId);
+    return updated;
   }
 
   /**
@@ -229,7 +232,9 @@ export class UsersService {
     if (affected === 0) {
       this.logger.warn(`updateProfileBasic no rows updated: ${userId}`);
     }
-    return this.findOne(userId);
+    const updated = await this.findOne(userId);
+    await this.cacheInvalidator.invalidateUserCaches(['users'], userId);
+    return updated;
   }
 
   /**
@@ -370,7 +375,9 @@ export class UsersService {
   ): Promise<UserRecord> {
     await this.findOne(userId);
     await this.usersRepository.updateAvatar(userId, avatarUrl, avatarPublicId);
-    return this.findOne(userId);
+    const updated = await this.findOne(userId);
+    await this.cacheInvalidator.invalidateUserCaches(['users'], userId);
+    return updated;
   }
 
   /**
@@ -391,7 +398,9 @@ export class UsersService {
 
     await this.usersRepository.updateAvatar(userId, url, publicId);
     this.logger.log(`Avatar updated for user ${userId}`);
-    return this.findOne(userId);
+    const updated = await this.findOne(userId);
+    await this.cacheInvalidator.invalidateUserCaches(['users'], userId);
+    return updated;
   }
 
   /**
