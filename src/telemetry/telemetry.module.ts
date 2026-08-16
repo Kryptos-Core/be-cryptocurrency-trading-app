@@ -82,6 +82,11 @@ import { MetricsService } from './metrics.service';
       help: 'Total outbox rows moved to dead-letter state',
       labelNames: ['event_type'],
     }),
+    makeCounterProvider({
+      name: 'outbox_relay_dlq_retry_skipped_total',
+      help: 'Dead-letter rows skipped because EVENT_OUTBOX_DLQ_MAX_RETRIES was reached',
+      labelNames: ['event_type'],
+    }),
     makeGaugeProvider({
       name: 'market_read_model_trade_drift',
       help: 'Trade reconciliation drift between core trades and market read model',

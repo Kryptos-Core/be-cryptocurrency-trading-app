@@ -137,6 +137,24 @@ export class KafkaOutboxEventPublisher implements OutboxEventPublisher {
       Number(this.configService.get<string>('KAFKA_CONNECTION_TIMEOUT_MS') ?? '10000'),
     );
 
+    // Idempotent producer: kafkajs sticks an internal producer-id on every send
+    // so the broker can de-dupe retries within a single producer session.
+    // When idempotent is enabled, kafkajs forces `acks=-1` internally, so we
+    // don't expose a separate acks override. We still cap `maxInFlightRequests`
+    // so per-partition ordering is preserved across retries.
+    const idempotent =
+      String(this.configService.get<string>('KAFKA_PRODUCER_IDEMPOTENT') ?? 'true')
+        .toLowerCase()
+        .trim() !== 'false';
+    const configuredMaxInFlight = Math.max(
+      1,
+      Number(this.configService.get<string>('KAFKA_PRODUCER_MAX_IN_FLIGHT') ?? '1'),
+    );
+    // With idempotent=true kafkajs allows up to 5; the user-tunable cap is
+    // mostly relevant when idempotent is disabled. We clamp to 5 to avoid
+    // hitting kafkajs validation errors.
+    const maxInFlight = idempotent ? Math.min(configuredMaxInFlight, 5) : configuredMaxInFlight;
+
     const kafka = new Kafka({
       clientId,
       brokers,
@@ -146,11 +164,16 @@ export class KafkaOutboxEventPublisher implements OutboxEventPublisher {
 
     const producer = kafka.producer({
       createPartitioner: Partitioners.DefaultPartitioner,
+      idempotent,
+      maxInFlightRequests: maxInFlight,
+      transactionTimeout: 30_000,
     });
+
     await producer.connect();
     this.logger.log(
       `Kafka outbox publisher connected brokers=${brokers.join(',')} ` +
-        `requestTimeout=${requestTimeout}ms connectionTimeout=${connectionTimeout}ms`,
+        `requestTimeout=${requestTimeout}ms connectionTimeout=${connectionTimeout}ms ` +
+        `idempotent=${idempotent} maxInFlight=${maxInFlight} acks=${-1}`,
     );
     return producer;
   }

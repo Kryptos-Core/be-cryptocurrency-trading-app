@@ -233,6 +233,53 @@ export class EnvironmentVariables {
   @IsOptional()
   KAFKA_TOPIC_PREFIX?: string;
 
+  /**
+   * Enable Kafka idempotent producer (de-duplicates retries at the broker side
+   * within a single producer session) and `acks: -1` (all in-sync replicas).
+   * Default true — recommended for any deployment where producer retries are
+   * possible. Combined with `maxInFlightRequests: 1` so ordering is preserved
+   * per partition.
+   */
+  @IsString()
+  @IsOptional()
+  KAFKA_PRODUCER_IDEMPOTENT?: string = 'true';
+
+  /**
+   * Max in-flight requests per producer connection. Kafka recommends keeping
+   * this at 1 when idempotent is on so per-partition ordering is preserved
+   * across retries. Set higher only if your consumers do not require strict
+   * per-partition ordering.
+   */
+  @IsString()
+  @IsOptional()
+  KAFKA_PRODUCER_MAX_IN_FLIGHT?: string = '1';
+
+  /**
+   * acks value used by the NestJS producer: -1 (all in-sync replicas), 0, or 1.
+   * Only honored when idempotent producer is disabled; idempotent producer
+   * forces acks=-1 internally.
+   */
+  @IsString()
+  @IsOptional()
+  KAFKA_PRODUCER_ACKS?: string = '-1';
+
+  /**
+   * Bounded DLQ retry cap. Once a dead-lettered row has been reset
+   * `EVENT_OUTBOX_DLQ_MAX_RETRIES` times, it is excluded from the auto-retry
+   * sweep and must be replayed manually (e.g. via the outbox admin API).
+   */
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_DLQ_MAX_RETRIES?: string = '3';
+
+  /**
+   * Optional override of the per-flush dead-letter retry cap. Mirrors the
+   * existing `DEAD_LETTER_RETRY_PER_FLUSH` constant in `outbox-relay.service.ts`.
+   */
+  @IsString()
+  @IsOptional()
+  EVENT_OUTBOX_DEAD_LETTER_RETRY_PER_FLUSH?: string = '3';
+
   @IsString()
   @IsOptional()
   TICKER_SOURCE?: string = 'nestjs';

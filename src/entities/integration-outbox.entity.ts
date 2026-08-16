@@ -64,4 +64,14 @@ export class IntegrationOutbox {
 
   @Column({ type: 'timestamp', precision: 6, nullable: true })
   dead_lettered_at!: Date | null;
+
+  /**
+   * Counts how many times a row has been reset from the dead-letter state back
+   * into the normal relay queue. Combined with `EVENT_OUTBOX_DLQ_MAX_RETRIES`,
+   * this enforces a bounded DLQ retry loop — once the counter exceeds the cap,
+   * the row stays in dead-letter state and is excluded from auto-retry so a
+   * poisoned message cannot churn the relay forever.
+   */
+  @Column({ type: 'int', default: 0 })
+  dlq_retry_count!: number;
 }

@@ -55,6 +55,9 @@ export class MetricsService {
     @InjectMetric('outbox_relay_dead_lettered_total')
     private readonly outboxRelayDeadLetteredTotal: Counter,
 
+    @InjectMetric('outbox_relay_dlq_retry_skipped_total')
+    private readonly outboxRelayDlqRetrySkippedTotal: Counter,
+
     @InjectMetric('market_read_model_trade_drift')
     private readonly marketReadModelTradeDrift: Gauge,
 
@@ -206,6 +209,10 @@ export class MetricsService {
 
   incrementOutboxRelayDeadLettered(eventType: string): void {
     this.outboxRelayDeadLetteredTotal.inc({ event_type: eventType });
+  }
+
+  incrementOutboxRelayDlqRetrySkipped(eventType: string): void {
+    this.outboxRelayDlqRetrySkippedTotal.inc({ event_type: eventType });
   }
 
   setMarketReadModelTradeDrift(windowHours: number, drift: number): void {

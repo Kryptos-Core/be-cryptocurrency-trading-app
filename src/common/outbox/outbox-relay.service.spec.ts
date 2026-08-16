@@ -41,6 +41,7 @@ function makeRow(id: string, eventType: string): IntegrationOutbox {
   row.last_publish_error = null;
   row.next_retry_at = null;
   row.dead_lettered_at = null;
+  row.dlq_retry_count = 0;
   return row;
 }
 
@@ -55,6 +56,7 @@ describe('OutboxRelayService', () => {
     incrementOutboxRelayFailure: jest.Mock;
     incrementOutboxRelayRetryScheduled: jest.Mock;
     incrementOutboxRelayDeadLettered: jest.Mock;
+    incrementOutboxRelayDlqRetrySkipped: jest.Mock;
     setOutboxBacklog: jest.Mock;
     setOutboxDeadLetterRows: jest.Mock;
     setOutboxRetryScheduledRows: jest.Mock;
@@ -136,6 +138,7 @@ describe('OutboxRelayService', () => {
       incrementOutboxRelayFailure: jest.fn(),
       incrementOutboxRelayRetryScheduled: jest.fn(),
       incrementOutboxRelayDeadLettered: jest.fn(),
+      incrementOutboxRelayDlqRetrySkipped: jest.fn(),
       setOutboxBacklog: jest.fn(),
       setOutboxDeadLetterRows: jest.fn(),
       setOutboxRetryScheduledRows: jest.fn(),
@@ -334,5 +337,229 @@ describe('OutboxRelayService', () => {
     expect(published).toBe(0);
     expect(integrationSync.dispatchRow).not.toHaveBeenCalled();
     expect(outboxPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('skips dead-letter reset once dlq_retry_count reaches EVENT_OUTBOX_DLQ_MAX_RETRIES', async () => {
+    const dlqRow = makeRow(
+      'dddddddd-dddd-7ddd-8ddd-dddddddddddd',
+      OutboxIntegrationEventType.MarketPairUpdatedV1,
+    );
+    dlqRow.publish_attempts = 5;
+    dlqRow.dead_lettered_at = new Date('2026-04-20T00:00:00.000Z');
+    dlqRow.dlq_retry_count = 3; // already at the cap
+
+    const publishableRow = makeRow(
+      'eeeeeeee-eeee-7eee-8eee-eeeeeeeeeeee',
+      OutboxIntegrationEventType.MarketPairCreatedV1,
+    );
+
+    const updateBuilder = {
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 0 }),
+    };
+    const cqbMock = jest.fn(() => updateBuilder);
+
+    const backlogRepository = {
+      count: jest.fn().mockResolvedValue(0),
+      findOne: jest.fn().mockResolvedValue(null),
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      })),
+    };
+
+    const transactionCalls: unknown[][] = [];
+    const ds = {
+      getRepository: jest.fn(() => backlogRepository),
+      manager: { findOne: jest.fn().mockResolvedValue(dlqRow) },
+      transaction: jest.fn(async (fn: (em: unknown) => Promise<number>) => {
+        const txIndex = transactionCalls.length;
+        transactionCalls.push([]);
+        const em = {
+          createQueryBuilder: () => ({
+            setLock: () => ({
+              setOnLocked: () => ({
+                where: () => ({
+                  andWhere: () => ({
+                    andWhere: () => ({
+                      andWhere: () => ({
+                        orderBy: () => ({
+                          take: () => ({
+                            getMany: async () => (txIndex === 0 ? [publishableRow] : []),
+                          }),
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+          save: jest.fn(async (_entity: unknown, row: IntegrationOutbox) => {
+            /* row is published */
+          }),
+        };
+        return fn(em);
+      }),
+      createQueryBuilder: cqbMock,
+    } as unknown as DataSource;
+    void transactionCalls;
+
+    const configServiceLocal = {
+      get: jest.fn((key: string) => {
+        switch (key) {
+          case 'EVENT_OUTBOX_MAX_ATTEMPTS':
+            return '5';
+          case 'EVENT_OUTBOX_RETRY_BASE_MS':
+            return '1000';
+          case 'EVENT_OUTBOX_DLQ_MAX_RETRIES':
+            return '3';
+          case 'EVENT_OUTBOX_DEAD_LETTER_RETRY_PER_FLUSH':
+            return '3';
+          default:
+            return undefined;
+        }
+      }),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OutboxRelayService,
+        { provide: DataSource, useValue: ds },
+        { provide: RedisService, useValue: {} },
+        { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configServiceLocal },
+        { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
+      ],
+    }).compile();
+
+    const relay = moduleRef.get(OutboxRelayService);
+    const { published } = await relay.flushOnce();
+
+    expect(published).toBe(1);
+    // Once published > 0 the relay walks the DLQ candidate loop.
+    // With dlq_retry_count already at the cap, the skip path should fire
+    // and a metrics event should be emitted with the row's event_type label.
+    expect(metricsService.incrementOutboxRelayDlqRetrySkipped).toHaveBeenCalledWith(
+      dlqRow.event_type,
+    );
+    expect(cqbMock).not.toHaveBeenCalled(); // atomic reset UPDATE was not even issued
+  });
+
+  it('resets dead-letter row when dlq_retry_count is below the cap and increments the counter', async () => {
+    const dlqRow = makeRow(
+      'ffffffff-ffff-7fff-8fff-ffffffffffff',
+      OutboxIntegrationEventType.MarketPairUpdatedV1,
+    );
+    dlqRow.publish_attempts = 5;
+    dlqRow.dead_lettered_at = new Date('2026-04-20T00:00:00.000Z');
+    dlqRow.dlq_retry_count = 1; // below cap
+
+    const publishableRow = makeRow(
+      'aaaa1111-aaaa-7aaa-8aaa-aaaaaaaaaaaa',
+      OutboxIntegrationEventType.MarketPairCreatedV1,
+    );
+
+    // The repository backlog builder (used by updateOperationalMetrics) is
+    // independent from the reset UPDATE builder, so we mock both pathways.
+    const updateBuilder = {
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const cqbMock = jest.fn(() => updateBuilder);
+
+    const backlogRepository = {
+      count: jest.fn().mockResolvedValue(0),
+      findOne: jest.fn().mockResolvedValue(null),
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      })),
+    };
+
+    const transactionCalls: unknown[][] = [];
+    const ds = {
+      getRepository: jest.fn(() => backlogRepository),
+      manager: { findOne: jest.fn().mockResolvedValue(dlqRow) },
+      transaction: jest.fn(async (fn: (em: unknown) => Promise<number>) => {
+        const txIndex = transactionCalls.length;
+        transactionCalls.push([]);
+        const em = {
+          createQueryBuilder: () => ({
+            setLock: () => ({
+              setOnLocked: () => ({
+                where: () => ({
+                  andWhere: () => ({
+                    andWhere: () => ({
+                      andWhere: () => ({
+                        orderBy: () => ({
+                          take: () => ({
+                            getMany: async () => (txIndex === 0 ? [publishableRow] : []),
+                          }),
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+          save: jest.fn(async (_entity: unknown, row: IntegrationOutbox) => {
+            /* row is published */
+          }),
+        };
+        return fn(em);
+      }),
+      createQueryBuilder: cqbMock,
+    } as unknown as DataSource;
+    void transactionCalls;
+
+    const configServiceLocal = {
+      get: jest.fn((key: string) => {
+        switch (key) {
+          case 'EVENT_OUTBOX_MAX_ATTEMPTS':
+            return '5';
+          case 'EVENT_OUTBOX_RETRY_BASE_MS':
+            return '1000';
+          case 'EVENT_OUTBOX_DLQ_MAX_RETRIES':
+            return '3';
+          case 'EVENT_OUTBOX_DEAD_LETTER_RETRY_PER_FLUSH':
+            return '3';
+          default:
+            return undefined;
+        }
+      }),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OutboxRelayService,
+        { provide: DataSource, useValue: ds },
+        { provide: RedisService, useValue: {} },
+        { provide: OutboxIntegrationSyncService, useValue: integrationSync },
+        { provide: ConfigService, useValue: configServiceLocal },
+        { provide: OUTBOX_EVENT_PUBLISHER, useValue: outboxPublisher },
+        { provide: MetricsService, useValue: metricsService },
+        { provide: OUTBOX_DLQ_PUBLISHER, useValue: dlqPublisher },
+      ],
+    }).compile();
+
+    const relay = moduleRef.get(OutboxRelayService);
+    const { published } = await relay.flushOnce();
+
+    expect(published).toBe(1);
+    // Once published > 0 the relay walks the DLQ candidate loop and calls
+    // resetDeadLetterRow once per iteration. With dlq_retry_count below the
+    // cap, the reset query must be issued via `ds.createQueryBuilder()`.
+    expect(cqbMock).toHaveBeenCalled();
+    expect(metricsService.incrementOutboxRelayDlqRetrySkipped).not.toHaveBeenCalled();
   });
 });

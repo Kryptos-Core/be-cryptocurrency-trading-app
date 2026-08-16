@@ -66,6 +66,10 @@ describe('Outbox publisher drivers', () => {
                   return '30000';
                 case 'KAFKA_CONNECTION_TIMEOUT_MS':
                   return '10000';
+                case 'KAFKA_PRODUCER_IDEMPOTENT':
+                  return 'true';
+                case 'KAFKA_PRODUCER_MAX_IN_FLIGHT':
+                  return '1';
                 default:
                   return undefined;
               }

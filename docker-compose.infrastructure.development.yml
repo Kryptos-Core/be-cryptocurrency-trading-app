@@ -10,7 +10,7 @@
 #   docker compose --env-file .env.development -f docker-compose.infrastructure.development.yml --profile timescale up -d
 #
 # Profiles:
-#   - kafka: Zookeeper + Kafka
+#   - kafka: Kafka (KRaft combined mode — broker + controller)
 #   - clickhouse: ClickHouse
 #   - timescale: TimescaleDB
 # ============================================================
@@ -71,28 +71,8 @@ services:
       start_period: 5s
     logging: *default-logging
 
-  # Zookeeper — required for Kafka < 3.6. For KRaft mode, see docs/kafka-kraft.md
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: crypto-trading-dev-zookeeper
-    restart: unless-stopped
-    networks:
-      - crypto-trading-network
-    profiles: ['kafka']
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    volumes:
-      - crypto-trading-dev-zookeeper-data:/var/lib/zookeeper/data
-      - crypto-trading-dev-zookeeper-txn:/var/lib/zookeeper/log
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    logging: *default-logging
-
+  # Kafka — KRaft combined mode (broker + controller on same process, single node, RF=1).
+  # See docs/kafka-kraft.md for the rationale and operational notes.
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: crypto-trading-dev-kafka
@@ -100,31 +80,83 @@ services:
     networks:
       - crypto-trading-network
     profiles: ['kafka']
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://${APP_HOSTNAME:-localhost}:${KAFKA_EXTERNAL_PORT:-29092}
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:${KAFKA_EXTERNAL_PORT:-29092}
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:${KAFKA_EXTERNAL_PORT:-29092},CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://${APP_HOSTNAME:-localhost}:${KAFKA_EXTERNAL_PORT:-29092}'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_DATA_DIRS: /var/lib/kafka/data
+      # Enable remote JMX so the bitnami/jmx-exporter sidecar can scrape broker MBeans.
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka
+      KAFKA_JMX_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.port=9999
+        -Dcom.sun.management.jmxremote.rmi.port=9999
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka
       TZ: 'UTC'
     volumes:
       - crypto-trading-dev-kafka-data:/var/lib/kafka/data
     ports:
       - "${BIND_HOST:-127.0.0.1}:${KAFKA_EXTERNAL_PORT:-29092}:29092"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      # The Confluent entrypoint wires `KAFKA_JMX_OPTS` into `kafka-broker-api-versions`
+      # when the healthcheck runs, which causes a stray JMX subscriber to try
+      # to bind 9999 again. Disable JMX for the probe by running the client
+      # directly with `KAFKA_OPTS` cleared so only the broker process owns
+      # the JMX RMI socket.
+      test: ["CMD-SHELL", "KAFKA_OPTS= KAFKA_JMX_OPTS= /usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 60s
+    logging: *default-logging
+
+  # Kafka JMX exporter sidecar — exposes broker JMX MBeans as Prometheus metrics.
+  # Scrape target: Prometheus (or curl http://localhost:9101/metrics).
+  # Config file: ./monitoring/kafka-jmx-exporter.yml (keep cardinality low).
+  kafka-jmx-exporter:
+    image: bitnami/jmx-exporter:latest
+    container_name: crypto-trading-dev-kafka-jmx-exporter
+    restart: unless-stopped
+    networks:
+      - crypto-trading-network
+    profiles: ['kafka']
+    environment:
+      JMX_EXPORTER_CONFIG: /etc/jmx-exporter/kafka.yml
+    volumes:
+      - ./monitoring/kafka-jmx-exporter.yml:/etc/jmx-exporter/kafka.yml:ro
+    ports:
+      # Default port 9101 collides with Flutter Dart DevTools on Windows hosts.
+      # Use 9191 internally; `KAFKA_JMX_EXPORTER_PORT` overrides the host mapping.
+      - "${BIND_HOST:-127.0.0.1}:${KAFKA_JMX_EXPORTER_PORT:-9191}:9191"
+    command: ["9191", "/etc/jmx-exporter/kafka.yml"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      # bash's /dev/tcp probe is the only reliable check we have inside the
+      # bitnami/jmx-exporter image (no wget/curl/busybox). Verify the HTTP
+      # socket is open and that the request returns a 200; the deeper
+      # "metrics are populated" check happens at Prometheus scrape time.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9191 && printf 'GET /metrics HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     logging: *default-logging
 
   # ClickHouse — schema SQL trong docker-entrypoint-initdb.d chay tu dong lan dau.
@@ -197,6 +229,4 @@ volumes:
   crypto-trading-dev-timescaledb-data:
   crypto-trading-dev-redis-data:
   crypto-trading-dev-clickhouse-data:
-  crypto-trading-dev-zookeeper-data:
-  crypto-trading-dev-zookeeper-txn:
   crypto-trading-dev-kafka-data:

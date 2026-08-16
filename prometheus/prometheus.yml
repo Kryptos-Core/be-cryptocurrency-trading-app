@@ -82,3 +82,18 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 30s
     scrape_timeout: 10s
+
+  # Kafka broker JMX exporter (sidecar: bitnami/jmx-exporter)
+  # Exposes broker MBeans (controller quorum, JVM, request metrics).
+  # Default port 9101 — dev overrides to 9191 via KAFKA_JMX_EXPORTER_PORT in
+  # .env.development to dodge the Flutter Dart DevTools port collision on Windows.
+  # Joined to backend-network via docker-compose.{prod,staging}.yml; see
+  # `monitoring/kafka-jmx-exporter.yml` for the metric allowlist.
+  - job_name: 'kafka-jmx'
+    static_configs:
+      - targets: ['kafka-jmx-exporter:9101']
+        labels:
+          service: kafka-broker
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s

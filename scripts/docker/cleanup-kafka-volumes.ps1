@@ -1,9 +1,9 @@
 # cleanup-kafka-volumes.ps1
-# Clean up Kafka/Zookeeper Docker volumes and optionally restart the infrastructure stack.
+# Clean up the Kafka (KRaft) Docker volume and optionally restart the infrastructure stack.
 #
-# Use when Kafka crashes with: KeeperErrorCode = NodeExists
-# This script stops containers, backs up volume data to a timestamped archive,
-# then removes the stale volumes so Kafka can start fresh.
+# Use when Kafka crashes or needs a hard reset (stale __cluster_metadata log).
+# This script stops the container, backs up the volume data to a timestamped
+# archive, then removes the stale volume so Kafka can start fresh.
 #
 # Usage:
 #   .\scripts\docker\cleanup-kafka-volumes.ps1       # Interactive (prompts for confirm)
@@ -17,17 +17,45 @@ if ($y) { $AutoConfirm = $true }
 
 $ErrorActionPreference = 'Stop'
 
-$VolumePrefix = "be-cryptocurrency-trading-app"
+# Auto-detect the Docker Compose project name from the running kafka container.
+$KafkaContainer = if ($env:KAFKA_CONTAINER) { $env:KAFKA_CONTAINER } else { 'crypto-trading-dev-kafka' }
+$DetectedProject = ''
+try {
+    $DetectedProject = docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' $KafkaContainer 2>$null
+    if ($LASTEXITCODE -ne 0) { $DetectedProject = '' }
+} catch { $DetectedProject = '' }
+
+if ($DetectedProject) {
+    $VolumePrefix = $DetectedProject
+} elseif (docker volume ls -q | Select-String -SimpleMatch 'crypto-trading-dev_crypto-trading-dev-kafka-data') {
+    $VolumePrefix = 'crypto-trading-dev'
+} elseif (docker volume ls -q | Select-String -SimpleMatch 'crypto-trading-staging_crypto-trading-staging-kafka-data') {
+    $VolumePrefix = 'crypto-trading-staging'
+} elseif (docker volume ls -q | Select-String -SimpleMatch 'crypto-trading-prod_crypto-trading-prod-kafka-data') {
+    $VolumePrefix = 'crypto-trading-prod'
+} else {
+    $VolumePrefix = 'be-cryptocurrency-trading-app'
+}
+
 $TargetVolumes = @(
-    "${VolumePrefix}_zookeeper_data",
-    "${VolumePrefix}_zookeeper_txn",
+    "${VolumePrefix}_crypto-trading-dev-kafka-data",
+    "${VolumePrefix}_crypto-trading-staging-kafka-data",
+    "${VolumePrefix}_crypto-trading-prod-kafka-data",
     "${VolumePrefix}_kafka_data"
 )
+# Filter to only volumes that actually exist.
+$TargetVolumes = $TargetVolumes | Where-Object { docker volume ls -q | Select-String -SimpleMatch $_ }
 $BackupDir = "kafka-volume-backup-$(Get-Date -Format 'yyyyMMddHHmmss')"
 
 Write-Host ""
-Write-Host "=== Kafka/Zookeeper Volume Cleanup ===" -ForegroundColor Cyan
+Write-Host "=== Kafka Volume Cleanup (KRaft) ===" -ForegroundColor Cyan
+Write-Host "  Detected project: $VolumePrefix" -ForegroundColor Cyan
 Write-Host ""
+
+if ($TargetVolumes.Count -eq 0) {
+    Write-Host "No kafka_data volumes found - nothing to clean." -ForegroundColor Yellow
+    exit 0
+}
 
 if (-not $AutoConfirm) {
     Write-Host "The following volumes will be REMOVED:" -ForegroundColor Yellow
@@ -44,14 +72,14 @@ if (-not $AutoConfirm) {
     }
 }
 
-# Step 1: Stop containers first
-Write-Host "[1/4] Stopping Kafka and Zookeeper containers..." -ForegroundColor Yellow
+# Step 1: Stop container first
+Write-Host "[1/4] Stopping Kafka container..." -ForegroundColor Yellow
 $prevErrorAction = $ErrorActionPreference
 $ErrorActionPreference = 'SilentlyContinue'
-docker stop crypto_trading_kafka crypto_trading_zookeeper -t 5 2>&1 | Out-Null
-docker rm crypto_trading_kafka crypto_trading_zookeeper -f 2>&1 | Out-Null
+docker stop $KafkaContainer -t 5 2>&1 | Out-Null
+docker rm $KafkaContainer -f 2>&1 | Out-Null
 $ErrorActionPreference = $prevErrorAction
-Write-Host "      Containers stopped and removed." -ForegroundColor Green
+Write-Host "      Container stopped and removed." -ForegroundColor Green
 
 # Step 2: Backup volumes
 Write-Host "[2/4] Backing up volumes to .\$BackupDir..." -ForegroundColor Yellow
@@ -115,5 +143,5 @@ Pop-Location
 Write-Host ""
 Write-Host "=== Done ===" -ForegroundColor Cyan
 Write-Host "Run the following to check Kafka logs:" -ForegroundColor White
-Write-Host "  docker logs crypto_trading_kafka --tail 50" -ForegroundColor Gray
+Write-Host "  docker logs $KafkaContainer --tail 50" -ForegroundColor Gray
 Write-Host ""

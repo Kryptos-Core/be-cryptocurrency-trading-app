@@ -1,0 +1,88 @@
+# JMX exporter config for Kafka broker (KRaft combined mode).
+#
+# Consumed by `bitnami/jmx-exporter` sidecar container; see
+# `docker-compose.infrastructure.{development,staging,prod}.yml`.
+#
+# Reference: https://github.com/prometheus/jmx_exporter — Kafka sample config
+# exposes the standard Kafka JMX MBeans plus a few low-cardinality helpers.
+#
+# Important: keep cardinality low. Do NOT expose per-topic, per-partition
+# metrics here — those blow up Prometheus storage and are not actionable
+# for cluster-level SLOs. Per-topic metrics belong in the NestJS backend's
+# Prometheus exporter (see `outbox_*` and `kafka_publish_duration_seconds`
+# in `src/telemetry/metrics.service.ts`).
+#
+# Pattern syntax cheat-sheet (jmx_exporter 1.6.x):
+#   domain<type=X, name=Y, ...><>Attribute : value
+#              ^^ comma WITHOUT space ^^         ^^ empty <> before attribute ^^
+
+hostPort: kafka:9999
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # ---- JVM ----------------------------------------------------------------
+  # CompositeData attribute: HeapMemoryUsage<committed/init/max/used>
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>(\w+):'
+    name: kafka_jvm_heap_memory_used_bytes
+    type: GAUGE
+    attrNameSnakeCase: true
+
+  - pattern: 'java.lang<type=GarbageCollector, name=(\w+)><>CollectionCount:'
+    name: kafka_jvm_gc_collection_count
+    type: COUNTER
+    labels:
+      gc: "$1"
+
+  - pattern: 'java.lang<type=GarbageCollector, name=(\w+)><>CollectionTime:'
+    name: kafka_jvm_gc_collection_seconds
+    type: COUNTER
+    labels:
+      gc: "$1"
+
+  # ---- Broker-level topic metrics (cluster-wide, NOT per-topic) -----------
+  # kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec / BytesInPerSec / ...
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(\w+)><>OneMinuteRate:'
+    name: kafka_server_topic_$1_one_minute_rate
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(\w+)><>Count:'
+    name: kafka_server_topic_$1_total
+    type: COUNTER
+
+  # ---- Network / request metrics -----------------------------------------
+  - pattern: 'kafka.network<type=RequestMetrics, name=(\w+), request=(\w+)><>Count:'
+    name: kafka_network_request_count_total
+    type: COUNTER
+    labels:
+      request: "$2"
+
+  - pattern: 'kafka.network<type=RequestMetrics, name=(\w+), request=(\w+)><>TotalTimeMs:'
+    name: kafka_network_request_total_ms_total
+    type: COUNTER
+    labels:
+      request: "$2"
+
+  # ---- Controller / KRaft metrics -----------------------------------------
+  - pattern: 'kafka.controller<type=ControllerStats, name=(\w+)><>Value:'
+    name: kafka_controller_$1
+    type: GAUGE
+
+  - pattern: 'kafka.controller<type=KafkaController, name=ActiveControllerCount><>Value:'
+    name: kafka_controller_active_count
+    type: GAUGE
+
+  # ---- KRaft Raft metrics (low-cardinality: current-state only) ----------
+  - pattern: 'kafka.server<type=raft-metrics><>current-state: ([a-z]+)'
+    name: kafka_server_raft_metrics_current_state_info
+    type: GAUGE
+    value: 1
+    labels:
+      state: "$1"
+
+  # Catch-all for any other kafka.* <type=X><>(metric) so we don't miss
+  # important counters when new ones are introduced upstream. The exporter
+  # labels each metric with `_objectname` so cardinality remains bounded.
+  - pattern: 'kafka\.(\w+)<type=(\w+)><>([a-zA-Z][\w-]+):'
+    name: kafka_$1_$2_$3
+    type: UNTYPED

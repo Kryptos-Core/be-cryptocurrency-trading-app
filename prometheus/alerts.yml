@@ -171,3 +171,46 @@ groups:
           description: "1-minute load average is above 80% of CPU count for 10 minutes."
           impact: "Containers may respond slowly; API latency, DB queries, and background workers can degrade."
           action: "Inspect top processes, container CPU usage, noisy jobs, DB load, and recent traffic spikes."
+
+  - name: kafka-broker
+    interval: 30s
+    rules:
+      # Kafka JMX exporter scraped — same pattern as MonitoringTargetDown but
+      # tagged to the broker specifically so it pages the on-call even when the
+      # rest of monitoring is healthy.
+      - alert: KafkaBrokerJmxDown
+        expr: up{job="kafka-jmx"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka JMX exporter is down"
+          description: "Prometheus cannot scrape the bitnami/jmx-exporter sidecar at {{ $labels.instance }} for more than 2 minutes."
+          impact: "Broker-level metrics (request rates, JVM, controller quorum) are unavailable. Application health is unaffected but capacity planning and incident triage lose visibility."
+          action: "Inspect docker ps/logs for kafka-jmx-exporter, confirm Kafka container still listens on :9999 with JMX enabled, and that the sidecar can resolve 'kafka'."
+
+      # Kafka active controller dropped to 0 — there is no leader for the
+      # KRaft metadata quorum. Writes will block until a controller is elected.
+      - alert: KafkaControllerInactive
+        expr: kafka_controller_active_count == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka has no active controller"
+          description: "kafka_controller_active_count is 0 for 2 minutes. Cluster: {{ $labels.instance }}."
+          impact: "Producer writes will block (e.g. all outbox traffic stalls). Consumers will stop receiving new partitions."
+          action: "Inspect `kafka.controller` JMX MBeans, `__cluster_metadata` log dir, and recent broker logs. On single-broker dev, restart the Kafka container after taking a `__cluster_metadata` backup if needed."
+
+      # Outbox DLQ bounded-retry budget exhausted — message has been bounced
+      # more than EVENT_OUTBOX_DLQ_MAX_RETRIES times. Requires manual replay.
+      - alert: OutboxDlqRetryBudgetExhausted
+        expr: increase(outbox_relay_dlq_retry_skipped_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox DLQ retry budget reached for {{ $labels.event_type }}"
+          description: "At least one outbox row for event_type {{ $labels.event_type }} has exhausted the bounded DLQ retry budget (EVENT_OUTBOX_DLQ_MAX_RETRIES). It now requires manual replay via /admin/outbox endpoints."
+          impact: "Downstream consumers no longer receive this event automatically. Persisted business state is correct (transaction committed) but the read model / integrations diverge until the row is replayed."
+          action: "Identify the affected row (POST /admin/outbox/dead-lettered with filter), inspect last_publish_error, fix root cause, then call POST /admin/outbox/{id}/replay."

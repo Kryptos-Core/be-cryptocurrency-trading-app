@@ -2,6 +2,7 @@
 /**
  * cleanup-kafka-volumes.js
  * Cross-platform wrapper: detects OS and runs the appropriate cleanup script.
+ * Manages the Kafka (KRaft) Docker volume — no ZooKeeper anymore.
  */
 
 const { spawn } = require('child_process');

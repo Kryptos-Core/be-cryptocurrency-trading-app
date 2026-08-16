@@ -32,6 +32,8 @@ export class OutboxRelayService {
   private readonly logger = new Logger(OutboxRelayService.name);
   private readonly maxAttempts: number;
   private readonly retryBaseMs: number;
+  private readonly dlqMaxRetries: number;
+  private readonly deadLetterRetryPerFlush: number;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -51,6 +53,18 @@ export class OutboxRelayService {
     this.retryBaseMs = Math.max(
       100,
       Number(this.configService.get<string>('EVENT_OUTBOX_RETRY_BASE_MS') ?? '1000'),
+    );
+    // Bounded DLQ retry cap. Combined with `dlq_retry_count` on each row,
+    // guarantees a poisoned message can be auto-retried at most this many times.
+    this.dlqMaxRetries = Math.max(
+      0,
+      Number(this.configService.get<string>('EVENT_OUTBOX_DLQ_MAX_RETRIES') ?? '3'),
+    );
+    this.deadLetterRetryPerFlush = Math.max(
+      0,
+      Number(
+        this.configService.get<string>('EVENT_OUTBOX_DEAD_LETTER_RETRY_PER_FLUSH') ?? String(DEAD_LETTER_RETRY_PER_FLUSH),
+      ),
     );
   }
 
@@ -170,21 +184,37 @@ export class OutboxRelayService {
     await this.updateOperationalMetrics();
 
     let deadLetterRetried = 0;
+    let deadLetterSkipped = 0;
     if (published > 0) {
-      for (let i = 0; i < DEAD_LETTER_RETRY_PER_FLUSH; i++) {
+      for (let i = 0; i < this.deadLetterRetryPerFlush; i++) {
         const candidate = await this.findOldestDeadLetterRow();
         if (!candidate) break;
+        if ((candidate.dlq_retry_count ?? 0) >= this.dlqMaxRetries) {
+          // Bounded retry: this row has already exhausted its DLQ retry budget.
+          // Track and skip rather than resetting indefinitely. Operators can
+          // replay via the outbox admin endpoints once the root cause is fixed.
+          this.metricsService.incrementOutboxRelayDlqRetrySkipped(candidate.event_type);
+          this.logger.warn(
+            `Outbox dead-letter row ${candidate.id} (event_type=${candidate.event_type}) ` +
+              `exhausted DLQ retries (${candidate.dlq_retry_count ?? 0}/${this.dlqMaxRetries}). ` +
+              `Manual replay required via /admin/outbox endpoints.`,
+          );
+          deadLetterSkipped++;
+          break;
+        }
         const reset = await this.resetDeadLetterRow(candidate.id);
         if (reset) {
           this.logger.log(
-            `Outbox dead-letter row reset and queued for retry: id=${candidate.id} event_type=${candidate.event_type}`,
+            `Outbox dead-letter row reset and queued for retry: ` +
+              `id=${candidate.id} event_type=${candidate.event_type} ` +
+              `dlq_retry_count=${candidate.dlq_retry_count ?? 0}/${this.dlqMaxRetries}`,
           );
           deadLetterRetried++;
         }
       }
     }
 
-    if (deadLetterRetried > 0) {
+    if (deadLetterRetried > 0 || deadLetterSkipped > 0) {
       await this.updateOperationalMetrics();
     }
 
@@ -263,10 +293,17 @@ export class OutboxRelayService {
 
   /**
    * Reset a dead-lettered row so it re-enters the normal relay pipeline.
-   * Resets attempt counter and clears dead-letter metadata.
+   * Atomically increments `dlq_retry_count` so the bounded DLQ retry loop
+   * can detect rows that have already been retried the maximum number of
+   * times. Returns false when nothing was changed (e.g. another worker
+   * raced us to the same row, or the row has already been replayed).
    */
   private async resetDeadLetterRow(rowId: string): Promise<boolean> {
     try {
+      // Use a single SQL update to atomically increment + clear dead-letter
+      // metadata. The increments-and-where guards against racing with
+      // concurrent replay attempts (e.g. multiple backend replicas or
+      // an operator hitting the outbox admin replay endpoint simultaneously).
       const result = await this.dataSource
         .createQueryBuilder()
         .update(IntegrationOutbox)
@@ -276,9 +313,13 @@ export class OutboxRelayService {
           last_publish_error: null,
           publish_attempts: 0,
         })
+        .set({
+          dlq_retry_count: () => 'COALESCE("dlq_retry_count", 0) + 1',
+        })
         .where('id = :id', { id: rowId })
         .andWhere('published_at IS NULL')
         .andWhere('dead_lettered_at IS NOT NULL')
+        .andWhere('COALESCE("dlq_retry_count", 0) < :max', { max: this.dlqMaxRetries })
         .execute();
       return (result.affected ?? 0) > 0;
     } catch (error) {

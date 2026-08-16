@@ -89,7 +89,7 @@ make docker-down
 | `market-aggregator` | Mặc định trong profile `services` | Postgres + Redis (healthy) |
 | `matching-engine`  | Mặc định trong profile `services` | Postgres + Redis (healthy) |
 | `public-ws-gateway`| Mặc định trong profile `services` | Redis (healthy) |
-| `kafka`            | `--profile kafka` | Zookeeper |
+| `kafka`            | `--profile kafka` | (KRaft combined mode, không cần Zookeeper — xem `docs/kafka-kraft.md`) |
 | `clickhouse`       | `--profile clickhouse` | — |
 | `timescale`        | `--profile timescale` | — |
 

@@ -43,4 +43,4 @@ The upstream ECC project can be used for personal machine-wide sync, but it is n
 1. Không commit `.env*`, khóa ví, RPC secrets, credential thật.
 2. Module `matching/`, `orders/` cực nhạy — luôn có test và mô tả rủi ro khi đổi luồng khớp lệnh.
 3. Biến env mới → cập nhật `src/config/env.validation.ts` (theo README).
-4. Trả lời user tiếng Việt khi họ dùng tiếng Việt; thuật ngữ kỹ thuật giữ tiếng Anh chuẩn ngành.
+4. **Luôn luôn trả lời user bằng tiếng Việt có dấu** cho mọi phản hồi, kế hoạch, tài liệu; thuật ngữ kỹ thuật (NestJS, outbox, CQRS, matching, v.v.) giữ tiếng Anh chuẩn ngành. Xem chi tiết ở [`.cursor/rules/common/language-vi.md`](./.cursor/rules/common/language-vi.md).

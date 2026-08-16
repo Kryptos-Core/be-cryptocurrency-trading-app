@@ -1,10 +1,10 @@
 #!/bin/bash
 # cleanup-kafka-volumes.sh
-# Clean up Kafka/Zookeeper Docker volumes and optionally restart the infrastructure stack.
+# Clean up the Kafka (KRaft) Docker volume and optionally restart the infrastructure stack.
 #
-# Use when Kafka crashes with: KeeperErrorCode = NodeExists
-# This script stops containers, backs up volume data to a timestamped archive,
-# then removes the stale volumes so Kafka can start fresh.
+# Use when Kafka crashes or needs a hard reset (stale __cluster_metadata log).
+# This script stops the container, backs up the volume data to a timestamped
+# archive, then removes the stale volume so Kafka can start fresh.
 #
 # Usage:
 #   ./scripts/docker/cleanup-kafka-volumes.sh       # Interactive (prompts for confirm)
@@ -12,10 +12,26 @@
 
 set -e
 
-VOLUME_PREFIX="be-cryptocurrency-trading-app"
+# Auto-detect the Docker Compose project name from the running kafka container.
+# The project name is taken from the `name:` field of the compose file used to
+# bring up the kafka service. We fall back to historical prefixes if no container is found.
+KAFKA_CONTAINER="${KAFKA_CONTAINER:-crypto-trading-dev-kafka}"
+DETECTED_PROJECT=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$KAFKA_CONTAINER" 2>/dev/null || true)
+if [[ -n "$DETECTED_PROJECT" ]]; then
+    VOLUME_PREFIX="$DETECTED_PROJECT"
+elif docker volume ls -q | grep -q '^crypto-trading-dev_crypto-trading-dev-kafka-data$'; then
+    VOLUME_PREFIX="crypto-trading-dev"
+elif docker volume ls -q | grep -q '^crypto-trading-staging_crypto-trading-staging-kafka-data$'; then
+    VOLUME_PREFIX="crypto-trading-staging"
+elif docker volume ls -q | grep -q '^crypto-trading-prod_crypto-trading-prod-kafka-data$'; then
+    VOLUME_PREFIX="crypto-trading-prod"
+else
+    VOLUME_PREFIX="be-cryptocurrency-trading-app"
+fi
 TARGET_VOLUMES=(
-    "${VOLUME_PREFIX}_zookeeper_data"
-    "${VOLUME_PREFIX}_zookeeper_txn"
+    "${VOLUME_PREFIX}_crypto-trading-dev-kafka-data"
+    "${VOLUME_PREFIX}_crypto-trading-staging-kafka-data"
+    "${VOLUME_PREFIX}_crypto-trading-prod-kafka-data"
     "${VOLUME_PREFIX}_kafka_data"
 )
 BACKUP_DIR="kafka-volume-backup-$(date +'%Y%m%d%H%M%S')"
@@ -28,8 +44,23 @@ if [[ "${1:-}" == "-y" ]] || [[ "${1:-}" == "--yes" ]]; then
 fi
 
 echo ""
-echo -e "\033[1;36m=== Kafka/Zookeeper Volume Cleanup ===\033[0m"
+echo -e "\033[1;36m=== Kafka Volume Cleanup (KRaft) ===\033[0m"
+echo -e "  Detected project: $VOLUME_PREFIX"
 echo ""
+
+# Filter to only volumes that actually exist on the host.
+EXISTING_VOLUMES=()
+for vol in "${TARGET_VOLUMES[@]}"; do
+    if docker volume ls -q | grep -qE "^${vol}$"; then
+        EXISTING_VOLUMES+=("$vol")
+    fi
+done
+TARGET_VOLUMES=("${EXISTING_VOLUMES[@]}")
+
+if [[ ${#TARGET_VOLUMES[@]} -eq 0 ]]; then
+    echo -e "\033[1;33mNo kafka_data volumes found — nothing to clean.\033[0m"
+    exit 0
+fi
 
 if [[ "$AUTO_CONFIRM" == "false" ]]; then
     echo -e "\033[1;33mThe following volumes will be REMOVED:\033[0m"
@@ -47,11 +78,11 @@ if [[ "$AUTO_CONFIRM" == "false" ]]; then
     fi
 fi
 
-# Step 1: Stop containers first
-echo -e "\033[1;33m[1/4] Stopping Kafka and Zookeeper containers...\033[0m"
-docker stop crypto_trading_kafka crypto_trading_zookeeper 2>/dev/null || true
-docker rm crypto_trading_kafka crypto_trading_zookeeper 2>/dev/null || true
-echo -e "\033[1;32m      Containers stopped and removed.\033[0m"
+# Step 1: Stop container first
+echo -e "\033[1;33m[1/4] Stopping Kafka container...\033[0m"
+docker stop "$KAFKA_CONTAINER" 2>/dev/null || true
+docker rm "$KAFKA_CONTAINER" 2>/dev/null || true
+echo -e "\033[1;32m      Container stopped and removed.\033[0m"
 
 # Step 2: Backup volumes
 echo -e "\033[1;33m[2/4] Backing up volumes to ./$BACKUP_DIR...\033[0m"
@@ -103,5 +134,5 @@ docker compose -f docker-compose.infrastructure.yml --profile kafka up -d
 echo ""
 echo -e "\033[1;36m=== Done ===\033[0m"
 echo -e "Run the following to check Kafka logs:"
-echo -e "  \033[1;90mdocker logs crypto_trading_kafka --tail 50\033[0m"
+echo -e "  \033[1;90mdocker logs $KAFKA_CONTAINER --tail 50\033[0m"
 echo ""

@@ -22,8 +22,6 @@ volumes:
   postgres_data:
   redis_data:
   kafka_data:
-  zookeeper_data:
-  zookeeper_txn:
   clickhouse_data:
   timescaledb_data:
 
@@ -94,44 +92,39 @@ services:
     networks:
       - backend-network
 
-  # ─── Kafka (ZooKeeper Mode) ────────────────────────────────────────────────────
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-      - zookeeper_txn:/var/lib/zookeeper/log
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/localhost/2181' && echo imok || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    networks:
-      - backend-network
-
+  # ─── Kafka (KRaft combined mode — broker + controller on same process, single node, RF=1) ─────
+  # See docs/kafka-kraft.md for rationale and operational notes.
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
     restart: unless-stopped
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://${APP_HOSTNAME}:${KAFKA_EXTERNAL_PORT:-29092}
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:29092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:${KAFKA_EXTERNAL_PORT:-29092},CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://${APP_HOSTNAME}:${KAFKA_EXTERNAL_PORT:-29092}'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_DATA_DIRS: /var/lib/kafka/data
+      # Enable remote JMX so the bitnami/jmx-exporter sidecar can scrape broker MBeans.
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka
+      KAFKA_JMX_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.port=9999
+        -Dcom.sun.management.jmxremote.rmi.port=9999
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka
       TZ: 'UTC'
     volumes:
       - kafka_data:/var/lib/kafka/data
@@ -139,11 +132,38 @@ services:
       - "127.0.0.1:9092:9092"
       - "${KAFKA_EXTERNAL_BIND_HOST:-0.0.0.0}:${KAFKA_EXTERNAL_PORT:-29092}:29092"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      # Healthcheck runs JMX-free; the broker JVM already owns port 9999.
+      test: ["CMD-SHELL", "KAFKA_OPTS= KAFKA_JMX_OPTS= /usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 60s
+    networks:
+      - backend-network
+
+  # ─── Kafka JMX exporter sidecar ───────────────────────────────────────────────────
+  # Exposes broker JMX MBeans as Prometheus metrics on :9101.
+  # Prometheus scrape target is added in docker-compose.monitoring.prod.yml.
+  kafka-jmx-exporter:
+    image: bitnami/jmx-exporter:latest
+    container_name: kafka-jmx-exporter
+    restart: unless-stopped
+    environment:
+      JMX_EXPORTER_CONFIG: /etc/jmx-exporter/kafka.yml
+    volumes:
+      - ./monitoring/kafka-jmx-exporter.yml:/etc/jmx-exporter/kafka.yml:ro
+    ports:
+      - "${KAFKA_JMX_EXPORTER_BIND_HOST:-0.0.0.0}:${KAFKA_JMX_EXPORTER_PORT:-9101}:9101"
+    command: ["9101", "/etc/jmx-exporter/kafka.yml"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9101 && printf 'GET /metrics HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - backend-network
 
